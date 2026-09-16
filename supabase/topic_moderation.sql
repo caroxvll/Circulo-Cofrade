@@ -15,6 +15,7 @@ alter table public.forum_topics
   alter column status set default 'pending';
 
 drop policy if exists "Temas legibles por todos" on public.forum_topics;
+drop policy if exists "Temas publicados o propios" on public.forum_topics;
 
 create policy "Temas publicados o propios"
   on public.forum_topics for select

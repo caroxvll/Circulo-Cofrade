@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { JWT } from "npm:google-auth-library@9";
+import * as jose from "npm:jose@5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,19 +28,25 @@ type NotificationPreferences = {
   notify_topics: boolean;
   notify_mentions: boolean;
   notify_followers: boolean;
+  notify_reactions: boolean;
   notify_calendar: boolean;
+  notify_quiz: boolean;
+  notify_news: boolean;
 };
 
 const TYPE_PREF: Record<string, keyof NotificationPreferences> = {
   hashtag_activity: "notify_hashtags",
   topic_activity: "notify_topics",
   user_post: "notify_profiles",
+  user_reply: "notify_topics",
   mention: "notify_mentions",
   new_follower: "notify_followers",
+  reply_reaction: "notify_reactions",
   calendar: "notify_calendar",
+  quiz: "notify_quiz",
+  news_published: "notify_news",
 };
 
-/** Mismos valores por defecto que `notify_pref_enabled()` en notification_social.sql */
 const PREF_DEFAULTS: Record<keyof NotificationPreferences, boolean> = {
   push_enabled: false,
   notify_hashtags: true,
@@ -48,7 +54,10 @@ const PREF_DEFAULTS: Record<keyof NotificationPreferences, boolean> = {
   notify_topics: true,
   notify_mentions: true,
   notify_followers: false,
+  notify_reactions: true,
   notify_calendar: false,
+  notify_quiz: true,
+  notify_news: true,
 };
 
 function prefEnabled(
@@ -71,29 +80,50 @@ function shouldSendPush(
   return prefEnabled(prefs, prefKey);
 }
 
+function hermandadSectionQueryValue(category: string): string {
+  switch (category) {
+    case "culto":
+      return "cultos";
+    case "acto":
+      return "actos";
+    case "patrimonio":
+      return "patrimonio";
+    default:
+      return "noticias";
+  }
+}
+
 function buildRoute(record: NotificationRecord): string {
-  const payload = record.payload ?? {};
-  if (typeof payload.route === "string" && payload.route.length > 0) {
-    return payload.route;
+  const data = record.payload ?? {};
+  if (typeof data.route === "string" && data.route.length > 0) {
+    return data.route;
   }
 
-  const forumId = payload.forumId;
-  const topicId = payload.topicId;
+  const forumId = data.forumId;
+  const topicId = data.topicId;
   if (typeof forumId === "string" && typeof topicId === "string") {
-    const replyId = payload.replyId;
+    const params = new URLSearchParams();
+    const replyId = data.replyId;
     if (typeof replyId === "string" && replyId.length > 0) {
-      return `/foros/${forumId}/tema/${topicId}?reply=${
-        encodeURIComponent(replyId)
-      }`;
+      params.set("reply", replyId);
     }
-    return `/foros/${forumId}/tema/${topicId}`;
+    const officialCategory = data.officialCategory;
+    if (
+      forumId === "hermandades" &&
+      typeof officialCategory === "string" &&
+      officialCategory.length > 0
+    ) {
+      params.set("seccion", hermandadSectionQueryValue(officialCategory));
+    }
+    const qs = params.toString();
+    return `/foros/${forumId}/tema/${topicId}${qs ? `?${qs}` : ""}`;
   }
 
   if (
     record.type === "new_follower" &&
-    typeof payload.profileId === "string"
+    typeof data.profileId === "string"
   ) {
-    return `/perfil/usuario/${payload.profileId}`;
+    return `/perfil/usuario/${data.profileId}`;
   }
 
   return "";
@@ -112,20 +142,44 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+/** OAuth2 access token para FCM (sin google-auth-library: rompe el boot en Deno). */
 async function getFcmAccessToken(serviceAccount: {
   client_email: string;
   private_key: string;
 }): Promise<string> {
-  const client = new JWT({
-    email: serviceAccount.client_email,
-    key: serviceAccount.private_key,
-    scopes: ["https://www.googleapis.com/auth/firebase.messaging"],
+  const pem = serviceAccount.private_key.replace(/\\n/g, "\n");
+  const privateKey = await jose.importPKCS8(pem, "RS256");
+
+  const assertion = await new jose.SignJWT({
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+  })
+    .setProtectedHeader({ alg: "RS256", typ: "JWT" })
+    .setIssuer(serviceAccount.client_email)
+    .setSubject(serviceAccount.client_email)
+    .setAudience("https://oauth2.googleapis.com/token")
+    .setIssuedAt()
+    .setExpirationTime("1h")
+    .sign(privateKey);
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
   });
-  const tokens = await client.authorize();
-  if (!tokens.access_token) {
+
+  if (!tokenRes.ok) {
+    const text = await tokenRes.text();
+    throw new Error(`OAuth Firebase falló: ${tokenRes.status} ${text}`);
+  }
+
+  const json = await tokenRes.json() as { access_token?: string };
+  if (!json.access_token) {
     throw new Error("No se pudo obtener access_token de Firebase");
   }
-  return tokens.access_token;
+  return json.access_token;
 }
 
 async function sendFcmMessage(
@@ -149,6 +203,9 @@ async function sendFcmMessage(
           token,
           notification: { title, body },
           data,
+          android: {
+            priority: "high",
+          },
           webpush: {
             headers: { Urgency: "high" },
             notification: {
@@ -203,7 +260,9 @@ Deno.serve(async (req) => {
       return jsonResponse({
         error: "FIREBASE_SERVICE_ACCOUNT no es JSON válido",
         hint,
-        detail: parseError instanceof Error ? parseError.message : String(parseError),
+        detail: parseError instanceof Error
+          ? parseError.message
+          : String(parseError),
         startsWith: serviceAccountRaw.slice(0, 24),
       }, 500);
     }
@@ -221,27 +280,29 @@ Deno.serve(async (req) => {
       }, 500);
     }
 
-    let payload: WebhookPayload;
+    let webhook: WebhookPayload;
     try {
-      payload = (await req.json()) as WebhookPayload;
+      webhook = (await req.json()) as WebhookPayload;
     } catch (parseError) {
       return jsonResponse({
         error: "Cuerpo de la petición no es JSON válido",
-        detail: parseError instanceof Error ? parseError.message : String(parseError),
+        detail: parseError instanceof Error
+          ? parseError.message
+          : String(parseError),
       }, 400);
     }
 
-    if (payload.type !== "INSERT" || payload.table !== "notifications") {
+    if (webhook.type !== "INSERT" || webhook.table !== "notifications") {
       return jsonResponse({ skipped: true, reason: "evento ignorado" });
     }
 
-    const record = payload.record;
+    const record = webhook.record;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const { data: prefs, error: prefsError } = await supabase
       .from("notification_preferences")
       .select(
-        "push_enabled, notify_hashtags, notify_profiles, notify_topics, notify_mentions, notify_followers, notify_calendar",
+        "push_enabled, notify_hashtags, notify_profiles, notify_topics, notify_mentions, notify_followers, notify_reactions, notify_calendar, notify_quiz",
       )
       .eq("user_id", record.user_id)
       .maybeSingle();
@@ -261,16 +322,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: tokens, error: tokensError } = await supabase
+    const { data: tokenRows, error: tokensError } = await supabase
       .from("device_tokens")
-      .select("fcm_token")
-      .eq("user_id", record.user_id);
+      .select("fcm_token, platform, updated_at")
+      .eq("user_id", record.user_id)
+      .order("updated_at", { ascending: false });
 
     if (tokensError) {
       return jsonResponse({ error: tokensError.message }, 500);
     }
 
-    if (!tokens?.length) {
+    const seenPlatforms = new Set<string>();
+    const tokens = (tokenRows ?? []).filter((row) => {
+      if (seenPlatforms.has(row.platform)) return false;
+      seenPlatforms.add(row.platform);
+      return true;
+    });
+
+    if (!tokens.length) {
       return jsonResponse({ skipped: true, reason: "sin tokens" });
     }
 
@@ -283,6 +352,20 @@ Deno.serve(async (req) => {
       title: record.title,
       body,
     };
+
+    const notifPayload = record.payload ?? {};
+    if (typeof notifPayload.forumId === "string") {
+      data.forumId = notifPayload.forumId;
+    }
+    if (typeof notifPayload.topicId === "string") {
+      data.topicId = notifPayload.topicId;
+    }
+    if (typeof notifPayload.replyId === "string") {
+      data.replyId = notifPayload.replyId;
+    }
+    if (typeof notifPayload.officialCategory === "string") {
+      data.officialCategory = notifPayload.officialCategory;
+    }
 
     const results = await Promise.all(
       tokens.map(async (row) => {

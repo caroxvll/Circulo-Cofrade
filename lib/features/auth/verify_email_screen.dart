@@ -160,8 +160,8 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                 icon: const Icon(Icons.chevron_left, color: AppColors.burgundy),
               ),
         title: Text(
-          'Revisa tu correo',
-          style: AppTypography.displaySmall().copyWith(fontSize: 17),
+          'REVISA TU CORREO',
+          style: AppTypography.screenAppBarTitle(),
         ),
         centerTitle: true,
       ),

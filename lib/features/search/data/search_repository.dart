@@ -12,15 +12,15 @@ class SearchRepository {
   SearchRepository({
     SupabaseClient? client,
     CalendarRepository? calendarRepository,
-  })  : _client = client,
-        _calendarRepository =
-            calendarRepository ?? CalendarRepository(client: client);
+  }) : _client = client,
+       _calendarRepository =
+           calendarRepository ?? CalendarRepository(client: client);
 
   final SupabaseClient? _client;
   final CalendarRepository _calendarRepository;
 
   static const _profileAuthorSelect =
-      'profiles!author_id(avatar_url, suspended_at)';
+      'profiles!author_id(avatar_url, verified, suspended_at)';
 
   bool get isRemote => _client != null;
 
@@ -53,16 +53,16 @@ class SearchRepository {
     final extraTopicRows = extraIds.isEmpty
         ? <Map<String, dynamic>>[]
         : await _client!
-            .from('forum_topics')
-            .select('*, $_profileAuthorSelect')
-            .eq('status', 'published')
-            .inFilter('id', extraIds)
-            .order('created_at', ascending: false);
+              .from('forum_topics')
+              .select('*, $_profileAuthorSelect')
+              .eq('status', 'published')
+              .inFilter('id', extraIds)
+              .order('created_at', ascending: false);
 
     final handleQuery = query.replaceAll('@', '');
     final profileRows = await _client!
         .from('profiles')
-        .select('id, handle, display_name, avatar_url, bio')
+        .select('id, handle, display_name, avatar_url, verified, bio')
         .isFilter('suspended_at', null)
         .or(
           'handle.ilike.$handleQuery%,display_name.ilike.$pattern,bio.ilike.$pattern',
@@ -79,9 +79,7 @@ class SearchRepository {
           .where((row) => !_isAuthorSuspended(row))
           .map(_topicFromRow)
           .toList(),
-      profiles: [
-        for (final row in profileRows) _profileFromRow(row),
-      ],
+      profiles: [for (final row in profileRows) _profileFromRow(row)],
       events: events,
     );
   }
@@ -115,7 +113,16 @@ class SearchRepository {
       isResolved: row['is_resolved'] as bool? ?? false,
       authorId: row['author_id'] as String?,
       authorAvatarUrl: _avatarUrlFromRow(row),
+      authorVerified: _authorVerifiedFromRow(row),
       status: TopicStatus.published,
+      isPinned: row['is_pinned'] as bool? ?? false,
+      pinSortOrder: row['pin_sort_order'] as int? ?? 0,
+      isSystem: row['is_system'] as bool? ?? false,
+      seasonKey: row['season_key'] as String?,
+      iconKey: row['icon_key'] as String?,
+      coverImageUrl: row['cover_image_url'] as String?,
+      isListed: row['is_listed'] as bool? ?? true,
+      createdAt: createdAt,
     );
   }
 
@@ -127,6 +134,7 @@ class SearchRepository {
       handle: handle,
       displayName: row['display_name'] as String? ?? handleRaw,
       avatarUrl: row['avatar_url'] as String?,
+      isVerified: row['verified'] as bool? ?? false,
       bio: row['bio'] as String? ?? '',
     );
   }
@@ -137,6 +145,14 @@ class SearchRepository {
       return profile['avatar_url'] as String?;
     }
     return null;
+  }
+
+  bool _authorVerifiedFromRow(Map<String, dynamic> row) {
+    final profile = row['profiles'];
+    if (profile is Map<String, dynamic>) {
+      return profile['verified'] as bool? ?? false;
+    }
+    return false;
   }
 
   bool _isAuthorSuspended(Map<String, dynamic> row) {

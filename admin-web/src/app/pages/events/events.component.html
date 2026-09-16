@@ -1,0 +1,380 @@
+<section class="queue-page events-page">
+  <header>
+    <div>
+      <p class="eyebrow">Plataforma · solo admin</p>
+      <h1>Eventos</h1>
+      <p class="lead">
+        Calendario cofrade: crea y edita eventos con portada e icono, y revisa
+        las propuestas pendientes.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+      <button type="button" class="btn btn-primary" (click)="openCreate()">Nuevo evento</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button type="button" class="tab" [class.active]="tab() === 'calendar'" (click)="setTab('calendar')">
+      Calendario
+    </button>
+    <button type="button" class="tab" [class.active]="tab() === 'pending'" (click)="setTab('pending')">
+      Solicitudes
+      @if (pendingCount() > 0) {
+        <span class="tab-badge">{{ pendingCount() }}</span>
+      }
+    </button>
+  </div>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (tab() === 'calendar') {
+    <div class="filters">
+      <input
+        type="search"
+        [(ngModel)]="search"
+        (keyup.enter)="searchCalendar()"
+        placeholder="Buscar título, lugar u organizador…"
+      />
+      <select
+        [ngModel]="typeFilter()"
+        (ngModelChange)="setTypeFilter($event)"
+      >
+        <option value="all">Todos los tipos</option>
+        @for (type of eventTypes; track type.value) {
+          <option [value]="type.value">{{ type.label }}</option>
+        }
+      </select>
+      <div class="range-chips">
+        <button type="button" class="chip" [class.active]="range() === 'upcoming'" (click)="setRange('upcoming')">
+          Próximos
+        </button>
+        <button type="button" class="chip" [class.active]="range() === 'past'" (click)="setRange('past')">
+          Pasados
+        </button>
+        <button type="button" class="chip" [class.active]="range() === 'all'" (click)="setRange('all')">
+          Todos
+        </button>
+      </div>
+      <button type="button" class="btn btn-soft" (click)="searchCalendar()" [disabled]="loading()">
+        Buscar
+      </button>
+    </div>
+
+    @if (loading()) {
+      <div class="state-box">Cargando calendario…</div>
+    } @else if (events().length === 0) {
+      <div class="empty-box">No hay eventos con estos filtros.</div>
+    } @else {
+      <div class="queue-list">
+        @for (event of events(); track event.id) {
+          <article class="queue-card event-card">
+            <div class="event-main">
+              @if (event.coverImageUrl) {
+                <img [src]="event.coverImageUrl" alt="" class="cover" />
+              } @else if (event.customIconUrl) {
+                <img [src]="event.customIconUrl" alt="" class="icon-thumb" />
+              } @else {
+                <div class="cover placeholder">{{ typeLabel(event.eventType).slice(0, 1) }}</div>
+              }
+              <div class="event-body">
+                <div class="event-kicker">
+                  <span class="type-pill">{{ typeLabel(event.eventType) }}</span>
+                  <span>{{ dateTime(event.startsAt) }}</span>
+                </div>
+                <h2>{{ event.title }}</h2>
+                <p class="queue-meta">
+                  @if (event.organizerLabel) {
+                    {{ event.organizerLabel }}
+                    ·
+                  }
+                  @if (event.location) {
+                    {{ event.location }}
+                    ·
+                  }
+                  Publicado
+                </p>
+                @if (event.subtitle) {
+                  <p class="queue-excerpt">{{ event.subtitle }}</p>
+                }
+              </div>
+            </div>
+            <div class="queue-actions">
+              <button type="button" class="btn btn-ghost" (click)="openEdit(event)">Editar</button>
+              <button
+                type="button"
+                class="btn btn-danger"
+                [disabled]="busyId() === event.id"
+                (click)="remove(event)"
+              >
+                Eliminar
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  }
+
+  @if (tab() === 'pending') {
+    @if (loading()) {
+      <div class="state-box">Cargando solicitudes…</div>
+    } @else if (pending().length === 0) {
+      <div class="empty-box">No hay eventos pendientes de revisión.</div>
+    } @else {
+      <div class="queue-list">
+        @for (event of pending(); track event.id) {
+          <article class="queue-card event-card">
+            <div class="event-main">
+              @if (event.coverImageUrl) {
+                <img [src]="event.coverImageUrl" alt="" class="cover" />
+              } @else {
+                <div class="cover placeholder">?</div>
+              }
+              <div class="event-body">
+                <div class="event-kicker">
+                  <span class="type-pill pending">Pendiente</span>
+                  <span>{{ typeLabel(event.eventType) }} · {{ dateTime(event.startsAt) }}</span>
+                </div>
+                <h2>{{ event.title }}</h2>
+                <p class="queue-meta">
+                  {{
+                    event.createdByHandle
+                      ? 'propuesto por @' + event.createdByHandle + ' · '
+                      : ''
+                  }}
+                  {{ timeAgo(event.createdAt) }}
+                </p>
+                @if (event.subtitle) {
+                  <p class="queue-excerpt">{{ event.subtitle }}</p>
+                }
+              </div>
+            </div>
+            <div class="queue-actions">
+              <button
+                type="button"
+                class="btn btn-danger"
+                [disabled]="busyId() === event.id"
+                (click)="reject(event)"
+              >
+                Rechazar
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost"
+                (click)="openEdit(event)"
+              >
+                Revisar
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="busyId() === event.id"
+                (click)="publish(event)"
+              >
+                Publicar
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  }
+</section>
+
+@if (showForm()) {
+  <div class="dialog-backdrop" (click)="closeForm()">
+    <div class="dialog form-dialog" (click)="$event.stopPropagation()">
+      <h3>{{ formTitleText() }}</h3>
+      <p class="form-lead">
+        Misma ficha que en la app: tipo, fecha, lugar, organizador, portada e icono.
+      </p>
+
+      <label>
+        Tipo
+        <select [(ngModel)]="formType">
+          @for (type of eventTypes; track type.value) {
+            <option [value]="type.value">{{ type.label }}</option>
+          }
+        </select>
+      </label>
+
+      <label>
+        Título
+        <input [(ngModel)]="formTitle" maxlength="120" placeholder="Nombre del evento" />
+      </label>
+
+      <label>
+        Descripción
+        <textarea
+          [(ngModel)]="formSubtitle"
+          rows="3"
+          maxlength="500"
+          placeholder="Detalle breve para el calendario"
+        ></textarea>
+      </label>
+
+      <div class="form-row">
+        <label>
+          Fecha y hora
+          <input type="datetime-local" [(ngModel)]="formStartsAtLocal" />
+        </label>
+        <label>
+          Lugar
+          <input [(ngModel)]="formLocation" maxlength="160" placeholder="Calle, templo…" />
+        </label>
+      </div>
+
+      <div class="organizer-block">
+        <div class="organizer-head">
+          <strong>Organizador / escudo</strong>
+          <span>Reutiliza la biblioteca de la app o escribe uno nuevo.</span>
+        </div>
+
+        <label>
+          Buscar en biblioteca
+          <div class="organizer-search-row">
+            <input
+              type="search"
+              [(ngModel)]="organizerSearch"
+              (keyup.enter)="searchOrganizers()"
+              placeholder="Hermandad, banda…"
+            />
+            <button
+              type="button"
+              class="btn btn-soft"
+              (click)="searchOrganizers()"
+              [disabled]="organizersLoading()"
+            >
+              Buscar
+            </button>
+          </div>
+        </label>
+
+        @if (organizersLoading()) {
+          <p class="organizer-hint">Cargando biblioteca…</p>
+        } @else if (organizers().length === 0) {
+          <p class="organizer-hint">
+            No hay escudos guardados aún. Escribe el nombre y sube un icono;
+            se añadirá a la biblioteca al publicar.
+          </p>
+        } @else {
+          <div class="organizer-list">
+            @for (item of organizers(); track item.organizerKey) {
+              <div
+                class="organizer-chip"
+                [class.active]="selectedOrganizerKey() === item.organizerKey"
+              >
+                <button
+                  type="button"
+                  class="organizer-pick"
+                  (click)="pickOrganizer(item)"
+                >
+                  @if (item.logoUrl) {
+                    <img [src]="item.logoUrl" alt="" />
+                  } @else {
+                    <span class="organizer-fallback">{{
+                      (item.displayLabel || '?').slice(0, 1)
+                    }}</span>
+                  }
+                  <span>{{ item.displayLabel || item.organizerKey }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="organizer-remove"
+                  title="Eliminar de la biblioteca"
+                  [disabled]="busyId() === item.organizerKey"
+                  (click)="removeOrganizerFromLibrary($event, item)"
+                >
+                  ×
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        <label>
+          Nombre visible
+          <input
+            [(ngModel)]="formOrganizer"
+            (ngModelChange)="onOrganizerTyped()"
+            maxlength="120"
+            placeholder="Nombre del organizador / hermandad"
+          />
+        </label>
+      </div>
+
+      <div class="media-grid">
+        <div class="media-block">
+          <span class="media-label">Portada del card</span>
+          <p class="media-hint">Imagen grande del listado en el calendario.</p>
+          @if (formCoverUrl) {
+            <img [src]="formCoverUrl" alt="" class="preview cover-preview" />
+          } @else {
+            <div class="preview empty">Sin portada</div>
+          }
+          <label class="file-row">
+            Subir portada
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              [disabled]="uploading()"
+              (change)="onUpload('cover', $event)"
+            />
+          </label>
+          @if (formCoverUrl) {
+            <button type="button" class="btn btn-ghost" (click)="clearCover()">Quitar</button>
+          }
+          <label>
+            URL portada
+            <input [(ngModel)]="formCoverUrl" placeholder="https://…" />
+          </label>
+        </div>
+
+        <div class="media-block">
+          <span class="media-label">Escudo / icono</span>
+          <p class="media-hint">Sale junto al organizador y se guarda en la biblioteca.</p>
+          @if (formIconUrl) {
+            <img [src]="formIconUrl" alt="" class="preview icon-preview" />
+          } @else {
+            <div class="preview empty icon-preview">Sin escudo</div>
+          }
+          <label class="file-row">
+            Subir escudo
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              [disabled]="uploading()"
+              (change)="onUpload('icon', $event)"
+            />
+          </label>
+          @if (formIconUrl) {
+            <button type="button" class="btn btn-ghost" (click)="clearIcon()">Quitar</button>
+          }
+          <label>
+            URL escudo
+            <input [(ngModel)]="formIconUrl" placeholder="https://…" />
+          </label>
+        </div>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-soft" (click)="closeForm()" [disabled]="saving()">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="saveForm()"
+          [disabled]="saving() || uploading()"
+        >
+          {{ saving() ? 'Guardando…' : editing() ? 'Guardar cambios' : 'Publicar evento' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

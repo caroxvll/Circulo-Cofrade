@@ -13,6 +13,7 @@ class AuthEmailForm extends StatelessWidget {
     this.loading = false,
     this.displayNameController,
     this.handleController,
+    this.dark = false,
   });
 
   final TextEditingController emailController;
@@ -22,6 +23,7 @@ class AuthEmailForm extends StatelessWidget {
   final String submitLabel;
   final VoidCallback onSubmit;
   final bool loading;
+  final bool dark;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +32,8 @@ class AuthEmailForm extends StatelessWidget {
         if (displayNameController != null) ...[
           TextField(
             controller: displayNameController,
+            cursorColor: dark ? AppColors.gold : null,
+            style: _fieldStyle(),
             textInputAction: TextInputAction.next,
             decoration: _decoration('Nombre visible'),
           ),
@@ -38,6 +42,8 @@ class AuthEmailForm extends StatelessWidget {
         if (handleController != null) ...[
           TextField(
             controller: handleController,
+            cursorColor: dark ? AppColors.gold : null,
+            style: _fieldStyle(),
             textInputAction: TextInputAction.next,
             decoration: _decoration('Handle (@usuario)'),
           ),
@@ -47,6 +53,8 @@ class AuthEmailForm extends StatelessWidget {
           controller: emailController,
           keyboardType: TextInputType.emailAddress,
           autocorrect: false,
+          cursorColor: dark ? AppColors.gold : null,
+          style: _fieldStyle(),
           textInputAction: TextInputAction.next,
           decoration: _decoration('Email'),
         ),
@@ -54,6 +62,8 @@ class AuthEmailForm extends StatelessWidget {
         TextField(
           controller: passwordController,
           obscureText: true,
+          cursorColor: dark ? AppColors.gold : null,
+          style: _fieldStyle(),
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => onSubmit(),
           decoration: _decoration('Contraseña'),
@@ -64,11 +74,19 @@ class AuthEmailForm extends StatelessWidget {
           child: FilledButton(
             onPressed: loading ? null : onSubmit,
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.burgundy,
-              foregroundColor: AppColors.textOnDark,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              backgroundColor: dark ? AppColors.gold : AppColors.burgundy,
+              foregroundColor: dark
+                  ? const Color(0xFF2A0710)
+                  : AppColors.textOnDark,
+              disabledBackgroundColor: dark
+                  ? AppColors.gold.withValues(alpha: 0.56)
+                  : null,
+              disabledForegroundColor: dark
+                  ? const Color(0xFF2A0710).withValues(alpha: 0.6)
+                  : null,
+              padding: const EdgeInsets.symmetric(vertical: 13),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dark ? 14 : 12),
               ),
             ),
             child: loading
@@ -77,16 +95,57 @@ class AuthEmailForm extends StatelessWidget {
                     height: 22,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Text(submitLabel, style: AppTypography.titleLarge(
-                    color: AppColors.textOnDark,
-                  ).copyWith(fontSize: 16)),
+                : Text(
+                    submitLabel,
+                    style: AppTypography.titleLarge(
+                      color: dark
+                          ? const Color(0xFF2A0710)
+                          : AppColors.textOnDark,
+                    ).copyWith(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
           ),
         ),
       ],
     );
   }
 
+  TextStyle? _fieldStyle() {
+    if (!dark) return null;
+    return AppTypography.displaySmall(
+      color: AppColors.goldPale,
+    ).copyWith(fontSize: 20);
+  }
+
   InputDecoration _decoration(String label) {
+    if (dark) {
+      final borderRadius = BorderRadius.circular(16);
+      return InputDecoration(
+        labelText: label,
+        labelStyle: AppTypography.displaySmall(
+          color: AppColors.goldPale,
+        ).copyWith(fontSize: 20),
+        floatingLabelStyle: AppTypography.titleLarge(color: AppColors.gold),
+        filled: true,
+        fillColor: Colors.black.withValues(alpha: 0.08),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: borderRadius,
+          borderSide: const BorderSide(color: AppColors.gold, width: 1.3),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: borderRadius,
+          borderSide: const BorderSide(color: AppColors.gold, width: 1.3),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: borderRadius,
+          borderSide: const BorderSide(color: AppColors.gold, width: 1.8),
+        ),
+      );
+    }
+
     return InputDecoration(
       labelText: label,
       labelStyle: AppTypography.bodyMedium(),

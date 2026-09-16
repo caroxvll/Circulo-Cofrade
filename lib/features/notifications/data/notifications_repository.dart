@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../core/utils/time_ago.dart';
 import '../../../shared/models/app_notification.dart';
+import '../../calendar/utils/calendar_notification_navigation.dart';
 import 'mock_notifications.dart';
 
 class NotificationsRepository {
@@ -25,7 +26,9 @@ class NotificationsRepository {
 
     if (rows.isEmpty) return [];
 
-    return rows.map(_fromRow).toList();
+    return _groupReplyReactionNotifications(
+      rows.map(_fromRow).toList(),
+    );
   }
 
   Future<void> markAllRead(String userId) async {
@@ -58,6 +61,37 @@ class NotificationsRepository {
         .eq('id', notificationId);
   }
 
+  Future<void> deleteUnreadReplyReactionsForReply(
+    String userId,
+    String replyId,
+  ) async {
+    if (_client == null) return;
+
+    await _client!
+        .from('notifications')
+        .delete()
+        .eq('user_id', userId)
+        .eq('type', 'reply_reaction')
+        .filter('read_at', 'is', null)
+        .filter('payload->>replyId', 'eq', replyId);
+  }
+
+  Future<void> markReadReplyReactionGroup(
+    String userId,
+    String replyId,
+  ) async {
+    if (_client == null) return;
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _client!
+        .from('notifications')
+        .update({'read_at': now})
+        .eq('user_id', userId)
+        .eq('type', 'reply_reaction')
+        .filter('read_at', 'is', null)
+        .filter('payload->>replyId', 'eq', replyId);
+  }
+
   Future<void> deleteAll(String userId) async {
     if (_client == null) return;
 
@@ -82,6 +116,11 @@ class NotificationsRepository {
       replyId: _payloadString(payload, 'replyId'),
       profileId: _payloadString(payload, 'profileId'),
       route: _payloadString(payload, 'route'),
+      officialCategory: _payloadString(payload, 'officialCategory'),
+      eventId: _payloadString(payload, 'eventId'),
+      eventStartsAt: parseNotificationEventStartsAt(payload['startsAt']),
+      topicTitle: _payloadString(payload, 'topicTitle'),
+      rejectionReason: _payloadString(payload, 'rejectionReason'),
       avatarIcon: _iconForType(type),
       badgeIcon: type == 'mention' ? Icons.alternate_email : null,
       badgeBackgroundColor:
@@ -103,6 +142,9 @@ class NotificationsRepository {
       'topic_rejected' => AppNotificationKind.topicRejected,
       'account_suspended' => AppNotificationKind.accountSuspended,
       'account_reactivated' => AppNotificationKind.accountReactivated,
+      'reply_reaction' => AppNotificationKind.replyReaction,
+      'cofrade_rank_up' => AppNotificationKind.cofradeRankUp,
+      'news_published' => AppNotificationKind.newsPublished,
       _ => AppNotificationKind.system,
     };
   }
@@ -121,6 +163,9 @@ class NotificationsRepository {
       'topic_rejected' => Icons.cancel_outlined,
       'account_suspended' => Icons.block_outlined,
       'account_reactivated' => Icons.check_circle_outline,
+      'reply_reaction' => Icons.add_reaction_outlined,
+      'cofrade_rank_up' => Icons.military_tech_outlined,
+      'news_published' => Icons.newspaper_outlined,
       _ => Icons.notifications_outlined,
     };
   }
@@ -136,6 +181,61 @@ class NotificationsRepository {
     if (value == null) return null;
     final text = value.toString();
     return text.isEmpty ? null : text;
+  }
+
+  /// Agrupa avisos duplicados de reacción (mismo comentario, sin leer).
+  List<AppNotification> _groupReplyReactionNotifications(
+    List<AppNotification> notifications,
+  ) {
+    final groupedReplyIds = <String>{};
+    final result = <AppNotification>[];
+
+    for (final notification in notifications) {
+      if (notification.kind != AppNotificationKind.replyReaction ||
+          notification.isRead ||
+          notification.replyId == null) {
+        result.add(notification);
+        continue;
+      }
+
+      final replyId = notification.replyId!.toLowerCase();
+      if (groupedReplyIds.contains(replyId)) continue;
+      groupedReplyIds.add(replyId);
+
+      final siblings = notifications
+          .where(
+            (n) =>
+                n.kind == AppNotificationKind.replyReaction &&
+                !n.isRead &&
+                n.replyId?.toLowerCase() == replyId,
+          )
+          .toList();
+
+      if (siblings.length <= 1) {
+        result.add(notification);
+        continue;
+      }
+
+      result.add(_mergeReactionNotifications(siblings));
+    }
+
+    return result;
+  }
+
+  AppNotification _mergeReactionNotifications(List<AppNotification> group) {
+    final latest = group.first;
+    final first = group.last;
+    final count = group.length;
+
+    if (count == 2) {
+      return latest.copyWith(
+        subtitle: '${first.title} y ${latest.title} reaccionaron a tu comentario',
+      );
+    }
+
+    return latest.copyWith(
+      subtitle: '$count personas reaccionaron a tu comentario',
+    );
   }
 }
 

@@ -5,12 +5,12 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/utils/image_upload_compress.dart';
 import '../../core/widgets/cofradeo_avatar.dart';
 import '../../shared/models/user_profile.dart';
 import '../auth/auth_provider.dart';
-import '../forums/forums_provider.dart';
-import '../forums/topic_replies_provider.dart';
 import 'data/profile_repository.dart';
+import 'profile_design.dart';
 import 'profile_provider.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
@@ -37,6 +37,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _bioController.addListener(() {
+      if (mounted) setState(() {});
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(currentUserProvider);
       if (user == null && mounted) {
@@ -86,25 +89,34 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     });
 
     try {
-      final bytes = await file.readAsBytes();
-      final mime = switch (file.path.split('.').last.toLowerCase()) {
-        'png' => 'image/png',
-        'webp' => 'image/webp',
-        _ => 'image/jpeg',
-      };
+      final raw = await file.readAsBytes();
+      final compressed = await compressImageForUploadAsync(
+        raw,
+        maxBytes: ImageUploadLimits.avatarMaxBytes,
+        maxSide: ImageUploadLimits.avatarMaxSide,
+      );
+
+      if (mounted && compressed.wasCompressed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Avatar optimizado (${formatImageSize(raw.length)} → '
+              '${formatImageSize(compressed.bytes.length)})',
+            ),
+          ),
+        );
+      }
 
       final url = await ref.read(profileRepositoryProvider).uploadAvatar(
             userId: user.id,
-            bytes: bytes,
-            mimeType: mime,
+            bytes: compressed.bytes,
+            mimeType: compressed.mimeType,
           );
 
       setState(() => _avatarUrl = url);
       ref.invalidate(currentUserProfileProvider);
-      ref.invalidate(forumTopicsProvider);
-      ref.invalidate(topicRepliesFirstPageProvider);
-    } on AvatarTooLargeException {
-      setState(() => _error = 'La imagen supera 2 MB.');
+    } on ImageTooLargeAfterCompressException {
+      setState(() => _error = 'La imagen es demasiado grande. Prueba con otra.');
     } on ProfileUnavailableException {
       setState(() => _error = 'Configura Supabase y el bucket avatars.');
     } catch (_) {
@@ -155,111 +167,340 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
   }
 
+  TextStyle get _fieldLabelStyle => AppTypography.labelSmall(
+        color: AppColors.burgundy,
+      ).copyWith(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.15,
+      );
+
+  TextStyle get _fieldValueStyle => AppTypography.bodyLarge().copyWith(
+        fontSize: 15,
+        fontWeight: FontWeight.w500,
+        color: AppColors.textPrimary,
+      );
+
+  InputDecoration _borderlessField({String? hint}) => InputDecoration(
+        isDense: true,
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        hintText: hint,
+        hintStyle: AppTypography.bodyMedium(color: AppColors.textMuted)
+            .copyWith(fontSize: 15),
+        contentPadding: EdgeInsets.zero,
+        counterText: '',
+      );
+
+  Widget _fieldDivider() => Padding(
+        padding: const EdgeInsets.only(left: 48),
+        child: Divider(
+          height: 1,
+          thickness: 1,
+          color: AppColors.border.withValues(alpha: 0.75),
+        ),
+      );
+
+  Widget _profileFieldRow({
+    required IconData icon,
+    required String label,
+    required Widget field,
+    String? trailing,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceAlt,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 18, color: AppColors.burgundy),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: Text(label, style: _fieldLabelStyle)),
+                    if (trailing != null)
+                      Text(
+                        trailing,
+                        style: AppTypography.labelSmall(
+                          color: AppColors.textMuted,
+                        ).copyWith(fontSize: 12),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                field,
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(currentUserProfileProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.chevron_left, color: AppColors.burgundy),
-        ),
-        title: Text(
-          'Editar perfil',
-          style: AppTypography.displaySmall().copyWith(fontSize: 17),
-        ),
-        centerTitle: true,
-        actions: [
-          TextButton(
-            onPressed: _loading ? null : _save,
-            child: _loading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    'Guardar',
-                    style: AppTypography.bodyMedium(color: AppColors.burgundy),
-                  ),
-          ),
-        ],
-      ),
-      body: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(child: Text('Error al cargar perfil')),
-        data: (profile) {
-          _initFields(profile);
-          return ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              Center(
-                child: Stack(
-                  children: [
-                    CofradeoAvatar(
-                      imageUrl: _avatarUrl,
-                      icon: profile.avatarIcon,
-                      size: 88,
-                      backgroundColor: AppColors.burgundyDark,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => context.pop(),
+                    icon: const Icon(
+                      Icons.chevron_left,
+                      color: AppColors.burgundy,
+                      size: 30,
                     ),
-                    if (_uploadingAvatar)
-                      const Positioned.fill(
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'EDITAR PERFIL',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.screenAppBarTitle().copyWith(
+                        fontSize: 24,
+                        letterSpacing: 0.45,
                       ),
-                  ],
-                ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _loading ? null : _save,
+                    child: _loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            'Guardar',
+                            style: AppTypography.bodyMedium(
+                              color: AppColors.burgundy,
+                            ).copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton(
-                  onPressed: _uploadingAvatar ? null : _pickAvatar,
-                  child: const Text('Cambiar foto'),
-                ),
+            ),
+            Expanded(
+              child: profileAsync.when(
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (_, __) =>
+                    const Center(child: Text('Error al cargar perfil')),
+                data: (profile) {
+                  _initFields(profile);
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                    children: [
+                      Text(
+                        'Actualiza tu información para que la comunidad '
+                        'pueda conocerte mejor.',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.bodyMedium(
+                          color: AppColors.textSecondary,
+                        ).copyWith(fontSize: 14, height: 1.45),
+                      ),
+                      const SizedBox(height: 22),
+                      Center(
+                        child: GestureDetector(
+                          onTap: _uploadingAvatar ? null : _pickAvatar,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              CofradeoAvatar(
+                                imageUrl: _avatarUrl,
+                                icon: profile.avatarIcon,
+                                size: 104,
+                                backgroundColor: AppColors.burgundyDark,
+                              ),
+                              if (_uploadingAvatar)
+                                Positioned.fill(
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black38,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.textOnDark,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: AppColors.border,
+                                      width: 1.2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.textPrimary
+                                            .withValues(alpha: 0.08),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.photo_camera_outlined,
+                                    size: 17,
+                                    color: AppColors.burgundy,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Center(
+                        child: TextButton(
+                          onPressed: _uploadingAvatar ? null : _pickAvatar,
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.burgundy,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                          ),
+                          child: Text(
+                            'Cambiar foto',
+                            style: AppTypography.bodyMedium(
+                              color: AppColors.burgundy,
+                            ).copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      DecoratedBox(
+                        decoration: ProfileDesign.cardDecoration(),
+                        child: Column(
+                          children: [
+                            _profileFieldRow(
+                              icon: Icons.person_outline_rounded,
+                              label: 'Nombre visible',
+                              field: TextField(
+                                controller: _displayNameController,
+                                style: _fieldValueStyle,
+                                textInputAction: TextInputAction.next,
+                                decoration: _borderlessField(),
+                              ),
+                            ),
+                            _fieldDivider(),
+                            _profileFieldRow(
+                              icon: Icons.edit_outlined,
+                              label: 'Bio',
+                              trailing: '${_bioController.text.length}/160',
+                              field: TextField(
+                                controller: _bioController,
+                                style: _fieldValueStyle,
+                                maxLines: 3,
+                                minLines: 1,
+                                maxLength: 160,
+                                textInputAction: TextInputAction.newline,
+                                decoration: _borderlessField(
+                                  hint: 'Cuéntanos algo sobre ti…',
+                                ),
+                              ),
+                            ),
+                            _fieldDivider(),
+                            _profileFieldRow(
+                              icon: Icons.location_on_outlined,
+                              label: 'Dirección',
+                              field: TextField(
+                                controller: _addressController,
+                                style: _fieldValueStyle,
+                                textInputAction: TextInputAction.next,
+                                decoration: _borderlessField(
+                                  hint: 'Añade tu ciudad o localidad',
+                                ),
+                              ),
+                            ),
+                            _fieldDivider(),
+                            _profileFieldRow(
+                              icon: Icons.calendar_today_outlined,
+                              label: 'Fundación',
+                              field: TextField(
+                                controller: _foundedController,
+                                style: _fieldValueStyle,
+                                textInputAction: TextInputAction.next,
+                                decoration: _borderlessField(
+                                  hint: 'Año de fundación (opcional)',
+                                ),
+                              ),
+                            ),
+                            _fieldDivider(),
+                            _profileFieldRow(
+                              icon: Icons.language_outlined,
+                              label: 'Sitio web',
+                              field: TextField(
+                                controller: _websiteController,
+                                style: _fieldValueStyle,
+                                keyboardType: TextInputType.url,
+                                textInputAction: TextInputAction.done,
+                                decoration: _borderlessField(
+                                  hint: 'https://tuweb.com (opcional)',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Handle ${profile.handle} — cambio limitado en versión futura.',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.labelSmall(
+                          color: AppColors.textMuted,
+                        ).copyWith(fontSize: 12, height: 1.4),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 14),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: AppTypography.bodyMedium(
+                            color: AppColors.accentRed,
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _displayNameController,
-                decoration: const InputDecoration(labelText: 'Nombre visible'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _bioController,
-                maxLines: 3,
-                maxLength: 160,
-                decoration: const InputDecoration(labelText: 'Bio'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _addressController,
-                decoration: const InputDecoration(labelText: 'Dirección'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _foundedController,
-                decoration: const InputDecoration(labelText: 'Fundación'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _websiteController,
-                decoration: const InputDecoration(labelText: 'Sitio web'),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Handle ${profile.handle} — cambio limitado en versión futura.',
-                style: AppTypography.labelSmall(),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  style: AppTypography.bodyMedium(color: AppColors.accentRed),
-                ),
-              ],
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,0 +1,59 @@
+<section class="queue-page">
+  <header>
+    <div>
+      <p class="eyebrow">Moderación</p>
+      <h1>Cierres solicitados</h1>
+      <p class="lead">El autor pidió cerrar el hilo. Puedes aceptar o dejarlo abierto.</p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando solicitudes…</div>
+  } @else if (topics().length === 0) {
+    <div class="empty-box">No hay cierres pendientes.</div>
+  } @else {
+    <div class="queue-list">
+      @for (topic of topics(); track topic.id) {
+        <article class="queue-card">
+          <h2>{{ topic.title }}</h2>
+          <p class="queue-meta">
+            {{ topic.forumId }}
+            ·
+            {{ topic.authorHandle ? '@' + topic.authorHandle + ' · ' : '' }}
+            {{ timeAgo(topic.createdAt) }}
+          </p>
+          @if (topic.excerpt) {
+            <p class="queue-excerpt">{{ topic.excerpt }}</p>
+          }
+          <div class="queue-actions">
+            <button
+              type="button"
+              class="btn btn-ghost"
+              [disabled]="busyId() === topic.id"
+              (click)="reject(topic)"
+            >
+              Rechazar solicitud
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="busyId() === topic.id"
+              (click)="approve(topic)"
+            >
+              Cerrar tema
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>

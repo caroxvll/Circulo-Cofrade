@@ -1,0 +1,254 @@
+<section class="queue-page companies-page">
+  <header>
+    <div>
+      <p class="eyebrow">Plataforma · solo admin</p>
+      <h1>Empresas</h1>
+      <p class="lead">
+        Marcas activas con cupo configurable. Banner (zonas) + logo (eventos).
+        Al quitar una empresa se borra de patrocinios y de finanzas.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <span class="cupo-pill" [class.full]="cupo().full">
+        Cupo {{ cupo().used }}/{{ cupo().max }}
+      </span>
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  <section class="cupo-settings">
+    <div>
+      <h2>Cupo máximo</h2>
+      <p class="lead compact">
+        Cambia cuántas empresas pueden estar activas a la vez (ahora
+        {{ cupo().used }}/{{ cupo().max }}). Rango 1–100.
+      </p>
+    </div>
+    <div class="cupo-edit">
+      <label>
+        Máximo
+        <input
+          type="number"
+          min="1"
+          max="100"
+          [(ngModel)]="cupoDraft"
+          [disabled]="savingCupo()"
+        />
+      </label>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="savingCupo() || +cupoDraft === maxCompanies()"
+        (click)="saveCupo()"
+      >
+        {{ savingCupo() ? 'Guardando…' : 'Guardar cupo' }}
+      </button>
+    </div>
+  </section>
+
+  @if (cupo().full && nextWait(); as next) {
+    <div class="info-box">
+      Cupo lleno. Cuando liberes un hueco, la siguiente en espera es
+      <strong>{{ next.companyName }}</strong>.
+    </div>
+  }
+
+  @if (!cupo().full && nextWait(); as next) {
+    <div class="info-box ok">
+      Hay {{ cupo().free }} hueco{{ cupo().free === 1 ? '' : 's' }} libre{{ cupo().free === 1 ? '' : 's' }}.
+      Siguiente en espera: <strong>{{ next.companyName }}</strong> — créale un
+      patrocinio cuando toque.
+    </div>
+  }
+
+  <div class="filters">
+    <input type="search" [(ngModel)]="search" placeholder="Buscar empresa…" />
+  </div>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando empresas…</div>
+  } @else if (visible().length === 0) {
+    <div class="empty-box">
+      Aún no hay marcas activas. Crea un patrocinio y aparecerá aquí.
+    </div>
+  } @else {
+    <div class="company-grid">
+      @for (company of visible(); track company.key) {
+        <article class="company-card">
+          <div class="previews">
+            <div class="preview">
+              <span>Banner</span>
+              @if (company.imageUrl) {
+                <img [src]="company.imageUrl" alt="" />
+              } @else {
+                <div class="missing">Sin banner</div>
+              }
+            </div>
+            <div class="preview">
+              <span>Logo eventos</span>
+              @if (company.sponsorLogoUrl) {
+                <img [src]="company.sponsorLogoUrl" alt="" class="logo" />
+              } @else {
+                <div class="missing">Sin logo</div>
+              }
+            </div>
+          </div>
+          <h2>{{ company.name }}</h2>
+          <p class="queue-meta">
+            {{ company.adIds.length }} pieza{{ company.adIds.length === 1 ? '' : 's' }}
+            · {{ company.activeCount }} activa{{ company.activeCount === 1 ? '' : 's' }}
+          </p>
+          <p class="zones">
+            @for (placement of company.placements; track placement) {
+              <em>{{ zoneName(placement) }}</em>
+            }
+          </p>
+          <div class="queue-actions">
+            <button type="button" class="btn btn-primary" (click)="openEdit(company)">
+              Editar
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost danger"
+              [disabled]="saving()"
+              (click)="removeCompany(company)"
+            >
+              Quitar
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+  }
+
+  <section class="waitlist-block">
+    <header class="wait-head">
+      <div>
+        <h2>Lista de espera</h2>
+        <p class="lead compact">
+          Cuando el cupo está lleno, anota aquí quién entra al liberar un hueco
+          (orden de llegada).
+        </p>
+      </div>
+    </header>
+
+    <div class="wait-form">
+      <label>
+        Empresa
+        <input [(ngModel)]="waitName" placeholder="Nombre de la marca" />
+      </label>
+      <label>
+        Contacto
+        <input [(ngModel)]="waitContact" placeholder="Email / teléfono (opcional)" />
+      </label>
+      <label>
+        Notas
+        <input [(ngModel)]="waitNotes" placeholder="Zonas pedidas, precio…" />
+      </label>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="saving()"
+        (click)="addToWaitlist()"
+      >
+        Añadir a espera
+      </button>
+    </div>
+
+    @if (waitlist().length === 0) {
+      <div class="empty-box soft">Nadie en espera.</div>
+    } @else {
+      <ol class="wait-list">
+        @for (entry of waitlist(); track entry.id; let i = $index) {
+          <li>
+            <div>
+              <strong>{{ i + 1 }}. {{ entry.companyName }}</strong>
+              @if (entry.contact) {
+                <span class="sub">{{ entry.contact }}</span>
+              }
+              @if (entry.notes) {
+                <span class="sub">{{ entry.notes }}</span>
+              }
+            </div>
+            <button type="button" class="btn btn-ghost" (click)="removeWait(entry)">
+              Quitar
+            </button>
+          </li>
+        }
+      </ol>
+    }
+  </section>
+</section>
+
+@if (editing(); as company) {
+  <div class="dialog-backdrop" (click)="closeEdit()">
+    <div class="dialog form-dialog" (click)="$event.stopPropagation()">
+      <h3>Editar empresa</h3>
+      <p class="hint">
+        Los cambios de banner y logo se aplican a
+        <strong>todas</strong> las piezas de «{{ company.name }}».
+      </p>
+      <label>
+        Nombre
+        <input [(ngModel)]="formName" />
+      </label>
+      <label>
+        Enlace destino
+        <input [(ngModel)]="formUrl" placeholder="https://…" />
+      </label>
+
+      <div class="asset-block">
+        <h4>Banner (zonas)</h4>
+        <p class="hint">Foros, calendario, buscar, destacados… ~1200×300</p>
+        @if (formBannerUrl) {
+          <img [src]="formBannerUrl" alt="" class="preview-wide" />
+        }
+        <label>
+          URL
+          <input [(ngModel)]="formBannerUrl" />
+        </label>
+        <label class="file-row">
+          Subir banner
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            (change)="onUpload('banner', $event)"
+          />
+        </label>
+      </div>
+
+      <div class="asset-block">
+        <h4>Logo (eventos patrocinados)</h4>
+        <p class="hint">Tarjeta de evento en foro · recomendado ~520×300, fondo transparente</p>
+        @if (formLogoUrl) {
+          <img [src]="formLogoUrl" alt="" class="preview-logo" />
+        }
+        <label>
+          URL
+          <input [(ngModel)]="formLogoUrl" />
+        </label>
+        <label class="file-row">
+          Subir logo
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            (change)="onUpload('logo', $event)"
+          />
+        </label>
+      </div>
+
+      <div class="queue-actions">
+        <button type="button" class="btn btn-ghost" (click)="closeEdit()">Cancelar</button>
+        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="save()">
+          {{ saving() ? 'Guardando…' : 'Guardar en todas las piezas' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

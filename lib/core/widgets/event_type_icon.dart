@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../constants/app_assets.dart';
 import '../theme/app_colors.dart';
+import '../utils/image_decode_cache.dart';
+import 'cofradeo_network_image.dart';
 import '../../shared/models/calendar_event.dart';
 
 /// Icono de tipo de evento: usa tu imagen en assets/icons/ si existe,
@@ -11,20 +14,32 @@ class EventTypeIcon extends StatelessWidget {
     super.key,
     required this.type,
     this.size = 52,
+    this.customIconUrl,
+    this.roundedSquare = false,
   });
 
   final EventType type;
   final double size;
+  final String? customIconUrl;
+  final bool roundedSquare;
 
   @override
   Widget build(BuildContext context) {
-    final assetPath = AppAssets.eventIconPath(type);
+    final iconPath = customIconUrl?.trim().isNotEmpty == true
+        ? customIconUrl!.trim()
+        : AppAssets.eventIconPath(type);
+    final fallback = Icon(
+      _fallbackIcon(type),
+      color: AppColors.burgundy,
+      size: size * 0.42,
+    );
 
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
+        shape: roundedSquare ? BoxShape.rectangle : BoxShape.circle,
+        borderRadius: roundedSquare ? BorderRadius.circular(16) : null,
         color: AppColors.backgroundElevated,
         border: Border.all(
           color: AppColors.gold.withValues(alpha: 0.25),
@@ -32,20 +47,7 @@ class EventTypeIcon extends StatelessWidget {
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: EdgeInsets.all(size * 0.18),
-        child: Image.asset(
-          assetPath,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            return Icon(
-              _fallbackIcon(type),
-              color: AppColors.burgundy,
-              size: size * 0.42,
-            );
-          },
-        ),
-      ),
+      child: _IconImage(path: iconPath, size: size, fallback: fallback),
     );
   }
 
@@ -58,5 +60,61 @@ class EventTypeIcon extends StatelessWidget {
       EventType.concierto => Icons.music_note,
       EventType.evento => Icons.event_outlined,
     };
+  }
+}
+
+class _IconImage extends StatelessWidget {
+  const _IconImage({
+    required this.path,
+    required this.size,
+    required this.fallback,
+  });
+
+  final String path;
+  final double size;
+  final Widget fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedPath = path.toLowerCase().split('?').first;
+    final isSvg = normalizedPath.endsWith('.svg');
+    final isNetwork = path.startsWith('http://') || path.startsWith('https://');
+
+    if (isSvg && isNetwork) {
+      return SvgPicture.network(
+        path,
+        fit: BoxFit.cover,
+        placeholderBuilder: (_) => fallback,
+      );
+    }
+    if (isSvg) {
+      return SvgPicture.asset(
+        path,
+        fit: BoxFit.cover,
+        placeholderBuilder: (_) => fallback,
+      );
+    }
+    if (isNetwork) {
+      return CofradeoNetworkImage(
+        url: path,
+        fit: BoxFit.cover,
+        width: size,
+        height: size,
+        cacheSize: size,
+        placeholder: fallback,
+        errorWidget: fallback,
+      );
+    }
+    return Image.asset(
+      path,
+      fit: BoxFit.cover,
+      width: size,
+      height: size,
+      filterQuality: FilterQuality.low,
+      cacheWidth: ImageDecodeCache.px(context, size),
+      cacheHeight: ImageDecodeCache.px(context, size),
+      gaplessPlayback: true,
+      errorBuilder: (context, error, stackTrace) => fallback,
+    );
   }
 }

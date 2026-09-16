@@ -1,0 +1,43 @@
+.page {
+  width: min(100%, 720px);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+h1 {
+  margin: 6px 0 10px;
+  font-family: var(--font-serif);
+  font-size: clamp(1.6rem, 2.2vw, 2rem);
+  color: var(--text);
+}
+
+.lead {
+  margin: 0 0 18px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  max-width: 60ch;
+}
+
+.box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.box p {
+  margin: 0 0 8px;
+}
+
+.box p:last-child {
+  margin-bottom: 0;
+}

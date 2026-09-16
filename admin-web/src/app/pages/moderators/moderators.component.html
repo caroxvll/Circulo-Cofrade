@@ -1,0 +1,75 @@
+<section class="queue-page">
+  <header>
+    <div>
+      <p class="eyebrow">Comunidad · solo admin</p>
+      <h1>Moderadores</h1>
+      <p class="lead">
+        Asigna moderación por foro. No es un rol global: vive en
+        <code>forum_moderators</code>.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  <div class="panel">
+    <h2>Asignar moderador</h2>
+    <div class="form-grid">
+      <label>
+        Usuario
+        <app-handle-search [(ngModel)]="selected"></app-handle-search>
+      </label>
+      <label>
+        Foro
+        <select [(ngModel)]="forumId">
+          @for (pillar of pillars(); track pillar.id) {
+            <option [value]="pillar.id">{{ pillar.name }}</option>
+          }
+        </select>
+      </label>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="assigning() || !selected || !forumId"
+        (click)="assign()"
+      >
+        {{ assigning() ? 'Asignando…' : 'Asignar' }}
+      </button>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando asignaciones…</div>
+  } @else if (assignments().length === 0) {
+    <div class="empty-box">Todavía no hay moderadores de foro.</div>
+  } @else {
+    <div class="queue-list">
+      @for (row of assignments(); track row.profileId + ':' + row.forumId) {
+        <article class="queue-card">
+          <h2>{{ '@' + row.handle }}</h2>
+          <p class="queue-meta">
+            {{ row.forumName }}
+            · {{ timeAgo(row.assignedAt) }}
+          </p>
+          <div class="queue-actions">
+            <button
+              type="button"
+              class="btn btn-danger"
+              [disabled]="busyKey() === row.profileId + ':' + row.forumId"
+              (click)="remove(row)"
+            >
+              Quitar
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>

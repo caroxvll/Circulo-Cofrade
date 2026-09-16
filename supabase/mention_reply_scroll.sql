@@ -110,7 +110,7 @@ begin
           'replyId', new.id::text
         )
       from public.profiles p
-      where lower(p.handle) = v_handle
+      where lower(regexp_replace(p.handle, '^@', '')) = v_handle
         and p.id is distinct from new.author_id
         and public.notify_pref_enabled(p.id, 'mentions')
         and public.is_not_blocked(p.id, new.author_id);
@@ -120,3 +120,5 @@ begin
   return new;
 end;
 $$;
+
+-- Publicaciones oficiales hermandad → ver hermandad_official_post_notify.sql

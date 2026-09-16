@@ -26,7 +26,7 @@ Flujo: **modo invitado** para explorar → login al intentar publicar o personal
 
 Backend recomendado: **Supabase Auth** (JWT, RLS, mismo stack que foros y perfiles).
 
-Configuración paso a paso: [`SUPABASE.md`](SUPABASE.md).
+Configuración paso a paso: [`GOOGLE_AUTH.md`](GOOGLE_AUTH.md) · [`SUPABASE.md`](SUPABASE.md).
 
 ## Tipos de cuenta tras el registro
 

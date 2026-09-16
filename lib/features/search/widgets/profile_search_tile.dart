@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
+import '../../../core/widgets/verified_account_badge.dart';
 import '../models/search_results.dart';
+import '../search_design.dart';
 
 class ProfileSearchTile extends StatelessWidget {
   const ProfileSearchTile({
@@ -18,52 +20,74 @@ class ProfileSearchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(14),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              CofradeoAvatar(
-                imageUrl: profile.avatarUrl,
-                size: 44,
-                backgroundColor: AppColors.backgroundElevated,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      profile.displayName,
-                      style: AppTypography.titleLarge().copyWith(fontSize: 15),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      profile.handle,
-                      style: AppTypography.labelSmall(color: AppColors.burgundy),
-                    ),
-                    if (profile.bio.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        profile.bio,
-                        style: AppTypography.bodyMedium(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
+        borderRadius: BorderRadius.circular(SearchDesign.cardRadius),
+        child: Ink(
+          decoration: SearchDesign.cardDecoration(),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                CofradeoAvatar(
+                  imageUrl: profile.avatarUrl,
+                  size: 48,
+                  backgroundColor: AppColors.backgroundElevated,
                 ),
-              ),
-              const Icon(Icons.chevron_right, color: AppColors.textMuted),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              profile.displayName,
+                              style: AppTypography.titleLarge(
+                                color: AppColors.textPrimary,
+                              ).copyWith(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (profile.isVerified) ...[
+                            const SizedBox(width: 4),
+                            const VerifiedAccountIcon(size: 14),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        profile.handle,
+                        style: AppTypography.labelSmall(
+                          color: AppColors.burgundy,
+                        ).copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      if (profile.bio.isNotEmpty) ...[
+                        const SizedBox(height: 5),
+                        Text(
+                          profile.bio,
+                          style: SearchDesign.sectionMeta().copyWith(
+                            color: AppColors.textSecondary,
+                            height: 1.35,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textMuted.withValues(alpha: 0.75),
+                ),
+              ],
+            ),
           ),
         ),
       ),

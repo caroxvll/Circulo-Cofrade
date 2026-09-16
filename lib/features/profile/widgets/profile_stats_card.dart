@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
 import '../data/mock_profile.dart';
+import '../profile_design.dart';
 
 class ProfileStatsCard extends StatelessWidget {
   const ProfileStatsCard({
@@ -14,16 +14,11 @@ class ProfileStatsCard extends StatelessWidget {
   final int publicationCount;
   final int followerCount;
 
-  static const _cardColor = Color(0xFF1C1C1E);
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        color: _cardColor,
-        borderRadius: BorderRadius.circular(14),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+      decoration: ProfileDesign.cardDecoration(highlighted: true),
       child: IntrinsicHeight(
         child: Row(
           children: [
@@ -36,7 +31,7 @@ class ProfileStatsCard extends StatelessWidget {
             VerticalDivider(
               width: 1,
               thickness: 1,
-              color: Colors.white.withValues(alpha: 0.15),
+              color: AppColors.border.withValues(alpha: 0.8),
             ),
             Expanded(
               child: _StatColumn(
@@ -62,18 +57,9 @@ class _StatColumn extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          value,
-          style: AppTypography.displaySmall(color: AppColors.textOnDark)
-              .copyWith(fontSize: 22),
-        ),
+        Text(value, style: ProfileDesign.statValue()),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: AppTypography.labelSmall(
-            color: AppColors.goldLight,
-          ).copyWith(fontSize: 12),
-        ),
+        Text(label, style: ProfileDesign.statLabel()),
       ],
     );
   }

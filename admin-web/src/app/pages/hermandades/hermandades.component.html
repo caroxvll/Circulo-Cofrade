@@ -1,0 +1,151 @@
+<section class="queue-page">
+  <header>
+    <div>
+      <p class="eyebrow">Comunidad · solo admin</p>
+      <h1>Hermandades</h1>
+      <p class="lead">
+        Crea cuentas oficiales (Edge Function), vincula tablones y revisa
+        asignaciones activas.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (created(); as account) {
+    <div class="success-box">
+      <strong>Cuenta creada:</strong> {{ '@' + account.handle }} · {{ account.email }}
+      @if (account.temporaryPassword) {
+        <div class="pwd-row">
+          <code>{{ account.temporaryPassword }}</code>
+          <button type="button" class="btn btn-ghost" (click)="copyPassword()">
+            Copiar contraseña
+          </button>
+        </div>
+        <p class="sub">Guárdala ahora: no se vuelve a mostrar.</p>
+      }
+    </div>
+  }
+
+  <div class="two-col">
+    <div class="panel">
+      <h2>Crear cuenta oficial</h2>
+      <label>
+        Nombre oficial
+        <input [(ngModel)]="displayName" />
+      </label>
+      <label>
+        Handle
+        <input [(ngModel)]="handle" placeholder="sin @" />
+      </label>
+      <label>
+        Email
+        <input type="email" [(ngModel)]="email" />
+      </label>
+      <label class="check">
+        <input type="checkbox" [(ngModel)]="autoPassword" />
+        Generar contraseña temporal
+      </label>
+      @if (!autoPassword) {
+        <label>
+          Contraseña (≥ 8)
+          <input type="text" [(ngModel)]="password" />
+        </label>
+      }
+      <label>
+        Tablón (opcional)
+        <select [(ngModel)]="createTopicId">
+          <option value="">Sin vincular aún</option>
+          @for (topic of topics(); track topic.id) {
+            <option [value]="topic.id">{{ topic.title }}</option>
+          }
+        </select>
+      </label>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="creating()"
+        (click)="createAccount()"
+      >
+        {{ creating() ? 'Creando…' : 'Crear cuenta hermandad' }}
+      </button>
+    </div>
+
+    <div class="panel">
+      <h2>Vincular cuenta existente</h2>
+      <label>
+        Cuenta
+        <app-handle-search [(ngModel)]="selected"></app-handle-search>
+      </label>
+      <label>
+        Tablón
+        <select [(ngModel)]="linkTopicId">
+          @for (topic of topics(); track topic.id) {
+            <option [value]="topic.id">{{ topic.title }}</option>
+          }
+        </select>
+      </label>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="linking() || !selected || !linkTopicId"
+        (click)="linkAccount()"
+      >
+        {{ linking() ? 'Vinculando…' : 'Vincular tablón' }}
+      </button>
+    </div>
+  </div>
+
+  <h2 class="block-title">Asignaciones activas</h2>
+  @if (loading()) {
+    <div class="state-box">Cargando…</div>
+  } @else if (assignments().length === 0) {
+    <div class="empty-box">No hay vinculaciones de tablón.</div>
+  } @else {
+    <div class="queue-list">
+      @for (row of assignments(); track row.profileId + ':' + row.topicId) {
+        <article class="queue-card">
+          <h2>{{ '@' + row.handle }}</h2>
+          <p class="queue-meta">
+            {{ row.topicTitle }} · {{ timeAgo(row.createdAt) }}
+          </p>
+          <div class="queue-actions">
+            <button
+              type="button"
+              class="btn btn-danger"
+              [disabled]="busyKey() === row.profileId + ':' + row.topicId"
+              (click)="remove(row)"
+            >
+              Quitar
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+  }
+
+  <h2 class="block-title">Cuentas brotherhood</h2>
+  @if (brotherhoods().length === 0) {
+    <div class="empty-box">Ninguna cuenta con account_type = brotherhood.</div>
+  } @else {
+    <div class="queue-list">
+      @for (user of brotherhoods(); track user.id) {
+        <article class="queue-card">
+          <h2>{{ user.displayName }}</h2>
+          <p class="queue-meta">
+            {{ '@' + user.handle }}
+            · {{ user.verified ? 'verificada' : 'sin verificar' }}
+            · {{ timeAgo(user.createdAt) }}
+          </p>
+        </article>
+      }
+    </div>
+  }
+</section>

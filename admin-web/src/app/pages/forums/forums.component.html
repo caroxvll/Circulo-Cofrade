@@ -1,0 +1,392 @@
+<section class="queue-page forums-page">
+  <header>
+    <div>
+      <p class="eyebrow">Comunidad · solo admin</p>
+      <h1>Foros y apariencia</h1>
+      <p class="lead">
+        Hero de FOROS, portadas de pilares, textos y temas destacados
+        (Cuaresma / Semana Santa / Glorias).
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando foros…</div>
+  } @else {
+    <section class="hero-block">
+      <div class="hero-copy">
+        <h2>Hero lista FOROS</h2>
+        <p>Imagen de cabecera de la pantalla principal de foros.</p>
+        <div class="queue-actions">
+          <label class="btn btn-primary file-btn">
+            {{ saving() ? 'Subiendo…' : 'Subir imagen' }}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              [disabled]="saving()"
+              (change)="onHeroUpload($event)"
+            />
+          </label>
+          @if (heroUrl()) {
+            <button type="button" class="btn btn-ghost" [disabled]="saving()" (click)="clearHero()">
+              Quitar
+            </button>
+          }
+        </div>
+      </div>
+      <div class="hero-preview">
+        @if (heroUrl(); as url) {
+          <img [src]="url" alt="Hero FOROS" />
+        } @else {
+          <div class="hero-empty">Sin hero personalizado</div>
+        }
+      </div>
+    </section>
+
+    <div class="filters">
+      <input type="search" [(ngModel)]="search" placeholder="Buscar foro…" />
+    </div>
+
+    <h2 class="section-title">Pilares</h2>
+    @if (visible().length === 0) {
+      <div class="empty-box">No hay foros con ese filtro.</div>
+    } @else {
+      <div class="pillar-grid">
+        @for (pillar of visible(); track pillar.id) {
+          <article class="pillar-card" [class.off]="!pillar.isEnabled">
+            <div class="cover">
+              @if (pillar.coverImageUrl) {
+                <img [src]="pillar.coverImageUrl" alt="" />
+              } @else {
+                <div class="cover-fallback">{{ pillar.name.charAt(0) }}</div>
+              }
+              @if (pillar.isActive) {
+                <span class="badge">Activo</span>
+              }
+            </div>
+            <div class="body">
+              <h3>{{ pillar.name }}</h3>
+              <p class="id">{{ pillar.id }}</p>
+              <p class="desc">{{ pillar.description || 'Sin descripción' }}</p>
+              <p class="queue-meta">
+                Orden {{ pillar.sortOrder }} · {{ pillar.topicCount }} temas ·
+                {{ pillar.messageCount }} msgs
+                @if (!pillar.isEnabled) {
+                  · <em>oculto</em>
+                }
+              </p>
+              <div class="queue-actions wrap">
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === pillar.id"
+                  (click)="toggleEnabled(pillar)"
+                >
+                  {{ pillar.isEnabled ? 'Ocultar' : 'Mostrar' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  [disabled]="busyId() === pillar.id"
+                  (click)="toggleActive(pillar)"
+                >
+                  {{ pillar.isActive ? 'Quitar Activo' : 'Badge Activo' }}
+                </button>
+                <button type="button" class="btn btn-ghost" (click)="openCover(pillar)">
+                  Portada
+                </button>
+                <button type="button" class="btn btn-primary" (click)="openEdit(pillar)">
+                  Textos
+                </button>
+                @if (canDeletePillar(pillar)) {
+                  <button
+                    type="button"
+                    class="btn btn-ghost danger"
+                    [disabled]="busyId() === pillar.id"
+                    (click)="removePillar(pillar)"
+                  >
+                    Eliminar
+                  </button>
+                }
+              </div>
+            </div>
+          </article>
+        }
+      </div>
+    }
+
+    <section class="pinned-block">
+      <div class="pinned-head">
+        <div>
+          <h2 class="section-title">Temas destacados</h2>
+          <p class="lead compact">
+            Fijos arriba en Círculo, Pentagrama y Martillo. En Círculo puedes
+            marcar temporada (Cuaresma / SS / Glorias).
+          </p>
+        </div>
+      </div>
+
+      @for (group of pinnedGroups(); track group.forumId) {
+        <div class="pinned-group">
+          <div class="group-head">
+            <h3>{{ group.label }}</h3>
+            <button type="button" class="btn btn-soft" (click)="openNewTopic(group.forumId)">
+              Nuevo tema
+            </button>
+          </div>
+          @if (group.topics.length === 0) {
+            <div class="empty-box soft">Sin temas destacados en este foro.</div>
+          } @else {
+            <div class="topic-list">
+              @for (topic of group.topics; track topic.id; let i = $index) {
+                <article class="topic-card" [class.hidden-topic]="!topic.isListed">
+                  @if (topic.coverImageUrl) {
+                    <img class="topic-thumb" [src]="topic.coverImageUrl" alt="" />
+                  } @else {
+                    <div class="topic-thumb fallback">★</div>
+                  }
+                  <div class="topic-body">
+                    <h4>{{ topic.title }}</h4>
+                    <p class="queue-meta">
+                      Orden {{ topic.pinSortOrder }}
+                      @if (topic.seasonKey) {
+                        · {{ seasonLabel(topic.seasonKey) }}
+                      }
+                      · {{ topic.isListed ? 'Visible' : 'Oculto' }}
+                    </p>
+                    <p class="desc">{{ topic.excerpt }}</p>
+                    <div class="queue-actions wrap">
+                      <button
+                        type="button"
+                        class="btn btn-ghost"
+                        [disabled]="i === 0 || busyId() === topic.id"
+                        (click)="moveTopic(topic, -1)"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-ghost"
+                        [disabled]="i === group.topics.length - 1 || busyId() === topic.id"
+                        (click)="moveTopic(topic, 1)"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-soft"
+                        [disabled]="busyId() === topic.id"
+                        (click)="toggleTopicListed(topic)"
+                      >
+                        {{ topic.isListed ? 'Ocultar' : 'Mostrar' }}
+                      </button>
+                      <button type="button" class="btn btn-primary" (click)="openEditTopic(topic)">
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-ghost danger"
+                        [disabled]="busyId() === topic.id"
+                        (click)="removeTopic(topic)"
+                      >
+                        Borrar
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
+</section>
+
+@if (dialog() === 'pillar' && editingPillar(); as pillar) {
+  <div class="dialog-backdrop" (click)="closeDialog()">
+    <div class="dialog form-dialog" (click)="$event.stopPropagation()">
+      <h3>Editar textos</h3>
+      <p class="hint">ID fijo: <code>{{ pillar.id }}</code></p>
+      <label>
+        Nombre
+        <input [(ngModel)]="formName" />
+      </label>
+      <label>
+        Descripción (lista FOROS)
+        <textarea rows="3" [(ngModel)]="formDescription"></textarea>
+      </label>
+      <label>
+        Tagline «Sobre este foro»
+        <input [(ngModel)]="formTagline" />
+      </label>
+      <label>
+        Texto «Sobre este foro»
+        <textarea rows="4" [(ngModel)]="formAbout"></textarea>
+      </label>
+      <label>
+        Normas del foro
+        <textarea rows="4" [(ngModel)]="formRules"></textarea>
+      </label>
+      <div class="queue-actions">
+        <button type="button" class="btn btn-ghost" (click)="closeDialog()">Cancelar</button>
+        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="saveEdit()">
+          {{ saving() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (dialog() === 'cover' && editingPillar(); as pillar) {
+  <div class="dialog-backdrop" (click)="closeDialog()">
+    <div class="dialog form-dialog" (click)="$event.stopPropagation()">
+      <h3>Portada · {{ pillar.name }}</h3>
+      @if (formCoverUrl) {
+        <img class="dialog-preview" [src]="formCoverUrl" alt="" />
+      }
+      <label>
+        URL
+        <input [(ngModel)]="formCoverUrl" placeholder="https://…" />
+      </label>
+      <label class="file-row">
+        Subir imagen
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          (change)="onPillarCoverUpload($event)"
+        />
+      </label>
+      <div class="queue-actions">
+        <button type="button" class="btn btn-ghost" (click)="closeDialog()">Cancelar</button>
+        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="saveCover()">
+          {{ saving() ? 'Guardando…' : 'Guardar portada' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (dialog() === 'topic-new') {
+  <div class="dialog-backdrop" (click)="closeDialog()">
+    <div class="dialog form-dialog" (click)="$event.stopPropagation()">
+      <h3>Nuevo tema destacado</h3>
+      <label>
+        Foro
+        <select [(ngModel)]="topicForumId">
+          @for (id of parentForumIds; track id) {
+            <option [value]="id">{{ parentLabel(id) }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Título
+        <input [(ngModel)]="topicTitle" />
+      </label>
+      @if (topicForumId === 'foro-cofradiero') {
+        <label>
+          Temporada
+          <select [(ngModel)]="topicSeason">
+            <option value="">Sin temporada</option>
+            @for (s of seasonKeys; track s.value) {
+              <option [value]="s.value">{{ s.label }}</option>
+            }
+          </select>
+        </label>
+      }
+      <label>
+        Icono
+        <select [(ngModel)]="topicIcon">
+          @for (icon of iconKeys; track icon.value) {
+            <option [value]="icon.value">{{ icon.label }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Excerpt
+        <textarea rows="2" [(ngModel)]="topicExcerpt" placeholder="Opcional"></textarea>
+      </label>
+      <label>
+        Cuerpo
+        <textarea rows="4" [(ngModel)]="topicBody" placeholder="Opcional"></textarea>
+      </label>
+      <div class="queue-actions">
+        <button type="button" class="btn btn-ghost" (click)="closeDialog()">Cancelar</button>
+        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="createTopic()">
+          {{ saving() ? 'Creando…' : 'Crear' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (dialog() === 'topic-edit' && editingTopic(); as topic) {
+  <div class="dialog-backdrop" (click)="closeDialog()">
+    <div class="dialog form-dialog" (click)="$event.stopPropagation()">
+      <h3>{{ topic.title }}</h3>
+      <p class="hint">
+        {{ parentLabel(topic.forumId) }}
+        @if (topic.seasonKey) {
+          · {{ seasonLabel(topic.seasonKey) }}
+        }
+      </p>
+      @if (topicCoverUrl) {
+        <img class="dialog-preview" [src]="topicCoverUrl" alt="" />
+      }
+      <label>
+        Excerpt
+        <textarea rows="2" [(ngModel)]="topicExcerpt"></textarea>
+      </label>
+      <label>
+        Cuerpo
+        <textarea rows="4" [(ngModel)]="topicBody"></textarea>
+      </label>
+      <label>
+        Icono
+        <select [(ngModel)]="topicIcon">
+          @for (icon of iconKeys; track icon.value) {
+            <option [value]="icon.value">{{ icon.label }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Portada (URL)
+        <input [(ngModel)]="topicCoverUrl" />
+      </label>
+      <label class="file-row">
+        Subir portada
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          (change)="onTopicCoverUpload($event)"
+        />
+      </label>
+      <label class="check">
+        <input type="checkbox" [(ngModel)]="topicListed" />
+        Visible en la lista del foro
+      </label>
+      <label class="check">
+        <input type="checkbox" [(ngModel)]="topicShowHubTitle" />
+        Mostrar título e icono sobre la portada del hub
+      </label>
+      <p class="hint">
+        Desactívalo si la imagen ya incluye la marca (p. ej. Semana Santa).
+      </p>
+      <div class="queue-actions">
+        <button type="button" class="btn btn-ghost" (click)="closeDialog()">Cancelar</button>
+        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="saveTopic()">
+          {{ saving() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

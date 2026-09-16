@@ -6,7 +6,9 @@ import '../../../core/theme/app_colors.dart';
 import '../notifications_provider.dart';
 
 class NotificationsBellButton extends ConsumerWidget {
-  const NotificationsBellButton({super.key});
+  const NotificationsBellButton({super.key, this.iconColor});
+
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -18,7 +20,7 @@ class NotificationsBellButton extends ConsumerWidget {
         IconButton(
           onPressed: () => context.go('/notificaciones'),
           icon: const Icon(Icons.notifications_outlined),
-          color: AppColors.burgundy,
+          color: iconColor ?? AppColors.burgundy,
         ),
         if (hasUnread)
           const Positioned(

@@ -1,0 +1,63 @@
+<section class="queue-page">
+  <header>
+    <div>
+      <p class="eyebrow">Moderación</p>
+      <h1>Historial de rechazos</h1>
+      <p class="lead">Temas rechazados. Puedes borrarlos de la base de datos.</p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando historial…</div>
+  } @else if (topics().length === 0) {
+    <div class="empty-box">No hay rechazos registrados.</div>
+  } @else {
+    <div class="queue-list">
+      @for (topic of topics(); track topic.id) {
+        <article class="queue-card">
+          <h2>{{ topic.title }}</h2>
+          <p class="queue-meta">
+            {{ topic.forumId }}
+            ·
+            {{ topic.authorHandle ? '@' + topic.authorHandle + ' · ' : '' }}
+            {{ timeAgo(topic.rejectedAt || topic.createdAt) }}
+          </p>
+          @if (topic.rejectionReason) {
+            <p class="queue-excerpt"><strong>Motivo:</strong> {{ topic.rejectionReason }}</p>
+          }
+          <div class="queue-actions">
+            <button
+              type="button"
+              class="btn btn-danger"
+              [disabled]="busyId() === topic.id"
+              (click)="remove(topic)"
+            >
+              Eliminar
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+    @if (hasMore()) {
+      <div class="queue-toolbar" style="margin-top: 14px">
+        <button
+          type="button"
+          class="btn btn-ghost"
+          [disabled]="loadingMore()"
+          (click)="loadMore()"
+        >
+          {{ loadingMore() ? 'Cargando…' : 'Cargar más' }}
+        </button>
+      </div>
+    }
+  }
+</section>

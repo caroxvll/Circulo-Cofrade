@@ -9,4 +9,8 @@ abstract final class AppBranding {
   static const defaultBio = 'Miembro de Círculo Cofrade.';
   static const logoutConfirm = '¿Seguro que quieres salir de Círculo Cofrade?';
   static const joinCta = 'Únete a Círculo Cofrade';
+
+  /// Origen https para enlaces compartidos y App Links.
+  /// Requiere `assetlinks.json` / AASA en el dominio para abrir la app sola.
+  static const webOrigin = 'https://cofradeo.app';
 }

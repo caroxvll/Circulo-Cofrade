@@ -61,6 +61,12 @@ En Supabase → **SQL Editor**:
 7. Ejecuta [`supabase/reply_likes_and_moderation.sql`](../supabase/reply_likes_and_moderation.sql)  
    Me gusta en respuestas (tabla `forum_reply_likes`)
 
+7b. Ejecuta [`supabase/reply_reactions.sql`](../supabase/reply_reactions.sql) y después  
+    [`supabase/reply_reactions_emoji.sql`](../supabase/reply_reactions_emoji.sql)  
+    Reacciones múltiples (❤️ 👏 🤗 …) + Realtime entre pantallas. **Sin el segundo script la app no guarda emojis.**  
+    Si `reply_reactions.sql` falla con **23514**, ejecuta solo [`supabase/reply_reactions_fix.sql`](../supabase/reply_reactions_fix.sql).  
+    Luego [`supabase/reply_reaction_notify.sql`](../supabase/reply_reaction_notify.sql) — aviso al autor, listado de quién reaccionó y **agrupación** («3 personas reaccionaron…»). Vuelve a ejecutarlo si ya lo tenías: actualiza el trigger.
+
 8. Ejecuta [`supabase/topic_views_dedup.sql`](../supabase/topic_views_dedup.sql)  
    Visitas: tabla `topic_views` + **1 visita por usuario/invitado y día**  
    (sustituye la función simple de `topic_view_counter.sql`)
@@ -104,14 +110,37 @@ En Supabase → **SQL Editor**:
     update public.profiles set role = 'editor' where handle = 'hermandad_ejemplo';
     ```
 
-20. Ejecuta [`supabase/search_trends.sql`](../supabase/search_trends.sql)  
+20. Ejecuta [`supabase/calendar_notify.sql`](../supabase/calendar_notify.sql)  
+    Avisos a usuarios cuando un evento del calendario queda **publicado/aprobado**. Respeta la preferencia **Avisos importantes** (`notify_calendar`).
+
+20b. Ejecuta [`supabase/calendar_event_reminders.sql`](../supabase/calendar_event_reminders.sql)  
+    Recordatorios **24 h** y **1 h** antes del evento. Activa **pg_cron** y ejecuta [`calendar_event_reminders_cron.sql`](../supabase/calendar_event_reminders_cron.sql).
+
+20c. Ejecuta [`supabase/google_oauth_profile.sql`](../supabase/google_oauth_profile.sql)  
+    Perfil automático al registrarse con Google (nombre, foto, handle único).
+
+20d. Comprueba el despliegue con [`verify_calendar_oauth_deploy.sql`](../supabase/verify_calendar_oauth_deploy.sql)  
+    Todas las filas deben mostrar `ok = true` (pg_cron solo tras el paso 20b).  
+    Pruebas manuales en app: [`PRUEBAS-BETA.md`](PRUEBAS-BETA.md).
+
+21. Ejecuta [`supabase/search_trends.sql`](../supabase/search_trends.sql)  
     Tendencias reales en Buscar: función `fetch_trending_hashtags` (#hashtags en temas y respuestas publicados). Sin SQL nuevo en tablas.
 
-21. Ejecuta [`supabase/forum_reply_edit_delete.sql`](../supabase/forum_reply_edit_delete.sql)  
+22. Ejecuta [`supabase/forum_reply_edit_delete.sql`](../supabase/forum_reply_edit_delete.sql)  
     Editar respuesta (30 min, sin hijos) + ocultar (soft delete) conservando texto para moderación/reportes.
 
-22. **Push FCM** — ejecuta [`supabase/device_tokens.sql`](../supabase/device_tokens.sql) y sigue [`PUSH_FCM.md`](PUSH_FCM.md)  
+23. **Push FCM** — ejecuta [`supabase/device_tokens.sql`](../supabase/device_tokens.sql) y sigue [`PUSH_FCM.md`](PUSH_FCM.md)  
     Tabla `device_tokens`, Edge Function `send-push`, webhook en `notifications` INSERT, claves Firebase en `env.json`.
+
+24. Ejecuta [`supabase/noticias_forum.sql`](../supabase/noticias_forum.sql)  
+    Foro fijo **Noticias**: solo admin/moderadores crean; admin publica directo; moderador → pendiente Junta; avisos `news_published` + preferencia `notify_news`.  
+    Tras el SQL, redeploy de la Edge Function `send-push` (mapea `news_published` → `notify_news`).
+
+25. Ejecuta [`supabase/noticias_related_forum.sql`](../supabase/noticias_related_forum.sql)  
+    Etiqueta opcional `related_forum_id` en noticias (asocia a Círculo / Pentagrama / Martillo / Hermandades sin duplicar el hilo).
+
+26. Ejecuta [`supabase/noticias_forum_follow.sql`](../supabase/noticias_forum_follow.sql)  
+    Botón **Seguir noticias**: `follows.target_type = 'forum'`. Los avisos `news_published` llegan **solo a quien sigue** Noticias (y tiene `notify_news`).
 
 > Pantalla Junta en la app: Perfil → **Junta** (solo admin/moderator). Plan completo en [`ADMIN.md`](ADMIN.md)
 
@@ -122,7 +151,7 @@ En Supabase → **SQL Editor**:
 | Provider | Acción |
 |----------|--------|
 | **Email** | Activar. **Confirm email: ON** (obligatorio en producción; ver nota abajo) |
-| **Google** | Client ID/Secret (Google Cloud Console) |
+| **Google** | Client ID/Secret — guía completa en [`GOOGLE_AUTH.md`](GOOGLE_AUTH.md) |
 | **Apple** | Service ID + key (iOS) |
 
 #### Confirmación de email (importante)

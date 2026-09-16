@@ -1,0 +1,250 @@
+<section class="queue-page conversations-page">
+  <header>
+    <div>
+      <p class="eyebrow">Moderación</p>
+      <h1>Conversaciones</h1>
+      <p class="lead">
+        Explora foros, abre hilos y modera: cerrar temas, borrar mensajes y
+        eliminar conversaciones.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button
+        type="button"
+        class="btn btn-soft"
+        (click)="reloadTopics()"
+        [disabled]="loadingTopics() || !selectedForumId()"
+      >
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loadingForums()) {
+    <div class="state-box">Cargando foros…</div>
+  } @else if (forums().length === 0) {
+    <div class="empty-box">
+      No hay foros disponibles para moderar con esta cuenta.
+    </div>
+  } @else {
+    <div class="conv-layout" [class.thread-open]="!!selectedTopic()">
+      <aside class="forum-rail">
+        <p class="rail-title">Foros</p>
+        <div class="forum-list">
+          @for (forum of forums(); track forum.id) {
+            <button
+              type="button"
+              class="forum-item"
+              [class.active]="selectedForumId() === forum.id"
+              (click)="selectForum(forum.id)"
+            >
+              <strong>{{ forum.name }}</strong>
+              <span>
+                {{ forum.topicCount }} temas · {{ forum.messageCount }} msgs
+                @if (!forum.isEnabled) {
+                  · oculto
+                }
+              </span>
+            </button>
+          }
+        </div>
+      </aside>
+
+      <section class="topics-pane">
+        <div class="topics-toolbar">
+          <div>
+            <h2>{{ selectedForum()?.name || 'Temas' }}</h2>
+            <p class="queue-meta">
+              {{ isAdmin() ? 'Vista admin' : 'Tus foros moderados' }}
+            </p>
+          </div>
+          <div class="filters compact">
+            <input
+              type="search"
+              [(ngModel)]="topicSearch"
+              (keyup.enter)="searchTopics()"
+              placeholder="Buscar tema o autor…"
+            />
+            <select
+              [ngModel]="statusFilter()"
+              (ngModelChange)="setStatusFilter($event)"
+            >
+              <option value="published">Publicados</option>
+              <option value="pending">Pendientes</option>
+              <option value="rejected">Rechazados</option>
+              <option value="all">Todos</option>
+            </select>
+            <button type="button" class="btn btn-soft" (click)="searchTopics()">
+              Buscar
+            </button>
+          </div>
+        </div>
+
+        @if (loadingTopics()) {
+          <div class="state-box">Cargando temas…</div>
+        } @else if (topics().length === 0) {
+          <div class="empty-box">No hay temas con estos filtros.</div>
+        } @else {
+          <div class="topic-list">
+            @for (topic of topics(); track topic.id) {
+              <button
+                type="button"
+                class="topic-row"
+                [class.active]="selectedTopic()?.id === topic.id"
+                (click)="openTopic(topic.id)"
+              >
+                <div class="topic-main">
+                  <div class="topic-kicker">
+                    <span class="pill" [attr.data-status]="topic.status">
+                      {{ statusLabel(topic.status) }}
+                    </span>
+                    @if (topic.isClosed) {
+                      <span class="pill closed">Cerrado</span>
+                    }
+                    @if (topic.isPinned) {
+                      <span class="pill pinned">Fijado</span>
+                    }
+                    @if (topic.isSystem) {
+                      <span class="pill system">Sistema</span>
+                    }
+                  </div>
+                  <strong>{{ topic.title }}</strong>
+                  <span class="queue-meta">
+                    {{ handleLabel(topic.authorHandle) }}
+                    · {{ topic.commentCount }} resp.
+                    · {{ timeAgo(topic.lastActivityAt || topic.createdAt) }}
+                  </span>
+                  @if (topic.excerpt) {
+                    <p class="topic-excerpt">{{ topic.excerpt }}</p>
+                  }
+                </div>
+              </button>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="thread-pane">
+        @if (!selectedTopic()) {
+          <div class="thread-empty">
+            <h3>Selecciona un tema</h3>
+            <p>Aquí verás el contenido y las respuestas para moderar.</p>
+          </div>
+        } @else if (loadingThread()) {
+          <div class="state-box">Cargando conversación…</div>
+        } @else {
+          <div class="thread-head">
+            <button type="button" class="btn btn-ghost back-mobile" (click)="closeThread()">
+              ← Temas
+            </button>
+            <div class="thread-title-block">
+              <div class="topic-kicker">
+                <span class="pill" [attr.data-status]="selectedTopic()!.status">
+                  {{ statusLabel(selectedTopic()!.status) }}
+                </span>
+                @if (selectedTopic()!.isClosed) {
+                  <span class="pill closed">Cerrado</span>
+                }
+              </div>
+              <h2>{{ selectedTopic()!.title }}</h2>
+              <p class="queue-meta">
+                {{ handleLabel(selectedTopic()!.authorHandle) }}
+                · {{ dateTime(selectedTopic()!.createdAt) }}
+                · {{ selectedTopic()!.viewCount }} vistas
+              </p>
+            </div>
+            <div class="thread-actions">
+              @if (selectedTopic()!.isClosed) {
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === selectedTopic()!.id"
+                  (click)="reopenTopic()"
+                >
+                  Reabrir
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === selectedTopic()!.id"
+                  (click)="closeTopic()"
+                >
+                  Cerrar
+                </button>
+              }
+              <button
+                type="button"
+                class="btn btn-danger"
+                [disabled]="busyId() === selectedTopic()!.id"
+                (click)="deleteTopic()"
+              >
+                Eliminar tema
+              </button>
+            </div>
+          </div>
+
+          <article class="op-post">
+            <p class="op-label">Publicación original</p>
+            <div class="op-body">{{ selectedTopic()!.body || selectedTopic()!.excerpt }}</div>
+          </article>
+
+          <div class="replies-head">
+            <h3>Respuestas ({{ visibleReplies().length }})</h3>
+          </div>
+
+          @if (visibleReplies().length === 0) {
+            <div class="empty-box soft">Aún no hay respuestas en este hilo.</div>
+          } @else {
+            <div class="reply-list">
+              @for (reply of visibleReplies(); track reply.id) {
+                <article class="reply-card" [class.deleted]="!!reply.deletedAt">
+                  <div class="reply-top">
+                    <div>
+                      <strong>{{ handleLabel(reply.authorHandle) }}</strong>
+                      <span class="queue-meta">{{ dateTime(reply.createdAt) }}</span>
+                    </div>
+                    @if (!reply.deletedAt) {
+                      <button
+                        type="button"
+                        class="btn btn-soft"
+                        [disabled]="busyId() === reply.id"
+                        (click)="hideReply(reply)"
+                      >
+                        Ocultar
+                      </button>
+                    } @else {
+                      <div class="reply-actions">
+                        <span class="pill closed">Oculta</span>
+                        <button
+                          type="button"
+                          class="btn btn-danger"
+                          [disabled]="busyId() === reply.id"
+                          (click)="purgeReply(reply)"
+                        >
+                          Borrar definitivo
+                        </button>
+                      </div>
+                    }
+                  </div>
+                  <p class="reply-content" [class.muted]="!!reply.deletedAt">
+                    {{ reply.content }}
+                  </p>
+                  @if (reply.deletedAt) {
+                    <p class="queue-meta reply-deleted-note">
+                      Oculta · {{ dateTime(reply.deletedAt) }}
+                    </p>
+                  }
+                </article>
+              }
+            </div>
+          }
+        }
+      </section>
+    </div>
+  }
+</section>

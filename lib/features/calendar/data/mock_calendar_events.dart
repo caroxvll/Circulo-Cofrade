@@ -1,161 +1,143 @@
+import '../../../core/constants/app_assets.dart';
 import '../../../shared/models/calendar_event.dart';
 
-
-
 final mockCalendarEvents = <CalendarEvent>[
-
   CalendarEvent(
-
+    id: 'mock-event-1',
     date: DateTime(2026, 6, 2),
-
     title: 'Salida de Procesión',
-
     subtitle: 'Hermandad de la Macarena. 20:30',
-
     type: EventType.procesion,
-
     dayLabel: 'Salida de\nProcesión',
-
     time: '20:30',
-
     organizerLabel: 'Hermandad de la Macarena',
-
   ),
-
   CalendarEvent(
-
+    id: 'mock-event-2',
     date: DateTime(2026, 6, 5),
-
     title: 'Salida de Procesión',
-
     subtitle: 'Ntra. Señora de la Misericordia. 18:00',
-
     type: EventType.procesion,
-
     time: '18:00',
-
     organizerLabel: 'Ntra. Señora de la Misericordia',
-
   ),
-
   CalendarEvent(
-
+    id: 'mock-event-3',
     date: DateTime(2026, 6, 6),
-
     title: 'Traslado al paso',
-
     subtitle: 'Capilla de los Marineros. 11:00',
-
     type: EventType.evento,
-
     dayLabel: 'Traslado',
-
     time: '11:00',
-
     location: 'Capilla de los Marineros',
-
+    organizerLabel: 'Hdad. del Rocío',
   ),
-
   CalendarEvent(
-
+    id: 'mock-event-4',
     date: DateTime(2026, 6, 8),
-
     title: 'Iguala de costaleros',
-
     subtitle: 'Casa de la Hermandad. 19:00',
-
     type: EventType.iguala,
-
     dayLabel: 'Iguala',
-
     time: '19:00',
-
     location: 'Casa de la Hermandad',
-
+    organizerLabel: 'Hdad. de la Sentencia',
+    customIconUrl: AppAssets.forumCofradieroIcon,
   ),
-
   CalendarEvent(
-
+    id: 'mock-event-5',
     date: DateTime(2026, 6, 10),
-
     title: 'Concierto de marchas',
-
     subtitle: 'Teatro Lope de Vega. 21:00',
-
     type: EventType.concierto,
-
     dayLabel: 'Concierto',
-
     time: '21:00',
-
     location: 'Teatro Lope de Vega',
-
+    organizerLabel: 'Banda de la Cruz Roja',
+    customIconUrl: AppAssets.forumPentagramaIcon,
   ),
-
   CalendarEvent(
-
+    id: 'mock-event-6',
     date: DateTime(2026, 6, 12),
-
     title: 'Ensayo general de banda',
-
     subtitle: 'Agrupación Musical. 21:00',
-
     type: EventType.ensayo,
-
     dayLabel: 'Ensayo',
-
     time: '21:00',
-
+    organizerLabel: 'Agrupación Musical',
   ),
-
   CalendarEvent(
-
+    id: 'mock-event-7',
     date: DateTime(2026, 6, 15),
-
     title: 'Ensayo de nazarenos',
-
     subtitle: 'Sede de la Hermandad. 20:00',
-
     type: EventType.ensayo,
-
     time: '20:00',
-
     location: 'Sede de la Hermandad',
-
+    organizerLabel: 'Hdad. de la Sentencia',
+    customIconUrl: AppAssets.forumCofradieroIcon,
   ),
-
   CalendarEvent(
-
+    id: 'mock-event-8',
     date: DateTime(2026, 6, 20),
-
     title: 'Iguala de nazarenos',
-
     subtitle: 'Calle Sierpes. 10:30',
-
     type: EventType.iguala,
-
     time: '10:30',
-
     location: 'Calle Sierpes',
-
+    organizerLabel: 'Hdad. del Gran Poder',
   ),
-
   CalendarEvent(
-
-    date: DateTime(2026, 6, 24),
-
-    title: 'Procesión de gloria',
-
-    subtitle: 'Corpus Christi. 12:00',
-
-    type: EventType.gloria,
-
-    dayLabel: 'Gloria',
-
-    time: '12:00',
-
+    id: 'mock-event-9',
+    date: DateTime(2026, 6, 23),
+    title: 'Hdad del Valle',
+    subtitle: 'Procesión extraordinaria',
+    type: EventType.procesion,
+    time: '21:45',
+    location: 'Iglesia de la Anunciación',
+    organizerLabel: 'Hdad. del Valle',
+    customIconUrl: AppAssets.forumCofradieroIcon,
   ),
-
+  CalendarEvent(
+    id: 'mock-event-10',
+    date: DateTime(2026, 6, 23),
+    title: 'Ensayo de costaleros',
+    subtitle: 'Preparación del paso',
+    type: EventType.ensayo,
+    time: '20:00',
+    location: 'Casa de Hermandad',
+    organizerLabel: 'Hdad. de la Sentencia',
+    customIconUrl: AppAssets.forumCofradieroIcon,
+  ),
+  CalendarEvent(
+    id: 'mock-event-11',
+    date: DateTime(2026, 6, 23),
+    title: 'Traslado del Cristo',
+    subtitle: 'Acto de traslado',
+    type: EventType.evento,
+    time: '19:30',
+    location: 'Basílica del Gran Poder',
+    organizerLabel: 'Hdad. del Gran Poder',
+  ),
+  CalendarEvent(
+    id: 'mock-event-12',
+    date: DateTime(2026, 6, 23),
+    title: 'Concierto de marchas',
+    subtitle: 'Programa cofrade',
+    type: EventType.concierto,
+    time: '22:15',
+    location: 'Teatro de la Maestranza',
+    organizerLabel: 'Banda de la Cruz Roja',
+    customIconUrl: AppAssets.forumPentagramaIcon,
+  ),
+  CalendarEvent(
+    id: 'mock-event-13',
+    date: DateTime(2026, 6, 24),
+    title: 'Procesión de gloria',
+    subtitle: 'Corpus Christi. 12:00',
+    type: EventType.gloria,
+    dayLabel: 'Gloria',
+    time: '12:00',
+    organizerLabel: 'Hdad. del Valle',
+  ),
 ];
-
-

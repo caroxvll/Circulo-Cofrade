@@ -1,0 +1,266 @@
+.season-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.preview-panel {
+  background: linear-gradient(160deg, #2a1618, #1a1210);
+  color: #f5efe8;
+  border-color: transparent;
+  min-height: 180px;
+}
+
+.preview-panel.on {
+  background: linear-gradient(160deg, #7a0814, #3a1014);
+}
+
+.panel-label {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  font-weight: 700;
+}
+
+.preview-panel h2 {
+  margin: 0 0 6px;
+  font-family: var(--font-serif);
+  font-size: 1.45rem;
+}
+
+.preview-panel p {
+  margin: 0;
+  opacity: 0.9;
+  line-height: 1.45;
+}
+
+.resolved {
+  margin-top: 16px !important;
+  font-size: 0.88rem;
+  opacity: 0.85 !important;
+}
+
+.resolved em {
+  font-style: normal;
+  opacity: 0.75;
+}
+
+.panel label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.panel input[type='number'],
+.panel input[type='date'],
+.year-pick select {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  background: #fff;
+}
+
+.check.big {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  grid-template-columns: none;
+  margin-bottom: 16px;
+  font-size: 0.95rem;
+}
+
+.hint {
+  margin: -4px 0 12px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.panel h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.panel hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+.year-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.ok-box {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #e8f0ea;
+  color: #2f6b3a;
+  border: 1px solid #c5d9cb;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .season-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.days-panel {
+  margin-top: 14px;
+}
+
+.days-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.days-head h3 {
+  margin: 0 0 6px;
+}
+
+.live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #f1eae2;
+  color: #5c5652;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.live-status.on {
+  background: rgba(122, 8, 20, 0.1);
+  color: #7a0814;
+}
+
+.live-status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.days-actions {
+  margin-bottom: 12px;
+}
+
+.day-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.day-row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.day-row.open {
+  border-color: rgba(122, 8, 20, 0.28);
+  background: rgba(122, 8, 20, 0.03);
+}
+
+.day-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.day-main strong {
+  font-size: 0.95rem;
+}
+
+.day-range {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.badge {
+  display: inline-block;
+  width: fit-content;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: #eee;
+  color: #555;
+}
+
+.badge[data-tone='open'] {
+  background: rgba(122, 8, 20, 0.12);
+  color: #7a0814;
+}
+
+.badge[data-tone='forced'] {
+  background: rgba(155, 116, 36, 0.18);
+  color: #9b7424;
+}
+
+.badge[data-tone='scheduled'] {
+  background: #e8eef5;
+  color: #3a5a7a;
+}
+
+.badge[data-tone='closed'] {
+  background: #f0ebe6;
+  color: #6e6a67;
+}
+
+.day-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .days-head {
+    flex-direction: column;
+  }
+
+  .day-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .day-actions {
+    justify-content: flex-start;
+  }
+}

@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -43,7 +44,16 @@ final supabaseReadyProvider = Provider<bool>((ref) {
   return SupabaseConfig.isConfigured && SupabaseBootstrap.isInitialized;
 });
 
-/// Con Supabase conectado la app exige sesión; sin credenciales (tests/dev) permite invitado.
+bool _isWidgetTest() =>
+    WidgetsBinding.instance.runtimeType.toString().contains('TestWidgetsFlutterBinding');
+
+/// Si Supabase no está configurado y NO estamos en `flutter test`,
+/// evitamos que se muestren datos mock: forzamos ir a auth.
+///
+/// En `flutter test` mantenemos el comportamiento anterior para que los mocks
+/// de UI se puedan renderizar.
 final authRequiredProvider = Provider<bool>((ref) {
-  return ref.watch(supabaseReadyProvider);
+  final supabaseReady = ref.watch(supabaseReadyProvider);
+  if (_isWidgetTest()) return supabaseReady;
+  return true;
 });

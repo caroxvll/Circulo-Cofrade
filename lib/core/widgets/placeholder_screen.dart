@@ -29,7 +29,10 @@ class PlaceholderScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 24),
-            Text(title, style: AppTypography.displayLarge()),
+            Text(
+              title.toUpperCase(),
+              style: AppTypography.screenTitle(),
+            ),
             if (subtitle != null) ...[
               const SizedBox(height: 8),
               Text(subtitle!, style: AppTypography.bodyMedium()),

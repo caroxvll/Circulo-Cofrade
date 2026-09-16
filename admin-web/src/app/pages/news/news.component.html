@@ -1,0 +1,406 @@
+<section class="queue-page news-page">
+  <header>
+    <div>
+      <p class="eyebrow">Comunidad</p>
+      <h1>Noticias</h1>
+      <p class="lead">
+        Publica o programa piezas del canal editorial. Usa negrita/cursiva como
+        en la app y previsualiza el móvil antes de sacar.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button
+        type="button"
+        class="btn btn-soft"
+        (click)="reload()"
+        [disabled]="loading() || busy()"
+      >
+        Actualizar
+      </button>
+      @if (tab() === 'scheduled') {
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="publishDue()"
+          [disabled]="busy() || !canManage()"
+        >
+          Publicar vencidas
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (!canManage()) {
+    <div class="empty-box">
+      Solo admin o moderadores del foro Noticias pueden gestionar este canal.
+    </div>
+  } @else {
+    <div class="tabs">
+      <button
+        type="button"
+        [class.active]="tab() === 'compose'"
+        (click)="setTab('compose')"
+      >
+        {{ isEditing() ? 'Editar' : 'Crear' }}
+      </button>
+      <button
+        type="button"
+        [class.active]="tab() === 'published'"
+        (click)="setTab('published')"
+      >
+        Publicadas
+      </button>
+      <button
+        type="button"
+        [class.active]="tab() === 'scheduled'"
+        (click)="setTab('scheduled')"
+      >
+        Programadas
+      </button>
+    </div>
+
+    @if (error()) {
+      <div class="error-box">{{ error() }}</div>
+    }
+    @if (ok()) {
+      <div class="ok-box">{{ ok() }}</div>
+    }
+
+    @if (tab() === 'compose') {
+      <div class="compose-layout" [class.preview-hidden]="!showPreview()">
+        <form class="compose-card" (ngSubmit)="submit()">
+          @if (isEditing()) {
+            <div class="edit-banner">
+              <strong>
+                @if (editingTopicId) {
+                  Editando noticia publicada
+                } @else {
+                  Editando noticia programada
+                }
+              </strong>
+              <button type="button" class="btn btn-ghost" (click)="cancelEdit()">
+                Cancelar edición
+              </button>
+            </div>
+          }
+
+          <label>
+            <span>Título</span>
+            <input
+              type="text"
+              [(ngModel)]="title"
+              name="title"
+              maxlength="160"
+              required
+              placeholder="Titular de la noticia"
+              (ngModelChange)="onTitleInput()"
+            />
+          </label>
+
+          <div class="editor-block">
+            <div class="editor-toolbar">
+              <span class="field-label">Cuerpo</span>
+              <div class="fmt-btns">
+                <button
+                  type="button"
+                  class="fmt"
+                  title="Negrita"
+                  (click)="applyFormat('bold', bodyArea)"
+                >
+                  <strong>B</strong>
+                </button>
+                <button
+                  type="button"
+                  class="fmt"
+                  title="Cursiva"
+                  (click)="applyFormat('italic', bodyArea)"
+                >
+                  <em>I</em>
+                </button>
+                <button
+                  type="button"
+                  class="fmt"
+                  title="Lista"
+                  (click)="applyFormat('bullet', bodyArea)"
+                >
+                  • Lista
+                </button>
+                <button
+                  type="button"
+                  class="fmt"
+                  title="Cita"
+                  (click)="applyFormat('quote', bodyArea)"
+                >
+                  “ ”
+                </button>
+                <button
+                  type="button"
+                  class="fmt"
+                  title="Enlace"
+                  (click)="applyFormat('link', bodyArea)"
+                >
+                  Link
+                </button>
+                <button
+                  type="button"
+                  class="fmt preview-toggle"
+                  (click)="togglePreview()"
+                >
+                  {{ showPreview() ? 'Ocultar móvil' : 'Ver móvil' }}
+                </button>
+              </div>
+            </div>
+            <textarea
+              #bodyArea
+              [(ngModel)]="body"
+              name="body"
+              rows="12"
+              required
+              placeholder="Escribe la noticia… Selecciona texto y pulsa B / I"
+              (ngModelChange)="onBodyInput()"
+            ></textarea>
+            <p class="hint">
+              Mismo formato que la app: <code>**negrita**</code>,
+              <code>_cursiva_</code>, listas y citas.
+            </p>
+          </div>
+
+          <div class="compose-row">
+            <label>
+              <span>Etiqueta de foro (opcional)</span>
+              <select
+                [(ngModel)]="relatedForumId"
+                name="relatedForumId"
+                (ngModelChange)="onMetaChange()"
+              >
+                <option value="">Sin etiqueta</option>
+                @for (opt of relatedOptions; track opt.id) {
+                  <option [value]="opt.id">{{ opt.label }}</option>
+                }
+              </select>
+            </label>
+
+            @if (!editingTopicId) {
+              <label class="schedule-toggle">
+                <input
+                  type="checkbox"
+                  [(ngModel)]="scheduleMode"
+                  name="scheduleMode"
+                  [disabled]="!!editingScheduledId"
+                />
+                <span>Programar publicación</span>
+              </label>
+            }
+          </div>
+
+          @if (scheduleMode) {
+            <label>
+              <span>Fecha y hora</span>
+              <input
+                type="datetime-local"
+                [(ngModel)]="scheduledLocal"
+                name="scheduledLocal"
+                required
+              />
+            </label>
+          }
+
+          <div class="cover-block">
+            <span class="field-label">Portada (opcional)</span>
+            <div class="cover-actions">
+              <label class="btn btn-soft file-btn">
+                {{ uploading() ? 'Subiendo…' : 'Subir imagen' }}
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  [disabled]="uploading() || busy()"
+                  (change)="onCoverSelected($event)"
+                />
+              </label>
+              @if (coverImageUrl) {
+                <button type="button" class="btn btn-ghost" (click)="clearCover()">
+                  Quitar
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="compose-actions">
+            @if (isEditing()) {
+              <button
+                type="button"
+                class="btn btn-soft"
+                (click)="cancelEdit()"
+                [disabled]="busy()"
+              >
+                Cancelar
+              </button>
+            }
+            <button
+              type="submit"
+              class="btn btn-primary"
+              [disabled]="busy() || uploading()"
+            >
+              {{
+                busy()
+                  ? 'Guardando…'
+                  : editingTopicId
+                    ? 'Guardar cambios'
+                    : editingScheduledId
+                      ? 'Guardar programación'
+                      : scheduleMode
+                        ? 'Programar noticia'
+                        : 'Publicar ahora'
+              }}
+            </button>
+          </div>
+        </form>
+
+        @if (showPreview()) {
+          <aside class="preview-pane" aria-label="Vista previa móvil">
+            <p class="preview-label">Vista previa · móvil</p>
+            <div class="phone">
+              <div class="phone-bezel">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                  <header class="phone-appbar">
+                    <span class="back">‹</span>
+                    <strong>Noticias</strong>
+                    <span class="spacer"></span>
+                  </header>
+                  <div class="phone-scroll">
+                    @if (coverImageUrl) {
+                      <img class="phone-cover" [src]="coverImageUrl" alt="" />
+                    }
+                    <div class="phone-content">
+                      @if (relatedForumId) {
+                        <span class="phone-chip">{{ previewRelated() }}</span>
+                      }
+                      <h2>{{ title.trim() || 'Titular de la noticia' }}</h2>
+                      <p class="phone-meta">Ahora · Junta</p>
+                      <div
+                        class="phone-body"
+                        [innerHTML]="previewHtml()"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        }
+      </div>
+    }
+
+    @if (tab() === 'published') {
+      @if (loading()) {
+        <div class="state-box">Cargando…</div>
+      } @else if (published().length === 0) {
+        <div class="empty-box">Todavía no hay noticias en el canal.</div>
+      } @else {
+        <div class="news-list">
+          @for (item of published(); track item.id) {
+            <article class="news-card">
+              @if (item.coverImageUrl) {
+                <img [src]="item.coverImageUrl" alt="" />
+              }
+              <div class="news-card-body">
+                <div class="kicker">
+                  <span class="pill" [attr.data-status]="item.status">
+                    {{ statusLabel(item.status) }}
+                  </span>
+                  <span class="pill soft">{{ relatedLabel(item.relatedForumId) }}</span>
+                </div>
+                <h2>{{ item.title }}</h2>
+                <p class="queue-meta">
+                  {{ item.authorHandle || '@—' }}
+                  · {{ dateTime(item.createdAt) }}
+                  · {{ item.commentCount }} resp.
+                </p>
+                <p class="excerpt">{{ item.excerpt }}</p>
+                <div class="queue-actions">
+                  <button
+                    type="button"
+                    class="btn btn-soft"
+                    [disabled]="busy()"
+                    (click)="startEditPublished(item)"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-danger"
+                    [disabled]="busy()"
+                    (click)="deletePublished(item)"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    }
+
+    @if (tab() === 'scheduled') {
+      @if (loading()) {
+        <div class="state-box">Cargando…</div>
+      } @else if (scheduled().length === 0) {
+        <div class="empty-box">No hay noticias en la cola de programación.</div>
+      } @else {
+        <div class="news-list">
+          @for (item of scheduled(); track item.id) {
+            <article class="news-card">
+              <div class="news-card-body">
+                <div class="kicker">
+                  <span class="pill" [attr.data-status]="item.status">
+                    {{ statusLabel(item.status) }}
+                  </span>
+                  <span class="pill soft">{{ relatedLabel(item.relatedForumId) }}</span>
+                </div>
+                <h2>{{ item.title }}</h2>
+                <p class="queue-meta">
+                  {{ item.authorHandle }}
+                  · sale {{ dateTime(item.scheduledAt) }}
+                </p>
+                <p class="excerpt">{{ item.excerpt }}</p>
+                <div class="queue-actions">
+                  @if (item.status === 'scheduled') {
+                    <button
+                      type="button"
+                      class="btn btn-soft"
+                      [disabled]="busy()"
+                      (click)="startEditScheduled(item)"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-soft"
+                      [disabled]="busy()"
+                      (click)="cancelScheduled(item)"
+                    >
+                      Cancelar
+                    </button>
+                  }
+                  @if (item.status === 'scheduled' || item.status === 'cancelled') {
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      [disabled]="busy()"
+                      (click)="deleteScheduled(item)"
+                    >
+                      Eliminar
+                    </button>
+                  }
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    }
+  }
+</section>

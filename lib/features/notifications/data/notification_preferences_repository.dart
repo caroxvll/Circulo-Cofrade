@@ -36,6 +36,10 @@ class NotificationPreferencesRepository {
       'notify_topics': prefs.notifyTopics,
       'notify_mentions': prefs.notifyMentions,
       'notify_followers': prefs.notifyFollowers,
+      'notify_reactions': prefs.notifyReactions,
+      'notify_calendar': prefs.notifyCalendar,
+      'notify_quiz': prefs.notifyQuiz,
+      'notify_news': prefs.notifyNews,
       'push_enabled': prefs.pushEnabled,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     });
@@ -48,6 +52,10 @@ class NotificationPreferencesRepository {
       notifyTopics: row['notify_topics'] as bool? ?? true,
       notifyMentions: row['notify_mentions'] as bool? ?? true,
       notifyFollowers: row['notify_followers'] as bool? ?? false,
+      notifyReactions: row['notify_reactions'] as bool? ?? true,
+      notifyCalendar: row['notify_calendar'] as bool? ?? false,
+      notifyQuiz: row['notify_quiz'] as bool? ?? true,
+      notifyNews: row['notify_news'] as bool? ?? true,
       pushEnabled: row['push_enabled'] as bool? ?? false,
     );
   }

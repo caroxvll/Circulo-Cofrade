@@ -16,6 +16,26 @@ class DeviceTokensRepository {
   }) async {
     if (_client == null) return;
 
+    try {
+      // Un token = un usuario (quita el mismo FCM de otras cuentas).
+      await _client!.rpc(
+        'claim_device_token',
+        params: {
+          'p_fcm_token': fcmToken,
+          'p_platform': platform,
+        },
+      );
+      return;
+    } catch (_) {
+      // Fallback si aún no ejecutaron device_tokens_unique.sql
+    }
+
+    await _client!
+        .from('device_tokens')
+        .delete()
+        .eq('user_id', userId)
+        .eq('platform', platform);
+
     await _client!.from('device_tokens').upsert({
       'user_id': userId,
       'fcm_token': fcmToken,

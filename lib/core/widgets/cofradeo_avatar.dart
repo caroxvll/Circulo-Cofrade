@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import 'cofradeo_network_image.dart';
 
 class CofradeoAvatar extends StatelessWidget {
   const CofradeoAvatar({
@@ -30,11 +31,19 @@ class CofradeoAvatar extends StatelessWidget {
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      child: imageUrl != null
-          ? Image.network(
-              imageUrl!,
+      child: imageUrl != null && imageUrl!.trim().isNotEmpty
+          ? CofradeoNetworkImage(
+              url: imageUrl!,
+              width: size,
+              height: size,
+              cacheSize: size,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Icon(
+              placeholder: Icon(
+                icon ?? Icons.person,
+                color: AppColors.gold,
+                size: size * 0.5,
+              ),
+              errorWidget: Icon(
                 icon ?? Icons.person,
                 color: AppColors.gold,
                 size: size * 0.5,

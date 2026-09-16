@@ -1,0 +1,74 @@
+<section class="queue-page">
+  <header>
+    <div>
+      <p class="eyebrow">Moderación</p>
+      <h1>Reportes</h1>
+      <p class="lead">Cola agrupada por objetivo (perfil, tema o respuesta).</p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando reportes…</div>
+  } @else if (groups().length === 0) {
+    <div class="empty-box">No hay reportes pendientes.</div>
+  } @else {
+    <div class="queue-list">
+      @for (group of groups(); track keyOf(group)) {
+        <article class="queue-card">
+          <h2>{{ typeLabel(group.targetType) }} · {{ group.targetLabel }}</h2>
+          <p class="queue-meta">
+            {{ group.reports.length }}
+            reporte{{ group.reports.length === 1 ? '' : 's' }}
+            · {{ group.reasonsSummary || 'Sin motivo' }}
+            · {{ timeAgo(group.latestAt) }}
+          </p>
+          @if (expanded() === keyOf(group)) {
+            <div class="queue-excerpt">
+              @for (report of group.reports; track report.id) {
+                <p>
+                  <strong>{{ report.reporterHandle ? '@' + report.reporterHandle : 'Usuario' }}</strong>
+                  · {{ report.reason }}
+                  @if (report.details) {
+                    — {{ report.details }}
+                  }
+                </p>
+              }
+            </div>
+          }
+          <div class="queue-actions">
+            <button type="button" class="btn btn-ghost" (click)="toggle(group)">
+              {{ expanded() === keyOf(group) ? 'Ocultar' : 'Ver detalles' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="busyKey() === keyOf(group)"
+              (click)="resolve(group)"
+            >
+              Revisar todos
+            </button>
+            @if (isAdmin() && group.authorProfileId) {
+              <button
+                type="button"
+                class="btn btn-danger"
+                [disabled]="busyKey() === keyOf(group)"
+                (click)="suspend(group)"
+              >
+                Suspender
+              </button>
+            }
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>

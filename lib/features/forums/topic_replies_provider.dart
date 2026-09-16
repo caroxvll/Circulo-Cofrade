@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/models/forum.dart';
 import '../moderation/moderation_provider.dart';
-import 'data/forums_repository.dart';
 import 'forums_provider.dart';
 
 const topicRepliesPageSize = 30;
@@ -49,6 +48,149 @@ class TopicRepliesState {
   final bool isLoading;
 }
 
+/// Parches locales de realtime: UI al instante; el refetch confirma después.
+class TopicRepliesLivePatch {
+  const TopicRepliesLivePatch({
+    this.upserts = const {},
+    this.removedIds = const {},
+    this.softDeletedAt = const {},
+  });
+
+  final Map<String, ForumReply> upserts;
+  final Set<String> removedIds;
+  final Map<String, DateTime> softDeletedAt;
+}
+
+class TopicRepliesLivePatchesMap
+    extends Notifier<Map<String, TopicRepliesLivePatch>> {
+  @override
+  Map<String, TopicRepliesLivePatch> build() => {};
+
+  TopicRepliesLivePatch of(String topicId) =>
+      state[topicId] ?? const TopicRepliesLivePatch();
+
+  void clear(String topicId) {
+    if (!state.containsKey(topicId)) return;
+    final next = {...state}..remove(topicId);
+    state = next;
+  }
+
+  void upsert(String topicId, ForumReply reply) {
+    final current = of(topicId);
+    final id = reply.id.toLowerCase();
+    final soft = {...current.softDeletedAt};
+    if (reply.deletedAt != null) {
+      soft[id] = reply.deletedAt!;
+    } else {
+      soft.remove(id);
+    }
+    state = {
+      ...state,
+      topicId: TopicRepliesLivePatch(
+        upserts: {...current.upserts, id: reply},
+        removedIds: {...current.removedIds}..remove(id),
+        softDeletedAt: soft,
+      ),
+    };
+  }
+
+  void markDeleted(String topicId, String replyId, {DateTime? deletedAt}) {
+    final id = replyId.toLowerCase();
+    final current = of(topicId);
+    state = {
+      ...state,
+      topicId: TopicRepliesLivePatch(
+        upserts: current.upserts,
+        removedIds: {...current.removedIds}..remove(id),
+        softDeletedAt: {
+          ...current.softDeletedAt,
+          id: deletedAt ?? DateTime.now(),
+        },
+      ),
+    };
+  }
+
+  void remove(String topicId, String replyId) {
+    final id = replyId.toLowerCase();
+    final current = of(topicId);
+    final upserts = {...current.upserts}..remove(id);
+    final soft = {...current.softDeletedAt}..remove(id);
+    state = {
+      ...state,
+      topicId: TopicRepliesLivePatch(
+        upserts: upserts,
+        removedIds: {...current.removedIds, id},
+        softDeletedAt: soft,
+      ),
+    };
+  }
+}
+
+final topicRepliesLivePatchesProvider = NotifierProvider<
+    TopicRepliesLivePatchesMap, Map<String, TopicRepliesLivePatch>>(
+  TopicRepliesLivePatchesMap.new,
+);
+
+List<ForumReply> applyLivePatches(
+  List<ForumReply> replies,
+  TopicRepliesLivePatch patch,
+) {
+  if (patch.upserts.isEmpty &&
+      patch.removedIds.isEmpty &&
+      patch.softDeletedAt.isEmpty) {
+    return replies;
+  }
+
+  final byId = <String, ForumReply>{
+    for (final r in replies) r.id.toLowerCase(): r,
+  };
+
+  for (final entry in patch.upserts.entries) {
+    final previous = byId[entry.key];
+    final incoming = entry.value;
+    if (previous == null) {
+      byId[entry.key] = incoming;
+      continue;
+    }
+    byId[entry.key] = previous.copyWith(
+      content: incoming.content.isNotEmpty ? incoming.content : null,
+      authorHandle:
+          incoming.authorHandle.isNotEmpty ? incoming.authorHandle : null,
+      deletedAt: incoming.deletedAt ?? previous.deletedAt,
+      editedAt: incoming.editedAt ?? previous.editedAt,
+      parentReplyId: incoming.parentReplyId ?? previous.parentReplyId,
+      imageUrl: incoming.imageUrl ?? previous.imageUrl,
+    );
+  }
+
+  for (final entry in patch.softDeletedAt.entries) {
+    final previous = byId[entry.key];
+    if (previous == null || previous.isDeleted) continue;
+    byId[entry.key] = previous.copyWith(deletedAt: entry.value);
+  }
+
+  for (final id in patch.removedIds) {
+    byId.remove(id);
+  }
+
+  final seen = <String>{};
+  final ordered = <ForumReply>[];
+  for (final r in replies) {
+    final id = r.id.toLowerCase();
+    if (patch.removedIds.contains(id)) continue;
+    final next = byId[id];
+    if (next == null) continue;
+    ordered.add(next);
+    seen.add(id);
+  }
+  for (final id in patch.upserts.keys) {
+    if (seen.contains(id) || patch.removedIds.contains(id)) continue;
+    final next = byId[id];
+    if (next != null) ordered.add(next);
+  }
+  return ordered;
+}
+
 class TopicRepliesPaginationMap extends Notifier<Map<String, ReplyPagination>> {
   @override
   Map<String, ReplyPagination> build() => {};
@@ -86,6 +228,7 @@ final topicRepliesFirstPageProvider =
             hasMore: batch.length == topicRepliesPageSize,
           ),
         );
+    ref.read(topicRepliesLivePatchesProvider.notifier).clear(topicId);
     return batch
         .where((r) => r.authorId == null || !hidden.contains(r.authorId))
         .toList();
@@ -97,19 +240,22 @@ final topicRepliesStateProvider =
   final firstAsync = ref.watch(topicRepliesFirstPageProvider(topicId));
   final pagination = ref.watch(topicRepliesPaginationProvider)[topicId] ??
       const ReplyPagination();
+  final live =
+      ref.watch(topicRepliesLivePatchesProvider)[topicId] ??
+      const TopicRepliesLivePatch();
 
   return firstAsync.when(
-    loading: () => const TopicRepliesState(
-      replies: [],
+    loading: () => TopicRepliesState(
+      replies: applyLivePatches(const [], live),
       hasMore: true,
       isLoading: true,
     ),
-    error: (_, __) => TopicRepliesState(
-      replies: pagination.extra,
+    error: (_, _) => TopicRepliesState(
+      replies: applyLivePatches(pagination.extra, live),
       hasMore: false,
     ),
     data: (first) => TopicRepliesState(
-      replies: [...first, ...pagination.extra],
+      replies: applyLivePatches([...first, ...pagination.extra], live),
       hasMore: pagination.hasMore,
       isLoadingMore: pagination.loadingMore,
     ),

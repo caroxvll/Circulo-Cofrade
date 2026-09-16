@@ -18,19 +18,31 @@ class BlockedAccountsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
           onPressed: () => context.pop(),
           icon: const Icon(Icons.chevron_left, color: AppColors.burgundy),
         ),
-        title: Text(
-          'Cuentas bloqueadas',
-          style: AppTypography.displaySmall().copyWith(fontSize: 17),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'CUENTAS BLOQUEADAS',
+            maxLines: 1,
+            softWrap: false,
+            style: AppTypography.screenAppBarTitle().copyWith(
+              fontSize: 22,
+              letterSpacing: 0.35,
+            ),
+          ),
         ),
         centerTitle: true,
+        titleSpacing: 0,
       ),
       body: blockedAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => Center(
+        error: (_, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
@@ -42,21 +54,24 @@ class BlockedAccountsScreen extends ConsumerWidget {
         data: (entries) {
           if (entries.isEmpty) {
             return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Nadie bloqueado',
-                    style: AppTypography.displaySmall(),
+                    style: AppTypography.displaySmall().copyWith(
+                      fontSize: 22,
+                      height: 1.15,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
                     'Cuando bloquees a alguien desde su perfil (menú ···), '
                     'aparecerá aquí para que puedas desbloquearlo.',
                     style: AppTypography.bodyMedium(
                       color: AppColors.textMuted,
-                    ),
+                    ).copyWith(fontSize: 14.5, height: 1.45),
                   ),
                 ],
               ),

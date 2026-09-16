@@ -33,7 +33,7 @@ Un cofrade puede ser admin. Una hermandad también. El rol **no** lo elige el us
 | Pendiente | Detalle |
 |-----------|---------|
 | Push FCM a admins | Fase 9 — [`NOTIFICACIONES.md`](NOTIFICACIONES.md) |
-| Panel admin completo | Fase E — usuarios, métricas… (pilares MVP ya en Junta) |
+| Panel admin completo | Fase E — usuarios, métricas… (pilares MVP ya en Junta). Visión web: [`ADMIN-WEB.md`](ADMIN-WEB.md) |
 
 ---
 

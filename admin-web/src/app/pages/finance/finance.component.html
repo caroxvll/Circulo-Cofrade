@@ -1,0 +1,395 @@
+<section class="queue-page finance-page">
+  <header>
+    <div>
+      <p class="eyebrow">Plataforma · solo admin</p>
+      <h1>Finanzas</h1>
+      <p class="lead">
+        Cobros de empresas (pagado / pendiente / impagado) y gastos de
+        operación. Resumen del periodo abajo.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <label class="inline">
+      Mes
+      <select
+        [ngModel]="periodMonth()"
+        (ngModelChange)="onPeriodChange($event)"
+        [disabled]="allMonths()"
+      >
+        @for (month of periodOptions(); track month) {
+          <option [value]="month">{{ monthLabel(month) }}</option>
+        }
+      </select>
+    </label>
+    <label class="check">
+      <input
+        type="checkbox"
+        [checked]="allMonths()"
+        (change)="toggleAllMonths(($any($event.target)).checked)"
+      />
+      Ver todo
+    </label>
+  </div>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  <div class="stats finance-stats">
+    <article>
+      <strong>{{ eur(summary().paid) }}</strong>
+      <span>Ingresos cobrados</span>
+    </article>
+    <article>
+      <strong>{{ eur(summary().pending) }}</strong>
+      <span>Pendiente</span>
+      @if (summary().overdue > 0) {
+        <em class="warn">{{ eur(summary().overdue) }} vencido</em>
+      }
+    </article>
+    <article>
+      <strong>{{ eur(summary().unpaid) }}</strong>
+      <span>Impagado</span>
+    </article>
+    <article>
+      <strong>{{ eur(summary().expenses) }}</strong>
+      <span>Gastos</span>
+    </article>
+    <article class="net">
+      <strong>{{ eur(summary().net) }}</strong>
+      <span>Neto (cobrado − gastos)</span>
+    </article>
+  </div>
+
+  <div class="tabs">
+    <button type="button" class="tab" [class.active]="tab() === 'income'" (click)="setTab('income')">
+      Ingresos
+    </button>
+    <button type="button" class="tab" [class.active]="tab() === 'expenses'" (click)="setTab('expenses')">
+      Gastos
+    </button>
+  </div>
+
+  @if (loading()) {
+    <div class="state-box">Cargando finanzas…</div>
+  } @else if (tab() === 'income') {
+    <div class="queue-toolbar income-toolbar">
+      <div class="seg">
+        <button
+          type="button"
+          class="tab"
+          [class.active]="incomeView() === 'companies'"
+          (click)="setIncomeView('companies')"
+        >
+          Por empresa
+        </button>
+        <button
+          type="button"
+          class="tab"
+          [class.active]="incomeView() === 'detail'"
+          (click)="setIncomeView('detail')"
+        >
+          Detalle
+        </button>
+      </div>
+      <button type="button" class="btn btn-primary" (click)="openNewPayment()">
+        Nuevo cobro
+      </button>
+    </div>
+
+    @if (incomeView() === 'companies') {
+      @if (byCompany().length === 0) {
+        <div class="empty-box">
+          No hay empresas ni cobros. Crea marcas en Patrocinios o registra un cobro.
+        </div>
+      } @else {
+        <div class="company-pay-grid">
+          @for (row of byCompany(); track row.key) {
+            <article class="company-pay-card" [attr.data-state]="row.headline">
+              <div class="pay-head">
+                <h3>{{ row.name }}</h3>
+                <span
+                  class="pill"
+                  [class.ok]="row.headline === 'paid'"
+                  [class.warn]="row.headline === 'pending' || row.headline === 'mixed'"
+                  [class.danger]="row.headline === 'unpaid'"
+                  [class.muted]="row.headline === 'none'"
+                >
+                  {{ headlineLabel(row.headline) }}
+                </span>
+              </div>
+              <dl class="pay-amounts">
+                <div>
+                  <dt>Cobrado</dt>
+                  <dd>{{ eur(row.paid) }}</dd>
+                </div>
+                <div>
+                  <dt>Pendiente</dt>
+                  <dd>
+                    {{ eur(row.pending) }}
+                    @if (row.overdue > 0) {
+                      <em class="warn">{{ eur(row.overdue) }} vencido</em>
+                    }
+                  </dd>
+                </div>
+                <div>
+                  <dt>Impagado</dt>
+                  <dd>{{ eur(row.unpaid) }}</dd>
+                </div>
+              </dl>
+              @if (row.payments.length) {
+                <ul class="pay-mini">
+                  @for (payment of row.payments; track payment.id) {
+                    <li>
+                      <span>{{ payment.concept || 'Cobro' }} · {{ eur(payment.amount) }}</span>
+                      <span
+                        class="pill tiny"
+                        [class.ok]="payment.status === 'paid'"
+                        [class.warn]="payment.status === 'pending'"
+                        [class.danger]="payment.status === 'unpaid' || overdue(payment)"
+                      >
+                        {{ statusLabel(payment.status) }}
+                      </span>
+                      <div class="mini-actions">
+                        @if (payment.status !== 'paid') {
+                          <button type="button" class="linkish" (click)="markPaid(payment)">
+                            Pagado
+                          </button>
+                        }
+                        <button type="button" class="linkish" (click)="openEditPayment(payment)">
+                          Editar
+                        </button>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="sub empty-line">Sin cobros en este periodo</p>
+              }
+              <div class="queue-actions">
+                <button type="button" class="btn btn-soft" (click)="openNewPaymentFor(row.name)">
+                  Añadir cobro
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    } @else if (payments().length === 0) {
+      <div class="empty-box">No hay cobros en este periodo.</div>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Empresa</th>
+              <th>Concepto</th>
+              <th>Importe</th>
+              <th>Estado</th>
+              <th>Periodo</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (payment of payments(); track payment.id) {
+              <tr>
+                <td>
+                  <strong>{{ payment.sponsorName }}</strong>
+                  @if (payment.notes) {
+                    <div class="sub">{{ payment.notes }}</div>
+                  }
+                </td>
+                <td>{{ payment.concept || '—' }}</td>
+                <td>{{ eur(payment.amount) }}</td>
+                <td>
+                  <span
+                    class="pill"
+                    [class.ok]="payment.status === 'paid'"
+                    [class.warn]="payment.status === 'pending'"
+                    [class.danger]="payment.status === 'unpaid' || overdue(payment)"
+                  >
+                    {{ statusLabel(payment.status) }}
+                    @if (overdue(payment)) {
+                      · vencido
+                    }
+                  </span>
+                  @if (payment.dueDate && payment.status === 'pending') {
+                    <div class="sub">Vence {{ payment.dueDate }}</div>
+                  }
+                  @if (payment.paidAt && payment.status === 'paid') {
+                    <div class="sub">Cobrado {{ payment.paidAt }}</div>
+                  }
+                </td>
+                <td>{{ monthLabel(payment.periodMonth) }}</td>
+                <td class="actions">
+                  @if (payment.status !== 'paid') {
+                    <button type="button" class="btn btn-soft" (click)="markPaid(payment)">
+                      Marcar pagado
+                    </button>
+                  }
+                  <button type="button" class="btn btn-ghost" (click)="openEditPayment(payment)">
+                    Editar
+                  </button>
+                  <button type="button" class="btn btn-danger" (click)="removePayment(payment)">
+                    Borrar
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  } @else {
+    <div class="queue-toolbar" style="margin-bottom: 12px">
+      <button type="button" class="btn btn-primary" (click)="openNewExpense()">
+        Nuevo gasto
+      </button>
+    </div>
+    @if (expenses().length === 0) {
+      <div class="empty-box">No hay gastos en este periodo.</div>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Concepto</th>
+              <th>Categoría</th>
+              <th>Importe</th>
+              <th>Fecha</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (expense of expenses(); track expense.id) {
+              <tr>
+                <td>
+                  <strong>{{ expense.concept }}</strong>
+                  @if (expense.notes) {
+                    <div class="sub">{{ expense.notes }}</div>
+                  }
+                </td>
+                <td><span class="pill">{{ categoryLabel(expense.category) }}</span></td>
+                <td>{{ eur(expense.amount) }}</td>
+                <td>{{ expense.expenseDate }}</td>
+                <td class="actions">
+                  <button type="button" class="btn btn-ghost" (click)="openEditExpense(expense)">
+                    Editar
+                  </button>
+                  <button type="button" class="btn btn-danger" (click)="removeExpense(expense)">
+                    Borrar
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</section>
+
+@if (showPaymentForm()) {
+  <div class="dialog-backdrop" (click)="closePaymentForm()">
+    <div class="dialog form-dialog" (click)="$event.stopPropagation()">
+      <h3>{{ editingPayment() ? 'Editar cobro' : 'Nuevo cobro' }}</h3>
+      <label>
+        Empresa
+        <input list="company-names" [(ngModel)]="paySponsor" />
+        <datalist id="company-names">
+          @for (name of companyNames(); track name) {
+            <option [value]="name"></option>
+          }
+        </datalist>
+      </label>
+      <label>
+        Concepto
+        <input [(ngModel)]="payConcept" placeholder="Patrocinio septiembre…" />
+      </label>
+      <label>
+        Importe (€)
+        <input type="number" min="0" step="0.01" [(ngModel)]="payAmount" />
+      </label>
+      <label>
+        Estado
+        <select [(ngModel)]="payStatus">
+          <option value="pending">Pendiente</option>
+          <option value="paid">Pagado</option>
+          <option value="unpaid">Impagado</option>
+        </select>
+      </label>
+      <label>
+        Mes de facturación
+        <input type="date" [(ngModel)]="payPeriod" />
+      </label>
+      <label>
+        Vencimiento
+        <input type="date" [(ngModel)]="payDue" />
+      </label>
+      @if (payStatus === 'paid') {
+        <label>
+          Fecha de cobro
+          <input type="date" [(ngModel)]="payPaidAt" />
+        </label>
+      }
+      <label>
+        Notas
+        <textarea [(ngModel)]="payNotes" rows="3"></textarea>
+      </label>
+      <div class="queue-actions">
+        <button type="button" class="btn btn-ghost" (click)="closePaymentForm()">Cancelar</button>
+        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="savePayment()">
+          {{ saving() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showExpenseForm()) {
+  <div class="dialog-backdrop" (click)="closeExpenseForm()">
+    <div class="dialog form-dialog" (click)="$event.stopPropagation()">
+      <h3>{{ editingExpense() ? 'Editar gasto' : 'Nuevo gasto' }}</h3>
+      <label>
+        Concepto
+        <input [(ngModel)]="expConcept" />
+      </label>
+      <label>
+        Categoría
+        <select [(ngModel)]="expCategory">
+          <option value="infra">Infra / hosting</option>
+          <option value="ads">Publicidad</option>
+          <option value="tools">Herramientas</option>
+          <option value="legal">Legal / admin</option>
+          <option value="general">General</option>
+          <option value="other">Otros</option>
+        </select>
+      </label>
+      <label>
+        Importe (€)
+        <input type="number" min="0" step="0.01" [(ngModel)]="expAmount" />
+      </label>
+      <label>
+        Fecha
+        <input type="date" [(ngModel)]="expDate" />
+      </label>
+      <label>
+        Notas
+        <textarea [(ngModel)]="expNotes" rows="3"></textarea>
+      </label>
+      <div class="queue-actions">
+        <button type="button" class="btn btn-ghost" (click)="closeExpenseForm()">Cancelar</button>
+        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="saveExpense()">
+          {{ saving() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

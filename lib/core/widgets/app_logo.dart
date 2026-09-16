@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_assets.dart';
+import '../utils/image_decode_cache.dart';
 
 /// Logo de Círculo Cofrade reutilizable en toda la app.
 class AppLogo extends StatelessWidget {
@@ -18,11 +19,15 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cache = ImageDecodeCache.px(context, size);
     if (forLogin) {
       return Image.asset(
         AppAssets.logoLogin,
         width: size,
         fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        cacheWidth: cache,
+        gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) {
           return _FallbackLogo(size: size);
         },
@@ -36,6 +41,10 @@ class AppLogo extends StatelessWidget {
       width: size,
       height: size,
       fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      cacheWidth: cache,
+      cacheHeight: cache,
+      gaplessPlayback: true,
       errorBuilder: (context, error, stackTrace) {
         return _FallbackLogo(size: size);
       },
