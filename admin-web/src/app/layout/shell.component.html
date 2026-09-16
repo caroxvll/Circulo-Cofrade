@@ -1,0 +1,164 @@
+<div
+  class="shell"
+  [class.menu-open]="menuOpen()"
+  [class.sidebar-collapsed]="sidebarCollapsed()"
+>
+  <div
+    class="backdrop"
+    [class.visible]="menuOpen()"
+    (click)="closeMenu()"
+    aria-hidden="true"
+  ></div>
+
+  <aside class="sidebar" id="junta-sidebar">
+    <div class="brand">
+      <img class="brand-mark" src="/logo-mark.png" alt="" width="40" height="40" />
+      <div class="brand-text">
+        <strong>Círculo Cofrade</strong>
+        <small>Panel Junta</small>
+      </div>
+      <button
+        type="button"
+        class="icon-btn close-mobile"
+        (click)="closeMenu()"
+        aria-label="Cerrar menú"
+      >
+        ✕
+      </button>
+    </div>
+
+    <button
+      type="button"
+      class="collapse-toggle"
+      (click)="toggleSidebarCollapse()"
+      [attr.aria-expanded]="!sidebarCollapsed()"
+      [attr.aria-label]="sidebarCollapsed() ? 'Expandir menú' : 'Encoger menú'"
+      [attr.title]="sidebarCollapsed() ? 'Expandir menú' : 'Encoger menú'"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        @if (sidebarCollapsed()) {
+          <path
+            d="M9 6l6 6-6 6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        } @else {
+          <path
+            d="M15 6l-6 6 6 6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        }
+      </svg>
+      <span class="collapse-label">{{
+        sidebarCollapsed() ? 'Abrir' : 'Encoger'
+      }}</span>
+    </button>
+
+    <nav aria-label="Módulos de la Junta">
+      <a
+        [routerLink]="overview().route"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        [attr.title]="overview().label"
+      >
+        <span class="nav-icon" aria-hidden="true" [innerHTML]="navIcon('overview')"></span>
+        <span class="nav-label">{{ overview().label }}</span>
+      </a>
+
+      @for (group of sections(); track group.section) {
+        <p class="section-title">{{ group.title }}</p>
+        @for (item of group.items; track item.id) {
+          <a
+            [routerLink]="item.route"
+            [queryParams]="navQueryParams(item.id)"
+            routerLinkActive="active"
+            [attr.title]="item.label"
+          >
+            <span class="nav-icon" aria-hidden="true" [innerHTML]="navIcon(item.id)"></span>
+            <span class="nav-label">{{ item.shortLabel }}</span>
+            <span class="tags">
+              @if (badgeFor(item.id) > 0) {
+                <em class="count">{{ badgeFor(item.id) }}</em>
+              }
+              @if (item.comingSoon) {
+                <em>pronto</em>
+              }
+              @if (item.webOnly) {
+                <em class="web">web</em>
+              }
+            </span>
+            @if (badgeFor(item.id) > 0) {
+              <i class="nav-dot" aria-hidden="true"></i>
+            }
+          </a>
+        }
+      }
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="who">
+        <strong>{{ profile()?.displayName || profile()?.handle || 'Staff' }}</strong>
+        <small>{{ profile()?.role }} · {{ '@' + (profile()?.handle || '—') }}</small>
+      </div>
+      <button type="button" class="ghost" (click)="signOut()" title="Salir">
+        <svg class="ghost-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            d="M10 7V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M15 12H3m0 0 3-3m-3 3 3 3"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <span class="ghost-label">Salir</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="workspace">
+    <header class="topbar">
+      <button
+        type="button"
+        class="icon-btn menu-toggle"
+        (click)="toggleMenu()"
+        [attr.aria-expanded]="menuOpen()"
+        aria-controls="junta-sidebar"
+        aria-label="Abrir menú"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <div class="topbar-brand">
+        <img src="/logo-mark.png" alt="" width="28" height="28" />
+        <strong>Círculo Cofrade</strong>
+        <span>Junta</span>
+      </div>
+      <div class="topbar-role" [class.admin]="isAdmin()">
+        {{ isAdmin() ? 'Admin' : 'Moderador' }}
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="main-inner">
+        <router-outlet />
+      </div>
+    </main>
+  </div>
+</div>

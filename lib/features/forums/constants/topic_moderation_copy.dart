@@ -2,7 +2,7 @@ import '../../../shared/models/forum.dart';
 
 abstract final class TopicModerationCopy {
   static const juntaName =
-      'Junta de Gobierno de la Comunidad Cofradiero';
+      'Junta de Gobierno de la Comunidad Circulo Cofrade';
 
   static const pendingTitle = 'Pendiente de aprobación';
   static const pendingBody =

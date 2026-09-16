@@ -10,9 +10,10 @@ import '../auth/email_verification_gate.dart';
 import '../search/data/follows_repository.dart';
 import '../search/follows_provider.dart';
 import 'profile_provider.dart';
-import 'widgets/info_card.dart';
 import 'widgets/profile_actions_menu.dart';
 import 'widgets/profile_header.dart';
+import 'widgets/profile_info_tab.dart';
+import 'widgets/profile_pill_tab_bar.dart';
 import 'widgets/publications_tab.dart';
 import 'widgets/staff_profile_actions.dart';
 import 'widgets/suspended_account_banner.dart';
@@ -44,8 +45,8 @@ class UserProfileScreen extends ConsumerWidget {
           icon: const Icon(Icons.chevron_left, color: AppColors.burgundy),
         ),
         title: Text(
-          'Perfil',
-          style: AppTypography.displaySmall().copyWith(fontSize: 17),
+          'PERFIL',
+          style: AppTypography.screenAppBarTitle(),
         ),
         centerTitle: true,
         actions: [
@@ -123,20 +124,17 @@ class _UserProfileBody extends ConsumerWidget {
           ),
           SliverPersistentHeader(
             pinned: true,
-            delegate: _ProfileTabBarDelegate(
-              TabBar(
-                labelStyle: AppTypography.titleLarge().copyWith(fontSize: 15),
-                unselectedLabelStyle:
-                    AppTypography.bodyLarge(color: AppColors.textMuted)
-                        .copyWith(fontWeight: FontWeight.w500),
-                labelColor: AppColors.textPrimary,
-                unselectedLabelColor: AppColors.textMuted,
-                indicatorColor: AppColors.accentRed,
-                indicatorWeight: 3,
-                dividerColor: AppColors.border,
-                tabs: const [
-                  Tab(text: 'Publicaciones'),
-                  Tab(text: 'Acerca de'),
+            delegate: ProfileTabBarDelegate(
+              tabBar: const ProfilePillTabBar(
+                tabs: [
+                  ProfilePillTab(
+                    icon: Icons.grid_view_rounded,
+                    label: 'Actividad',
+                  ),
+                  ProfilePillTab(
+                    icon: Icons.info_outline_rounded,
+                    label: 'Información',
+                  ),
                 ],
               ),
             ),
@@ -146,22 +144,11 @@ class _UserProfileBody extends ConsumerWidget {
           children: [
             PublicationsTab(
               userId: profile.id,
-              publicationCount: profile.publicationCount,
-              followerCount: profile.followerCount,
               isAuthenticated: true,
             ),
-            ListView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-              children: [
-                Text('Información', style: AppTypography.displaySmall()),
-                const SizedBox(height: 16),
-                ..._infoItems(profile).map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: InfoCard(item: item),
-                  ),
-                ),
-              ],
+            ProfileInfoTab(
+              profile: profile,
+              isAuthenticated: currentUser != null,
             ),
           ],
         ),
@@ -194,39 +181,6 @@ class _UserProfileBody extends ConsumerWidget {
         );
       }
     }
-  }
-
-  List<ProfileInfoItem> _infoItems(UserProfile profile) {
-    final items = <ProfileInfoItem>[];
-    if (profile.address.isNotEmpty) {
-      items.add(ProfileInfoItem(
-        icon: Icons.location_on_outlined,
-        label: 'Dirección',
-        value: profile.address,
-      ));
-    }
-    if (profile.foundedLabel.isNotEmpty) {
-      items.add(ProfileInfoItem(
-        icon: Icons.calendar_today_outlined,
-        label: 'Fundación',
-        value: profile.foundedLabel,
-      ));
-    }
-    if (profile.website.isNotEmpty) {
-      items.add(ProfileInfoItem(
-        icon: Icons.language_outlined,
-        label: 'Sitio Web',
-        value: profile.website,
-      ));
-    }
-    if (items.isEmpty) {
-      items.add(const ProfileInfoItem(
-        icon: Icons.info_outline,
-        label: 'Perfil',
-        value: 'Sin información adicional.',
-      ));
-    }
-    return items;
   }
 }
 
@@ -268,31 +222,4 @@ class _FollowProfileButton extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ProfileTabBarDelegate extends SliverPersistentHeaderDelegate {
-  _ProfileTabBarDelegate(this.tabBar);
-
-  final TabBar tabBar;
-
-  @override
-  double get minExtent => tabBar.preferredSize.height;
-
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return Material(
-      color: AppColors.background,
-      child: tabBar,
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _ProfileTabBarDelegate oldDelegate) => false;
 }

@@ -28,8 +28,8 @@ enum ActivityFeedFilter { all, topics, replies }
 String activityFilterLabel(ActivityFeedFilter filter) {
   return switch (filter) {
     ActivityFeedFilter.all => 'Todo',
-    ActivityFeedFilter.topics => 'Temas',
-    ActivityFeedFilter.replies => 'Respuestas',
+    ActivityFeedFilter.topics => 'Mis temas',
+    ActivityFeedFilter.replies => 'Mis respuestas',
   };
 }
 

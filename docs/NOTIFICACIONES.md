@@ -13,6 +13,7 @@ Hay **tres formas de “seguir”**, mismo destino:
 | **Hashtag / tendencia** | Buscar → `TrendCard` → **Seguir** | Tema de conversación, ej. `#ViernesSanto` |
 | **Hermandad / usuario** | Perfil ajeno → **Seguir** | Cuenta, ej. `@hermandad_sevilla` |
 | **Hilo de foro** | Detalle del tema → **Seguir hilo** | Un tema concreto (solo publicados) |
+| **Noticias** | Foro Noticias → **Seguir noticias** | El apartado entero: aviso al publicar una noticia |
 
 ---
 
@@ -180,6 +181,12 @@ notification_preferences
   user_id, notify_hashtags, notify_profiles, notify_topics, notify_mentions,
   notify_followers, notify_calendar, push_enabled, updated_at
 ```
+
+Para que **Avisos importantes** funcione de verdad con eventos del calendario,
+ejecuta también:
+
+- [`supabase/calendar_notify.sql`](../supabase/calendar_notify.sql) — aviso al publicar/aprobar
+- [`supabase/calendar_event_reminders.sql`](../supabase/calendar_event_reminders.sql) — recordatorio 24 h y 1 h antes (requiere **pg_cron**)
 
 ---
 

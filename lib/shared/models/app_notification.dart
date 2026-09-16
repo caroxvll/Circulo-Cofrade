@@ -13,6 +13,9 @@ enum AppNotificationKind {
   topicRejected,
   accountSuspended,
   accountReactivated,
+  replyReaction,
+  cofradeRankUp,
+  newsPublished,
   system,
 }
 
@@ -32,6 +35,11 @@ class AppNotification {
     this.replyId,
     this.profileId,
     this.route,
+    this.officialCategory,
+    this.eventId,
+    this.eventStartsAt,
+    this.topicTitle,
+    this.rejectionReason,
   });
 
   final String id;
@@ -48,12 +56,17 @@ class AppNotification {
   final String? replyId;
   final String? profileId;
   final String? route;
+  final String? officialCategory;
+  final String? eventId;
+  final DateTime? eventStartsAt;
+  final String? topicTitle;
+  final String? rejectionReason;
 
-  AppNotification copyWith({bool? isRead}) {
+  AppNotification copyWith({bool? isRead, String? subtitle}) {
     return AppNotification(
       id: id,
       title: title,
-      subtitle: subtitle,
+      subtitle: subtitle ?? this.subtitle,
       timeAgo: timeAgo,
       kind: kind,
       isRead: isRead ?? this.isRead,
@@ -65,6 +78,11 @@ class AppNotification {
       replyId: replyId,
       profileId: profileId,
       route: route,
+      officialCategory: officialCategory,
+      eventId: eventId,
+      eventStartsAt: eventStartsAt,
+      topicTitle: topicTitle,
+      rejectionReason: rejectionReason,
     );
   }
 }

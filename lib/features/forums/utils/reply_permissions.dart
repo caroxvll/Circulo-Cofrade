@@ -28,6 +28,34 @@ bool canAuthorDeleteReply(ForumReply reply, String? userId) {
   return !reply.isDeleted;
 }
 
+bool canEditOfficialHermandadPost({
+  required ForumReply reply,
+  required String topicId,
+  required String? userId,
+  required bool isAdmin,
+  required bool isVerified,
+  required Set<String> hermandadTopicIds,
+}) {
+  if (!reply.isOfficial || reply.isDeleted) return false;
+  if (isAdmin) return true;
+  if (userId == null || reply.authorId != userId) return false;
+  return isVerified && hermandadTopicIds.contains(topicId);
+}
+
+bool canPinOfficialHermandadPost({
+  required ForumReply reply,
+  required String topicId,
+  required String? userId,
+  required bool isAdmin,
+  required bool isVerified,
+  required Set<String> hermandadTopicIds,
+}) {
+  if (!reply.isOfficial || reply.isDeleted) return false;
+  if (isAdmin) return true;
+  if (userId == null) return false;
+  return isVerified && hermandadTopicIds.contains(topicId);
+}
+
 bool canStaffDeleteReply(ForumReply reply, bool isStaff) {
   return isStaff && !reply.isDeleted;
 }

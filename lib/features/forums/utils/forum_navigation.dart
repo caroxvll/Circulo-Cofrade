@@ -1,24 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// Abre un hilo con pila navegable (lista del foro → tema).
-/// Necesario al llegar desde notificaciones o enlaces directos.
+/// Abre un hilo desde notificaciones o enlaces.
+/// Navegación directa (sin pasar por /foros → lista) para que no se sienta lento.
+/// Atrás usa [popForumTopic] → lista del foro.
 void openForumTopic(
   BuildContext context, {
   required String forumId,
   required String topicId,
   String querySuffix = '',
 }) {
-  context.go('/foros');
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!context.mounted) return;
-    context.push('/foros/$forumId');
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) {
-        context.push('/foros/$forumId/tema/$topicId$querySuffix');
-      }
-    });
-  });
+  context.go('/foros/$forumId/tema/$topicId$querySuffix');
 }
 
 /// Atrás en detalle de tema: pop si hay pila, si no lista del foro.

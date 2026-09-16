@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/models/user_profile.dart';
 import '../auth/auth_provider.dart';
-import 'data/mock_profile.dart';
 import 'data/profile_from_user.dart';
 import 'data/profile_repository.dart';
 import '../../shared/models/profile_activity.dart';
@@ -13,12 +12,8 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
 
 final currentUserProfileProvider = FutureProvider<UserProfile>((ref) async {
   final user = ref.watch(currentUserProvider);
-  final authRequired = ref.watch(authRequiredProvider);
   if (user == null) {
-    if (authRequired) {
-      throw StateError('Sin sesión');
-    }
-    return mockCurrentProfile;
+    throw StateError('Sin sesión');
   }
 
   final repo = ref.watch(profileRepositoryProvider);

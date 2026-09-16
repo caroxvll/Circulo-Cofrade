@@ -68,6 +68,7 @@ const mockSearchProfiles = <SearchProfileHit>[
     id: 'hermandad-sevilla',
     handle: '@hermandad_sevilla',
     displayName: 'Hermandad Sevilla',
+    isVerified: true,
     bio: 'Cuenta oficial. Paz y Misericordia.',
   ),
   SearchProfileHit(

@@ -6,7 +6,10 @@ import '../../../core/theme/app_typography.dart';
 import '../../../shared/models/forum.dart';
 import '../data/reply_moderation_exception.dart';
 import '../forums_provider.dart';
-import 'mention_autocomplete_field.dart';
+import '../topic_detail_typography.dart';
+import 'forum_compose_field.dart';
+import 'forum_compose_sheet_header.dart';
+import 'forum_compose_sheet_layout.dart';
 
 Future<void> showReplyEditSheet(
   BuildContext context,
@@ -20,6 +23,8 @@ Future<void> showReplyEditSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    isDismissible: true,
+    enableDrag: true,
     backgroundColor: AppColors.background,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -53,6 +58,8 @@ class _ReplyEditSheetState extends ConsumerState<_ReplyEditSheet> {
   late final TextEditingController _controller;
   bool _submitting = false;
   String? _error;
+
+  bool get _isHermandades => widget.forumId == 'hermandades';
 
   @override
   void initState() {
@@ -103,24 +110,34 @@ class _ReplyEditSheetState extends ConsumerState<_ReplyEditSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + bottom),
+    return ForumComposeSheetLayout(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Editar respuesta', style: AppTypography.displaySmall()),
-          const SizedBox(height: 6),
-          Text(
-            'Solo durante 30 minutos y si nadie ha respondido debajo.',
-            style: AppTypography.bodyMedium(color: AppColors.textMuted),
+          ForumComposeSheetTitleBar(
+            closeEnabled: !_submitting,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Editar respuesta', style: TopicDetailTypography.title()),
+                const SizedBox(height: 4),
+                Text(
+                  'Solo durante 30 minutos y si nadie ha respondido debajo.',
+                  style: AppTypography.bodyMedium(color: AppColors.textMuted),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
-          MentionAutocompleteField(
+          ForumComposeField(
             controller: _controller,
-            hintText: 'Corrige tu mensaje…',
+            toolbar: _isHermandades
+                ? ForumComposeToolbar.editorial
+                : ForumComposeToolbar.standard,
+            hintText: _isHermandades
+                ? 'Corrige la publicación…'
+                : 'Corrige tu mensaje…',
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),

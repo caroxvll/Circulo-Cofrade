@@ -1,0 +1,58 @@
+<section class="page">
+  <header class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Fase 3 · patrocinios</p>
+      <h1>Resumen</h1>
+      <p class="lead">
+        Hola
+        {{ profile()?.displayName || profile()?.handle || 'staff' }}.
+        Moderación + usuarios, moderadores y hermandades en el panel web.
+        @if (pendingTotal() > 0) {
+          Hay <strong>{{ pendingTotal() }}</strong> ítem{{ pendingTotal() === 1 ? '' : 's' }} por revisar.
+        } @else if (!countsLoading()) {
+          No hay nada pendiente ahora mismo.
+        }
+      </p>
+    </div>
+    <div class="hero-actions">
+      <button type="button" class="refresh" (click)="refresh()" [disabled]="countsLoading()">
+        {{ countsLoading() ? 'Actualizando…' : 'Actualizar' }}
+      </button>
+      <div class="badge desktop-only" [class.admin]="isAdmin()">
+        {{ isAdmin() ? 'Admin' : 'Moderador' }}
+      </div>
+    </div>
+  </header>
+
+  <div class="queue-grid">
+    @for (card of queueCards(); track card.route) {
+      <a class="queue-stat" [routerLink]="card.route">
+        <span class="count">{{ card.count }}</span>
+        <strong>{{ card.label }}</strong>
+        <span class="go">Abrir cola →</span>
+      </a>
+    }
+  </div>
+
+  <div class="block-head">
+    <h2 class="block-title">Módulos</h2>
+    <p class="block-note">Moderación · comunidad · patrocinios</p>
+  </div>
+  <div class="modules">
+    @for (m of modules(); track m.id) {
+      <a class="mod" [routerLink]="m.route">
+        <strong>{{ m.label }}</strong>
+        <span>
+          @if (m.comingSoon) {
+            Próximamente
+          } @else {
+            Abrir
+          }
+          @if (m.webOnly) {
+            · solo web
+          }
+        </span>
+      </a>
+    }
+  </div>
+</section>

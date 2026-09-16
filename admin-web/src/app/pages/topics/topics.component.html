@@ -1,0 +1,90 @@
+<section class="queue-page">
+  <header>
+    <div>
+      <p class="eyebrow">Moderación</p>
+      <h1>Temas pendientes</h1>
+      <p class="lead">Aprueba o rechaza propuestas de hilo antes de publicarlas.</p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando cola…</div>
+  } @else if (topics().length === 0) {
+    <div class="empty-box">No hay temas pendientes. Buen trabajo.</div>
+  } @else {
+    <div class="queue-list">
+      @for (topic of topics(); track topic.id) {
+        <article class="queue-card">
+          <h2>{{ topic.title }}</h2>
+          <p class="queue-meta">
+            {{ topic.forumId }}
+            ·
+            {{ topic.authorHandle ? '@' + topic.authorHandle + ' · ' : '' }}
+            {{ timeAgo(topic.createdAt) }}
+          </p>
+          @if (topic.excerpt) {
+            <p class="queue-excerpt">{{ topic.excerpt }}</p>
+          }
+          <div class="queue-actions">
+            <button
+              type="button"
+              class="btn btn-danger"
+              [disabled]="busyId() === topic.id"
+              (click)="openReject(topic)"
+            >
+              Rechazar
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="busyId() === topic.id"
+              (click)="approve(topic)"
+            >
+              Aprobar
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>
+
+@if (rejectTarget(); as topic) {
+  <div class="dialog-backdrop" (click)="closeReject()">
+    <div class="dialog" (click)="$event.stopPropagation()">
+      <h3>Rechazar tema</h3>
+      <p>«{{ topic.title }}»</p>
+      <div class="presets">
+        @for (preset of presets; track preset) {
+          <button type="button" class="preset" (click)="usePreset(preset)">
+            {{ preset }}
+          </button>
+        }
+      </div>
+      <label>
+        Motivo
+        <textarea [(ngModel)]="rejectReason" placeholder="Explica el rechazo…"></textarea>
+      </label>
+      <div class="queue-actions">
+        <button type="button" class="btn btn-ghost" (click)="closeReject()">Cancelar</button>
+        <button
+          type="button"
+          class="btn btn-danger"
+          [disabled]="busyId() === topic.id || rejectReason.trim().length < 3"
+          (click)="confirmReject()"
+        >
+          Confirmar rechazo
+        </button>
+      </div>
+    </div>
+  </div>
+}

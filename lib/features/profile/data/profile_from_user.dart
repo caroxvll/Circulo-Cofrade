@@ -11,15 +11,16 @@ UserProfile userProfileFromAuth(User user) {
 
   return UserProfile(
     id: user.id,
-    displayName: meta['display_name'] as String? ??
+    displayName:
+        meta['display_name'] as String? ??
         user.email?.split('@').first ??
         'Cofrade',
     handle: handle,
-    bio: meta['bio'] as String? ??
-        AppBranding.defaultBio,
+    bio: meta['bio'] as String? ?? AppBranding.defaultBio,
     publicationCount: (meta['publication_count'] as int?) ?? 0,
     followerCount: (meta['follower_count'] as int?) ?? 0,
     avatarIcon: Icons.face_3,
+    isVerified: meta['verified'] as bool? ?? false,
     address: meta['address'] as String? ?? '',
     foundedLabel: meta['founded_label'] as String? ?? '',
     website: meta['website'] as String? ?? '',

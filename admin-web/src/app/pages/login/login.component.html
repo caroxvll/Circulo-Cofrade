@@ -1,0 +1,80 @@
+<div class="login">
+  <div class="login-atmosphere" aria-hidden="true">
+    <div class="glow glow-a"></div>
+    <div class="glow glow-b"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+  </div>
+
+  <main class="login-stage">
+    <section class="brand-panel">
+      <img class="brand-mark" src="/logo-mark.png" alt="" width="72" height="72" />
+      <p class="brand-eyebrow">Acceso staff</p>
+      <h1 class="brand-name">Círculo Cofrade</h1>
+      <p class="brand-line">Panel de Junta</p>
+      <p class="brand-copy">
+        Centro de control web con la misma cuenta staff que en la app.
+      </p>
+      <ul class="brand-points">
+        <li>Moderación y comunidad</li>
+        <li>Calendario y temporada</li>
+        <li>Patrocinios y finanzas</li>
+      </ul>
+    </section>
+
+    <section class="auth-panel">
+      <header class="auth-head">
+        <h2>Entrar</h2>
+        <p>Usa tu email y contraseña de staff.</p>
+      </header>
+
+      @if (!configured) {
+        <div class="banner warn">
+          Falta <code>environment.local.ts</code>. En esta carpeta ejecuta
+          <code>npm run sync-env</code> (lee el <code>env.json</code> del repo).
+        </div>
+      }
+
+      @if (denied) {
+        <div class="banner warn">
+          Sesión cerrada: esa cuenta no es admin ni moderador.
+        </div>
+      }
+
+      <form class="auth-form" (ngSubmit)="submit()" #f="ngForm">
+        <label class="field">
+          <span>Email</span>
+          <input
+            name="email"
+            type="email"
+            autocomplete="username"
+            placeholder="tu@correo.com"
+            [(ngModel)]="email"
+            required
+          />
+        </label>
+        <label class="field">
+          <span>Contraseña</span>
+          <input
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            [(ngModel)]="password"
+            required
+          />
+        </label>
+
+        @if (error()) {
+          <p class="error" role="alert">{{ error() }}</p>
+        }
+
+        <button class="submit" type="submit" [disabled]="loading() || !configured">
+          <span>{{ loading() ? 'Entrando…' : 'Entrar al panel' }}</span>
+        </button>
+      </form>
+
+      <p class="auth-foot">Solo cuentas de Junta · Círculo Cofrade</p>
+    </section>
+  </main>
+</div>

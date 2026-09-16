@@ -1,0 +1,492 @@
+<section class="queue-page ads-page">
+  <header>
+    <div>
+      <p class="eyebrow">Plataforma · solo admin</p>
+      <h1>Patrocinios</h1>
+      <p class="lead">
+        Dónde salen las marcas, informe por mes y pack en todas las zonas.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+      <button type="button" class="btn btn-primary" (click)="openCreate()">Nuevo</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button type="button" class="tab" [class.active]="tab() === 'map'" (click)="setTab('map')">
+      Dónde salen
+    </button>
+    <button type="button" class="tab" [class.active]="tab() === 'report'" (click)="setTab('report')">
+      Informe
+    </button>
+    <button type="button" class="tab" [class.active]="tab() === 'pack'" (click)="setTab('pack')">
+      Todas las zonas
+    </button>
+  </div>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (tab() === 'map') {
+    <div class="filters">
+      <input
+        type="search"
+        [(ngModel)]="search"
+        placeholder="Buscar marca, foro o zona…"
+      />
+      <select [ngModel]="filter()" (ngModelChange)="filter.set($event)">
+        <option value="all">Todos</option>
+        <option value="active">Activos</option>
+        <option value="paused">Pausados</option>
+      </select>
+    </div>
+
+    @if (loading()) {
+      <div class="state-box">Cargando patrocinios…</div>
+    } @else if (groupedAds().length === 0) {
+      <div class="empty-box">No hay piezas con estos filtros.</div>
+    } @else {
+      <div class="zones">
+        @for (group of groupedAds(); track group.placement) {
+          <section class="zone">
+            <div class="zone-head">
+              <div>
+                <h2>{{ commercialName(group.placement) }}</h2>
+                <p>{{ whereHint(group.placement) }}</p>
+              </div>
+              <div class="zone-actions">
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="saving()"
+                  (click)="equalizeZone(group.placement)"
+                >
+                  Igualar salidas
+                </button>
+                <button type="button" class="btn btn-ghost" (click)="openCreate(group.placement)">
+                  Añadir aquí
+                </button>
+              </div>
+            </div>
+            <div class="queue-list">
+              @for (ad of group.ads; track ad.id) {
+                <article class="queue-card ad-card">
+                  <div class="ad-main">
+                    @if (ad.imageUrl || ad.sponsorLogoUrl) {
+                      <img
+                        [src]="ad.imageUrl || ad.sponsorLogoUrl"
+                        alt=""
+                        class="thumb"
+                      />
+                    }
+                    <div>
+                      <h3>{{ displayName(ad) }}</h3>
+                      <p class="queue-meta">
+                        {{ targetDetail(ad) }}
+                        · {{ priorityLabel(ad.priority) }}
+                        · {{ ad.active ? 'Activo' : 'Pausado' }}
+                      </p>
+                    </div>
+                  </div>
+                  <div class="queue-actions">
+                    <button type="button" class="btn btn-ghost" (click)="openEdit(ad)">
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-soft"
+                      [disabled]="busyId() === ad.id"
+                      (click)="toggleActive(ad)"
+                    >
+                      {{ ad.active ? 'Pausar' : 'Activar' }}
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      [disabled]="busyId() === ad.id"
+                      (click)="removeAd(ad)"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+        }
+      </div>
+    }
+  }
+
+  @if (tab() === 'report') {
+    <div class="report-shell">
+      <div class="report-toolbar">
+        <div class="period-chips">
+          <button type="button" class="chip" [class.active]="period() === 'current'" (click)="setPeriod('current')">
+            Mes actual
+          </button>
+          <button type="button" class="chip" [class.active]="period() === 'previous'" (click)="setPeriod('previous')">
+            Mes anterior
+          </button>
+          <button type="button" class="chip" [class.active]="period() === 'custom'" (click)="setPeriod('custom')">
+            Personalizado
+          </button>
+          <button type="button" class="chip" [class.active]="period() === 'all'" (click)="setPeriod('all')">
+            Todo
+          </button>
+        </div>
+        <div class="export-actions">
+          <button
+            type="button"
+            class="btn btn-soft"
+            (click)="downloadExcel()"
+            [disabled]="exporting() || (reportRows().length === 0 && zoneSummaries().length === 0)"
+          >
+            Excel
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="downloadWord()"
+            [disabled]="exporting() || (reportRows().length === 0 && zoneSummaries().length === 0)"
+          >
+            {{ exporting() ? 'Generando…' : 'Word explicativo' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            (click)="copyCsv()"
+            [disabled]="reportRows().length === 0"
+          >
+            Copiar CSV
+          </button>
+        </div>
+      </div>
+
+      @if (period() === 'custom') {
+        <div class="custom-range">
+          <label>
+            Desde
+            <input
+              type="date"
+              [ngModel]="customFrom()"
+              (ngModelChange)="customFrom.set($event)"
+            />
+          </label>
+          <label>
+            Hasta
+            <input
+              type="date"
+              [ngModel]="customTo()"
+              (ngModelChange)="customTo.set($event)"
+            />
+          </label>
+          <button type="button" class="btn btn-soft" (click)="applyCustomRange()">
+            Aplicar rango
+          </button>
+        </div>
+      }
+
+      <p class="period-line">
+        Periodo: <strong>{{ periodLabel() }}</strong>
+        · Vistas y clics reales del intervalo
+      </p>
+
+      @if (statsError()) {
+        <div class="error-box">{{ statsError() }}</div>
+      }
+
+      @if (statsLoading()) {
+        <div class="state-box">Cargando informe…</div>
+      } @else {
+        <div class="stats report-kpis">
+          <article>
+            <strong>{{ formatInt(reportTotals().impressions) }}</strong>
+            <span>Vistas</span>
+          </article>
+          <article>
+            <strong>{{ formatInt(reportTotals().clicks) }}</strong>
+            <span>Clics</span>
+          </article>
+          <article>
+            <strong>{{ formatCtr(reportTotals().ctr) }}</strong>
+            <span>CTR medio</span>
+          </article>
+          <article>
+            <strong>{{ reportTotals().companies }}</strong>
+            <span>Empresas</span>
+          </article>
+          <article>
+            <strong>{{ reportTotals().zones }}</strong>
+            <span>Zonas con datos</span>
+          </article>
+        </div>
+
+        @if (zoneSummaries().length) {
+          <section class="zone-summary">
+            <div class="zone-summary-head">
+              <h2>Zonas activas</h2>
+              <p>Piezas en marcha y rendimiento del periodo</p>
+            </div>
+            <div class="zone-summary-grid">
+              @for (zone of zoneSummaries(); track zone.placement) {
+                <button
+                  type="button"
+                  class="zone-tile"
+                  [class.active]="reportZone() === zone.placement"
+                  [class.idle]="zone.activePieces === 0"
+                  (click)="reportZone.set(reportZone() === zone.placement ? '' : zone.placement)"
+                >
+                  <strong>{{ zone.label }}</strong>
+                  <span class="zone-meta">
+                    {{ zone.activePieces }}/{{ zone.totalPieces }} activas
+                  </span>
+                  <span class="zone-metrics">
+                    {{ formatInt(zone.impressions) }} vistas ·
+                    {{ formatInt(zone.clicks) }} clics ·
+                    CTR {{ formatCtr(zone.ctr) }}
+                  </span>
+                </button>
+              }
+            </div>
+          </section>
+        }
+
+        <div class="report-filters">
+          <input
+            type="search"
+            [ngModel]="reportSearch()"
+            (ngModelChange)="reportSearch.set($event)"
+            placeholder="Buscar empresa o zona…"
+          />
+          <select
+            [ngModel]="reportZone()"
+            (ngModelChange)="reportZone.set($event)"
+          >
+            <option value="">Todas las zonas</option>
+            @for (opt of reportZoneOptions(); track opt.value) {
+              <option [value]="opt.value">{{ opt.label }}</option>
+            }
+          </select>
+          <select
+            [ngModel]="reportSort()"
+            (ngModelChange)="setReportSort($event)"
+          >
+            <option value="impressions">Orden: más vistas</option>
+            <option value="clicks">Orden: más clics</option>
+            <option value="ctr">Orden: mejor CTR</option>
+            <option value="company">Orden: empresa</option>
+            <option value="zone">Orden: zona</option>
+          </select>
+          <label class="check zero-toggle">
+            <input
+              type="checkbox"
+              [checked]="showZeroRows()"
+              (change)="showZeroRows.set(($any($event.target)).checked)"
+            />
+            Incluir sin actividad
+          </label>
+        </div>
+
+        @if (reportRows().length === 0) {
+          <div class="empty-box">
+            Sin filas para {{ periodLabel() }}.
+            @if (!showZeroRows()) {
+              Prueba «Incluir sin actividad» o cambia el periodo.
+            }
+          </div>
+        } @else {
+          <div class="table-wrap report-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Empresa</th>
+                  <th>Zona</th>
+                  <th>Detalle</th>
+                  <th>Estado</th>
+                  <th class="num">Vistas</th>
+                  <th class="num">Clics</th>
+                  <th class="num">CTR</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of reportRows(); track row.id) {
+                  <tr [class.dim]="row.impressions === 0 && row.clicks === 0">
+                    <td>
+                      <strong>{{ row.sponsorName }}</strong>
+                    </td>
+                    <td>{{ row.zoneLabel }}</td>
+                    <td class="detail">{{ row.detail || '—' }}</td>
+                    <td>
+                      @if (row.active === true) {
+                        <span class="pill ok">Activa</span>
+                      } @else if (row.active === false) {
+                        <span class="pill muted">Pausada</span>
+                      } @else {
+                        <span class="pill muted">—</span>
+                      }
+                    </td>
+                    <td class="num">{{ formatInt(row.impressions) }}</td>
+                    <td class="num">{{ formatInt(row.clicks) }}</td>
+                    <td class="num">{{ formatCtr(row.ctr) }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="4"><strong>Total filtrado</strong></td>
+                  <td class="num"><strong>{{ formatInt(reportTotals().impressions) }}</strong></td>
+                  <td class="num"><strong>{{ formatInt(reportTotals().clicks) }}</strong></td>
+                  <td class="num"><strong>{{ formatCtr(reportTotals().ctr) }}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        }
+      }
+    </div>
+  }
+
+  @if (tab() === 'pack') {
+    <div class="panel">
+      <h2>Local en todas las zonas</h2>
+      <p class="lead">
+        Elige una marca ya creada y marca dónde quieres que salga. No incluye
+        «evento patrocinado» (eso va foro a foro).
+      </p>
+      <label>
+        Marca
+        <select [(ngModel)]="selectedPackName">
+          <option value="">Selecciona…</option>
+          @for (sponsor of packSponsors(); track sponsor.name) {
+            <option [value]="sponsor.name">{{ sponsor.name }}</option>
+          }
+        </select>
+      </label>
+      <div class="zone-checks">
+        @for (placement of packPlacements; track placement) {
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="isZoneSelected(placement)"
+              (change)="toggleZone(placement)"
+            />
+            <span>
+              <strong>{{ commercialName(placement) }}</strong>
+              <small>{{ whereHint(placement) }}</small>
+            </span>
+          </label>
+        }
+      </div>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="packing()"
+        (click)="savePack()"
+      >
+        {{ packing() ? 'Guardando…' : 'Activar en zonas marcadas' }}
+      </button>
+    </div>
+  }
+</section>
+
+@if (showForm()) {
+  <div class="dialog-backdrop" (click)="closeForm()">
+    <div class="dialog form-dialog" (click)="$event.stopPropagation()">
+      <h3>{{ editing() ? 'Editar patrocinio' : 'Nuevo patrocinio' }}</h3>
+      <label>
+        Título
+        <input [(ngModel)]="formTitle" />
+      </label>
+      <label>
+        Patrocinador
+        <input [(ngModel)]="formSponsor" />
+      </label>
+      <label>
+        Enlace destino
+        <input [(ngModel)]="formUrl" placeholder="https://…" />
+      </label>
+      <label>
+        Zona
+        <select [(ngModel)]="formPlacement">
+          @for (placement of placements; track placement) {
+            <option [value]="placement">{{ commercialName(placement) }}</option>
+          }
+        </select>
+      </label>
+      @if (needsForum()) {
+        <label>
+          Foro
+          <select [(ngModel)]="formForumId">
+            <option value="">Todos los foros</option>
+            @for (forumId of forumIds; track forumId) {
+              <option [value]="forumId">{{ forumLabel(forumId) }}</option>
+            }
+          </select>
+        </label>
+      }
+      @if (needsTopic()) {
+        <label>
+          Tema destacado
+          <select [(ngModel)]="formTopicId">
+            <option value="">Todos los destacados</option>
+            @for (topicId of topicIds; track topicId) {
+              <option [value]="topicId">{{ topicLabel(topicId) }}</option>
+            }
+          </select>
+        </label>
+      }
+      <label>
+        Imagen (URL)
+        <input [(ngModel)]="formImageUrl" />
+      </label>
+      <label class="file-row">
+        Subir creativo
+        <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onUpload('image', $event)" />
+      </label>
+      <label>
+        Logo (URL)
+        <input [(ngModel)]="formLogoUrl" />
+      </label>
+      <label class="file-row">
+        Subir logo
+        <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onUpload('logo', $event)" />
+      </label>
+      <div class="priority-block">
+        <span class="priority-label">Rotación en la zona</span>
+        <p class="hint">
+          Elige cómo de a menudo sale frente a otras marcas. «Igualdad» reparte
+          las salidas a partes iguales entre quienes también usan Igualdad.
+        </p>
+        <div class="priority-chips">
+          @for (tier of priorityTiers; track tier.value) {
+            <button
+              type="button"
+              class="priority-chip"
+              [class.active]="formPriority === tier.value"
+              (click)="setPriorityTier(tier.value)"
+            >
+              <strong>{{ tier.label }}</strong>
+              <span>{{ tier.hint }}</span>
+            </button>
+          }
+        </div>
+        <p class="priority-estimate">{{ formPriorityHint() }}</p>
+      </div>
+      <label class="check">
+        <input type="checkbox" [(ngModel)]="formActive" />
+        Activo
+      </label>
+      <div class="queue-actions">
+        <button type="button" class="btn btn-ghost" (click)="closeForm()">Cancelar</button>
+        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="saveForm()">
+          {{ saving() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

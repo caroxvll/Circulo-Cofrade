@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../shared/models/app_notification.dart';
+import '../notifications_design.dart';
 
 class NotificationCard extends StatelessWidget {
   const NotificationCard({
@@ -15,66 +16,79 @@ class NotificationCard extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onTap;
 
-  static const _cardColor = Color(0xFF1C1C1E);
-
   @override
   Widget build(BuildContext context) {
+    final unread = !notification.isRead;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: _cardColor,
-            borderRadius: BorderRadius.circular(14),
-            border: notification.isRead
-                ? null
-                : Border.all(
-                    color: AppColors.burgundy.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(NotificationsDesign.cardRadius),
+        child: Ink(
+          decoration: NotificationsDesign.cardDecoration(unread: unread),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (unread)
+                  Container(
+                    width: 3,
+                    height: 44,
+                    margin: const EdgeInsets.only(right: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.burgundy,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _NotificationLeading(notification: notification),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            notification.title,
-                            style: AppTypography.titleLarge(
-                              color: AppColors.textOnDark,
-                            ).copyWith(fontSize: 15),
+                _NotificationLeading(notification: notification),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              notification.title,
+                              style: AppTypography.titleLarge(
+                                color: AppColors.textPrimary,
+                              ).copyWith(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                height: 1.25,
+                              ),
+                            ),
                           ),
+                          const SizedBox(width: 8),
+                          Text(
+                            notification.timeAgo,
+                            style: NotificationsDesign.meta().copyWith(
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        notification.subtitle,
+                        style: AppTypography.bodyMedium(
+                          color: AppColors.textSecondary,
+                        ).copyWith(
+                          height: 1.35,
+                          fontSize: 13,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          notification.timeAgo,
-                          style: AppTypography.labelSmall(
-                            color: AppColors.textMuted,
-                          ).copyWith(fontSize: 11),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      notification.subtitle,
-                      style: AppTypography.bodyMedium(
-                        color: AppColors.goldLight,
-                      ).copyWith(height: 1.35),
-                    ),
-                  ],
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -103,6 +117,9 @@ class _NotificationLeading extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: notification.badgeBackgroundColor ?? AppColors.burgundy,
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.2),
+        ),
       ),
       child: Icon(
         notification.badgeIcon ?? Icons.notifications_outlined,

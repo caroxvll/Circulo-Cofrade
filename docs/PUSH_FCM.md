@@ -117,6 +117,10 @@ En **Supabase Dashboard → Database → Webhooks → Create**:
 | Type | Supabase Edge Function |
 | Function | `send-push` |
 
+**Importante:** usa **solo el webhook** o **solo** el trigger SQL de [`push_webhook_trigger.sql`](../supabase/push_webhook_trigger.sql), **nunca los dos**. Si ambos están activos, cada aviso dispara `send-push` dos veces y llegan dos pushes idénticos.
+
+Comprueba con [`verify_push_not_duplicated.sql`](../supabase/verify_push_not_duplicated.sql).
+
 ## 6. Probar
 
 1. Inicia sesión en la app con Firebase configurado.
@@ -135,12 +139,38 @@ En **Supabase Dashboard → Database → Webhooks → Create**:
 
 ## Preferencias
 
-La función respeta `push_enabled` y el tipo (`notify_hashtags`, `notify_profiles`, etc.). Tipos desconocidos (p. ej. moderación admin) se envían si `push_enabled` está activo.
+La función respeta `push_enabled` y el tipo:
+
+| Tipo notificación | Preferencia |
+|-------------------|-------------|
+| `hashtag_activity` | `notify_hashtags` |
+| `topic_activity`, `user_reply` | `notify_topics` |
+| `user_post` | `notify_profiles` |
+| `mention` | `notify_mentions` |
+| `new_follower` | `notify_followers` |
+| `reply_reaction` | `notify_reactions` |
+| `calendar` | `notify_calendar` |
+| `quiz` | `notify_quiz` |
+
+Tipos desconocidos (p. ej. moderación admin) se envían si `push_enabled` está activo.
+
+Para reacciones en comentarios, ejecuta también [`reply_reaction_notify.sql`](../supabase/reply_reaction_notify.sql) (columna `notify_reactions`).
+
+Tras cambiar `send-push`, redeploy:
+
+```bash
+npx supabase functions deploy send-push
+```
+
+Los pushes de reacciones incluyen `forumId`, `topicId`, `replyId` y `officialCategory` en el payload FCM para abrir el hilo (y la sección del tablón si aplica).
 
 ## Troubleshooting
 
 | Problema | Qué revisar |
 |----------|-------------|
+| **Push duplicado (mismo título dos veces)** | Webhook **y** trigger `notifications_send_push` activos a la vez → ejecuta `verify_push_not_duplicated.sql` y deja solo un disparador |
+| **Push duplicado solo en Chrome/web** | Service worker mostraba el banner dos veces (FCM + `showNotification` manual); corregido en `web/firebase-messaging-sw.js` |
+| **Varios pushes distintos por un reply** | Normal si aplica `user_reply` + `hashtag_activity` (lógica de negocio) |
 | No aparece toggle push | `FIREBASE_PROJECT_ID` en `env.json` + hot restart |
 | Sin fila en `device_tokens` | Permisos denegados, VAPID en web, o SQL no ejecutado |
 | Push no llega | Webhook activo, secretos de función, tokens válidos |

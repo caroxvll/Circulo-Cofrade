@@ -36,6 +36,28 @@ create policy "Usuario actualiza su perfil"
   on public.profiles for update
   using (auth.uid() = id);
 
+-- La verificación es administrativa; la app no debe permitir autoverificación.
+create or replace function public.prevent_profile_verified_self_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.verified is distinct from old.verified
+     and auth.uid() is not null
+     and auth.uid() = old.id then
+    raise exception 'No puedes cambiar tu propia verificación desde la app';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_profile_verified_guard on public.profiles;
+create trigger on_profile_verified_guard
+  before update on public.profiles
+  for each row execute function public.prevent_profile_verified_self_change();
+
 -- Trigger: crear perfil al registrarse
 create or replace function public.handle_new_user()
 returns trigger
@@ -153,11 +175,13 @@ create table if not exists public.forum_pillars (
   name text not null,
   description text not null default '',
   icon_key text not null default 'church',
+  icon_image_url text,
   sort_order int not null default 0,
   topic_count int not null default 0,
   message_count int not null default 0,
   last_activity_at timestamptz,
-  last_topic_id text references public.forum_topics (id) on delete set null,
+  -- FK a forum_topics se añade después (evita 42P01 en proyecto vacío)
+  last_topic_id text,
   last_topic_title text,
   is_enabled boolean not null default true,
   is_active boolean not null default false,
@@ -178,8 +202,34 @@ create table if not exists public.forum_topics (
   comment_count int not null default 0,
   status text not null default 'pending'
     check (status in ('pending', 'published', 'rejected')),
+  is_pinned boolean not null default false,
+  pin_sort_order int not null default 0,
+  is_system boolean not null default false,
+  season_key text
+    check (
+      season_key is null
+      or season_key in ('cuaresma', 'semana_santa', 'glorias')
+    ),
+  icon_key text,
+  cover_image_url text,
+  is_listed boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'forum_pillars_last_topic_id_fkey'
+  ) then
+    alter table public.forum_pillars
+      add constraint forum_pillars_last_topic_id_fkey
+      foreign key (last_topic_id)
+      references public.forum_topics (id)
+      on delete set null;
+  end if;
+end $$;
 
 create table if not exists public.forum_replies (
   id uuid primary key default gen_random_uuid(),
@@ -187,6 +237,14 @@ create table if not exists public.forum_replies (
   author_id uuid references public.profiles (id) on delete set null,
   author_handle text not null,
   content text not null check (char_length(content) between 1 and 4000),
+  is_official boolean not null default false,
+  official_category text
+    check (
+      official_category is null
+      or official_category in (
+        'noticia', 'culto', 'acto', 'patrimonio'
+      )
+    ),
   like_count int not null default 0,
   created_at timestamptz not null default now()
 );
@@ -199,9 +257,12 @@ alter table public.forum_pillars enable row level security;
 alter table public.forum_topics enable row level security;
 alter table public.forum_replies enable row level security;
 
+drop policy if exists "Pilares legibles por todos" on public.forum_pillars;
 create policy "Pilares legibles por todos"
   on public.forum_pillars for select using (true);
 
+drop policy if exists "Temas publicados o propios" on public.forum_topics;
+drop policy if exists "Temas legibles por todos" on public.forum_topics;
 create policy "Temas publicados o propios"
   on public.forum_topics for select
   using (
@@ -209,6 +270,7 @@ create policy "Temas publicados o propios"
     or author_id = auth.uid()
   );
 
+drop policy if exists "Usuarios autenticados crean temas" on public.forum_topics;
 create policy "Usuarios autenticados crean temas"
   on public.forum_topics for insert
   with check (
@@ -220,9 +282,11 @@ create policy "Usuarios autenticados crean temas"
     )
   );
 
+drop policy if exists "Respuestas legibles por todos" on public.forum_replies;
 create policy "Respuestas legibles por todos"
   on public.forum_replies for select using (true);
 
+drop policy if exists "Usuarios autenticados responden" on public.forum_replies;
 create policy "Usuarios autenticados responden"
   on public.forum_replies for insert
   with check (

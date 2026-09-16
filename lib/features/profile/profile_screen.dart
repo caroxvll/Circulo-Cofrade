@@ -3,19 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
-import '../../core/widgets/screen_title_row.dart';
 import '../../shared/models/user_profile.dart';
 import '../auth/auth_provider.dart';
-import 'data/mock_profile.dart';
+import '../forums/widgets/forums_beige_background.dart';
 import 'data/profile_from_user.dart';
+import 'profile_design.dart';
 import 'profile_provider.dart';
 import 'widgets/own_profile_menu.dart';
 import 'widgets/email_verification_banner.dart';
 import 'widgets/following_tab.dart';
-import 'widgets/info_card.dart';
-import 'widgets/publications_tab.dart';
 import 'widgets/profile_header.dart';
+import 'widgets/profile_info_tab.dart';
+import 'widgets/profile_pill_tab_bar.dart';
+import 'widgets/profile_screen_header.dart';
+import 'widgets/publications_tab.dart';
 import 'widgets/suspended_account_banner.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -24,37 +25,52 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final authRequired = ref.watch(authRequiredProvider);
     final isAuth = user != null;
 
-    if (authRequired && !isAuth) {
-      return const Center(child: CircularProgressIndicator());
+    if (!isAuth) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        context.go('/login?redirect=${Uri.encodeComponent('/perfil')}');
+      });
+      return const _ProfileTextureBackground(
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
 
     final profileAsync = ref.watch(currentUserProfileProvider);
 
-    return profileAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) {
-        if (user == null) return const SizedBox.shrink();
-        return _ProfileBody(
+    return _ProfileTextureBackground(
+      child: profileAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => _ProfileBody(
           profile: userProfileFromAuth(user),
           isAuthenticated: true,
-        );
-      },
-      data: (profile) => _ProfileBody(
-        profile: profile,
-        isAuthenticated: isAuth,
+        ),
+        data: (profile) => _ProfileBody(profile: profile, isAuthenticated: true),
       ),
     );
   }
 }
 
+class _ProfileTextureBackground extends StatelessWidget {
+  const _ProfileTextureBackground({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        image: forumsBeigeDecorationImage(context),
+      ),
+      child: child,
+    );
+  }
+}
+
 class _ProfileBody extends ConsumerWidget {
-  const _ProfileBody({
-    required this.profile,
-    required this.isAuthenticated,
-  });
+  const _ProfileBody({required this.profile, required this.isAuthenticated});
 
   final UserProfile profile;
   final bool isAuthenticated;
@@ -71,31 +87,30 @@ class _ProfileBody extends ConsumerWidget {
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                padding: const EdgeInsets.fromLTRB(
+                  ProfileDesign.screenPadding,
+                  10,
+                  ProfileDesign.screenPadding,
+                  12,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ScreenTitleRow(
-                      title: 'Perfil',
-                      trailing: isAuthenticated
-                          ? [
-                              IconButton(
-                                tooltip: 'Opciones de cuenta',
-                                onPressed: () =>
-                                    showOwnProfileMenu(context, ref),
-                                icon: const Icon(
-                                  Icons.more_horiz,
-                                  color: AppColors.burgundy,
-                                ),
+                    ProfileScreenHeader(
+                      menuButton: isAuthenticated
+                          ? IconButton(
+                              tooltip: 'Opciones de cuenta',
+                              onPressed: () => showOwnProfileMenu(context, ref),
+                              icon: const Icon(
+                                Icons.more_horiz_rounded,
+                                color: AppColors.burgundy,
                               ),
-                            ]
-                          : const [],
+                            )
+                          : null,
                     ),
                     if (isAuthenticated && profile.isSuspended) ...[
                       const SizedBox(height: 12),
-                      SuspendedAccountBanner(
-                        reason: profile.suspendedReason,
-                      ),
+                      SuspendedAccountBanner(reason: profile.suspendedReason),
                     ],
                     if (isAuthenticated)
                       Consumer(
@@ -109,29 +124,36 @@ class _ProfileBody extends ConsumerWidget {
                           );
                         },
                       ),
-                    const SizedBox(height: 16),
-                    ProfileHeader(profile: profile),
+                    const SizedBox(height: 14),
+                    ProfileHeader(
+                      profile: profile,
+                      showFollowingCount: true,
+                      onFollowingTap: () {
+                        DefaultTabController.of(context).animateTo(1);
+                      },
+                    ),
                   ],
                 ),
               ),
             ),
             SliverPersistentHeader(
               pinned: true,
-              delegate: _ProfileTabBarDelegate(
-                TabBar(
-                  labelStyle: AppTypography.titleLarge().copyWith(fontSize: 15),
-                  unselectedLabelStyle:
-                      AppTypography.bodyLarge(color: AppColors.textMuted)
-                          .copyWith(fontWeight: FontWeight.w500),
-                  labelColor: AppColors.textPrimary,
-                  unselectedLabelColor: AppColors.textMuted,
-                  indicatorColor: AppColors.accentRed,
-                  indicatorWeight: 3,
-                  dividerColor: AppColors.border,
+              delegate: ProfileTabBarDelegate(
+                tabBar: ProfilePillTabBar(
                   tabs: [
-                    const Tab(text: 'Publicaciones'),
-                    if (isAuthenticated) const Tab(text: 'Siguiendo'),
-                    const Tab(text: 'Acerca de'),
+                    const ProfilePillTab(
+                      icon: Icons.grid_view_rounded,
+                      label: 'Actividad',
+                    ),
+                    if (isAuthenticated)
+                      const ProfilePillTab(
+                        icon: Icons.bookmark_outline_rounded,
+                        label: 'Siguiendo',
+                      ),
+                    const ProfilePillTab(
+                      icon: Icons.info_outline_rounded,
+                      label: 'Información',
+                    ),
                   ],
                 ),
               ),
@@ -141,106 +163,17 @@ class _ProfileBody extends ConsumerWidget {
             children: [
               PublicationsTab(
                 userId: profile.id,
-                publicationCount: profile.publicationCount,
-                followerCount: profile.followerCount,
                 isAuthenticated: isAuthenticated,
               ),
               if (isAuthenticated) const FollowingTab(),
-              _AboutTab(profile: profile, isAuthenticated: isAuthenticated),
+              ProfileInfoTab(
+                profile: profile,
+                isAuthenticated: isAuthenticated,
+              ),
             ],
           ),
         ),
       ),
     );
   }
-}
-
-class _AboutTab extends StatelessWidget {
-  const _AboutTab({
-    required this.profile,
-    required this.isAuthenticated,
-  });
-
-  final UserProfile profile;
-  final bool isAuthenticated;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = isAuthenticated && profile.address.isEmpty
-        ? <ProfileInfoItem>[]
-        : isAuthenticated
-            ? _itemsFromProfile(profile)
-            : mockProfileInfoItems;
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-      children: [
-        Text('Información', style: AppTypography.displaySmall()),
-        const SizedBox(height: 16),
-        if (items.isEmpty && isAuthenticated)
-          Text(
-            'Pulsa Editar para completar tu perfil.',
-            style: AppTypography.bodyMedium(),
-          )
-        else
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) const SizedBox(height: 12),
-            InfoCard(item: items[i]),
-          ],
-      ],
-    );
-  }
-
-  List<ProfileInfoItem> _itemsFromProfile(UserProfile profile) {
-    final items = <ProfileInfoItem>[];
-    if (profile.address.isNotEmpty) {
-      items.add(ProfileInfoItem(
-        icon: Icons.location_on_outlined,
-        label: 'Dirección',
-        value: profile.address,
-      ));
-    }
-    if (profile.foundedLabel.isNotEmpty) {
-      items.add(ProfileInfoItem(
-        icon: Icons.calendar_today_outlined,
-        label: 'Fundación',
-        value: profile.foundedLabel,
-      ));
-    }
-    if (profile.website.isNotEmpty) {
-      items.add(ProfileInfoItem(
-        icon: Icons.language_outlined,
-        label: 'Sitio Web',
-        value: profile.website,
-      ));
-    }
-    return items;
-  }
-}
-
-class _ProfileTabBarDelegate extends SliverPersistentHeaderDelegate {
-  _ProfileTabBarDelegate(this.tabBar);
-
-  final TabBar tabBar;
-
-  @override
-  double get minExtent => tabBar.preferredSize.height;
-
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return Material(
-      color: AppColors.background,
-      child: tabBar,
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _ProfileTabBarDelegate oldDelegate) => false;
 }

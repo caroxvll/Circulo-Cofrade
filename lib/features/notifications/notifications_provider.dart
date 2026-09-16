@@ -57,19 +57,27 @@ class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
 
     if (user != null && repo.isAvailable) {
       final list = await repo.fetchForUser(user.id);
-      _syncProfileActivity(user.id, list);
+      _syncProfileActivity(user.id, previous: null, list: list);
       return list;
     }
     return List<AppNotification>.from(mockNotifications);
   }
 
-  void _syncProfileActivity(String userId, List<AppNotification> list) {
-    final hasModerationUpdate = list.any(
+  void _syncProfileActivity(
+    String userId, {
+    required List<AppNotification>? previous,
+    required List<AppNotification> list,
+  }) {
+    if (previous == null) return;
+
+    final previousIds = previous.map((n) => n.id).toSet();
+    final hasNewModerationUpdate = list.any(
       (n) =>
-          n.kind == AppNotificationKind.topicPublished ||
-          n.kind == AppNotificationKind.topicRejected,
+          (n.kind == AppNotificationKind.topicPublished ||
+              n.kind == AppNotificationKind.topicRejected) &&
+          !previousIds.contains(n.id),
     );
-    if (!hasModerationUpdate) return;
+    if (!hasNewModerationUpdate) return;
 
     Future.microtask(() {
       ref.invalidate(userActivityProvider(userId));
@@ -96,6 +104,25 @@ class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
     });
   }
 
+  void _syncCofradeRankIfNeeded(
+    List<AppNotification>? previous,
+    List<AppNotification> list,
+  ) {
+    if (previous == null) return;
+
+    final previousIds = previous.map((n) => n.id).toSet();
+    final rankUp = list.any(
+      (n) =>
+          n.kind == AppNotificationKind.cofradeRankUp &&
+          !previousIds.contains(n.id),
+    );
+    if (!rankUp) return;
+
+    Future.microtask(() {
+      ref.invalidate(currentUserProfileProvider);
+    });
+  }
+
   Future<void> refresh() async {
     state = const AsyncLoading();
     state = AsyncData(await build());
@@ -111,8 +138,9 @@ class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
     try {
       final previous = state.asData?.value;
       final list = await repo.fetchForUser(user.id);
-      _syncProfileActivity(user.id, list);
+      _syncProfileActivity(user.id, previous: previous, list: list);
       _syncFollowerCountIfNeeded(previous, list);
+      _syncCofradeRankIfNeeded(previous, list);
       state = AsyncData(list);
     } catch (_) {
       // Mantener el estado anterior si falla la red.
@@ -151,17 +179,63 @@ class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
     final user = ref.read(currentUserProvider);
     final repo = ref.read(notificationsRepositoryProvider);
 
+    final current = state.asData?.value;
+    final target = current?.where((n) => n.id == id).firstOrNull;
+
+    // Optimistic local: no esperar refresh completo de la lista.
+    if (current != null) {
+      if (target?.kind == AppNotificationKind.replyReaction &&
+          target?.replyId != null) {
+        final replyId = target!.replyId!.toLowerCase();
+        state = AsyncData([
+          for (final n in current)
+            if (n.kind == AppNotificationKind.replyReaction &&
+                n.replyId?.toLowerCase() == replyId)
+              n.copyWith(isRead: true)
+            else
+              n,
+        ]);
+      } else {
+        state = AsyncData([
+          for (final n in current)
+            if (n.id == id) n.copyWith(isRead: true) else n,
+        ]);
+      }
+    }
+
     if (user != null && repo.isAvailable) {
-      await repo.markRead(user.id, id);
-      await refresh();
+      try {
+        if (target?.kind == AppNotificationKind.replyReaction &&
+            target?.replyId != null) {
+          await repo.markReadReplyReactionGroup(user.id, target!.replyId!);
+        } else {
+          await repo.markRead(user.id, id);
+        }
+      } catch (_) {}
       return;
     }
 
-    final current = state.asData?.value ?? mockNotifications;
-    state = AsyncData([
-      for (final n in current)
-        if (n.id == id) n.copyWith(isRead: true) else n,
-    ]);
+    if (current == null) {
+      final list = mockNotifications;
+      if (target?.kind == AppNotificationKind.replyReaction &&
+          target?.replyId != null) {
+        final replyId = target!.replyId!.toLowerCase();
+        state = AsyncData([
+          for (final n in list)
+            if (n.kind == AppNotificationKind.replyReaction &&
+                n.replyId?.toLowerCase() == replyId)
+              n.copyWith(isRead: true)
+            else
+              n,
+        ]);
+        return;
+      }
+
+      state = AsyncData([
+        for (final n in list)
+          if (n.id == id) n.copyWith(isRead: true) else n,
+      ]);
+    }
   }
 
   Future<void> dismiss(String id) async {
@@ -169,17 +243,44 @@ class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
     final repo = ref.read(notificationsRepositoryProvider);
 
     final current = state.asData?.value;
+    final target = current?.where((n) => n.id == id).firstOrNull;
+    final snapshot = current == null ? null : List<AppNotification>.from(current);
+
     if (current != null) {
-      state = AsyncData([
-        for (final n in current) if (n.id != id) n,
-      ]);
+      if (target?.kind == AppNotificationKind.replyReaction &&
+          target?.replyId != null &&
+          !target!.isRead) {
+        final replyId = target.replyId!.toLowerCase();
+        state = AsyncData([
+          for (final n in current)
+            if (!(n.kind == AppNotificationKind.replyReaction &&
+                !n.isRead &&
+                n.replyId?.toLowerCase() == replyId))
+              n,
+        ]);
+      } else {
+        state = AsyncData([
+          for (final n in current) if (n.id != id) n,
+        ]);
+      }
     }
 
     if (user != null && repo.isAvailable) {
       try {
-        await repo.delete(user.id, id);
+        if (target?.kind == AppNotificationKind.replyReaction &&
+            target?.replyId != null &&
+            !target!.isRead) {
+          await repo.deleteUnreadReplyReactionsForReply(
+            user.id,
+            target.replyId!,
+          );
+        } else {
+          await repo.delete(user.id, id);
+        }
       } catch (_) {
-        await refresh();
+        if (snapshot != null) {
+          state = AsyncData(snapshot);
+        }
       }
       return;
     }

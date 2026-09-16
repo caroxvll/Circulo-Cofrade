@@ -31,11 +31,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Calendario'), findsWidgets);
-    expect(find.text('Todas'), findsOneWidget);
-    expect(find.text('Junio 2026'), findsOneWidget);
 
     await _scrollDown(tester);
-    expect(find.text('Eventos del mes'), findsOneWidget);
+    expect(find.text('Días destacados'), findsOneWidget);
   });
 
   testWidgets('Al pulsar un día muestra su evento', (tester) async {
@@ -46,13 +44,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('10').last);
+    // En la cabecera se muestra una franja semanal, así que el día visible
+    // en tests depende del "selectedDate" inicial. Con el dataset mock, el
+    // día 23 tiene eventos como "Concierto de marchas".
+    await tester.tap(find.text('23').last);
     await tester.pumpAndSettle();
 
-    await _scrollDown(tester);
+    // En el carousel se muestra primero el evento "más temprano" (por hora).
+    await tester.tap(find.text('Traslado del Cristo').first);
+    await tester.pumpAndSettle();
 
-    expect(find.textContaining('Concierto de marchas'), findsOneWidget);
-    expect(find.text('Limpiar'), findsOneWidget);
+    expect(find.text('Detalle del evento'), findsOneWidget);
+    // Puede aparecer tanto en el carousel (slide) como dentro del bottom sheet.
+    expect(find.text('Traslado del Cristo'), findsWidgets);
   });
 
   testWidgets('Foro abre hilo con respuestas', (tester) async {
@@ -66,7 +70,7 @@ void main() {
     await tester.tap(find.text('Foros').last);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Foro Cofradiero'));
+    await tester.tap(find.text('Círculo Cofrade'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('Nueva ruta de la procesión').last);
@@ -76,7 +80,8 @@ void main() {
 
     await _scrollDown(tester);
 
-    expect(find.text('Respuestas'), findsOneWidget);
+    // El título se renderiza en mayúsculas.
+    expect(find.text('RESPUESTAS'), findsOneWidget);
     expect(find.text('@jose_carpintero'), findsWidgets);
     expect(find.text('Resuelto'), findsOneWidget);
     expect(find.text('Escribe una respuesta…'), findsOneWidget);
@@ -98,7 +103,7 @@ void main() {
 
     await _scrollDown(tester);
 
-    expect(find.text('Búsquedas Recientes'), findsOneWidget);
+    expect(find.text('Recientes'), findsOneWidget);
 
     await tester.tap(find.text('itinerario'));
     await tester.pump();
@@ -119,7 +124,7 @@ void main() {
     expect(find.textContaining('Banda de la procesión'), findsOneWidget);
   });
 
-  testWidgets('Perfil muestra tabs Publicaciones y Acerca de', (tester) async {
+  testWidgets('Perfil sin sesión no muestra mock y abre login', (tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: CofradeoApp(),
@@ -130,25 +135,8 @@ void main() {
     await tester.tap(find.text('Perfil').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Hermandad Sevilla'), findsOneWidget);
-    expect(find.text('@hermandad_sevilla'), findsOneWidget);
-    expect(find.text('150'), findsOneWidget);
-    expect(find.text('15.2K'), findsOneWidget);
-
-    await tester.tap(find.text('Acerca de'));
-    await tester.pumpAndSettle();
-
-    await _scrollDown(tester);
-
-    expect(find.text('Información'), findsOneWidget);
-    expect(find.text('Calle Sierpes, 12, Sevilla'), findsOneWidget);
-    expect(find.text('Fundada en 1565'), findsOneWidget);
-    expect(find.text('www.hermandadsevilla.es'), findsOneWidget);
-
-    await tester.tap(find.text('Publicaciones'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Próximamente'), findsOneWidget);
+    expect(find.textContaining('INICIAR SESIÓN'), findsOneWidget);
+    expect(find.text('Hermandad Sevilla'), findsNothing);
   });
 
   testWidgets('Notificaciones lista mock y quita punto rojo en Foros', (tester) async {
@@ -183,6 +171,11 @@ void main() {
           (widget.decoration as BoxDecoration).shape == BoxShape.circle,
     );
     expect(dotFinder, findsNothing);
+
+    // Algunos widgets (p. ej. VisibilityDetector) crean timers internos para
+    // medir visibilidad. Si se desmontan justo al terminar el test, Flutter
+    // marca "timersPending" y falla.
+    await tester.pump(const Duration(milliseconds: 1500));
   });
 
   testWidgets('Atajo calendario desde Buscar y hilo', (tester) async {
@@ -199,11 +192,11 @@ void main() {
     await tester.tap(find.byTooltip('Calendario'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Junio 2026'), findsOneWidget);
+    expect(find.text('CALENDARIO'), findsWidgets);
 
     await tester.tap(find.text('Foros').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Foro Cofradiero'));
+    await tester.tap(find.text('Círculo Cofrade'));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Nueva ruta de la procesión').last);
     await tester.pumpAndSettle();
@@ -211,10 +204,10 @@ void main() {
     await tester.tap(find.byTooltip('Calendario'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Junio 2026'), findsOneWidget);
+    expect(find.text('CALENDARIO'), findsWidgets);
   });
 
-  testWidgets('Perfil invitado abre pantalla de login', (tester) async {
+  testWidgets('Perfil sin sesión abre login', (tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: CofradeoApp(),
@@ -225,15 +218,6 @@ void main() {
     await tester.tap(find.text('Perfil').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Modo invitado'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Iniciar sesión'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Continuar con Google'), findsOneWidget);
-
-    await _scrollDown(tester);
-
-    expect(find.text('Explorar sin cuenta'), findsOneWidget);
+    expect(find.textContaining('INICIAR SESIÓN'), findsOneWidget);
   });
 }

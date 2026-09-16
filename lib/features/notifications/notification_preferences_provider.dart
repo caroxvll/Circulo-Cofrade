@@ -32,6 +32,10 @@ class NotificationPreferencesNotifier
     bool? notifyTopics,
     bool? notifyMentions,
     bool? notifyFollowers,
+    bool? notifyReactions,
+    bool? notifyCalendar,
+    bool? notifyQuiz,
+    bool? notifyNews,
     bool? pushEnabled,
   }) async {
     final user = ref.read(currentUserProvider);
@@ -45,6 +49,10 @@ class NotificationPreferencesNotifier
       notifyTopics: notifyTopics,
       notifyMentions: notifyMentions,
       notifyFollowers: notifyFollowers,
+      notifyReactions: notifyReactions,
+      notifyCalendar: notifyCalendar,
+      notifyQuiz: notifyQuiz,
+      notifyNews: notifyNews,
       pushEnabled: pushEnabled,
     );
 

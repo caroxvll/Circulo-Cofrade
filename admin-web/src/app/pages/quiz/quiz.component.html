@@ -1,0 +1,178 @@
+<section class="queue-page quiz-page">
+  <header>
+    <div>
+      <p class="eyebrow">Plataforma</p>
+      <h1>Pregunta en vivo</h1>
+      <p class="lead">
+        Crear, aprobar y lanzar rondas. También visibilidad pública y mensaje de
+        temporada cuando no hay ronda.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+      <button type="button" class="btn btn-primary" (click)="openCreate()">Nueva pregunta</button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando quiz…</div>
+  } @else {
+    <div class="quiz-top">
+      <article class="panel live-panel" [class.on]="live()?.state === 'live'">
+        <p class="panel-label">Estado en vivo</p>
+        @if (live()?.state === 'live') {
+          <h2>Ronda abierta</h2>
+          <p>{{ live()?.prompt }}</p>
+          <button type="button" class="btn btn-soft" [disabled]="saving()" (click)="closeLive()">
+            Cerrar ronda
+          </button>
+        } @else {
+          <h2>Sin ronda en vivo</h2>
+          <p>Aprueba una pregunta y lánzala cuando quieras.</p>
+        }
+      </article>
+
+      <article class="panel">
+        <label class="check big">
+          <input
+            type="checkbox"
+            [checked]="liveVisible()"
+            (change)="saveVisible(($any($event.target)).checked)"
+            [disabled]="saving()"
+          />
+          Visible para usuarios en la app
+        </label>
+
+        <h3>Temporada (sin ronda)</h3>
+        <label>
+          Empieza el
+          <input type="date" [(ngModel)]="seasonStartsOn" />
+        </label>
+        <label>
+          Mensaje
+          <textarea rows="3" [(ngModel)]="seasonMessage" placeholder="Texto cuando no hay ronda…"></textarea>
+        </label>
+        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="saveSeason()">
+          Guardar temporada
+        </button>
+      </article>
+    </div>
+
+    <div class="filters">
+      <button type="button" class="chip" [class.active]="filter() === 'ready'" (click)="filter.set('ready')">
+        Listas para lanzar
+      </button>
+      <button type="button" class="chip" [class.active]="filter() === 'pending'" (click)="filter.set('pending')">
+        Pendientes
+      </button>
+      <button type="button" class="chip" [class.active]="filter() === 'all'" (click)="filter.set('all')">
+        Todas
+      </button>
+    </div>
+
+    @if (visibleQuestions().length === 0) {
+      <div class="empty-box">No hay preguntas en este filtro.</div>
+    } @else {
+      <div class="question-list">
+        @for (q of visibleQuestions(); track q.id) {
+          <article class="question-card">
+            <div class="q-main">
+              @if (q.imageUrl) {
+                <img [src]="q.imageUrl" alt="" />
+              }
+              <div>
+                <span
+                  class="pill"
+                  [class.warn]="q.status === 'pending_review'"
+                  [class.ok]="q.status === 'approved'"
+                  [class.danger]="q.status === 'rejected'"
+                >
+                  {{ statusLabel(q.status) }}
+                </span>
+                @if (launchedIds().has(q.id)) {
+                  <span class="pill muted">Ya lanzada</span>
+                }
+                <h3>{{ q.prompt }}</h3>
+                <ul class="options">
+                  <li [class.correct]="q.correctOption === 'a'">A · {{ q.optionA }}</li>
+                  <li [class.correct]="q.correctOption === 'b'">B · {{ q.optionB }}</li>
+                  <li [class.correct]="q.correctOption === 'c'">C · {{ q.optionC }}</li>
+                  <li [class.correct]="q.correctOption === 'd'">D · {{ q.optionD }}</li>
+                </ul>
+              </div>
+            </div>
+            <div class="queue-actions wrap">
+              @if (q.status === 'pending_review' && isAdmin()) {
+                <button type="button" class="btn btn-soft" [disabled]="busyId() === q.id" (click)="approve(q)">
+                  Aprobar
+                </button>
+                <button type="button" class="btn btn-ghost" [disabled]="busyId() === q.id" (click)="reject(q)">
+                  Rechazar
+                </button>
+              }
+              @if (q.status === 'approved' && !launchedIds().has(q.id)) {
+                <button type="button" class="btn btn-primary" [disabled]="busyId() === q.id" (click)="launch(q)">
+                  Lanzar en vivo
+                </button>
+              }
+              @if (isAdmin()) {
+                <button type="button" class="btn btn-ghost danger" [disabled]="busyId() === q.id" (click)="remove(q)">
+                  Borrar
+                </button>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    }
+  }
+</section>
+
+@if (showForm()) {
+  <div class="dialog-backdrop" (click)="closeForm()">
+    <div class="dialog form-dialog" (click)="$event.stopPropagation()">
+      <h3>Nueva pregunta</h3>
+      <label>
+        Enunciado
+        <textarea rows="3" [(ngModel)]="formPrompt"></textarea>
+      </label>
+      <label>A <input [(ngModel)]="formA" /></label>
+      <label>B <input [(ngModel)]="formB" /></label>
+      <label>C <input [(ngModel)]="formC" /></label>
+      <label>D <input [(ngModel)]="formD" /></label>
+      <label>
+        Correcta
+        <select [(ngModel)]="formCorrect">
+          <option value="a">A</option>
+          <option value="b">B</option>
+          <option value="c">C</option>
+          <option value="d">D</option>
+        </select>
+      </label>
+      <label>
+        Explicación
+        <textarea rows="2" [(ngModel)]="formExplanation"></textarea>
+      </label>
+      <label>
+        Imagen (URL)
+        <input [(ngModel)]="formImageUrl" />
+      </label>
+      <label class="file-row">
+        Subir imagen (máx. 500 KB)
+        <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onImageUpload($event)" />
+      </label>
+      <div class="queue-actions">
+        <button type="button" class="btn btn-ghost" (click)="closeForm()">Cancelar</button>
+        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="create()">
+          {{ saving() ? 'Creando…' : 'Crear' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

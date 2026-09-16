@@ -15,12 +15,12 @@ class UserProfile {
     required this.foundedLabel,
     required this.website,
     this.avatarUrl,
+    this.isVerified = false,
     this.role = UserRole.member,
     this.isSuspended = false,
     this.suspendedReason,
+    this.trophyPoints = 0,
   });
-
-
 
   final String id;
 
@@ -43,34 +43,29 @@ class UserProfile {
   final String website;
 
   final String? avatarUrl;
+  final bool isVerified;
   final UserRole role;
   final bool isSuspended;
   final String? suspendedReason;
 
-  bool get isStaff => role.isStaff;
+  /// Puntos de trofeo del foro (cache en Supabase).
+  final int trophyPoints;
+
+  bool get isAdmin => role.isAdmin;
 }
 
-
-
 class ProfileInfoItem {
-
   const ProfileInfoItem({
-
     required this.icon,
 
     required this.label,
 
     required this.value,
-
   });
-
-
 
   final IconData icon;
 
   final String label;
 
   final String value;
-
 }
-

@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../shared/models/app_notification.dart';
 import '../../../shared/models/forum.dart';
 import '../../../shared/models/profile_activity.dart';
 import '../../auth/auth_provider.dart';
 import '../../forums/constants/topic_moderation_copy.dart';
-import '../../notifications/notifications_provider.dart';
 import '../data/hidden_activity_store.dart';
+import '../profile_design.dart';
 import '../profile_provider.dart';
-import 'profile_stats_card.dart';
+import 'profile_activity_card.dart';
+import 'profile_activity_filters.dart';
+import 'profile_screen_header.dart';
 
 const _pageSize = 15;
 
@@ -20,14 +20,10 @@ class PublicationsTab extends ConsumerStatefulWidget {
   const PublicationsTab({
     super.key,
     required this.userId,
-    required this.publicationCount,
-    required this.followerCount,
     required this.isAuthenticated,
   });
 
   final String userId;
-  final int publicationCount;
-  final int followerCount;
   final bool isAuthenticated;
 
   @override
@@ -51,7 +47,6 @@ class _PublicationsTabState extends ConsumerState<PublicationsTab> {
     _visibleLimit = _pageSize;
     _hiddenIds = {};
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _syncActivityIfNeeded();
       _loadHiddenIds();
     });
   }
@@ -68,22 +63,6 @@ class _PublicationsTabState extends ConsumerState<PublicationsTab> {
     if (!_isOwnProfile) return;
     final ids = await _hiddenStore.load(widget.userId);
     if (mounted) setState(() => _hiddenIds = ids);
-  }
-
-  void _syncActivityIfNeeded() {
-    if (!widget.isAuthenticated) return;
-
-    final notifications = ref.read(notificationsProvider).asData?.value;
-    if (notifications == null) return;
-
-    final hasModerationUpdate = notifications.any(
-      (n) =>
-          n.kind == AppNotificationKind.topicPublished ||
-          n.kind == AppNotificationKind.topicRejected,
-    );
-    if (hasModerationUpdate) {
-      ref.invalidate(userActivityProvider(widget.userId));
-    }
   }
 
   bool get _isOwnProfile {
@@ -120,13 +99,13 @@ class _PublicationsTabState extends ConsumerState<PublicationsTab> {
   Widget build(BuildContext context) {
     if (!widget.isAuthenticated) {
       return ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        padding: const EdgeInsets.fromLTRB(
+          ProfileDesign.screenPadding,
+          ProfileDesign.sectionGap,
+          ProfileDesign.screenPadding,
+          28,
+        ),
         children: [
-          ProfileStatsCard(
-            publicationCount: widget.publicationCount,
-            followerCount: widget.followerCount,
-          ),
-          const SizedBox(height: 32),
           Text(
             'Próximamente',
             style: AppTypography.displaySmall(color: AppColors.textMuted),
@@ -147,13 +126,13 @@ class _PublicationsTabState extends ConsumerState<PublicationsTab> {
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        padding: const EdgeInsets.fromLTRB(
+          ProfileDesign.screenPadding,
+          12,
+          ProfileDesign.screenPadding,
+          28,
+        ),
         children: [
-          ProfileStatsCard(
-            publicationCount: widget.publicationCount,
-            followerCount: widget.followerCount,
-          ),
-          const SizedBox(height: 24),
           if (!supabaseReady)
             Text(
               'Conecta Supabase para ver publicaciones reales.',
@@ -224,26 +203,11 @@ class _ActivityFeed extends StatelessWidget {
     final hasMore = visible.length > visibleLimit;
 
     if (activities.isEmpty) {
-      return Column(
-        children: [
-          Icon(
-            Icons.grid_view_outlined,
-            size: 40,
-            color: AppColors.textMuted.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Aún no hay publicaciones',
-            style: AppTypography.displaySmall(color: AppColors.textMuted),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Cuando publiques en los foros aparecerán aquí con su estado.',
-            style: AppTypography.bodyMedium(),
-            textAlign: TextAlign.center,
-          ),
-        ],
+      return ProfileEmptyState(
+        icon: Icons.grid_view_outlined,
+        title: 'Aún no hay publicaciones',
+        subtitle: 'Cuando publiques en los foros aparecerán aquí '
+            'con su estado.',
       );
     }
 
@@ -252,47 +216,54 @@ class _ActivityFeed extends StatelessWidget {
       children: [
         if (pendingTopics > 0) ...[
           _PendingTopicsBanner(count: pendingTopics),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
         ],
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tu actividad',
-                    style: AppTypography.titleLarge().copyWith(fontSize: 15),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isOwnProfile
-                        ? 'Desliza para ocultar · no borra del foro'
-                        : 'Temas y respuestas en los foros.',
-                    style: AppTypography.bodyMedium(),
-                  ),
-                ],
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+          decoration: ProfileDesign.activityPanelDecoration(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ProfileActivitySectionHeader(
+                count: visible.length,
+                isOwnProfile: isOwnProfile,
               ),
-            ),
-            if (isOwnProfile && hiddenIds.isNotEmpty)
-              TextButton(
-                onPressed: onRestoreHidden,
-                child: Text(
-                  'Mostrar ${hiddenIds.length} oculto${hiddenIds.length == 1 ? '' : 's'}',
-                  style: AppTypography.labelSmall(color: AppColors.burgundy)
-                      .copyWith(fontWeight: FontWeight.w600),
+              const SizedBox(height: 12),
+              Text(
+                'FILTRAR ACTIVIDAD',
+                style: ProfileDesign.filterSectionLabel(),
+              ),
+              const SizedBox(height: 8),
+              ProfileActivityFilters(
+                filter: filter,
+                onSelected: onFilterSelected,
+              ),
+              if (isOwnProfile && hiddenIds.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: onRestoreHidden,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.burgundy,
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      'Mostrar ${hiddenIds.length} oculto${hiddenIds.length == 1 ? '' : 's'}',
+                      style: ProfileDesign.meta().copyWith(
+                        color: AppColors.burgundy,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-          ],
+              ],
+            ],
+          ),
         ),
         const SizedBox(height: 12),
-        _FilterChips(
-          filter: filter,
-          activities: activities,
-          hiddenIds: hiddenIds,
-          onSelected: onFilterSelected,
-        ),
-        const SizedBox(height: 14),
         if (visible.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
@@ -315,7 +286,7 @@ class _ActivityFeed extends StatelessWidget {
                       activity: activity,
                       onHide: () => onHide(activity),
                     )
-                  : _ActivityCard(activity: activity),
+                  : ProfileActivityCard(activity: activity),
             ),
           if (hasMore)
             Center(
@@ -329,51 +300,6 @@ class _ActivityFeed extends StatelessWidget {
             ),
         ],
       ],
-    );
-  }
-}
-
-class _FilterChips extends StatelessWidget {
-  const _FilterChips({
-    required this.filter,
-    required this.activities,
-    required this.hiddenIds,
-    required this.onSelected,
-  });
-
-  final ActivityFeedFilter filter;
-  final List<ProfileActivity> activities;
-  final Set<String> hiddenIds;
-  final ValueChanged<ActivityFeedFilter> onSelected;
-
-  int _count(ActivityFeedFilter f) {
-    return filterActivities(activities, f, hiddenIds).length;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: ActivityFeedFilter.values.map((f) {
-        final selected = filter == f;
-        final count = _count(f);
-        return FilterChip(
-          label: Text('${activityFilterLabel(f)} ($count)'),
-          selected: selected,
-          onSelected: (selected) {
-            if (selected) onSelected(f);
-          },
-          selectedColor: AppColors.chipSelected,
-          checkmarkColor: AppColors.burgundy,
-          labelStyle: AppTypography.labelSmall(
-            color: selected ? AppColors.textPrimary : AppColors.textSecondary,
-          ).copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w500),
-          side: BorderSide(
-            color: selected ? AppColors.goldLight : AppColors.border,
-          ),
-        );
-      }).toList(),
     );
   }
 }
@@ -394,22 +320,32 @@ class _DismissibleActivityCard extends StatelessWidget {
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
+        padding: const EdgeInsets.only(right: 18),
+        margin: const EdgeInsets.only(bottom: 0),
         decoration: BoxDecoration(
-          color: AppColors.textMuted.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(12),
+          color: AppColors.burgundy.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(ProfileDesign.cardRadius),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Icon(Icons.visibility_off_outlined, size: 20),
-            SizedBox(width: 6),
-            Text('Ocultar'),
+            Icon(
+              Icons.visibility_off_outlined,
+              size: 18,
+              color: AppColors.burgundy.withValues(alpha: 0.85),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Ocultar',
+              style: AppTypography.labelSmall(
+                color: AppColors.burgundy,
+              ).copyWith(fontWeight: FontWeight.w700),
+            ),
           ],
         ),
       ),
       onDismissed: (_) => onHide(),
-      child: _ActivityCard(activity: activity),
+      child: ProfileActivityCard(activity: activity),
     );
   }
 }
@@ -423,139 +359,34 @@ class _PendingTopicsBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.goldPale.withValues(alpha: 0.35),
+        color: AppColors.goldPale.withValues(alpha: 0.32),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.goldLight),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.gavel_outlined, color: AppColors.burgundy, size: 22),
-          const SizedBox(width: 10),
+          const Icon(Icons.gavel_outlined, color: AppColors.burgundy, size: 18),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '$count tema${count == 1 ? '' : 's'} en revisión',
-                  style: AppTypography.titleLarge().copyWith(fontSize: 14),
+                  style: AppTypography.titleLarge().copyWith(fontSize: 13),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   TopicModerationCopy.profilePendingHint,
-                  style: AppTypography.bodyMedium(),
+                  style: AppTypography.bodyMedium().copyWith(fontSize: 12),
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ActivityCard extends StatelessWidget {
-  const _ActivityCard({required this.activity});
-
-  final ProfileActivity activity;
-
-  Color _borderColor() {
-    if (!activity.isTopic) return AppColors.border;
-    return switch (activity.topicStatus) {
-      TopicStatus.pending => AppColors.gold,
-      TopicStatus.rejected => AppColors.textMuted.withValues(alpha: 0.5),
-      _ => AppColors.border,
-    };
-  }
-
-  Color _badgeBackground() {
-    if (!activity.isTopic) return AppColors.backgroundElevated;
-    return switch (activity.topicStatus) {
-      TopicStatus.pending => AppColors.burgundy,
-      TopicStatus.rejected => AppColors.textMuted.withValues(alpha: 0.35),
-      TopicStatus.published => AppColors.burgundy.withValues(alpha: 0.12),
-      null => AppColors.backgroundElevated,
-    };
-  }
-
-  Color _badgeTextColor() {
-    if (!activity.isTopic) return AppColors.burgundy;
-    return switch (activity.topicStatus) {
-      TopicStatus.pending => AppColors.textOnDark,
-      TopicStatus.rejected => AppColors.textPrimary,
-      TopicStatus.published => AppColors.burgundy,
-      null => AppColors.burgundy,
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () => context.push(
-          '/foros/${activity.forumId}/tema/${activity.topicId}',
-        ),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _borderColor(),
-              width: activity.isTopic &&
-                      activity.topicStatus == TopicStatus.pending
-                  ? 1.5
-                  : 1,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _badgeBackground(),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      activity.isTopic
-                          ? 'Tema · ${activity.typeLabel}'
-                          : activity.typeLabel,
-                      style: AppTypography.labelSmall(color: _badgeTextColor()),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    activity.timeAgo,
-                    style: AppTypography.labelSmall(color: AppColors.accentRed),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                activity.title,
-                style: AppTypography.titleLarge().copyWith(fontSize: 15),
-              ),
-              if (activity.preview.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  activity.preview,
-                  style: AppTypography.bodyMedium(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ],
-          ),
-        ),
       ),
     );
   }

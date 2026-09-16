@@ -1,0 +1,17 @@
+<section class="page">
+  <p class="eyebrow">Próximamente</p>
+  <h1>{{ module()?.label || 'Módulo' }}</h1>
+  <p class="lead">
+    Esta pantalla es un marcador de la Fase 0. La lógica vivirá aquí en las
+    siguientes fases, reutilizando las mismas tablas y policies de Supabase
+    que la Junta de la app.
+  </p>
+  <div class="box">
+    <p>
+      Ruta: <code>{{ module()?.route }}</code>
+    </p>
+    @if (module()?.webOnly) {
+      <p>Solo panel web (no tiene pestaña equivalente en la app móvil).</p>
+    }
+  </div>
+</section>

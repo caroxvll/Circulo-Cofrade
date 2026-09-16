@@ -12,19 +12,34 @@ class ForumLastActivityLink extends StatelessWidget {
     super.key,
     required this.forum,
     this.onDarkBackground = false,
+    this.compact = false,
+    this.accentColor,
+    this.fontSize,
   });
 
   final ForumCategory forum;
   final bool onDarkBackground;
+  final bool compact;
+  final Color? accentColor;
+  final double? fontSize;
 
   @override
   Widget build(BuildContext context) {
     final text = formatForumLastTopicLine(forum);
     if (text.isEmpty) return const SizedBox.shrink();
 
+    final tone = accentColor ??
+        (onDarkBackground ? Colors.white70 : AppColors.accentRed);
+
+    final resolvedSize = fontSize ?? (compact ? 9.2 : 10.4);
+
     final style = AppTypography.labelSmall(
-      color: onDarkBackground ? Colors.white70 : AppColors.accentRed,
-    ).copyWith(height: 1.35);
+      color: onDarkBackground ? Colors.white70 : tone,
+    ).copyWith(
+      fontSize: resolvedSize,
+      height: 1.12,
+      fontWeight: FontWeight.w500,
+    );
 
     final topicId = forum.lastTopicId;
     if (topicId != null && topicId.isNotEmpty && !forum.isLocked) {
@@ -36,13 +51,12 @@ class ForumLastActivityLink extends StatelessWidget {
             padding: EdgeInsets.zero,
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            foregroundColor:
-                onDarkBackground ? Colors.white70 : AppColors.accentRed,
+            foregroundColor: onDarkBackground ? Colors.white70 : tone,
           ),
           child: Text(
             text,
             style: style,
-            maxLines: 2,
+            maxLines: compact ? 1 : 2,
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -52,7 +66,7 @@ class ForumLastActivityLink extends StatelessWidget {
     return Text(
       text,
       style: style,
-      maxLines: 2,
+      maxLines: compact ? 1 : 2,
       overflow: TextOverflow.ellipsis,
     );
   }

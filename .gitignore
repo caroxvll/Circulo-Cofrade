@@ -46,3 +46,5 @@ app.*.map.json
 
 # Secrets Supabase (local)
 env.json
+env.pre.json
+admin-web/src/environments/environment.local.ts

@@ -1,0 +1,122 @@
+<section class="queue-page demo-page">
+  <header>
+    <div>
+      <p class="eyebrow">Plataforma · solo admin · PRE</p>
+      <h1>Simulación</h1>
+      <p class="lead">
+        Carga un mundo de prueba (usuarios, temas, respuestas, eventos) para ver
+        la app en el móvil. El borrado solo elimina datos marcados como demo —
+        tu admin real no se toca.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading() || busy()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  <div class="warn-box">
+    Usa esto solo en el proyecto <strong>pre</strong> (`env.pre.json`). En
+    producción el flag `demo_tools_enabled` debe estar apagado.
+  </div>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+  @if (lastMessage()) {
+    <div class="info-box ok">{{ lastMessage() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Consultando estado…</div>
+  } @else if (status()) {
+    <div class="stats">
+      <article>
+        <strong>{{ status()!.seeded ? 'Activa' : 'Vacía' }}</strong>
+        <span>Simulación</span>
+      </article>
+      <article>
+        <strong>{{ status()!.demoUsers }}</strong>
+        <span>Usuarios demo</span>
+      </article>
+      <article>
+        <strong>{{ status()!.demoTopics }}</strong>
+        <span>Temas</span>
+      </article>
+      <article>
+        <strong>{{ status()!.demoReplies }}</strong>
+        <span>Respuestas</span>
+      </article>
+      <article>
+        <strong>{{ status()!.demoEvents }}</strong>
+        <span>Eventos</span>
+      </article>
+    </div>
+
+    <div class="actions-grid">
+      <section class="panel">
+        <h2>Cargar simulación</h2>
+        <p class="muted">
+          ~12 usuarios <code>demo_*</code>, 8 temas (1 pendiente), respuestas,
+          likes, follows y 5 eventos. Si ya hay demo, la regenera.
+        </p>
+        <label>
+          Escribe <strong>SIMULAR</strong> para confirmar
+          <input
+            [(ngModel)]="seedConfirm"
+            autocomplete="off"
+            placeholder="SIMULAR"
+            [disabled]="busy()"
+          />
+        </label>
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="busy() || seedConfirm.trim().toUpperCase() !== 'SIMULAR'"
+          (click)="seed()"
+        >
+          {{ busy() ? 'Trabajando…' : 'Cargar simulación' }}
+        </button>
+      </section>
+
+      <section class="panel danger-panel">
+        <h2>Quitar simulación</h2>
+        <p class="muted">
+          Borra solo handles <code>demo_*</code>, temas
+          <code>demo-topic-*</code> y emails <code>&#64;demo.cofradeo.local</code>.
+        </p>
+        <label>
+          Escribe <strong>LIMPIAR</strong> para confirmar
+          <input
+            [(ngModel)]="wipeConfirm"
+            autocomplete="off"
+            placeholder="LIMPIAR"
+            [disabled]="busy()"
+          />
+        </label>
+        <button
+          type="button"
+          class="btn btn-ghost danger"
+          [disabled]="busy() || wipeConfirm.trim().toUpperCase() !== 'LIMPIAR' || !status()!.seeded"
+          (click)="wipe()"
+        >
+          {{ busy() ? 'Trabajando…' : 'Quitar todo lo demo' }}
+        </button>
+      </section>
+    </div>
+
+    <section class="panel how-to">
+      <h2>Verlo en el móvil</h2>
+      <ol>
+        <li>Carga la simulación aquí.</li>
+        <li>
+          Arranca la app con pre:
+          <code>flutter run --dart-define-from-file=env.pre.json</code>
+        </li>
+        <li>Entra con tu admin de pre (o explora foros/calendario).</li>
+        <li>Cuando termines, pulsa «Quitar simulación».</li>
+      </ol>
+    </section>
+  }
+</section>

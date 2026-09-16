@@ -1,0 +1,392 @@
+<section class="queue-page notifications-page">
+  <header>
+    <div>
+      <p class="eyebrow">Plataforma · solo admin</p>
+      <h1>Notificaciones</h1>
+      <p class="lead">
+        Cobertura de avisos push por zonas, qué tiene cada persona activado y
+        volumen de avisos. No es un envío masivo.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <button type="button" class="chip" [class.active]="days() === 7" (click)="setDays(7)">
+      7 días
+    </button>
+    <button type="button" class="chip" [class.active]="days() === 30" (click)="setDays(30)">
+      30 días
+    </button>
+    <button type="button" class="chip" [class.active]="days() === 90" (click)="setDays(90)">
+      90 días
+    </button>
+  </div>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando cobertura…</div>
+  } @else if (overview()) {
+    <div class="rings">
+      <article class="ring-card">
+        <div class="ring" [style.background]="pushRingBg()">
+          <div class="ring-hole">
+            <strong>{{ pct(overview()!.pushEnabledUsers, overview()!.totalUsers) }}%</strong>
+            <span>con push</span>
+          </div>
+        </div>
+        <div class="ring-meta">
+          <h2>Avisos push</h2>
+          <ul class="legend">
+            <li>
+              <i class="swatch on"></i>
+              Activados
+              <b>{{ formatInt(overview()!.pushEnabledUsers) }}</b>
+            </li>
+            <li>
+              <i class="swatch off"></i>
+              Apagados / sin pref
+              <b>{{ formatInt(overview()!.pushDisabledUsers) }}</b>
+            </li>
+            <li class="total">
+              Base: {{ formatInt(overview()!.totalUsers) }} usuarios
+            </li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="ring-card">
+        <div class="ring" [style.background]="deviceRingBg()">
+          <div class="ring-hole">
+            <strong>{{ deviceReadyPct() }}%</strong>
+            <span>listos</span>
+          </div>
+        </div>
+        <div class="ring-meta">
+          <h2>Entre quien tiene push ON</h2>
+          <ul class="legend">
+            <li>
+              <i class="swatch ready"></i>
+              Con móvil registrado
+              <b>{{ formatInt(overview()!.pushOnWithDevice) }}</b>
+            </li>
+            <li>
+              <i class="swatch gap"></i>
+              ON pero sin dispositivo
+              <b>{{ formatInt(overview()!.pushOnNoDevice) }}</b>
+            </li>
+            <li class="total">
+              {{ formatInt(overview()!.tokenCount) }} registros de dispositivo en total
+            </li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="ring-card">
+        <div class="ring" [style.background]="platformRingBg()">
+          <div class="ring-hole">
+            <strong>{{ formatInt(overview()!.usersWithToken) }}</strong>
+            <span>con móvil</span>
+          </div>
+        </div>
+        <div class="ring-meta">
+          <h2>Por plataforma</h2>
+          @if (platformEntries(overview()!.tokensByPlatform).length === 0) {
+            <p class="muted">Nadie tiene dispositivo registrado.</p>
+          } @else {
+            <ul class="legend">
+              @for (row of platformEntries(overview()!.tokensByPlatform); track row.platform; let i = $index) {
+                <li>
+                  <i class="swatch" [attr.data-i]="i"></i>
+                  {{ platformLabel(row.platform) }}
+                  <b>{{ formatInt(row.count) }}</b>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      </article>
+    </div>
+
+    <div class="volume-kpis">
+      <article>
+        <strong>{{ formatInt(overview()!.notificationsTotal) }}</strong>
+        <span>Avisos in-app ({{ overview()!.days }}d)</span>
+      </article>
+    </div>
+
+    <div class="notif-grid">
+      <section class="panel">
+        <h2>Volumen por tipo</h2>
+        @if (overview()!.byType.length === 0) {
+          <p class="muted">Sin avisos en el periodo.</p>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th class="num">Cantidad</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of overview()!.byType; track row.type) {
+                  <tr>
+                    <td>
+                      <strong>{{ typeLabel(row.type) }}</strong>
+                      <div class="sub">{{ row.type }}</div>
+                    </td>
+                    <td class="num">{{ formatInt(row.count) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      <section class="panel">
+        <h2>Por día</h2>
+        @if (overview()!.byDay.length === 0) {
+          <p class="muted">Sin actividad diaria.</p>
+        } @else {
+          <div class="day-bars">
+            @for (row of overview()!.byDay; track row.day) {
+              <div class="day-row">
+                <span class="day">{{ row.day }}</span>
+                <div class="bar-track">
+                  <div
+                    class="bar"
+                    [style.width.%]="dayBarPercent(row.count, overview()!.byDay)"
+                  ></div>
+                </div>
+                <span class="num">{{ formatInt(row.count) }}</span>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    </div>
+  }
+
+  <section class="push-list-block">
+    <h2>Usuarios y qué tienen activado</h2>
+    <p class="lead compact">
+      Tabla paginada ({{ pageSize }} por página). Filtra por cobertura y busca
+      por handle; abre el detalle para ver cada preferencia.
+    </p>
+    <div class="filters">
+      <button type="button" class="chip" [class.active]="pushFilter() === 'on'" (click)="setPushFilter('on')">
+        Push activado
+      </button>
+      <button type="button" class="chip" [class.active]="pushFilter() === 'off'" (click)="setPushFilter('off')">
+        Push apagado
+      </button>
+      <button type="button" class="chip" [class.active]="pushFilter() === 'on_no_token'" (click)="setPushFilter('on_no_token')">
+        Activado sin móvil
+      </button>
+      <button type="button" class="chip" [class.active]="pushFilter() === 'off_with_token'" (click)="setPushFilter('off_with_token')">
+        Apagado con móvil
+      </button>
+      <button type="button" class="chip" [class.active]="pushFilter() === 'all'" (click)="setPushFilter('all')">
+        Todos
+      </button>
+    </div>
+    <div class="list-toolbar">
+      <input
+        type="search"
+        [(ngModel)]="pushSearch"
+        placeholder="Buscar handle o nombre…"
+        (keyup.enter)="searchPushUsers()"
+      />
+      <button type="button" class="btn btn-soft" (click)="searchPushUsers()" [disabled]="listLoading()">
+        Buscar
+      </button>
+    </div>
+
+    <div class="pager">
+      <span class="muted">{{ pageLabel() }}</span>
+      <div class="pager-actions">
+        <button
+          type="button"
+          class="btn btn-ghost"
+          (click)="goPage(-1)"
+          [disabled]="listLoading() || pushPage() === 0"
+        >
+          Anterior
+        </button>
+        <span class="page-n">Pág. {{ pushPage() + 1 }} / {{ totalPages() }}</span>
+        <button
+          type="button"
+          class="btn btn-ghost"
+          (click)="goPage(1)"
+          [disabled]="listLoading() || pushPage() + 1 >= totalPages()"
+        >
+          Siguiente
+        </button>
+      </div>
+    </div>
+
+    @if (listLoading()) {
+      <div class="state-box">Cargando página…</div>
+    } @else if (pushUsers().length === 0) {
+      <div class="empty-box">Nadie en este filtro.</div>
+    } @else {
+      <div class="table-wrap users-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Push</th>
+              <th>Dispositivo</th>
+              <th>Activado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of pushUsers(); track row.userId) {
+              <tr>
+                <td>
+                  <strong>{{ '@' + row.handle }}</strong>
+                  <div class="sub">{{ row.displayName || '—' }} · {{ row.role }}</div>
+                </td>
+                <td>
+                  <span class="pill" [class.ok]="row.pushEnabled" [class.warn]="!row.pushEnabled">
+                    {{ row.pushEnabled ? 'ON' : 'OFF' }}
+                  </span>
+                </td>
+                <td>
+                  <span class="device-hint" [class.ok]="row.pushEnabled && row.tokenCount > 0" [class.warn]="row.pushEnabled && row.tokenCount === 0">
+                    {{ coverageHint(row) }}
+                  </span>
+                  @if (row.platforms) {
+                    <div class="sub">{{ row.platforms }}</div>
+                  }
+                </td>
+                <td>
+                  @if (!row.prefs) {
+                    <span class="muted">Sin prefs</span>
+                  } @else {
+                    <div class="pref-chips">
+                      @for (key of tablePrefKeys; track key) {
+                        @if (rowPrefOn(row, key) === true) {
+                          <span class="pref-chip on" [title]="prefLabel(key)">{{ prefShort(key) }}</span>
+                        }
+                      }
+                      @if (!hasActivePrefChips(row)) {
+                        <span class="muted">Ninguna categoría</span>
+                      }
+                    </div>
+                  }
+                </td>
+                <td>
+                  <button type="button" class="btn btn-ghost" (click)="openUserFromList(row)">
+                    Detalle
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <section class="diag-block">
+    <h2>Detalle por usuario</h2>
+    <p class="lead compact">
+      Preferencias, móviles registrados y avisos recientes.
+    </p>
+    <app-handle-search [(ngModel)]="selected" (ngModelChange)="onUserPick($event)" />
+
+    @if (diagLoading()) {
+      <div class="state-box">Consultando…</div>
+    } @else if (diag() && !diag()!.found) {
+      <div class="empty-box">No hay usuario con ese handle.</div>
+    } @else if (diag()?.found) {
+      <article class="diag-card">
+        <header>
+          <div>
+            <h3>{{ '@' + diag()!.handle }}</h3>
+            <p class="muted">{{ diag()!.displayName || '—' }} · {{ diag()!.role }}</p>
+          </div>
+          <span
+            class="pill"
+            [class.ok]="diag()!.pushEnabled"
+            [class.warn]="!diag()!.pushEnabled"
+          >
+            {{ diag()!.pushEnabled ? 'Push ON' : 'Push OFF' }}
+          </span>
+        </header>
+
+        <div class="diag-cols">
+          <div>
+            <h4>Preferencias</h4>
+            @if (!diag()!.prefs) {
+              <p class="muted">Sin fila de preferencias.</p>
+            } @else {
+              <ul class="pref-list">
+                @for (p of prefEntries(diag()!.prefs); track p.key) {
+                  <li [class.off]="!p.on">
+                    <span>{{ prefLabel(p.key) }}</span>
+                    <em>{{ p.on ? 'sí' : 'no' }}</em>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+          <div>
+            <h4>Dispositivos ({{ diag()!.tokenCount || 0 }})</h4>
+            @if (!diag()!.tokens?.length) {
+              <p class="muted">Sin móviles registrados.</p>
+            } @else {
+              <ul class="plain">
+                @for (t of diag()!.tokens!; track t.tokenPreview) {
+                  <li>
+                    <strong>{{ platformLabel(t.platform) }}</strong>
+                    <span class="sub">{{ t.tokenPreview }}</span>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        </div>
+
+        <h4>Últimos avisos</h4>
+        @if (!diag()!.recentNotifications?.length) {
+          <p class="muted">Sin notificaciones recientes.</p>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Título</th>
+                  <th>Estado</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (n of diag()!.recentNotifications!; track n.id) {
+                  <tr>
+                    <td>{{ typeLabel(n.type) }}</td>
+                    <td>{{ n.title }}</td>
+                    <td>{{ n.read ? 'Leído' : 'Sin leer' }}</td>
+                    <td>{{ n.createdAt | date: 'short' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </article>
+    }
+  </section>
+</section>

@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/app_branding.dart';
+import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/utils/image_decode_cache.dart';
 import 'auth_provider.dart';
 import 'auth_navigation.dart';
 import 'auth_error_messages.dart';
@@ -69,7 +71,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       final verified = user?.emailConfirmedAt != null;
 
       if (response.session != null && verified) {
-        goAfterAuthenticated(context, ref, redirect: widget.redirect);
+        await goAfterAuthenticated(context, ref, redirect: widget.redirect);
         return;
       }
 
@@ -89,58 +91,117 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.burgundyDark,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           onPressed: () => context.pop(),
-          icon: const Icon(Icons.chevron_left, color: AppColors.burgundy),
+          icon: const Icon(Icons.chevron_left, color: AppColors.gold),
         ),
         title: Text(
-          'Crear cuenta',
-          style: AppTypography.displaySmall().copyWith(fontSize: 17),
+          'CREAR CUENTA',
+          style: AppTypography.displaySmall(color: AppColors.goldPale).copyWith(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
         ),
         centerTitle: true,
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          children: [
-            Text(
-              AppBranding.joinCta,
-              style: AppTypography.displaySmall(),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            AppAssets.loginBackground,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.medium,
+            cacheWidth: ImageDecodeCache.px(
+              context,
+              MediaQuery.sizeOf(context).width,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Elige un nombre y handle únicos. Las hermandades oficiales '
-              'requieren verificación (ver PERFIL.md).',
-              style: AppTypography.bodyMedium(),
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => const DecoratedBox(
+              decoration: BoxDecoration(color: Color(0xFF5A101A)),
             ),
-            const SizedBox(height: 24),
-            AuthEmailForm(
-              displayNameController: _displayNameController,
-              handleController: _handleController,
-              emailController: _emailController,
-              passwordController: _passwordController,
-              submitLabel: 'Registrarme',
-              loading: _loading,
-              onSubmit: _register,
+          ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final contentWidth = (constraints.maxWidth * 0.88).clamp(
+                  320.0,
+                  520.0,
+                );
+
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(24, 76, 24, 28),
+                  children: [
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: contentWidth),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              AppBranding.joinCta,
+                              style: AppTypography.displaySmall(
+                                color: AppColors.goldPale,
+                              ).copyWith(fontSize: 28),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Elige un nombre y handle únicos. Las hermandades oficiales '
+                              'requieren verificación.',
+                              style: AppTypography.bodyMedium(
+                                color: Colors.white.withValues(alpha: 0.86),
+                              ).copyWith(fontSize: 15),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 24),
+                            AuthEmailForm(
+                              displayNameController: _displayNameController,
+                              handleController: _handleController,
+                              emailController: _emailController,
+                              passwordController: _passwordController,
+                              submitLabel: 'Registrarme',
+                              loading: _loading,
+                              onSubmit: _register,
+                              dark: true,
+                            ),
+                            if (_error != null) ...[
+                              const SizedBox(height: 12),
+                              Text(
+                                _error!,
+                                style: AppTypography.bodyMedium(
+                                  color: AppColors.accentRed,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                            if (_info != null) ...[
+                              const SizedBox(height: 12),
+                              Text(
+                                _info!,
+                                style: AppTypography.bodyMedium(
+                                  color: AppColors.goldPale,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _error!,
-                style: AppTypography.bodyMedium(color: AppColors.accentRed),
-              ),
-            ],
-            if (_info != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _info!,
-                style: AppTypography.bodyMedium(color: AppColors.burgundy),
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

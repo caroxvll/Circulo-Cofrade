@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -25,18 +24,19 @@ class CofradeoCalendar extends StatelessWidget {
   final int? selectedDay;
 
   static const _weekdays = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+  static const _cellSize = 36.0;
+  static const _dotRowHeight = 10.0;
 
   @override
   Widget build(BuildContext context) {
-    final monthName = DateFormat('MMMM yyyy', 'es').format(focusedMonth);
-    final capitalizedMonth =
-        '${monthName[0].toUpperCase()}${monthName.substring(1)}';
+    final monthLabel = formatCalendarMonthLabel(focusedMonth);
+    final yearLabel = '${focusedMonth.year}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _MonthArrow(
               icon: Icons.chevron_left,
@@ -44,9 +44,29 @@ class CofradeoCalendar extends StatelessWidget {
                 DateTime(focusedMonth.year, focusedMonth.month - 1),
               ),
             ),
-            Text(
-              capitalizedMonth,
-              style: AppTypography.displaySmall(color: AppColors.textPrimary),
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    monthLabel,
+                    style: AppTypography.displaySmall().copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      height: 1.1,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  Text(
+                    yearLabel,
+                    style: AppTypography.bodyMedium(
+                      color: AppColors.textMuted,
+                    ).copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
             _MonthArrow(
               icon: Icons.chevron_right,
@@ -56,7 +76,7 @@ class CofradeoCalendar extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         Row(
           children: _weekdays
               .map(
@@ -65,8 +85,11 @@ class CofradeoCalendar extends StatelessWidget {
                     child: Text(
                       d,
                       style: AppTypography.labelSmall(
-                        color: AppColors.textMuted,
-                      ).copyWith(fontWeight: FontWeight.w600),
+                        color: AppColors.textSecondary,
+                      ).copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
                     ),
                   ),
                 ),
@@ -81,18 +104,28 @@ class CofradeoCalendar extends StatelessWidget {
 
   List<Widget> _buildWeeks() {
     final firstDay = DateTime(focusedMonth.year, focusedMonth.month, 1);
-    final daysInMonth =
-        DateTime(focusedMonth.year, focusedMonth.month + 1, 0).day;
+    final daysInMonth = DateTime(
+      focusedMonth.year,
+      focusedMonth.month + 1,
+      0,
+    ).day;
     final startOffset = firstDay.weekday - 1;
 
     final cells = <Widget>[];
+    final now = DateTime.now();
+    final isFocusedCurrentMonth =
+        focusedMonth.year == now.year && focusedMonth.month == now.month;
     for (var day = 1; day <= daysInMonth; day++) {
-      final dayEvents =
-          eventsOnDay(events, focusedMonth, day).where(filter.matches).toList();
+      final dayEvents = eventsOnDay(
+        events,
+        focusedMonth,
+        day,
+      ).where(filter.matches).toList();
       cells.add(
         _DayCell(
           day: day,
           events: dayEvents,
+          isToday: isFocusedCurrentMonth && day == now.day,
           isSelected: selectedDay == day,
           onTap: () => onDayTap(day, dayEvents),
         ),
@@ -144,8 +177,9 @@ class _MonthArrow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
+        child: SizedBox(
+          width: 36,
+          height: 36,
           child: Icon(icon, color: AppColors.burgundy, size: 22),
         ),
       ),
@@ -157,80 +191,74 @@ class _DayCell extends StatelessWidget {
   const _DayCell({
     required this.day,
     required this.events,
+    required this.isToday,
     required this.isSelected,
     required this.onTap,
   });
 
   final int day;
   final List<CalendarEvent> events;
+  final bool isToday;
   final bool isSelected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final hasEvent = events.isNotEmpty;
-    final cellLabel = _dayCellLabel(events);
+    final dayColor = isSelected
+        ? AppColors.textOnDark
+        : isToday
+            ? AppColors.burgundy
+            : AppColors.textPrimary;
 
     return Expanded(
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 4),
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            height: CofradeoCalendar._cellSize + CofradeoCalendar._dotRowHeight,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: CofradeoCalendar._cellSize,
+                  height: CofradeoCalendar._cellSize,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(10),
                     color: isSelected
                         ? AppColors.burgundy
-                        : hasEvent
-                            ? AppColors.gold.withValues(alpha: 0.12)
-                            : null,
-                    border: hasEvent || isSelected
+                        : isToday
+                            ? AppColors.gold.withValues(alpha: 0.14)
+                            : Colors.transparent,
+                    border: !isSelected && (isToday || hasEvent)
                         ? Border.all(
-                            color: isSelected
+                            color: isToday
                                 ? AppColors.burgundy
-                                : AppColors.gold,
-                            width: isSelected ? 2 : 2,
+                                : AppColors.gold.withValues(alpha: 0.75),
+                            width: isToday ? 1.4 : 1,
                           )
                         : null,
                   ),
                   child: Text(
                     '$day',
-                    style: AppTypography.bodyMedium(
-                      color: isSelected
-                          ? AppColors.textOnDark
-                          : hasEvent
-                              ? AppColors.goldDark
-                              : AppColors.textPrimary,
-                    ).copyWith(
-                      fontWeight:
-                          hasEvent || isSelected ? FontWeight.w700 : FontWeight.w400,
-                      fontSize: 14,
+                    style: AppTypography.bodyMedium(color: dayColor).copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
                     ),
                   ),
                 ),
-                if (hasEvent && cellLabel != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    cellLabel,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.labelSmall(
-                      color: isSelected ? AppColors.burgundy : AppColors.burgundy,
-                    ).copyWith(fontSize: 8, height: 1.1, fontWeight: FontWeight.w600),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ] else ...[
-                  const SizedBox(height: 20),
-                ],
+                SizedBox(
+                  height: CofradeoCalendar._dotRowHeight,
+                  child: hasEvent
+                      ? _EventDots(
+                          events: events,
+                          isSelected: isSelected,
+                        )
+                      : null,
+                ),
               ],
             ),
           ),
@@ -240,10 +268,50 @@ class _DayCell extends StatelessWidget {
   }
 }
 
-String? _dayCellLabel(List<CalendarEvent> events) {
-  if (events.isEmpty) return null;
-  if (events.length == 1) return events.first.calendarCellLabel;
-  final labels = events.map((e) => e.calendarCellLabel).toSet().toList();
-  if (labels.length == 1) return '${labels.first}\n×${events.length}';
-  return '${events.length}\neventos';
+class _EventDots extends StatelessWidget {
+  const _EventDots({required this.events, required this.isSelected});
+
+  final List<CalendarEvent> events;
+  final bool isSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = events.length.clamp(1, 3);
+    final extra = events.length - visible;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var index = 0; index < visible; index++)
+          Container(
+            width: 4,
+            height: 4,
+            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isSelected
+                  ? AppColors.textOnDark.withValues(alpha: 0.9)
+                  : _dotColor(events[index].type),
+            ),
+          ),
+        if (extra > 0)
+          Text(
+            '+$extra',
+            style: AppTypography.labelSmall(
+              color: isSelected ? AppColors.textOnDark : AppColors.textMuted,
+            ).copyWith(fontSize: 7.5, fontWeight: FontWeight.w700),
+          ),
+      ],
+    );
+  }
+}
+
+Color _dotColor(EventType type) {
+  return switch (type) {
+    EventType.iguala => AppColors.burgundy,
+    EventType.ensayo => AppColors.burgundy,
+    EventType.procesion => AppColors.burgundy,
+    _ => AppColors.goldDark,
+  };
 }

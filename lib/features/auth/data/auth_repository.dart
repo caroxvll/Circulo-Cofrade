@@ -66,6 +66,7 @@ class AuthRepository {
       data: {
         'display_name': displayName.trim(),
         'handle': normalizedHandle,
+        'onboarding_completed': true,
       },
     );
   }
@@ -131,6 +132,16 @@ class AuthRepository {
     );
   }
 
+  Future<void> markOnboardingCompleted() async {
+    _ensureAvailable();
+    await _client!.auth.updateUser(
+      UserAttributes(
+        data: {'onboarding_completed': true},
+      ),
+    );
+    await syncAuthUser();
+  }
+
   /// Lee el usuario en el servidor (p. ej. tras confirmar email en otro dispositivo).
   Future<UserResponse> syncAuthUser() async {
     _ensureAvailable();
@@ -165,8 +176,14 @@ class AuthRepository {
     return value.replaceAll(RegExp(r'[^a-z0-9_]'), '');
   }
 
-  String? get _oauthRedirectUrl {
-    if (kIsWeb) return null;
+  String get _oauthRedirectUrl {
+    if (kIsWeb) {
+      final base = Uri.base;
+      // PKCE: Supabase devuelve ?code= en la raíz donde corre la app web.
+      final path = base.path;
+      if (path.isEmpty || path == '/') return base.origin;
+      return '${base.origin}$path';
+    }
     return 'cofradeo://login-callback';
   }
 

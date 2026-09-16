@@ -1,0 +1,224 @@
+<section class="queue-page season-page">
+  <header>
+    <div>
+      <p class="eyebrow">Plataforma · solo admin</p>
+      <h1>Temporada</h1>
+      <p class="lead">
+        Cuenta atrás litúrgica y jornadas de Semana Santa (abrir / cerrar el en
+        directo aunque la calle siga pasada medianoche).
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <label class="year-pick">
+        Año
+        <select [ngModel]="year()" (ngModelChange)="onYearChange($event)">
+          @for (y of yearOptions(); track y) {
+            <option [value]="y">{{ y }}</option>
+          }
+        </select>
+      </label>
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+  @if (savedOk()) {
+    <div class="ok-box">Configuración guardada. La app la recoge al instante.</div>
+  }
+  @if (daysMsg()) {
+    <div class="ok-box">{{ daysMsg() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando temporada…</div>
+  } @else {
+    <div class="season-grid">
+      <article class="panel preview-panel" [class.on]="preview().visible">
+        <p class="panel-label">Vista previa (hoy)</p>
+        <h2>{{ preview().headline }}</h2>
+        @if (preview().subtitle) {
+          <p>{{ preview().subtitle }}</p>
+        }
+        <p class="resolved">
+          Ramos: <strong>{{ formatDate(resolvedPalm()) }}</strong><br />
+          Pascua: <strong>{{ formatDate(resolvedEaster()) }}</strong>
+          @if (draft().usesManualDates) {
+            <em> · fechas manuales</em>
+          } @else {
+            <em> · cálculo automático</em>
+          }
+        </p>
+      </article>
+
+      <article class="panel">
+        <label class="check big">
+          <input type="checkbox" [(ngModel)]="isEnabled" />
+          Mostrar cuenta atrás en la app
+        </label>
+
+        <label>
+          Días de antelación antes de Ramos
+          <input type="number" min="0" [max]="maxDays" [(ngModel)]="visibleDays" />
+        </label>
+        <p class="hint">
+          Con {{ visibleDays }} días, el banner aparece desde esa antelación hasta
+          el Sábado Santo. Máximo {{ maxDays }}.
+        </p>
+        <button type="button" class="btn btn-soft" (click)="activateFromToday()">
+          Activar desde hoy
+        </button>
+
+        <hr />
+
+        <h3>Fechas automáticas {{ year() }}</h3>
+        <p class="hint">
+          Ramos {{ formatDate(autoDates().palmSunday) }} · Pascua
+          {{ formatDate(autoDates().easterSunday) }}
+        </p>
+
+        <label>
+          Forzar Domingo de Ramos
+          <input type="date" [(ngModel)]="palmOverride" />
+        </label>
+        <label>
+          Forzar Domingo de Pascua
+          <input type="date" [(ngModel)]="easterOverride" />
+        </label>
+        <p class="hint">Déjalos vacíos para usar el cálculo automático.</p>
+
+        <div class="queue-actions">
+          <button type="button" class="btn btn-ghost" (click)="clearOverrides()">
+            Quitar forzado
+          </button>
+          <button
+            type="button"
+            class="btn btn-soft"
+            [disabled]="saving()"
+            (click)="resetToAutoAndSave()"
+          >
+            Restaurar automático
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="saving()"
+            (click)="save()"
+          >
+            {{ saving() ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </article>
+    </div>
+
+    <article class="panel days-panel">
+      <div class="days-head">
+        <div>
+          <p class="panel-label">En directo · Semana Santa</p>
+          <h3>Jornadas litúrgicas {{ year() }}</h3>
+          <p class="hint">
+            Por defecto cada jornada va de las 06:00 al día siguiente a las 03:00
+            (hora de Sevilla). Así Ramos sigue abierto a las 3 de la madrugada del
+            lunes. Puedes forzar Abrir / Cerrar cuando quieras.
+          </p>
+        </div>
+        <div class="live-status" [class.on]="liveOpenNow()">
+          <span class="dot"></span>
+          {{
+            liveOpenNow()
+              ? activeDay()
+                ? 'Abierto · ' + activeDay()!.label
+                : 'Abierto (sin jornadas aún)'
+              : 'Cerrado'
+          }}
+        </div>
+      </div>
+
+      <label class="check big">
+        <input
+          type="checkbox"
+          [ngModel]="liveEnabled"
+          (ngModelChange)="onLiveEnabledChange($event)"
+          [disabled]="daysBusy()"
+        />
+        Habilitar en directo SS (kill switch global)
+      </label>
+
+      <div class="queue-actions days-actions">
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="daysBusy()"
+          (click)="regenerateDays()"
+        >
+          {{ liturgicalDays().length ? 'Recalcular horarios' : 'Generar jornadas' }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-soft"
+          [disabled]="daysBusy() || !liturgicalDays().length"
+          (click)="autoAll()"
+        >
+          Todo automático
+        </button>
+        <button
+          type="button"
+          class="btn btn-ghost"
+          [disabled]="daysBusy() || !liturgicalDays().length"
+          (click)="closeAll()"
+        >
+          Cerrar todas
+        </button>
+      </div>
+
+      @if (!liturgicalDays().length) {
+        <div class="state-box">
+          Aún no hay jornadas para {{ year() }}. Pulsa «Generar jornadas».
+        </div>
+      } @else {
+        <ul class="day-list">
+          @for (day of liturgicalDays(); track day.dayKey) {
+            <li class="day-row" [class.open]="statusOf(day).tone === 'open' || statusOf(day).tone === 'forced'">
+              <div class="day-main">
+                <strong>{{ day.label }}</strong>
+                <span class="day-range">{{ formatRange(day.startsAt, day.endsAt) }}</span>
+                <span class="badge" [attr.data-tone]="statusOf(day).tone">
+                  {{ statusOf(day).text }}
+                </span>
+              </div>
+              <div class="day-actions">
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="daysBusy() || day.forceState === 'open'"
+                  (click)="setForce(day, 'open')"
+                >
+                  Abrir
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  [disabled]="daysBusy() || day.forceState === 'closed'"
+                  (click)="setForce(day, 'closed')"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  [disabled]="daysBusy() || day.forceState === 'auto'"
+                  (click)="setForce(day, 'auto')"
+                >
+                  Auto
+                </button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </article>
+  }
+</section>

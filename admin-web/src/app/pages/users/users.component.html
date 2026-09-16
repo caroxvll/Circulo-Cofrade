@@ -1,0 +1,123 @@
+<section class="queue-page">
+  <header>
+    <div>
+      <p class="eyebrow">Comunidad · solo admin</p>
+      <h1>Usuarios y altas</h1>
+      <p class="lead">
+        Altas recientes, búsqueda y gestión de rol, verificación y suspensión.
+        El email no está en profiles (vive en Auth).
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (stats(); as s) {
+    <div class="stats">
+      <article><strong>{{ s.today }}</strong><span>Hoy</span></article>
+      <article><strong>{{ s.last7 }}</strong><span>7 días</span></article>
+      <article><strong>{{ s.last30 }}</strong><span>30 días</span></article>
+      <article><strong>{{ s.total }}</strong><span>Total</span></article>
+    </div>
+  }
+
+  <div class="filters">
+    <input
+      type="search"
+      [(ngModel)]="search"
+      (keyup.enter)="onSearch()"
+      placeholder="Buscar handle o nombre…"
+    />
+    <button type="button" class="btn btn-ghost" (click)="onSearch()">Buscar</button>
+    <select [ngModel]="filter()" (ngModelChange)="filter.set($event)">
+      <option value="all">Todos (vista)</option>
+      <option value="admin">Solo admins</option>
+      <option value="brotherhood">Hermandades</option>
+      <option value="suspended">Suspendidos</option>
+    </select>
+  </div>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando usuarios…</div>
+  } @else if (visibleUsers().length === 0) {
+    <div class="empty-box">Sin resultados.</div>
+  } @else {
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Tipo</th>
+            <th>Alta</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of visibleUsers(); track user.id) {
+            <tr [class.dim]="!!user.suspendedAt">
+              <td>
+                <strong>{{ user.displayName }}</strong>
+                <div class="sub">{{ '@' + user.handle }}</div>
+              </td>
+              <td>
+                <span class="pill">{{ user.accountType }}</span>
+                @if (user.role === 'admin') {
+                  <span class="pill admin">admin</span>
+                }
+                @if (user.verified) {
+                  <span class="pill ok">verificado</span>
+                }
+              </td>
+              <td>
+                <div>{{ timeAgo(user.createdAt) }}</div>
+                <div class="sub">{{ dateTime(user.createdAt) }}</div>
+              </td>
+              <td>
+                @if (user.suspendedAt) {
+                  <span class="pill danger">suspendido</span>
+                  <div class="sub">{{ user.suspendedReason }}</div>
+                } @else {
+                  <span class="pill ok">activo</span>
+                }
+              </td>
+              <td class="actions">
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  [disabled]="busyId() === user.id || user.id === selfId()"
+                  (click)="toggleAdmin(user)"
+                >
+                  {{ user.role === 'admin' ? 'Quitar admin' : 'Hacer admin' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === user.id"
+                  (click)="toggleVerified(user)"
+                >
+                  {{ user.verified ? 'Quitar verif.' : 'Verificar' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  [disabled]="busyId() === user.id || user.id === selfId()"
+                  (click)="toggleSuspend(user)"
+                >
+                  {{ user.suspendedAt ? 'Reactivar' : 'Suspender' }}
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

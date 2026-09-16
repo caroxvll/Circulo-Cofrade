@@ -45,6 +45,23 @@ dependencies:
   shared_preferences: ^2.5.3
   firebase_core: ^3.13.0
   firebase_messaging: ^15.2.6
+  visibility_detector: ^0.4.0+2
+  url_launcher: ^6.3.2
+  geolocator: ^13.0.2
+  flutter_svg: ^2.3.0
+  file_picker: ^10.2.0
+  flutter_quill: ^11.5.0
+  markdown_quill: ^4.3.0
+  vsc_quill_delta_to_html: ^1.0.5
+  markdown: ^7.3.1
+  image: ^4.8.0
+  share_plus: ^12.0.2
+  path_provider: ^2.1.6
+  http: ^1.6.0
+  cached_network_image: ^3.4.1
+  audioplayers: ^6.7.1
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:
@@ -56,6 +73,27 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/logo.png
+  adaptive_icon_background: "#4D0008"
+  adaptive_icon_foreground: assets/images/logo.png
+  remove_alpha_ios: true
+
+flutter_native_splash:
+  background_image: assets/images/fondo.jpeg
+  image: assets/images/logo-login.png
+  android_12:
+    color: "#4D0008"
+    image: assets/images/logo-login.png
+    icon_background_color: "#4D0008"
+  ios: true
+  android: true
+  web: false
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -70,7 +108,17 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/banner_cuentaatras.jpg
+    - assets/images/forums/
+    - assets/images/hermandades/Viernes de Dolores/Bendición y Esperanza/
+    - assets/images/hermandades/Viernes de Dolores/Pino Montano/
     - assets/icons/
+    - assets/icons/foro_cofradiero.jpg
+    - assets/icons/pentagrama_cofrade.jpg
+    - assets/icons/martillo_trabajadera.jpg
+    - assets/icons/hermandades.jpg
+    - assets/icons/icono_noticias.png
+    - assets/anuncio/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

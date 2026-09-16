@@ -7,6 +7,7 @@ class SearchProfileHit {
     required this.handle,
     required this.displayName,
     this.avatarUrl,
+    this.isVerified = false,
     this.bio = '',
   });
 
@@ -14,6 +15,7 @@ class SearchProfileHit {
   final String handle;
   final String displayName;
   final String? avatarUrl;
+  final bool isVerified;
   final String bio;
 }
 
@@ -30,6 +32,28 @@ class SearchResults {
 
   bool get isEmpty => topics.isEmpty && profiles.isEmpty && events.isEmpty;
   bool get isNotEmpty => !isEmpty;
+
+  int get totalCount => profiles.length + events.length + topics.length;
+
+  String get summaryLabel {
+    final parts = <String>[];
+    if (profiles.isNotEmpty) {
+      parts.add(
+        profiles.length == 1 ? '1 perfil' : '${profiles.length} perfiles',
+      );
+    }
+    if (events.isNotEmpty) {
+      parts.add(
+        events.length == 1 ? '1 evento' : '${events.length} eventos',
+      );
+    }
+    if (topics.isNotEmpty) {
+      parts.add(
+        topics.length == 1 ? '1 tema' : '${topics.length} temas',
+      );
+    }
+    return parts.join(' · ');
+  }
 
   static const empty = SearchResults(topics: [], profiles: [], events: []);
 }

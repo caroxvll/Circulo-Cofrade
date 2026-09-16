@@ -6,8 +6,12 @@ import '../../core/messenger/root_messenger.dart';
 import '../../core/config/firebase_config.dart';
 import '../../core/firebase/firebase_bootstrap.dart';
 import '../../core/router/app_router.dart';
+import '../../core/utils/forum_topic_query.dart';
+import '../../features/forums/utils/official_post_categories.dart';
 import '../../firebase_background.dart';
 import '../auth/auth_provider.dart';
+import '../calendar/calendar_provider.dart';
+import '../calendar/utils/calendar_notification_navigation.dart';
 import '../notifications/notifications_provider.dart';
 import 'data/device_tokens_repository.dart';
 
@@ -160,10 +164,10 @@ class PushMessagingService {
     rootScaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Text(body.isNotEmpty ? '$title\n$body' : title),
-        action: message.data['route'] != null
+        action: _canNavigate(message.data)
             ? SnackBarAction(
                 label: 'Ver',
-                onPressed: () => _navigateToRoute(message.data['route']!),
+                onPressed: () => _navigateFromData(message.data),
               )
             : null,
       ),
@@ -171,10 +175,53 @@ class PushMessagingService {
   }
 
   void _onMessageOpened(RemoteMessage message) {
-    final route = message.data['route'];
+    _navigateFromData(message.data);
+  }
+
+  bool _canNavigate(Map<String, dynamic> data) {
+    return _resolveRoute(data) != null || isCalendarNotificationData(data);
+  }
+
+  Future<void> _navigateFromData(Map<String, dynamic> data) async {
+    if (isCalendarNotificationData(data)) {
+      _ref.read(routerProvider).go('/calendario');
+      final focus = await buildCalendarFocusFromNotification(
+        repo: _ref.read(calendarRepositoryProvider),
+        eventId: data['eventId']?.toString(),
+        startsAt: parseNotificationEventStartsAt(data['startsAt']),
+      );
+      if (focus != null) {
+        _ref.read(calendarFocusRequestProvider.notifier).setFocus(focus);
+      }
+      return;
+    }
+
+    final route = _resolveRoute(data);
     if (route != null && route.isNotEmpty) {
       _navigateToRoute(route);
     }
+  }
+
+  String? _resolveRoute(Map<String, dynamic> data) {
+    final route = data['route'];
+    if (route is String && route.isNotEmpty) return route;
+
+    final forumId = data['forumId'];
+    final topicId = data['topicId'];
+    if (forumId is! String || topicId is! String) return null;
+
+    final replyId = data['replyId'];
+    final section = data['officialCategory'] is String
+        ? hermandadSectionQueryValue(data['officialCategory'] as String)
+        : data['seccion'] is String
+            ? parseHermandadSectionQuery(data['seccion'] as String)
+            : null;
+
+    final query = buildForumTopicQuery(
+      section: forumId == 'hermandades' ? section : null,
+      replyId: replyId is String ? replyId : null,
+    );
+    return '/foros/$forumId/tema/$topicId$query';
   }
 
   void _navigateToRoute(String route) {
