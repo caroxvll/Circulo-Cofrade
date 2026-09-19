@@ -213,6 +213,15 @@ final topicReactionsRealtimeProvider = Provider.family<void, String>((
   final client = SupabaseBootstrap.client;
   if (client == null) return;
 
+  Timer? debounce;
+  void scheduleRefresh() {
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 220), () {
+      ref.invalidate(topicUserReactionProvider(topicId));
+      ref.invalidate(topicReactionCountsProvider(topicId));
+    });
+  }
+
   final channel = client
       .channel('topic-reactions-$topicId')
       .onPostgresChanges(
@@ -224,30 +233,31 @@ final topicReactionsRealtimeProvider = Provider.family<void, String>((
           column: 'topic_id',
           value: topicId,
         ),
-        callback: (_) {
-          ref.invalidate(topicUserReactionProvider(topicId));
-          ref.invalidate(topicReactionCountsProvider(topicId));
-        },
+        callback: (_) => scheduleRefresh(),
       )
       .subscribe();
 
   ref.onDispose(() {
+    debounce?.cancel();
     client.removeChannel(channel);
   });
 });
 
 /// Realtime: sincroniza reacciones entre pestañas/dispositivos en un hilo.
+/// Filtra por topic_id (tras scale_hardening_v1.sql) y debouncea invalidaciones.
 final topicReplyReactionsRealtimeProvider =
     Provider.family<void, String>((ref, topicId) {
   final client = SupabaseBootstrap.client;
   if (client == null) return;
 
-  final replyIds = ref.watch(
-    topicRepliesStateProvider(topicId).select(
-      (state) => state.replies.map((r) => r.id.toLowerCase()).toSet(),
-    ),
-  );
-  if (replyIds.isEmpty) return;
+  Timer? debounce;
+  void scheduleRefresh() {
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 220), () {
+      ref.invalidate(replyUserReactionsProvider(topicId));
+      ref.invalidate(replyReactionCountsProvider(topicId));
+    });
+  }
 
   final channel = client
       .channel('reply-reactions-$topicId')
@@ -255,19 +265,17 @@ final topicReplyReactionsRealtimeProvider =
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'forum_reply_likes',
-        callback: (payload) {
-          final record = payload.newRecord.isNotEmpty
-              ? payload.newRecord
-              : payload.oldRecord;
-          final replyId = record['reply_id']?.toString().toLowerCase();
-          if (replyId == null || !replyIds.contains(replyId)) return;
-          ref.invalidate(replyUserReactionsProvider(topicId));
-          ref.invalidate(replyReactionCountsProvider(topicId));
-        },
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'topic_id',
+          value: topicId,
+        ),
+        callback: (_) => scheduleRefresh(),
       )
       .subscribe();
 
   ref.onDispose(() {
+    debounce?.cancel();
     client.removeChannel(channel);
   });
 });
@@ -303,7 +311,7 @@ final forumTopicsRealtimeProvider = Provider.family<void, String>((
           column: 'forum_id',
           value: forumId,
         ),
-        callback: (payload) => {
+        callback: (payload) {
           // Altas/bajas y cambios de status (p. ej. pending→published) al instante.
           final immediate = payload.eventType == PostgresChangeEvent.delete ||
               payload.eventType == PostgresChangeEvent.insert ||

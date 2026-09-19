@@ -1,30 +1,10 @@
--- Banner en temas destacados (Cuaresma / Semana Santa / Glorias).
--- Placement: featured_topic · segmentación opcional por topic_id.
+-- El sorteo de anuncios debe ser VOLATILE (usa random()).
+-- Con STABLE Postgres puede devolver siempre el mismo resultado.
+-- Elimina sobrecargas antiguas de 1–2 argumentos.
 -- Ejecutar en Supabase → SQL Editor.
 
-alter table public.ads
-  add column if not exists topic_id text;
-
-create index if not exists ads_placement_topic_active_idx
-  on public.ads (placement, topic_id, active, priority desc);
-
-alter table public.ads drop constraint if exists ads_placement_check;
-
-alter table public.ads
-  add constraint ads_placement_check check (
-    placement in (
-      'home',
-      'forums_top',
-      'forums_middle',
-      'forums_event',
-      'calendar',
-      'search',
-      'profile',
-      'hermandades',
-      'featured_topic',
-      'noticias'
-    )
-  );
+drop function if exists public.get_ad_for_placement(text);
+drop function if exists public.get_ad_for_placement(text, text);
 
 create or replace function public.get_ad_for_placement(
   p_placement text,

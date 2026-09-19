@@ -1,7 +1,16 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
+  DispatchJobRow,
+  DispatchOverview,
   NotificationsAdminService,
   NotificationsOverview,
   PushUserFilter,
@@ -12,6 +21,8 @@ import {
 import { HandleHit } from '../../core/community/community.service';
 import { HandleSearchComponent } from '../../shared/handle-search.component';
 
+type NotifTab = 'coverage' | 'queue';
+
 @Component({
   selector: 'app-notifications-page',
   standalone: true,
@@ -19,10 +30,12 @@ import { HandleSearchComponent } from '../../shared/handle-search.component';
   templateUrl: './notifications.component.html',
   styleUrl: './notifications.component.scss',
 })
-export class NotificationsPageComponent implements OnInit {
+export class NotificationsPageComponent implements OnInit, OnDestroy {
   private readonly api = inject(NotificationsAdminService);
+  private queueTimer: ReturnType<typeof setInterval> | null = null;
 
   readonly pageSize = 50;
+  readonly tab = signal<NotifTab>('coverage');
   readonly days = signal(30);
   readonly overview = signal<NotificationsOverview | null>(null);
   readonly diag = signal<UserNotifDiag | null>(null);
@@ -33,7 +46,13 @@ export class NotificationsPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly listLoading = signal(false);
   readonly diagLoading = signal(false);
+  readonly queueLoading = signal(false);
+  readonly queueBusy = signal(false);
   readonly error = signal<string | null>(null);
+  readonly queueInfo = signal<string | null>(null);
+  readonly dispatchOverview = signal<DispatchOverview | null>(null);
+  readonly dispatchJobs = signal<DispatchJobRow[]>([]);
+  readonly liveQueue = signal(true);
 
   selected: HandleHit | null = null;
   pushSearch = '';
@@ -42,6 +61,8 @@ export class NotificationsPageComponent implements OnInit {
   readonly prefLabel = (k: string) => this.api.prefLabel(k);
   readonly prefShort = (k: string) => this.api.prefShort(k);
   readonly platformLabel = (p: string) => this.api.platformLabel(p);
+  readonly kindLabel = (k: string) => this.api.kindLabel(k);
+  readonly statusLabel = (s: string) => this.api.statusLabel(s);
   readonly tablePrefKeys = TABLE_PREF_KEYS;
 
   readonly totalPages = computed(() =>
@@ -60,6 +81,45 @@ export class NotificationsPageComponent implements OnInit {
     void this.reload();
   }
 
+  ngOnDestroy(): void {
+    this.stopQueueLive();
+  }
+
+  setTab(tab: NotifTab): void {
+    this.tab.set(tab);
+    this.error.set(null);
+    this.queueInfo.set(null);
+    if (tab === 'queue') {
+      void this.reloadQueue();
+      this.startQueueLive();
+    } else {
+      this.stopQueueLive();
+    }
+  }
+
+  startQueueLive(): void {
+    this.stopQueueLive();
+    if (!this.liveQueue()) return;
+    this.queueTimer = setInterval(() => {
+      if (this.tab() === 'queue' && this.liveQueue() && !this.queueBusy()) {
+        void this.reloadQueue(true);
+      }
+    }, 5000);
+  }
+
+  stopQueueLive(): void {
+    if (this.queueTimer) {
+      clearInterval(this.queueTimer);
+      this.queueTimer = null;
+    }
+  }
+
+  toggleLiveQueue(): void {
+    this.liveQueue.update((v) => !v);
+    if (this.liveQueue()) this.startQueueLive();
+    else this.stopQueueLive();
+  }
+
   async reload(): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
@@ -76,6 +136,94 @@ export class NotificationsPageComponent implements OnInit {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  async reloadQueue(silent = false): Promise<void> {
+    if (!silent) this.queueLoading.set(true);
+    if (!silent) this.error.set(null);
+    try {
+      const [overview, jobs] = await Promise.all([
+        this.api.fetchDispatchOverview(),
+        this.api.listDispatchJobs(50),
+      ]);
+      this.dispatchOverview.set(overview);
+      this.dispatchJobs.set(jobs);
+    } catch (err) {
+      this.error.set(
+        err instanceof Error
+          ? `${err.message} ¿Ejecutaste notification_dispatch_admin.sql (y v1/v2/cron)?`
+          : 'No se pudo cargar la cola',
+      );
+    } finally {
+      this.queueLoading.set(false);
+    }
+  }
+
+  async processNow(): Promise<void> {
+    this.queueBusy.set(true);
+    this.queueInfo.set(null);
+    this.error.set(null);
+    try {
+      const result = await this.api.processDispatchNow();
+      this.queueInfo.set(
+        result.processedTotal > 0
+          ? `Procesados ${result.processedTotal} avisos en este lote.`
+          : 'Cola vacía o sin más destinatarios en este tick.',
+      );
+      await this.reloadQueue(true);
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo procesar la cola',
+      );
+    } finally {
+      this.queueBusy.set(false);
+    }
+  }
+
+  async retryFailed(): Promise<void> {
+    this.queueBusy.set(true);
+    this.queueInfo.set(null);
+    this.error.set(null);
+    try {
+      const n = await this.api.retryFailedDispatchJobs();
+      this.queueInfo.set(
+        n > 0
+          ? `${n} trabajo(s) fallido(s) vueltos a la cola.`
+          : 'No había trabajos fallidos.',
+      );
+      await this.reloadQueue(true);
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudieron reintentar',
+      );
+    } finally {
+      this.queueBusy.set(false);
+    }
+  }
+
+  async reloadApiSchema(): Promise<void> {
+    this.queueBusy.set(true);
+    this.queueInfo.set(null);
+    this.error.set(null);
+    try {
+      await this.api.reloadApiSchema();
+      this.queueInfo.set(
+        'API recargada. Si faltaba alguna función nueva, ya debería verse.',
+      );
+      await this.reloadQueue(true);
+    } catch (err) {
+      this.error.set(
+        err instanceof Error
+          ? `${err.message} ¿Reejecutaste notification_dispatch_admin.sql?`
+          : 'No se pudo recargar el esquema',
+      );
+    } finally {
+      this.queueBusy.set(false);
+    }
+  }
+
+  statusCount(status: string): number {
+    return Number(this.dispatchOverview()?.byStatus?.[status] ?? 0);
   }
 
   async reloadPushUsers(): Promise<void> {

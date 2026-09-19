@@ -9,6 +9,7 @@ import '../calendar/liturgical_countdown_provider.dart';
 import '../auth/auth_provider.dart';
 import '../forums/forums_provider.dart';
 import '../forums/widgets/forums_shell_ad_bar.dart';
+import '../forums/widgets/noticias_shell_ad_bar.dart';
 import '../notifications/notifications_provider.dart';
 import '../permissions/permissions_provider.dart';
 
@@ -50,8 +51,10 @@ class CofradeoShell extends ConsumerWidget {
     final showCalendarDot = ref.watch(calendarHasEventTodayProvider);
     final showNotificationsDot = ref.watch(hasUnreadNotificationsProvider);
 
-    final showForumsAd = navigationShell.currentIndex == 1 &&
-        GoRouterState.of(context).uri.path == '/foros';
+    final path = GoRouterState.of(context).uri.path;
+    final onForumsTab = navigationShell.currentIndex == 1;
+    final showForumsAd = onForumsTab && path == '/foros';
+    final showNoticiasAd = onForumsTab && path == '/foros/noticias';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -61,6 +64,7 @@ class CofradeoShell extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (showForumsAd) const ForumsShellAdBar(),
+          if (showNoticiasAd) const NoticiasShellAdBar(),
           CofradeoBottomNav(
             currentIndex: navigationShell.currentIndex,
             onTap: (index) => _onTap(context, index, ref),

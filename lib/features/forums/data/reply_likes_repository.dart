@@ -143,6 +143,7 @@ class ReplyLikesRepository {
     required String userId,
     required String replyId,
     required String? reaction,
+    String? topicId,
   }) async {
     if (_client == null) throw const ReplyLikesUnavailableException();
 
@@ -156,12 +157,19 @@ class ReplyLikesRepository {
     }
 
     // Sin .select().single(): evita fallos PGRST116 si RLS no devuelve la fila.
+    // topic_id (opcional) acelera Realtime filtrado; el trigger SQL lo rellena si falta.
+    final row = <String, dynamic>{
+      'user_id': userId,
+      'reply_id': replyId,
+      'reaction': reaction,
+    };
+    final tid = topicId?.trim();
+    if (tid != null && tid.isNotEmpty) {
+      row['topic_id'] = tid;
+    }
+
     await _client!.from('forum_reply_likes').upsert(
-      {
-        'user_id': userId,
-        'reply_id': replyId,
-        'reaction': reaction,
-      },
+      row,
       onConflict: 'reply_id,user_id',
     );
   }

@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -12,6 +14,7 @@ import 'auth_provider.dart';
 import 'auth_navigation.dart';
 import 'auth_error_messages.dart';
 import 'data/auth_repository.dart';
+import 'pending_auth_redirect.dart';
 import 'widgets/auth_email_form.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -39,6 +42,50 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  bool get _showApple {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+  }
+
+  Future<void> _runOAuth(Future<void> Function() action) async {
+    ref.read(pendingAuthRedirectProvider.notifier).set(widget.redirect);
+    setState(() {
+      _loading = true;
+      _error = null;
+      _info = null;
+    });
+    try {
+      await action();
+      if (!mounted) return;
+      // En móvil el OAuth termina en el navegador; la app navega al volver
+      // (deep link) vía authStateChanges en app.dart.
+      if (!kIsWeb) {
+        setState(() => _loading = false);
+      }
+    } on AuthException catch (e) {
+      setState(() => _error = friendlyAuthErrorMessage(e));
+    } on AuthUnavailableException catch (e) {
+      setState(() => _error = e.message);
+    } catch (_) {
+      setState(() => _error = 'No se pudo abrir Google. Inténtalo de nuevo.');
+    } finally {
+      if (mounted && kIsWeb) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    await _runOAuth(
+      () => ref.read(authRepositoryProvider).signInWithGoogle(),
+    );
+  }
+
+  Future<void> _signInWithApple() async {
+    await _runOAuth(
+      () => ref.read(authRepositoryProvider).signInWithApple(),
+    );
   }
 
   Future<void> _register() async {
@@ -152,16 +199,34 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ).copyWith(fontSize: 28),
                               textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Elige un nombre y handle únicos. Las hermandades oficiales '
-                              'requieren verificación.',
-                              style: AppTypography.bodyMedium(
-                                color: Colors.white.withValues(alpha: 0.86),
-                              ).copyWith(fontSize: 15),
-                              textAlign: TextAlign.center,
+                            const SizedBox(height: 22),
+                            _SocialButton(
+                              label: 'Continuar con Google',
+                              backgroundColor: Colors.white,
+                              icon: SizedBox.square(
+                                dimension: 22,
+                                child: SvgPicture.asset(
+                                  AppAssets.googleLogo,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                              onPressed: _loading ? null : _signInWithGoogle,
                             ),
-                            const SizedBox(height: 24),
+                            if (_showApple) ...[
+                              const SizedBox(height: 10),
+                              _SocialButton(
+                                label: 'Continuar con Apple',
+                                icon: const Icon(
+                                  Icons.apple,
+                                  color: Color(0xFF2A0710),
+                                  size: 24,
+                                ),
+                                onPressed: _loading ? null : _signInWithApple,
+                              ),
+                            ],
+                            const SizedBox(height: 22),
+                            const _EmailDivider(),
+                            const SizedBox(height: 18),
                             AuthEmailForm(
                               displayNameController: _displayNameController,
                               handleController: _handleController,
@@ -192,6 +257,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 textAlign: TextAlign.center,
                               ),
                             ],
+                            const SizedBox(height: 8),
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                minimumSize: Size.zero,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 6,
+                                ),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: _loading
+                                  ? null
+                                  : () => context.push(
+                                      '/login${widget.redirect != null ? '?redirect=${Uri.encodeComponent(widget.redirect!)}' : ''}',
+                                    ),
+                              child: Text(
+                                '¿Ya tienes cuenta? Inicia sesión',
+                                style: AppTypography.displaySmall(
+                                  color: AppColors.goldPale,
+                                ).copyWith(fontSize: 18),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -203,6 +290,74 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  const _SocialButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.backgroundColor,
+  });
+
+  final String label;
+  final Widget icon;
+  final VoidCallback? onPressed;
+  final Color? backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = backgroundColor ?? AppColors.gold;
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: FilledButton.icon(
+        onPressed: onPressed,
+        icon: icon,
+        label: Text(
+          label,
+          style: AppTypography.titleLarge(
+            color: const Color(0xFF2A0710),
+          ).copyWith(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        style: FilledButton.styleFrom(
+          backgroundColor: bg,
+          foregroundColor: const Color(0xFF2A0710),
+          disabledBackgroundColor: bg.withValues(alpha: 0.56),
+          disabledForegroundColor: const Color(
+            0xFF2A0710,
+          ).withValues(alpha: 0.6),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmailDivider extends StatelessWidget {
+  const _EmailDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: AppColors.gold.withValues(alpha: 0.72))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Text(
+            'o con email',
+            style: AppTypography.titleLarge(
+              color: AppColors.goldPale,
+            ).copyWith(fontSize: 15, fontWeight: FontWeight.w700),
+          ),
+        ),
+        Expanded(child: Divider(color: AppColors.gold.withValues(alpha: 0.72))),
+      ],
     );
   }
 }

@@ -4,7 +4,8 @@
       <p class="eyebrow">Plataforma · solo admin</p>
       <h1>Patrocinios</h1>
       <p class="lead">
-        Dónde salen las marcas, informe por mes y pack en todas las zonas.
+        Mapa de zonas publicitarias: qué empresa sale en cada sitio, con banner
+        o logo de eventos según la zona.
       </p>
     </div>
     <div class="queue-toolbar">
@@ -32,90 +33,205 @@
   }
 
   @if (tab() === 'map') {
+    <div class="map-kpis">
+      <article>
+        <strong>{{ mapOverview().zones }}/{{ mapOverview().totalZones }}</strong>
+        <span>Zonas con marcas activas</span>
+      </article>
+      <article>
+        <strong>{{ mapOverview().companies }}</strong>
+        <span>Empresas activas</span>
+      </article>
+      <article>
+        <strong>{{ mapOverview().activePieces }}</strong>
+        <span>Piezas en rotación</span>
+      </article>
+      <article [class.warn]="mapOverview().missingEventLogo > 0">
+        <strong>{{ mapOverview().missingEventLogo }}</strong>
+        <span>Eventos sin logo</span>
+      </article>
+    </div>
+
+    @if (mapOverview().missingEventLogo > 0) {
+      <div class="info-box warn-box">
+        Hay eventos patrocinados sin <strong>logo de eventos</strong>. Esos
+        creativos no deben usar el banner de zona: edita la pieza o súbelo en
+        <em>Empresas → Logo eventos</em>.
+      </div>
+    }
+
+    <div class="zone-nav">
+      <button
+        type="button"
+        class="zone-chip"
+        [class.active]="focusZone() === ''"
+        (click)="focusZone.set('')"
+      >
+        Todas
+      </button>
+      @for (placement of placements; track placement) {
+        <button
+          type="button"
+          class="zone-chip"
+          [class.active]="focusZone() === placement"
+          [attr.data-zone]="placement"
+          (click)="setFocusZone(placement)"
+        >
+          {{ shortName(placement) }}
+        </button>
+      }
+    </div>
+
     <div class="filters">
       <input
         type="search"
         [(ngModel)]="search"
-        placeholder="Buscar marca, foro o zona…"
+        placeholder="Buscar empresa, foro o zona…"
       />
       <select [ngModel]="filter()" (ngModelChange)="filter.set($event)">
-        <option value="all">Todos</option>
-        <option value="active">Activos</option>
-        <option value="paused">Pausados</option>
+        <option value="all">Todos los estados</option>
+        <option value="active">Solo activos</option>
+        <option value="paused">Solo pausados</option>
       </select>
     </div>
 
     @if (loading()) {
       <div class="state-box">Cargando patrocinios…</div>
-    } @else if (groupedAds().length === 0) {
-      <div class="empty-box">No hay piezas con estos filtros.</div>
     } @else {
       <div class="zones">
-        @for (group of groupedAds(); track group.placement) {
-          <section class="zone">
-            <div class="zone-head">
-              <div>
-                <h2>{{ commercialName(group.placement) }}</h2>
-                <p>{{ whereHint(group.placement) }}</p>
+        @for (board of zoneBoards(); track board.placement) {
+          <section class="zone-board" [attr.data-zone]="board.placement">
+            <div class="zone-board-head">
+              <div class="zone-title-block">
+                <div class="zone-badge-row">
+                  <span class="zone-badge" [attr.data-zone]="board.placement">
+                    {{ board.shortLabel }}
+                  </span>
+                  @if (board.isEventZone) {
+                    <span class="asset-tag logo">Usa logo eventos</span>
+                  } @else {
+                    <span class="asset-tag banner">Usa banner</span>
+                  }
+                  <span class="count-pill" [class.empty]="board.activeCount === 0">
+                    {{ board.activeCount }} activa{{ board.activeCount === 1 ? '' : 's' }}
+                  </span>
+                </div>
+                <h2>{{ board.label }}</h2>
+                <p>{{ board.hint }}</p>
+                @if (board.companyNames.length) {
+                  <div class="company-chips">
+                    @for (name of board.companyNames; track name) {
+                      <span class="company-chip">{{ name }}</span>
+                    }
+                  </div>
+                } @else {
+                  <p class="empty-zone-hint">Ninguna empresa activa en esta zona.</p>
+                }
               </div>
               <div class="zone-actions">
+                @if (board.ads.length > 1) {
                 <button
                   type="button"
                   class="btn btn-soft"
                   [disabled]="saving()"
-                  (click)="equalizeZone(group.placement)"
+                  (click)="equalizeZone(board.placement)"
+                  title="Pone Igualdad (mismo %) a todas las piezas activas de esta zona"
                 >
                   Igualar salidas
                 </button>
-                <button type="button" class="btn btn-ghost" (click)="openCreate(group.placement)">
+                }
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  (click)="openCreate(board.placement)"
+                >
                   Añadir aquí
                 </button>
               </div>
             </div>
-            <div class="queue-list">
-              @for (ad of group.ads; track ad.id) {
-                <article class="queue-card ad-card">
-                  <div class="ad-main">
-                    @if (ad.imageUrl || ad.sponsorLogoUrl) {
-                      <img
-                        [src]="ad.imageUrl || ad.sponsorLogoUrl"
-                        alt=""
-                        class="thumb"
-                      />
-                    }
-                    <div>
-                      <h3>{{ displayName(ad) }}</h3>
-                      <p class="queue-meta">
-                        {{ targetDetail(ad) }}
-                        · {{ priorityLabel(ad.priority) }}
-                        · {{ ad.active ? 'Activo' : 'Pausado' }}
-                      </p>
+
+            @if (board.missingLogoCount > 0) {
+              <div class="zone-alert">
+                {{ board.missingLogoCount }} pieza{{ board.missingLogoCount === 1 ? '' : 's' }}
+                sin logo de eventos.
+              </div>
+            }
+
+            @if (board.ads.length === 0) {
+              <div class="zone-empty">
+                Zona libre. Añade una marca para ocupar este espacio.
+              </div>
+            } @else {
+              <div class="ad-grid">
+                @for (ad of board.ads; track ad.id) {
+                  <article class="ad-tile" [class.paused]="!ad.active">
+                    <div
+                      class="ad-preview"
+                      [class.logo-preview]="previewKind(ad.placement) === 'logo'"
+                    >
+                      @if (previewUrl(ad); as url) {
+                        <img [src]="url" [alt]="displayName(ad)" />
+                      } @else {
+                        <div class="preview-missing">
+                          @if (usesEventLogo(ad.placement)) {
+                            Sin logo eventos
+                          } @else {
+                            Sin banner
+                          }
+                        </div>
+                      }
+                      <span class="preview-label">
+                        {{ usesEventLogo(ad.placement) ? 'Logo eventos' : 'Banner' }}
+                      </span>
                     </div>
-                  </div>
-                  <div class="queue-actions">
-                    <button type="button" class="btn btn-ghost" (click)="openEdit(ad)">
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-soft"
-                      [disabled]="busyId() === ad.id"
-                      (click)="toggleActive(ad)"
-                    >
-                      {{ ad.active ? 'Pausar' : 'Activar' }}
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-danger"
-                      [disabled]="busyId() === ad.id"
-                      (click)="removeAd(ad)"
-                    >
-                      Quitar
-                    </button>
-                  </div>
-                </article>
-              }
-            </div>
+                    <div class="ad-body">
+                      <div class="ad-title-row">
+                        <h3>{{ displayName(ad) }}</h3>
+                        <span class="status-pill" [class.on]="ad.active" [class.off]="!ad.active">
+                          {{ ad.active ? 'Activo' : 'Pausado' }}
+                        </span>
+                      </div>
+                      <p class="ad-detail">{{ targetDetail(ad) }}</p>
+                      <p class="ad-meta">
+                        {{ priorityLabel(ad.priority) }}
+                        @if (shareLabel(ad); as share) {
+                          · <strong class="share">{{ share }}</strong>
+                        }
+                        @if (ad.calendarEventId) {
+                          · {{ eventLabel(ad.calendarEventId) }}
+                        } @else if (usesEventLogo(ad.placement)) {
+                          · {{ eventLabel(null) }}
+                        }
+                      </p>
+                      @if (usesEventLogo(ad.placement) && !ad.sponsorLogoUrl) {
+                        <p class="ad-warn">Falta el logo de eventos de esta empresa.</p>
+                      }
+                      <div class="queue-actions">
+                        <button type="button" class="btn btn-ghost" (click)="openEdit(ad)">
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-soft"
+                          [disabled]="busyId() === ad.id"
+                          (click)="toggleActive(ad)"
+                        >
+                          {{ ad.active ? 'Pausar' : 'Activar' }}
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-danger"
+                          [disabled]="busyId() === ad.id"
+                          (click)="removeAd(ad)"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                }
+              </div>
+            }
           </section>
         }
       </div>
@@ -356,7 +472,7 @@
       <h2>Local en todas las zonas</h2>
       <p class="lead">
         Elige una marca ya creada y marca dónde quieres que salga. No incluye
-        «evento patrocinado» (eso va foro a foro).
+        «evento patrocinado» (eso va foro a foro y usa el logo de eventos).
       </p>
       <label>
         Marca
@@ -398,93 +514,218 @@
   <div class="dialog-backdrop" (click)="closeForm()">
     <div class="dialog form-dialog" (click)="$event.stopPropagation()">
       <h3>{{ editing() ? 'Editar patrocinio' : 'Nuevo patrocinio' }}</h3>
-      <label>
-        Título
-        <input [(ngModel)]="formTitle" />
-      </label>
-      <label>
-        Patrocinador
-        <input [(ngModel)]="formSponsor" />
-      </label>
-      <label>
-        Enlace destino
-        <input [(ngModel)]="formUrl" placeholder="https://…" />
-      </label>
-      <label>
-        Zona
-        <select [(ngModel)]="formPlacement">
-          @for (placement of placements; track placement) {
-            <option [value]="placement">{{ commercialName(placement) }}</option>
-          }
-        </select>
-      </label>
-      @if (needsForum()) {
+
+      @if (formZoneLocked() || editing()) {
+        <div class="locked-zone" [attr.data-zone]="formPlacement">
+          <span class="zone-badge" [attr.data-zone]="formPlacement">
+            {{ shortName(formPlacement) }}
+          </span>
+          <div>
+            <strong>{{ commercialName(formPlacement) }}</strong>
+            <p>{{ whereHint(formPlacement) }}</p>
+          </div>
+        </div>
+      } @else {
         <label>
-          Foro
-          <select [(ngModel)]="formForumId">
-            <option value="">Todos los foros</option>
-            @for (forumId of forumIds; track forumId) {
-              <option [value]="forumId">{{ forumLabel(forumId) }}</option>
+          Zona
+          <select
+            [ngModel]="formPlacement"
+            (ngModelChange)="onPlacementChange($event)"
+          >
+            @for (placement of placements; track placement) {
+              <option [value]="placement">{{ commercialName(placement) }}</option>
             }
           </select>
         </label>
       }
-      @if (needsTopic()) {
-        <label>
-          Tema destacado
-          <select [(ngModel)]="formTopicId">
-            <option value="">Todos los destacados</option>
-            @for (topicId of topicIds; track topicId) {
-              <option [value]="topicId">{{ topicLabel(topicId) }}</option>
-            }
-          </select>
-        </label>
-      }
-      <label>
-        Imagen (URL)
-        <input [(ngModel)]="formImageUrl" />
-      </label>
-      <label class="file-row">
-        Subir creativo
-        <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onUpload('image', $event)" />
-      </label>
-      <label>
-        Logo (URL)
-        <input [(ngModel)]="formLogoUrl" />
-      </label>
-      <label class="file-row">
-        Subir logo
-        <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onUpload('logo', $event)" />
-      </label>
-      <div class="priority-block">
-        <span class="priority-label">Rotación en la zona</span>
-        <p class="hint">
-          Elige cómo de a menudo sale frente a otras marcas. «Igualdad» reparte
-          las salidas a partes iguales entre quienes también usan Igualdad.
-        </p>
-        <div class="priority-chips">
-          @for (tier of priorityTiers; track tier.value) {
-            <button
-              type="button"
-              class="priority-chip"
-              [class.active]="formPriority === tier.value"
-              (click)="setPriorityTier(tier.value)"
-            >
-              <strong>{{ tier.label }}</strong>
-              <span>{{ tier.hint }}</span>
-            </button>
+
+      @if (!editing()) {
+        <div class="company-pick">
+          <div class="company-pick-head">
+            <strong>Empresas creadas</strong>
+            <span>
+              @if (formIsEventZone()) {
+                Un clic rellena; luego elige el evento
+              } @else {
+                Un clic para meterla en esta zona
+              }
+            </span>
+          </div>
+
+          @if (formCompanyChoices().length === 0) {
+            <p class="form-hint">
+              Aún no hay empresas. Créalas en el menú Empresas (recomendado) o escribe el patrocinador abajo.
+            </p>
+          } @else {
+            <div class="company-pick-grid">
+              @for (choice of formCompanyChoices(); track choice.company.key) {
+                <button
+                  type="button"
+                  class="company-pick-card"
+                  [class.selected]="formCompanyKey === choice.company.key"
+                  [class.disabled]="choice.alreadyInZone"
+                  [disabled]="saving() || choice.alreadyInZone"
+                  (click)="
+                    choice.canOneClickPlace
+                      ? quickPlaceCompany(choice.company)
+                      : onCompanyPick(choice.company.key)
+                  "
+                >
+                  <div class="company-pick-thumb">
+                    @if (choice.needsLogo ? choice.company.sponsorLogoUrl : choice.company.imageUrl; as url) {
+                      <img [src]="url" [alt]="choice.company.name" />
+                    } @else {
+                      <span>Sin {{ choice.needsLogo ? 'logo' : 'banner' }}</span>
+                    }
+                  </div>
+                  <div class="company-pick-meta">
+                    <strong>{{ choice.company.name }}</strong>
+                    @if (choice.alreadyInZone) {
+                      <em>Ya en esta zona</em>
+                    } @else if (!choice.hasAsset) {
+                      <em>Falta creativo</em>
+                    } @else if (choice.needsLogo) {
+                      <em>Elegir evento →</em>
+                    } @else if (quickAddingKey() === choice.company.key) {
+                      <em>Añadiendo…</em>
+                    } @else {
+                      <em>Meter aquí</em>
+                    }
+                  </div>
+                </button>
+              }
+            </div>
           }
         </div>
-        <p class="priority-estimate">{{ formPriorityHint() }}</p>
-      </div>
-      <label class="check">
-        <input type="checkbox" [(ngModel)]="formActive" />
-        Activo
-      </label>
+      }
+
+      <details class="manual-fields" [open]="!!editing() || !!formCompanyKey || formCompanyChoices().length === 0">
+        <summary>{{ editing() ? 'Datos de la pieza' : 'O crear / ajustar a mano' }}</summary>
+
+        <label>
+          Título
+          <input [(ngModel)]="formTitle" />
+        </label>
+        <label>
+          Patrocinador
+          <input
+            [(ngModel)]="formSponsor"
+            (ngModelChange)="applyCompanyAssets(false)"
+          />
+        </label>
+        <label>
+          Enlace destino
+          <input [(ngModel)]="formUrl" placeholder="https://…" />
+        </label>
+
+        @if (needsForum()) {
+          <label>
+            Foro
+            <select [(ngModel)]="formForumId">
+              <option value="">Todos los foros</option>
+              @for (forumId of forumIds; track forumId) {
+                <option [value]="forumId">{{ forumLabel(forumId) }}</option>
+              }
+            </select>
+          </label>
+        }
+        @if (needsTopic()) {
+          <label>
+            Tema destacado
+            <select [(ngModel)]="formTopicId">
+              <option value="">Todos los destacados</option>
+              @for (topicId of topicIds; track topicId) {
+                <option [value]="topicId">{{ topicLabel(topicId) }}</option>
+              }
+            </select>
+          </label>
+        }
+        @if (needsEvent()) {
+          <label>
+            Evento del calendario
+            <select [(ngModel)]="formCalendarEventId">
+              <option value="__all__">Todos los eventos (hoy y futuros)</option>
+              @for (event of calendarEvents(); track event.id) {
+                <option [value]="event.id">{{ formatEventOption(event) }}</option>
+              }
+            </select>
+          </label>
+          <p class="form-hint">
+            Solo salen eventos de <strong>hoy o futuros</strong> (los pasados no).
+            La tarjeta usa el <strong>logo de eventos</strong> de la empresa, no el banner.
+          </p>
+        }
+
+        @if (!formIsEventZone()) {
+          <div class="asset-block">
+            <span class="asset-block-title">Banner de zona</span>
+            @if (formImageUrl) {
+              <img [src]="formImageUrl" alt="" class="form-preview banner" />
+            }
+            <label>
+              URL banner
+              <input [(ngModel)]="formImageUrl" />
+            </label>
+            <label class="file-row">
+              Subir banner
+              <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onUpload('image', $event)" />
+            </label>
+          </div>
+        }
+
+        <div class="asset-block" [class.required]="formIsEventZone()">
+          <span class="asset-block-title">
+            Logo eventos
+            @if (formIsEventZone()) {
+              <em>obligatorio</em>
+            }
+          </span>
+          @if (formLogoUrl) {
+            <img [src]="formLogoUrl" alt="" class="form-preview logo" />
+          } @else if (formIsEventZone()) {
+            <div class="form-preview missing">Sin logo — súbelo o edítalo en Empresas</div>
+          }
+          <label>
+            URL logo
+            <input [(ngModel)]="formLogoUrl" />
+          </label>
+          <label class="file-row">
+            Subir logo eventos
+            <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onUpload('logo', $event)" />
+          </label>
+        </div>
+
+        <div class="priority-block">
+          <span class="priority-label">Rotación en la zona</span>
+          <p class="hint">
+            Elige cómo de a menudo sale frente a otras marcas. «Igualdad» reparte
+            las salidas a partes iguales entre quienes también usan Igualdad.
+          </p>
+          <div class="priority-chips">
+            @for (tier of priorityTiers; track tier.value) {
+              <button
+                type="button"
+                class="priority-chip"
+                [class.active]="formPriority === tier.value"
+                (click)="setPriorityTier(tier.value)"
+              >
+                <strong>{{ tier.label }}</strong>
+                <span>{{ tier.hint }}</span>
+              </button>
+            }
+          </div>
+          <p class="priority-estimate">{{ formPriorityHint() }}</p>
+        </div>
+        <label class="check">
+          <input type="checkbox" [(ngModel)]="formActive" />
+          Activo
+        </label>
+      </details>
+
       <div class="queue-actions">
         <button type="button" class="btn btn-ghost" (click)="closeForm()">Cancelar</button>
         <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="saveForm()">
-          {{ saving() ? 'Guardando…' : 'Guardar' }}
+          {{ saving() ? 'Guardando…' : editing() ? 'Guardar' : 'Guardar pieza' }}
         </button>
       </div>
     </div>

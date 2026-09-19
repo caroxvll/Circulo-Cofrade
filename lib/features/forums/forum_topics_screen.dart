@@ -10,6 +10,7 @@ import '../../core/widgets/cofradeo_bottom_nav.dart';
 import '../../shared/models/forum.dart';
 import '../calendar/calendar_provider.dart';
 import '../calendar/models/calendar_focus_request.dart';
+import '../calendar/utils/calendar_event_utils.dart';
 import '../../shared/models/calendar_event.dart';
 import '../ads/ads_provider.dart';
 import '../ads/models/sponsored_ad.dart';
@@ -140,6 +141,7 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
         onRefresh: () async {
           ref.invalidate(forumTopicsProvider(forumId));
           ref.invalidate(forumPillarProvider(forumId));
+          invalidateForumAds(ref);
           await ref.read(forumTopicsProvider(forumId).future);
         },
         child: CustomScrollView(
@@ -282,10 +284,14 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
       _sort,
     );
 
+    // Noticias usa banner anclado propio (`noticias`); sin pubs en el feed.
+    final isNoticias = isNoticiasForum(forumId);
     final listBannerPlacement = _listBannerPlacement(forumId);
-    final showInFeedBanners = _showInFeedListBanners(query);
-    final hasSponsoredEvent = _hasSponsoredEventContext(ref, forumId);
-    final showTopListBanner = !hasSponsoredEvent;
+    final showInFeedBanners =
+        !isNoticias && _showInFeedListBanners(query);
+    final hasSponsoredEvent =
+        !isNoticias && _hasSponsoredEventContext(ref, forumId);
+    final showTopListBanner = !isNoticias && !hasSponsoredEvent;
 
     final listTop = forumId == 'hermandades' ? 0.0 : _listTopPadding;
 
@@ -442,10 +448,22 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
       data: (ad) {
         if (ad == null) return false;
         final eventId = ad.calendarEventId?.trim();
-        if (eventId == null || eventId.isEmpty) return false;
+        if (eventId == null || eventId.isEmpty) {
+          // «Todos los eventos»: hay tarjeta si existe alguno hoy/futuro.
+          final upcoming = ref.watch(sponsorshipEventPickerProvider);
+          return upcoming.when(
+            data: (events) =>
+                events.any((e) => !isCalendarEventPast(e)),
+            loading: () => true,
+            error: (_, _) => false,
+          );
+        }
 
         return ref.watch(calendarEventByIdProvider(eventId)).when(
-          data: (event) => event != null,
+          data: (event) {
+            if (event == null) return false;
+            return !isCalendarEventPast(event);
+          },
           loading: () => true,
           error: (_, _) => false,
         );
@@ -1963,6 +1981,8 @@ class _ForumTopicsSponsoredEventSlot extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (isNoticiasForum(forumId)) return const SizedBox.shrink();
+
     final adAsync = ref.watch(
       adForPlacementProvider(
         AdPlacementQuery(
@@ -1978,13 +1998,36 @@ class _ForumTopicsSponsoredEventSlot extends ConsumerWidget {
 
         final eventId = ad.calendarEventId?.trim();
         if (eventId == null || eventId.isEmpty) {
-          return const SizedBox.shrink();
+          final upcomingAsync = ref.watch(sponsorshipEventPickerProvider);
+          return upcomingAsync.when(
+            data: (events) {
+              CalendarEvent? next;
+              for (final event in events) {
+                if (!isCalendarEventPast(event)) {
+                  next = event;
+                  break;
+                }
+              }
+              if (next == null) return const SizedBox.shrink();
+              return SponsoredAdCard(
+                ad: ad,
+                style: SponsoredAdCardStyle.event,
+                event: next,
+                onEventTap: (linkedEvent) =>
+                    _openSponsoredCalendarEvent(context, ref, linkedEvent),
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
+          );
         }
 
         final eventAsync = ref.watch(calendarEventByIdProvider(eventId));
         return eventAsync.when(
           data: (event) {
-            if (event == null) return const SizedBox.shrink();
+            if (event == null || isCalendarEventPast(event)) {
+              return const SizedBox.shrink();
+            }
 
             return SponsoredAdCard(
               ad: ad,

@@ -7,7 +7,8 @@ export type AdPlacement =
   | 'calendar'
   | 'search'
   | 'profile'
-  | 'hermandades';
+  | 'hermandades'
+  | 'noticias';
 
 export const ADMIN_AD_PLACEMENTS: AdPlacement[] = [
   'forums_top',
@@ -17,6 +18,7 @@ export const ADMIN_AD_PLACEMENTS: AdPlacement[] = [
   'hermandades',
   'calendar',
   'search',
+  'noticias',
 ];
 
 export const PACK_AD_PLACEMENTS: AdPlacement[] = [
@@ -26,6 +28,7 @@ export const PACK_AD_PLACEMENTS: AdPlacement[] = [
   'hermandades',
   'calendar',
   'search',
+  'noticias',
 ];
 
 export const AD_FORUM_IDS = [
@@ -147,6 +150,16 @@ export interface PackSponsorOption {
   sponsorLogoUrl: string | null;
 }
 
+/**
+ * Placement reservado (no comercial) para la ficha de catálogo de una marca.
+ * La empresa se crea aquí sin ocupar una zona visible; luego se coloca en Patrocinios.
+ */
+export const COMPANY_CATALOG_PLACEMENT: AdPlacement = 'home';
+
+export function isCompanyCatalogPlacement(placement: string): boolean {
+  return placement === 'home' || placement === 'profile';
+}
+
 /** Marca / empresa agregada desde piezas de publicidad. */
 export interface CompanyProfile {
   key: string;
@@ -177,6 +190,8 @@ export function placementCommercialName(placement: string): string {
       return 'Calendario · banner';
     case 'search':
       return 'Buscar · banner';
+    case 'noticias':
+      return 'Noticias · banner';
     case 'profile':
       return 'Perfil';
     case 'home':
@@ -202,6 +217,8 @@ export function placementWhereHint(placement: string): string {
       return 'Banner en la pestaña Calendario.';
     case 'search':
       return 'Banner en Buscar (pantalla inicial, sin resultados).';
+    case 'noticias':
+      return 'Banner anclado en Noticias (encima de la barra inferior).';
     default:
       return '';
   }
@@ -241,7 +258,9 @@ export function adTargetDetail(ad: SponsoredAd): string {
     case 'forums_event': {
       const forum = ad.forumId ? adForumLabel(ad.forumId) : 'Todos los foros';
       if (ad.placement === 'forums_event') {
-        return `${forum} · Evento patrocinado`;
+        return ad.calendarEventId
+          ? `${forum} · Evento concreto`
+          : `${forum} · Todos los eventos (hoy/futuros)`;
       }
       return `Foro: ${forum}`;
     }
@@ -257,6 +276,8 @@ export function adTargetDetail(ad: SponsoredAd): string {
       return 'Pantalla: Calendario';
     case 'search':
       return 'Pantalla: Buscar (inicio)';
+    case 'noticias':
+      return 'Pantalla: Noticias';
     default:
       return '';
   }
@@ -273,6 +294,50 @@ export function adDisplayName(ad: Pick<SponsoredAd, 'sponsorName' | 'title'>): s
   const sponsor = ad.sponsorName.trim();
   if (sponsor) return sponsor;
   return ad.title.trim() || 'Sin nombre';
+}
+
+/** Evento patrocinado usa logo de empresa; el resto, banner de zona. */
+export function adUsesEventLogo(placement: AdPlacement | string): boolean {
+  return placement === 'forums_event';
+}
+
+/** Creativo que debe verse en el panel según la zona. */
+export function adPreviewUrl(
+  ad: Pick<SponsoredAd, 'placement' | 'imageUrl' | 'sponsorLogoUrl'>,
+): string | null {
+  if (adUsesEventLogo(ad.placement)) {
+    return ad.sponsorLogoUrl?.trim() || null;
+  }
+  return ad.imageUrl?.trim() || null;
+}
+
+export function adPreviewKind(
+  placement: AdPlacement | string,
+): 'banner' | 'logo' {
+  return adUsesEventLogo(placement) ? 'logo' : 'banner';
+}
+
+export function placementShortName(placement: string): string {
+  switch (placement) {
+    case 'forums_top':
+      return 'Foros';
+    case 'forums_event':
+      return 'Evento';
+    case 'forums_middle':
+      return 'Dentro foro';
+    case 'featured_topic':
+      return 'Destacados';
+    case 'hermandades':
+      return 'Hermandades';
+    case 'calendar':
+      return 'Calendario';
+    case 'search':
+      return 'Buscar';
+    case 'noticias':
+      return 'Noticias';
+    default:
+      return placementCommercialName(placement);
+  }
 }
 
 export function companyKeyFromName(name: string): string {
