@@ -599,6 +599,7 @@ class _PlacementSectionIcon extends StatelessWidget {
       AdPlacement.hermandades => Icons.groups_outlined,
       AdPlacement.calendar => Icons.calendar_month_outlined,
       AdPlacement.search => Icons.travel_explore_outlined,
+      AdPlacement.noticias => Icons.newspaper_outlined,
       _ => Icons.campaign_outlined,
     };
 
@@ -1654,6 +1655,7 @@ const _adminAdPlacements = [
   AdPlacement.hermandades,
   AdPlacement.calendar,
   AdPlacement.search,
+  AdPlacement.noticias,
 ];
 
 const _adTargetForumIds = [
@@ -1682,6 +1684,7 @@ String _placementCommercialName(AdPlacement placement) {
     AdPlacement.hermandades => 'Hermandades · banner',
     AdPlacement.calendar => 'Calendario · banner',
     AdPlacement.search => 'Buscar · banner',
+    AdPlacement.noticias => 'Noticias · banner',
     AdPlacement.profile => 'Perfil',
     AdPlacement.home => 'Inicio',
   };
@@ -1701,6 +1704,8 @@ String _placementWhereHint(AdPlacement placement) {
       'Banner en el canal Hermandades (listado por días).',
     AdPlacement.calendar => 'Banner en la pestaña Calendario.',
     AdPlacement.search => 'Banner en Buscar (pantalla inicial, sin resultados).',
+    AdPlacement.noticias =>
+      'Banner anclado en Noticias (encima de la barra inferior).',
     AdPlacement.profile => 'Reservado · perfil.',
     AdPlacement.home => 'Reservado · inicio.',
   };
@@ -1711,7 +1716,7 @@ String _placementLabel(AdPlacement placement) =>
 
 String _imageHelperForPlacement(AdPlacement placement) {
   return switch (placement) {
-    AdPlacement.forumsTop =>
+    AdPlacement.forumsTop || AdPlacement.noticias =>
       'Banner 1200×276 px. Deja libre la esquina inferior derecha para el botón.',
     AdPlacement.calendar ||
     AdPlacement.search ||

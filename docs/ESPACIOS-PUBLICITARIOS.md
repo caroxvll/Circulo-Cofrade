@@ -24,6 +24,7 @@ Cada espacio se contrata por **ubicación** (`placement`). Si varios anunciantes
 | 5 | **Banner en Hermandades** | `hermandades` | Banner en feed | Solo foro Hermandades |
 | 6 | **Banner en Calendario** | `calendar` | Banner compacto | Calendario cofrade |
 | 7 | **Banner en Buscar** | `search` | Banner compacto | Buscar (pantalla inicial) |
+| 8 | **Banner en Noticias** | `noticias` | Banner fijo | Canal Noticias (`/foros/noticias`) |
 
 > **Reservados (no activos en comercial):** `home`, `profile`.
 
@@ -50,7 +51,7 @@ Cada espacio se contrata por **ubicación** (`placement`). Si varios anunciantes
 |---|---|
 | **Dónde** | Dentro de un foro, **justo después de los temas fijados** y antes del listado de la comunidad. |
 | **Formato** | Tarjeta «EVENTO PATROCINADO»: portada del evento del calendario + datos (fecha, hora, templo) + logo del patrocinador. |
-| **Vinculación** | Obligatorio elegir un **evento del calendario cofrade** (ej. salida procesional, iguala, concierto). |
+| **Vinculación** | Un **evento concreto** del calendario, o **todos los eventos** de hoy/futuros (rota al próximo acto publicado). Los pasados no se muestran. |
 | **Logo patrocinador** | Recomendado **520 × 300 px**, PNG/WebP con fondo transparente. |
 | **Enlace** | Opcional; si no se indica, abre el calendario. |
 | **Foro destino** | Configurable: un foro concreto o todos. |
@@ -144,6 +145,22 @@ Cada espacio se contrata por **ubicación** (`placement`). Si varios anunciantes
 
 ---
 
+## 7. Banner en Noticias (`noticias`)
+
+| | |
+|---|---|
+| **Dónde** | Canal **Noticias**, anclado **encima de la barra de navegación inferior** (mismo patrón que el banner de Foros). |
+| **Cuándo se ve** | Solo en el listado de Noticias (`/foros/noticias`), no dentro de una noticia abierta. |
+| **Formato** | Banner horizontal premium. |
+| **Creativo** | **1200 × 276 px** (ratio ~4,35:1). Dejar libre la esquina inferior derecha para el botón «Ver más». |
+| **Foro destino** | No aplica (zona exclusiva de Noticias). |
+
+**Visibilidad:** alta en usuarios que leen actualidad cofrade. Una sola pieza anclada; **sin** banners adicionales en el feed de noticias (evita saturación).
+
+**Ideal para:** marcas de temporada, hostelería y comercios que quieran asociarse a la actualidad de la Semana Santa sevillana.
+
+---
+
 ## Sistema de rotación y probabilidades
 
 ### Cómo se elige el anuncio
@@ -227,6 +244,7 @@ Los informes se pueden extraer desde el panel de administración (Junta → Patr
 | Elemento | Especificación |
 |----------|----------------|
 | Banner superior foros | 1200 × 276 px |
+| Banner Noticias | 1200 × 276 px |
 | Banner listado / calendario / buscar / Hermandades | 1200 × 300 px (4:1) |
 | Logo evento patrocinado | 520 × 300 px, fondo transparente recomendado |
 | Formatos | PNG, WebP, JPG (máx. 4 MB) |
@@ -281,6 +299,10 @@ FOROS (lista)
   Pilares de foros
   → [forums_top] BANNER (fijo sobre bottom nav)
 
+NOTICIAS
+  Listado de noticias
+  → [noticias] BANNER (fijo sobre bottom nav)
+
 FORO (dentro)
   Temas fijados
   → [forums_event] TARJETA EVENTO (opcional, por foro)
@@ -325,6 +347,7 @@ BUSCAR (inicial)
 | Placement | Valor en base de datos |
 |-----------|------------------------|
 | Banner superior foros | `forums_top` |
+| Banner Noticias | `noticias` |
 | Evento patrocinado | `forums_event` |
 | Banner listado foro | `forums_middle` |
 | Banner Hermandades | `hermandades` |

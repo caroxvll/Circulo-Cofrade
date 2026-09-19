@@ -703,6 +703,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
               userId: user.id,
               replyId: reply.id,
               reaction: reaction,
+              topicId: widget.topicId,
             );
         // Optimistic + realtime; invalidar vaciaba contadores y parecía fallar.
       } on ReplyLikesUnavailableException {

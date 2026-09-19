@@ -62,6 +62,28 @@ export interface PushUsersPage {
   rows: PushUserRow[];
 }
 
+export interface DispatchJobRow {
+  id: string;
+  kind: string;
+  sourceId: string;
+  title: string;
+  status: string;
+  processedCount: number;
+  retryCount: number;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DispatchOverview {
+  byStatus: Record<string, number>;
+  byKindPending: { kind: string; jobs: number; processed: number }[];
+  pendingCount: number;
+  failedCount: number;
+  doneLast24h: number;
+  processedLast24h: number;
+}
+
 /** Prefs que mostramos como chips en la tabla (orden visual). */
 export const TABLE_PREF_KEYS = [
   'notify_mentions',
@@ -153,6 +175,109 @@ export class NotificationsAdminService {
       filter: (raw['filter'] as PushUserFilter) ?? 'all',
       rows,
     };
+  }
+
+  async fetchDispatchOverview(): Promise<DispatchOverview> {
+    const { data, error } = await getSupabase().rpc(
+      'staff_notification_dispatch_overview',
+    );
+    if (error) throw error;
+    const raw = (data ?? {}) as Record<string, unknown>;
+    const byKind = ((raw['byKindPending'] as Record<string, unknown>[]) ?? []).map(
+      (row) => ({
+        kind: String(row['kind'] ?? ''),
+        jobs: Number(row['jobs'] ?? 0),
+        processed: Number(row['processed'] ?? 0),
+      }),
+    );
+    return {
+      byStatus: (raw['byStatus'] as Record<string, number>) ?? {},
+      byKindPending: byKind,
+      pendingCount: Number(raw['pendingCount'] ?? 0),
+      failedCount: Number(raw['failedCount'] ?? 0),
+      doneLast24h: Number(raw['doneLast24h'] ?? 0),
+      processedLast24h: Number(raw['processedLast24h'] ?? 0),
+    };
+  }
+
+  async listDispatchJobs(limit = 40): Promise<DispatchJobRow[]> {
+    const { data, error } = await getSupabase()
+      .from('notification_dispatch_jobs')
+      .select(
+        'id, kind, source_id, title, status, processed_count, retry_count, error_message, created_at, updated_at',
+      )
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []).map((row) => ({
+      id: String(row['id'] ?? ''),
+      kind: String(row['kind'] ?? ''),
+      sourceId: String(row['source_id'] ?? ''),
+      title: String(row['title'] ?? ''),
+      status: String(row['status'] ?? ''),
+      processedCount: Number(row['processed_count'] ?? 0),
+      retryCount: Number(row['retry_count'] ?? 0),
+      errorMessage: (row['error_message'] as string | null) ?? null,
+      createdAt: String(row['created_at'] ?? ''),
+      updatedAt: String(row['updated_at'] ?? ''),
+    }));
+  }
+
+  async processDispatchNow(): Promise<{ processedTotal: number }> {
+    const { data, error } = await getSupabase().rpc(
+      'staff_process_notification_dispatch',
+      { p_limit: 500, p_max_jobs: 8 },
+    );
+    if (error) throw error;
+    const raw = (data ?? {}) as Record<string, unknown>;
+    return { processedTotal: Number(raw['processedTotal'] ?? 0) };
+  }
+
+  async retryFailedDispatchJobs(): Promise<number> {
+    const { data, error } = await getSupabase().rpc(
+      'staff_retry_failed_notification_jobs',
+    );
+    if (error) throw error;
+    return Number(data ?? 0);
+  }
+
+  async reloadApiSchema(): Promise<void> {
+    const { error } = await getSupabase().rpc('staff_reload_postgrest_schema');
+    if (error) throw error;
+  }
+
+  kindLabel(kind: string): string {
+    switch (kind) {
+      case 'news_published':
+        return 'Noticias';
+      case 'topic_followers':
+        return 'Hilo seguido';
+      case 'hashtag_followers':
+        return 'Hashtag';
+      case 'profile_followers':
+        return 'Perfil seguido';
+      case 'calendar_broadcast':
+        return 'Calendario';
+      case 'quiz_broadcast':
+        return 'Quiz';
+      default:
+        return kind || '—';
+    }
+  }
+
+  statusLabel(status: string): string {
+    switch (status) {
+      case 'pending':
+        return 'En cola';
+      case 'processing':
+        return 'Enviando';
+      case 'done':
+        return 'Hecho';
+      case 'failed':
+        return 'Fallido';
+      default:
+        return status;
+    }
   }
 
   typeLabel(type: string): string {

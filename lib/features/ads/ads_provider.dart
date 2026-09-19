@@ -36,7 +36,7 @@ final adsRepositoryProvider = Provider<AdsRepository>((ref) {
 });
 
 final adForPlacementProvider =
-    FutureProvider.family<SponsoredAd?, AdPlacementQuery>(
+    FutureProvider.autoDispose.family<SponsoredAd?, AdPlacementQuery>(
   (ref, query) {
     return ref.watch(adsRepositoryProvider).fetchAd(
           query.placement,
