@@ -5,38 +5,40 @@ import '../../ads/ads_provider.dart';
 import '../../ads/models/sponsored_ad.dart';
 import '../../ads/widgets/sponsored_ad_card.dart';
 
-/// Banner de foros anclado en el shell, justo encima de la bottom nav.
+/// Banner de calendario anclado en el shell, justo encima de la bottom nav.
 ///
-/// Al volver a Foros se pide un sorteo nuevo. El anuncio anterior se mantiene
-/// visible hasta que llega el siguiente (sin vaciar la barra ni saltar layout).
-class ForumsShellAdBar extends ConsumerStatefulWidget {
-  const ForumsShellAdBar({super.key});
+/// Al volver a Calendario se pide un sorteo nuevo. El anuncio anterior se
+/// mantiene visible hasta que llega el siguiente (sin saltar el layout).
+class CalendarShellAdBar extends ConsumerStatefulWidget {
+  const CalendarShellAdBar({super.key});
 
   static double heightForWidth(double width) {
     return 1.5 + width / 4.35;
   }
 
-  static const query = AdPlacementQuery(placement: AdPlacement.forumsTop);
+  static const query = AdPlacementQuery(placement: AdPlacement.calendar);
 
   @override
-  ConsumerState<ForumsShellAdBar> createState() => _ForumsShellAdBarState();
+  ConsumerState<CalendarShellAdBar> createState() => _CalendarShellAdBarState();
 }
 
-class _ForumsShellAdBarState extends ConsumerState<ForumsShellAdBar> {
+class _CalendarShellAdBarState extends ConsumerState<CalendarShellAdBar> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.invalidate(adForPlacementProvider(ForumsShellAdBar.query));
+      ref.invalidate(adForPlacementProvider(CalendarShellAdBar.query));
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final adAsync = ref.watch(adForPlacementProvider(ForumsShellAdBar.query));
+    final adAsync =
+        ref.watch(adForPlacementProvider(CalendarShellAdBar.query));
     final placeholder = SizedBox(
-      height: ForumsShellAdBar.heightForWidth(MediaQuery.sizeOf(context).width),
+      height:
+          CalendarShellAdBar.heightForWidth(MediaQuery.sizeOf(context).width),
     );
 
     return adAsync.when(

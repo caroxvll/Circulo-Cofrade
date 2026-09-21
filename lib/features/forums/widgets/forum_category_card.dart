@@ -25,10 +25,10 @@ class ForumCategoryCard extends StatelessWidget {
   final double height;
   final bool featured;
 
-  static const cardHeight = 118.0;
-  static const featuredHeight = 128.0;
-  static const cardGap = 8.0;
-  static const cardRadius = 18.0;
+  static const cardHeight = 128.0;
+  static const featuredHeight = 136.0;
+  static const cardGap = 5.0;
+  static const cardRadius = 16.0;
 
   /// Ancho de la miniatura: prioriza fracción del ancho de tarjeta (foto grande).
   static double coverWidthFor({
@@ -143,10 +143,7 @@ class _ForumCardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final metrics = _CardContentMetrics.forHeight(height, featured: featured);
-    final showActivityLink = height >= 112;
-    final descriptionLines = height >= 120
-        ? 2
-        : 1;
+    final descriptionLines = height >= 118 ? 2 : 1;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -187,25 +184,20 @@ class _ForumCardContent extends StatelessWidget {
             ],
           ),
           SizedBox(height: metrics.gap),
-          Expanded(
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: Text(
-                forum.description,
-                style: AppTypography.bodyMedium(
-                  color: locked
-                      ? AppColors.textMuted
-                      : AppColors.textSecondary,
-                ).copyWith(
-                  fontSize: metrics.bodySize,
-                  height: metrics.bodyLineHeight,
-                ),
-                maxLines: descriptionLines,
-                overflow: TextOverflow.ellipsis,
-              ),
+          Text(
+            forum.description,
+            style: AppTypography.bodyMedium(
+              color: locked
+                  ? AppColors.textMuted
+                  : AppColors.textSecondary,
+            ).copyWith(
+              fontSize: metrics.bodySize,
+              height: metrics.bodyLineHeight,
             ),
+            maxLines: descriptionLines,
+            overflow: TextOverflow.ellipsis,
           ),
-          SizedBox(height: metrics.gap),
+          const Spacer(),
           if (locked && forum.lockedLabel != null)
             Text(
               forum.lockedLabel!,
@@ -226,15 +218,13 @@ class _ForumCardContent extends StatelessWidget {
               iconSize: metrics.iconSize,
               topicsLabel: featured ? 'noticias' : 'temas',
             ),
-            if (showActivityLink) ...[
-              SizedBox(height: metrics.metaGap),
-              ForumLastActivityLink(
-                forum: forum,
-                compact: true,
-                accentColor: AppColors.burgundy,
-                fontSize: metrics.metaSize,
-              ),
-            ],
+            SizedBox(height: metrics.metaGap),
+            ForumLastActivityLink(
+              forum: forum,
+              compact: true,
+              accentColor: AppColors.burgundy,
+              fontSize: metrics.metaSize,
+            ),
           ],
         ],
       ),
@@ -280,38 +270,38 @@ class _CardContentMetrics {
     double height, {
     bool featured = false,
   }) {
-    if (featured || height >= 118) {
+    if (featured || height >= 120) {
       return const _CardContentMetrics(
-        verticalPad: 10,
-        horizontalPad: 12,
-        titleSize: 15,
+        verticalPad: 9,
+        horizontalPad: 10,
+        titleSize: 14.5,
         bodySize: 11.5,
-        bodyLineHeight: 1.28,
+        bodyLineHeight: 1.22,
         metaSize: 9.5,
-        iconSize: 11.5,
-        gap: 5,
+        iconSize: 11,
+        gap: 4,
         metaGap: 3,
       );
     }
-    if (height >= 102) {
+    if (height >= 108) {
       return const _CardContentMetrics(
         verticalPad: 8,
         horizontalPad: 10,
         titleSize: 14,
-        bodySize: 10.5,
-        bodyLineHeight: 1.25,
+        bodySize: 11,
+        bodyLineHeight: 1.2,
         metaSize: 9,
-        iconSize: 11,
-        gap: 4,
+        iconSize: 10.5,
+        gap: 3,
         metaGap: 2,
       );
     }
     return const _CardContentMetrics(
       verticalPad: 7,
-      horizontalPad: 10,
+      horizontalPad: 9,
       titleSize: 13.5,
-      bodySize: 10,
-      bodyLineHeight: 1.22,
+      bodySize: 10.5,
+      bodyLineHeight: 1.18,
       metaSize: 8.6,
       iconSize: 10.5,
       gap: 3,

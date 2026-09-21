@@ -37,6 +37,7 @@ class EventCard extends ConsumerWidget {
     final organizer = resolvedOrganizerLabel(logos, event);
     final shieldUrl = resolvedOrganizerShieldUrl(logos, event);
     final timing = calendarEventTiming(event);
+    final time = event.time == null ? null : _formatTimeCompact(event.time!);
 
     final card = Container(
       padding: const EdgeInsets.all(CalendarDesign.eventCardPadding),
@@ -57,14 +58,10 @@ class EventCard extends ConsumerWidget {
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _Thumbnail(event: event),
-          const SizedBox(width: 8),
-          if (event.time != null) ...[
-            _TimeColumn(time: event.time!),
-            const SizedBox(width: 8),
-          ],
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,6 +70,19 @@ class EventCard extends ConsumerWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    if (time != null) ...[
+                      Text(
+                        time,
+                        style: AppTypography.displaySmall().copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                          color: AppColors.burgundy,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     Expanded(
                       child: Text(
                         event.title,
@@ -81,24 +91,37 @@ class EventCard extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (timing != null) ...[
-                      const SizedBox(width: 6),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 112),
-                        child: _TimingBadge(timing: timing),
+                    if (showBookmark)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: IconButton(
+                          onPressed: onBookmarkToggle,
+                          icon: Icon(
+                            isBookmarked
+                                ? Icons.bookmark
+                                : Icons.bookmark_border,
+                            color: AppColors.burgundy,
+                            size: CalendarDesign.eventBookmarkSize,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
+                        ),
                       ),
-                    ],
                   ],
                 ),
                 if (organizer != null) ...[
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
                       _OrganizerShield(
                         shieldUrl: shieldUrl,
                         type: event.type,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 5),
                       Expanded(
                         child: Text(
                           organizer,
@@ -107,7 +130,7 @@ class EventCard extends ConsumerWidget {
                           ).copyWith(
                             fontSize: CalendarDesign.eventMetaSize,
                             fontWeight: FontWeight.w500,
-                            height: 1.15,
+                            height: 1.1,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -116,7 +139,7 @@ class EventCard extends ConsumerWidget {
                     ],
                   ),
                 ],
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Row(
                   children: [
                     Expanded(
@@ -125,23 +148,10 @@ class EventCard extends ConsumerWidget {
                         text: location,
                       ),
                     ),
-                    if (showBookmark)
-                      IconButton(
-                        onPressed: onBookmarkToggle,
-                        icon: Icon(
-                          isBookmarked
-                              ? Icons.bookmark
-                              : Icons.bookmark_border,
-                          color: AppColors.burgundy,
-                          size: CalendarDesign.eventBookmarkSize,
-                        ),
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 22,
-                          minHeight: 22,
-                        ),
-                      ),
+                    if (timing != null) ...[
+                      const SizedBox(width: 6),
+                      _TimingBadge(timing: timing),
+                    ],
                   ],
                 ),
               ],
@@ -164,28 +174,6 @@ class EventCard extends ConsumerWidget {
   }
 }
 
-class _TimeColumn extends StatelessWidget {
-  const _TimeColumn({required this.time});
-
-  final String time;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 40,
-      child: Text(
-        _formatTimeCompact(time),
-        style: AppTypography.displaySmall().copyWith(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          height: 1.1,
-          color: AppColors.textPrimary,
-        ),
-      ),
-    );
-  }
-}
-
 String _formatTimeCompact(String time) {
   final trimmed = time.trim();
   if (trimmed.isEmpty) return trimmed;
@@ -200,11 +188,10 @@ class _TimingBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+        color: timing.color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -218,16 +205,12 @@ class _TimingBadge extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              timing.label,
-              style: AppTypography.labelSmall(color: timing.color).copyWith(
-                fontSize: 8.5,
-                fontWeight: FontWeight.w600,
-                height: 1,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          Text(
+            timing.label,
+            style: AppTypography.labelSmall(color: timing.color).copyWith(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              height: 1,
             ),
           ),
         ],
@@ -304,7 +287,7 @@ class _MetaLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 10, color: AppColors.textMuted),
+        Icon(icon, size: 11, color: AppColors.textMuted),
         const SizedBox(width: 3),
         Expanded(
           child: Text(
@@ -313,7 +296,7 @@ class _MetaLine extends StatelessWidget {
               color: AppColors.textMuted,
             ).copyWith(
               fontSize: CalendarDesign.eventMetaSize,
-              height: 1.15,
+              height: 1.1,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

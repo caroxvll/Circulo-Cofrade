@@ -39,79 +39,71 @@ class _ArtworkBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final digits = CountdownBannerArtboard.digitsForDays(
+    final daysLabel = CountdownBannerArtboard.labelForDays(
       countdown.countdownDays!,
     );
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: AspectRatio(
-        aspectRatio: CountdownBannerArtboard.designWidth /
-            CountdownBannerArtboard.designHeight,
-        child: Image.asset(
-          AppAssets.countdownBanner,
-          fit: BoxFit.fill,
-          gaplessPlayback: true,
-          filterQuality: FilterQuality.medium,
-          cacheWidth: ImageDecodeCache.px(
-            context,
-            MediaQuery.sizeOf(context).width,
-          ),
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-            if (frame == null) {
-              return ColoredBox(
-                color: AppColors.surfaceAlt,
-                child: const Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              );
-            }
-
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                final height = constraints.maxHeight;
-
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    child,
-                    for (var i = 0;
-                        i < CountdownBannerArtboard.digitSlots.length;
-                        i++)
-                      _DigitSlot(
-                        slot: CountdownBannerArtboard.digitSlots[i],
-                        digit: digits[i],
-                        bannerWidth: width,
-                        bannerHeight: height,
-                      ),
-                  ],
-                );
-              },
-            );
-          },
-          errorBuilder: (_, __, ___) =>
-              _FallbackCardBanner(countdown: countdown, compact: true),
+    // Sin radio ni sombra: el arte se integra con el fondo del calendario.
+    return AspectRatio(
+      aspectRatio: CountdownBannerArtboard.designWidth /
+          CountdownBannerArtboard.designHeight,
+      child: Image.asset(
+        AppAssets.countdownBanner,
+        fit: BoxFit.fill,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.medium,
+        cacheWidth: ImageDecodeCache.px(
+          context,
+          MediaQuery.sizeOf(context).width,
         ),
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (frame == null) {
+            return ColoredBox(
+              color: AppColors.surfaceAlt,
+              child: const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  child,
+                  _DaysSlot(
+                    slot: CountdownBannerArtboard.daysSlot,
+                    label: daysLabel,
+                    bannerWidth: constraints.maxWidth,
+                    bannerHeight: constraints.maxHeight,
+                  ),
+                ],
+              );
+            },
+          );
+        },
+        errorBuilder: (_, __, ___) =>
+            _FallbackCardBanner(countdown: countdown, compact: true),
       ),
     );
   }
 }
 
-class _DigitSlot extends StatelessWidget {
-  const _DigitSlot({
+class _DaysSlot extends StatelessWidget {
+  const _DaysSlot({
     required this.slot,
-    required this.digit,
+    required this.label,
     required this.bannerWidth,
     required this.bannerHeight,
   });
 
   final Rect slot;
-  final String digit;
+  final String label;
   final double bannerWidth;
   final double bannerHeight;
 
@@ -125,7 +117,7 @@ class _DigitSlot extends StatelessWidget {
         bannerWidth * (slot.width / CountdownBannerArtboard.designWidth);
     final height =
         bannerHeight * (slot.height / CountdownBannerArtboard.designHeight);
-    final fontSize = height * 0.68;
+    final fontSize = height * 1.05;
 
     return Positioned(
       left: cx - width / 2,
@@ -134,7 +126,8 @@ class _DigitSlot extends StatelessWidget {
       height: height,
       child: Center(
         child: Text(
-          digit,
+          label,
+          textAlign: TextAlign.center,
           textHeightBehavior: const TextHeightBehavior(
             applyHeightToFirstAscent: false,
             applyHeightToLastDescent: false,
@@ -142,7 +135,7 @@ class _DigitSlot extends StatelessWidget {
           style: GoogleFonts.cormorantGaramond(
             fontSize: fontSize,
             fontWeight: FontWeight.w700,
-            color: AppColors.burgundyDark,
+            color: AppColors.burgundy,
             height: 1,
           ),
         ),

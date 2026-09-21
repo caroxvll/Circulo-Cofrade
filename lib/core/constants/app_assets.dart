@@ -10,7 +10,7 @@ abstract final class AppAssets {
   static const googleLogo = 'assets/images/google.svg';
   static const logoIcon = 'assets/images/logo_icon.png';
   static const forumsBeigeBackground = 'assets/images/fondobeige.jpeg';
-  static const countdownBanner = 'assets/images/banner_cuentaatras.jpg';
+  static const countdownBanner = 'assets/images/bannerDias.png';
 
   /// Hero del listado de foros.
   static const heroProcesion = 'assets/images/hero_procesion.png';

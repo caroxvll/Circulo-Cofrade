@@ -303,7 +303,7 @@ final forumTopicsRealtimeProvider = Provider.family<void, String>((
           column: 'forum_id',
           value: forumId,
         ),
-        callback: (payload) => {
+        callback: (payload) {
           // Altas/bajas y cambios de status (p. ej. pending→published) al instante.
           final immediate = payload.eventType == PostgresChangeEvent.delete ||
               payload.eventType == PostgresChangeEvent.insert ||
