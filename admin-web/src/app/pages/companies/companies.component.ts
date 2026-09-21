@@ -26,6 +26,7 @@ export class CompaniesPageComponent implements OnInit {
   readonly saving = signal(false);
   readonly savingCupo = signal(false);
   readonly editing = signal<CompanyProfile | null>(null);
+  readonly creating = signal(false);
 
   search = '';
   formName = '';
@@ -52,6 +53,8 @@ export class CompaniesPageComponent implements OnInit {
   });
 
   readonly nextWait = computed(() => this.waitlist()[0] ?? null);
+
+  readonly dialogOpen = computed(() => this.creating() || !!this.editing());
 
   ngOnInit(): void {
     void this.reload();
@@ -124,7 +127,24 @@ export class CompaniesPageComponent implements OnInit {
     }
   }
 
+  openCreate(): void {
+    if (this.cupo().full) {
+      this.error.set(
+        `Cupo lleno (${this.cupo().used}/${this.cupo().max}). Libera un hueco o añádela a la lista de espera.`,
+      );
+      return;
+    }
+    this.editing.set(null);
+    this.creating.set(true);
+    this.formName = '';
+    this.formUrl = '';
+    this.formBannerUrl = '';
+    this.formLogoUrl = '';
+    this.error.set(null);
+  }
+
   openEdit(company: CompanyProfile): void {
+    this.creating.set(false);
     this.editing.set(company);
     this.formName = company.name;
     this.formUrl = company.targetUrl;
@@ -132,7 +152,8 @@ export class CompaniesPageComponent implements OnInit {
     this.formLogoUrl = company.sponsorLogoUrl ?? '';
   }
 
-  closeEdit(): void {
+  closeDialog(): void {
+    this.creating.set(false);
     this.editing.set(null);
   }
 
@@ -158,15 +179,32 @@ export class CompaniesPageComponent implements OnInit {
   }
 
   async save(): Promise<void> {
-    const current = this.editing();
-    if (!current) return;
     if (this.formName.trim().length < 2) {
       this.error.set('El nombre debe tener al menos 2 caracteres.');
       return;
     }
+
     this.saving.set(true);
     this.error.set(null);
     try {
+      if (this.creating()) {
+        const createdName = this.formName.trim();
+        await this.adsApi.createCompany({
+          name: createdName,
+          targetUrl: this.formUrl,
+          imageUrl: this.formBannerUrl.trim() || null,
+          sponsorLogoUrl: this.formLogoUrl.trim() || null,
+        });
+        this.closeDialog();
+        await this.reload();
+        alert(
+          `Empresa «${createdName}» creada. Ya puedes colocarla en zonas desde Patrocinios.`,
+        );
+        return;
+      }
+
+      const current = this.editing();
+      if (!current) return;
       const n = await this.adsApi.updateCompany({
         currentName: current.name,
         name: this.formName,
@@ -174,7 +212,7 @@ export class CompaniesPageComponent implements OnInit {
         imageUrl: this.formBannerUrl.trim() || null,
         sponsorLogoUrl: this.formLogoUrl.trim() || null,
       });
-      this.closeEdit();
+      this.closeDialog();
       await this.reload();
       alert(`Actualizado en ${n} pieza${n === 1 ? '' : 's'}.`);
     } catch (err) {

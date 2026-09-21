@@ -4,17 +4,177 @@
       <p class="eyebrow">Plataforma · solo admin</p>
       <h1>Notificaciones</h1>
       <p class="lead">
-        Cobertura de avisos push por zonas, qué tiene cada persona activado y
-        volumen de avisos. No es un envío masivo.
+        Cobertura de push y cola de envío masivo (Cron). Los avisos grandes se
+        reparte solos; aquí los controlas en vivo.
       </p>
     </div>
     <div class="queue-toolbar">
-      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
-        Actualizar
-      </button>
+      @if (tab() === 'coverage') {
+        <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+          Actualizar
+        </button>
+      } @else {
+        <button
+          type="button"
+          class="btn btn-soft"
+          (click)="toggleLiveQueue()"
+          [class.active-live]="liveQueue()"
+        >
+          {{ liveQueue() ? 'En vivo · 5s' : 'En vivo off' }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-soft"
+          (click)="reloadQueue()"
+          [disabled]="queueLoading() || queueBusy()"
+        >
+          Actualizar
+        </button>
+      }
     </div>
   </header>
 
+  <div class="filters">
+    <button
+      type="button"
+      class="chip"
+      [class.active]="tab() === 'coverage'"
+      (click)="setTab('coverage')"
+    >
+      Cobertura
+    </button>
+    <button
+      type="button"
+      class="chip"
+      [class.active]="tab() === 'queue'"
+      (click)="setTab('queue')"
+    >
+      Cola de envío
+    </button>
+  </div>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+  @if (queueInfo()) {
+    <div class="info-box ok">{{ queueInfo() }}</div>
+  }
+
+  @if (tab() === 'queue') {
+    <section class="dispatch-panel">
+      <p class="lead compact">
+        El Cron vacía la cola cada minuto. Aquí ves pendientes, fallos y puedes
+        empujar un lote ya (sin esperar).
+      </p>
+
+      @if (queueLoading() && !dispatchOverview()) {
+        <div class="state-box">Cargando cola…</div>
+      } @else {
+        @if (dispatchOverview(); as d) {
+        <div class="dispatch-stats">
+          <article class="stat-card">
+            <strong>{{ formatInt(d.pendingCount) }}</strong>
+            <span>En cola / enviando</span>
+          </article>
+          <article class="stat-card warn" [class.hot]="d.failedCount > 0">
+            <strong>{{ formatInt(d.failedCount) }}</strong>
+            <span>Fallidos</span>
+          </article>
+          <article class="stat-card ok">
+            <strong>{{ formatInt(d.doneLast24h) }}</strong>
+            <span>Trabajos hechos (24h)</span>
+          </article>
+          <article class="stat-card">
+            <strong>{{ formatInt(d.processedLast24h) }}</strong>
+            <span>Avisos generados (24h)</span>
+          </article>
+        </div>
+
+        <div class="queue-actions dispatch-actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="queueBusy()"
+            (click)="processNow()"
+          >
+            {{ queueBusy() ? 'Procesando…' : 'Procesar ahora' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-soft"
+            [disabled]="queueBusy() || d.failedCount === 0"
+            (click)="retryFailed()"
+          >
+            Reintentar fallidos
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            [disabled]="queueBusy()"
+            (click)="reloadApiSchema()"
+            title="Equivalente a notify pgrst, reload schema"
+          >
+            Recargar API
+          </button>
+        </div>
+
+        @if (d.byKindPending.length) {
+          <h2 class="section-title">Pendiente por tipo</h2>
+          <ul class="kind-list">
+            @for (row of d.byKindPending; track row.kind) {
+              <li>
+                <strong>{{ kindLabel(row.kind) }}</strong>
+                <span>{{ row.jobs }} trabajo(s) · {{ formatInt(row.processed) }} avisos ya hechos</span>
+              </li>
+            }
+          </ul>
+        }
+
+        <h2 class="section-title">Últimos trabajos</h2>
+        @if (dispatchJobs().length === 0) {
+          <div class="empty-box soft">Aún no hay trabajos en la cola.</div>
+        } @else {
+          <div class="dispatch-table-wrap">
+            <table class="dispatch-table">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Título</th>
+                  <th>Estado</th>
+                  <th>Hechos</th>
+                  <th>Actualizado</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (job of dispatchJobs(); track job.id) {
+                  <tr [class.failed]="job.status === 'failed'">
+                    <td>{{ kindLabel(job.kind) }}</td>
+                    <td>
+                      <strong>{{ job.title }}</strong>
+                      @if (job.errorMessage) {
+                        <em class="err">{{ job.errorMessage }}</em>
+                      }
+                    </td>
+                    <td>
+                      <span class="status-pill" [attr.data-status]="job.status">
+                        {{ statusLabel(job.status) }}
+                      </span>
+                      @if (job.retryCount > 0) {
+                        <small>· reintento {{ job.retryCount }}</small>
+                      }
+                    </td>
+                    <td>{{ formatInt(job.processedCount) }}</td>
+                    <td>{{ job.updatedAt | date: 'dd/MM HH:mm:ss' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        }
+      }
+    </section>
+  } @else {
   <div class="filters">
     <button type="button" class="chip" [class.active]="days() === 7" (click)="setDays(7)">
       7 días
@@ -389,4 +549,5 @@
       </article>
     }
   </section>
+  }
 </section>

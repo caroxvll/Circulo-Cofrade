@@ -4,14 +4,22 @@
       <p class="eyebrow">Plataforma · solo admin</p>
       <h1>Empresas</h1>
       <p class="lead">
-        Marcas activas con cupo configurable. Banner (zonas) + logo (eventos).
-        Al quitar una empresa se borra de patrocinios y de finanzas.
+        Crea aquí las marcas (banner + logo) y luego colócalas en zonas desde
+        Patrocinios. Al quitar una empresa se borra de patrocinios y de finanzas.
       </p>
     </div>
     <div class="queue-toolbar">
       <span class="cupo-pill" [class.full]="cupo().full">
         Cupo {{ cupo().used }}/{{ cupo().max }}
       </span>
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="openCreate()"
+        [disabled]="loading() || saving()"
+      >
+        Nueva empresa
+      </button>
       <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
         Actualizar
       </button>
@@ -58,8 +66,8 @@
   @if (!cupo().full && nextWait(); as next) {
     <div class="info-box ok">
       Hay {{ cupo().free }} hueco{{ cupo().free === 1 ? '' : 's' }} libre{{ cupo().free === 1 ? '' : 's' }}.
-      Siguiente en espera: <strong>{{ next.companyName }}</strong> — créale un
-      patrocinio cuando toque.
+      Siguiente en espera: <strong>{{ next.companyName }}</strong> — créala con
+      Nueva empresa cuando toque.
     </div>
   }
 
@@ -75,7 +83,7 @@
     <div class="state-box">Cargando empresas…</div>
   } @else if (visible().length === 0) {
     <div class="empty-box">
-      Aún no hay marcas activas. Crea un patrocinio y aparecerá aquí.
+      Aún no hay marcas. Pulsa <strong>Nueva empresa</strong> para crear la primera.
     </div>
   } @else {
     <div class="company-grid">
@@ -101,8 +109,12 @@
           </div>
           <h2>{{ company.name }}</h2>
           <p class="queue-meta">
-            {{ company.adIds.length }} pieza{{ company.adIds.length === 1 ? '' : 's' }}
-            · {{ company.activeCount }} activa{{ company.activeCount === 1 ? '' : 's' }}
+            @if (company.placements.length === 0) {
+              Sin zonas aún · lista para colocar en Patrocinios
+            } @else {
+              {{ company.placements.length }} zona{{ company.placements.length === 1 ? '' : 's' }}
+              · {{ company.activeCount }} activa{{ company.activeCount === 1 ? '' : 's' }}
+            }
           </p>
           <p class="zones">
             @for (placement of company.placements; track placement) {
@@ -186,17 +198,22 @@
   </section>
 </section>
 
-@if (editing(); as company) {
-  <div class="dialog-backdrop" (click)="closeEdit()">
+@if (dialogOpen()) {
+  <div class="dialog-backdrop" (click)="closeDialog()">
     <div class="dialog form-dialog" (click)="$event.stopPropagation()">
-      <h3>Editar empresa</h3>
+      <h3>{{ creating() ? 'Nueva empresa' : 'Editar empresa' }}</h3>
       <p class="hint">
-        Los cambios de banner y logo se aplican a
-        <strong>todas</strong> las piezas de «{{ company.name }}».
+        @if (creating()) {
+          Define la marca y sus creativos. Después la colocarás en zonas desde
+          Patrocinios (sin crear piezas a mano).
+        } @else {
+          Los cambios de banner y logo se aplican a
+          <strong>todas</strong> las piezas de «{{ editing()?.name }}».
+        }
       </p>
       <label>
         Nombre
-        <input [(ngModel)]="formName" />
+        <input [(ngModel)]="formName" placeholder="Nombre de la marca" />
       </label>
       <label>
         Enlace destino
@@ -244,9 +261,15 @@
       </div>
 
       <div class="queue-actions">
-        <button type="button" class="btn btn-ghost" (click)="closeEdit()">Cancelar</button>
+        <button type="button" class="btn btn-ghost" (click)="closeDialog()">Cancelar</button>
         <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="save()">
-          {{ saving() ? 'Guardando…' : 'Guardar en todas las piezas' }}
+          @if (saving()) {
+            Guardando…
+          } @else if (creating()) {
+            Crear empresa
+          } @else {
+            Guardar en todas las piezas
+          }
         </button>
       </div>
     </div>

@@ -20,6 +20,7 @@ const packAdPlacements = <AdPlacement>[
   AdPlacement.hermandades,
   AdPlacement.calendar,
   AdPlacement.search,
+  AdPlacement.noticias,
 ];
 
 String placementCommercialName(AdPlacement placement) {
@@ -31,6 +32,7 @@ String placementCommercialName(AdPlacement placement) {
     AdPlacement.hermandades => 'Hermandades · banner',
     AdPlacement.calendar => 'Calendario · banner',
     AdPlacement.search => 'Buscar · banner',
+    AdPlacement.noticias => 'Noticias · banner',
     AdPlacement.profile => 'Perfil',
     AdPlacement.home => 'Inicio',
   };
@@ -50,6 +52,8 @@ String placementWhereHint(AdPlacement placement) {
       'Banner en el canal Hermandades (listado por días).',
     AdPlacement.calendar => 'Banner fijo encima de la bottom nav en Calendario.',
     AdPlacement.search => 'Banner en Buscar (pantalla inicial, sin resultados).',
+    AdPlacement.noticias =>
+      'Banner anclado en Noticias (encima de la barra inferior).',
     AdPlacement.profile => 'Reservado · perfil.',
     AdPlacement.home => 'Reservado · inicio.',
   };
@@ -85,6 +89,9 @@ String adTargetDetail(
       if (ad.placement == AdPlacement.forumsEvent) {
         final eventTitle = _eventTitle(ad.calendarEventId, events);
         if (eventTitle != null) return '$forum · Evento: $eventTitle';
+        if (ad.calendarEventId == null || ad.calendarEventId!.trim().isEmpty) {
+          return '$forum · Todos los eventos (hoy/futuros)';
+        }
         return '$forum · Evento patrocinado';
       }
       return 'Foro: $forum';
@@ -101,6 +108,8 @@ String adTargetDetail(
       return 'Pantalla: Calendario';
     case AdPlacement.search:
       return 'Pantalla: Buscar (inicio)';
+    case AdPlacement.noticias:
+      return 'Pantalla: Noticias';
     case AdPlacement.home:
       return 'Pantalla: Inicio';
     case AdPlacement.profile:

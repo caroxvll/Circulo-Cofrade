@@ -10,6 +10,7 @@ import '../calendar/widgets/calendar_shell_ad_bar.dart';
 import '../auth/auth_provider.dart';
 import '../forums/forums_provider.dart';
 import '../forums/widgets/forums_shell_ad_bar.dart';
+import '../forums/widgets/noticias_shell_ad_bar.dart';
 import '../notifications/notifications_provider.dart';
 import '../permissions/permissions_provider.dart';
 
@@ -65,6 +66,7 @@ class CofradeoShell extends ConsumerWidget {
         children: [
           if (showCalendarAd) const CalendarShellAdBar(),
           if (showForumsAd) const ForumsShellAdBar(),
+          if (showNoticiasAd) const NoticiasShellAdBar(),
           CofradeoBottomNav(
             currentIndex: navigationShell.currentIndex,
             onTap: (index) => _onTap(context, index, ref),

@@ -130,6 +130,7 @@ En Supabase → **SQL Editor**:
     Editar respuesta (30 min, sin hijos) + ocultar (soft delete) conservando texto para moderación/reportes.
 
 23. **Push FCM** — ejecuta [`supabase/device_tokens.sql`](../supabase/device_tokens.sql) y sigue [`PUSH_FCM.md`](PUSH_FCM.md)  
+24. **Escala (miles de usuarios)** — ejecuta [`supabase/scale_hardening_v1.sql`](../supabase/scale_hardening_v1.sql) y sigue [`SCALE.md`](SCALE.md)  
     Tabla `device_tokens`, Edge Function `send-push`, webhook en `notifications` INSERT, claves Firebase en `env.json`.
 
 24. Ejecuta [`supabase/noticias_forum.sql`](../supabase/noticias_forum.sql)  

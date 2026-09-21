@@ -13,6 +13,7 @@ import {
   AD_PRIORITY_TIERS,
   AdPlacement,
   AdStatisticsRow,
+  CompanyProfile,
   DEFAULT_MAX_IMPRESSIONS,
   FEATURED_TOPIC_IDS,
   PACK_AD_PLACEMENTS,
@@ -20,15 +21,21 @@ import {
   SponsoredAd,
   adDisplayName,
   adForumLabel,
+  adPreviewKind,
+  adPreviewUrl,
   adPriorityLabel,
   adPrioritySummary,
   adSharePercent,
   adTargetDetail,
+  adUsesEventLogo,
   competingAdsForPlacement,
   featuredTopicLabel,
   placementCommercialName,
+  placementShortName,
   placementWhereHint,
 } from '../../core/ads/ads.models';
+import { EventsService } from '../../core/events/events.service';
+import { CalendarEventRow } from '../../core/events/events.models';
 
 type AdsTab = 'map' | 'report' | 'pack';
 type PeriodKind = 'current' | 'previous' | 'custom' | 'all';
@@ -57,6 +64,18 @@ interface ZoneReportSummary {
   ctr: number;
 }
 
+interface ZoneBoard {
+  placement: AdPlacement;
+  label: string;
+  shortLabel: string;
+  hint: string;
+  ads: SponsoredAd[];
+  activeCount: number;
+  companyNames: string[];
+  missingLogoCount: number;
+  isEventZone: boolean;
+}
+
 @Component({
   selector: 'app-ads-page',
   standalone: true,
@@ -66,19 +85,26 @@ interface ZoneReportSummary {
 })
 export class AdsPageComponent implements OnInit {
   private readonly adsApi = inject(AdsService);
+  private readonly eventsApi = inject(EventsService);
 
   readonly tab = signal<AdsTab>('map');
   readonly ads = signal<SponsoredAd[]>([]);
+  readonly companies = signal<CompanyProfile[]>([]);
+  readonly calendarEvents = signal<CalendarEventRow[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly busyId = signal<string | null>(null);
   readonly saving = signal(false);
 
   readonly filter = signal<'all' | 'active' | 'paused'>('all');
+  readonly focusZone = signal<AdPlacement | ''>('');
   search = '';
 
   readonly editing = signal<SponsoredAd | null>(null);
   readonly showForm = signal(false);
+  /** Si true, la zona viene de «Añadir aquí» y no se elige en el formulario. */
+  readonly formZoneLocked = signal(false);
+  readonly quickAddingKey = signal<string | null>(null);
 
   formTitle = '';
   formSponsor = '';
@@ -88,8 +114,13 @@ export class AdsPageComponent implements OnInit {
   formPlacement: AdPlacement = 'forums_top';
   formForumId = '';
   formTopicId = '';
+  formCalendarEventId = '__all__';
+  formCompanyKey = '';
   formPriority = AD_PRIORITY_EQUAL;
   formActive = true;
+
+  /** Valor especial: patrocinio sobre cualquier evento hoy/futuro. */
+  readonly allEventsValue = '__all__';
 
   readonly priorityTiers = AD_PRIORITY_TIERS;
   readonly priorityLabel = adPriorityLabel;
@@ -118,35 +149,112 @@ export class AdsPageComponent implements OnInit {
   readonly topicIds = FEATURED_TOPIC_IDS;
 
   readonly commercialName = placementCommercialName;
+  readonly shortName = placementShortName;
   readonly whereHint = placementWhereHint;
   readonly forumLabel = adForumLabel;
   readonly topicLabel = featuredTopicLabel;
   readonly targetDetail = adTargetDetail;
   readonly displayName = adDisplayName;
+  readonly previewUrl = adPreviewUrl;
+  readonly previewKind = adPreviewKind;
+  readonly usesEventLogo = adUsesEventLogo;
 
-  readonly groupedAds = computed(() => {
+  /** % estimado de salida frente a competidores activos de la misma zona. */
+  shareForAd(ad: SponsoredAd): number | null {
+    const competitors = competingAdsForPlacement(this.ads(), ad).filter(
+      (item) => item.active,
+    );
+    return adSharePercent(ad.priority, competitors, ad.active);
+  }
+
+  shareLabel(ad: SponsoredAd): string {
+    const share = this.shareForAd(ad);
+    if (share == null) return '';
+    const rounded = Math.round(share);
+    return `~${rounded}% salidas`;
+  }
+
+  readonly mapOverview = computed(() => {
+    const ads = this.ads();
+    const active = ads.filter((ad) => ad.active);
+    const companies = new Set(active.map((ad) => adDisplayName(ad).toLowerCase()));
+    const zones = new Set(active.map((ad) => ad.placement));
+    const eventAds = ads.filter((ad) => ad.placement === 'forums_event');
+    const missingEventLogo = eventAds.filter((ad) => !ad.sponsorLogoUrl?.trim()).length;
+    return {
+      activePieces: active.length,
+      companies: companies.size,
+      zones: zones.size,
+      totalZones: ADMIN_AD_PLACEMENTS.length,
+      missingEventLogo,
+    };
+  });
+
+  readonly zoneBoards = computed<ZoneBoard[]>(() => {
     const query = this.search.trim().toLowerCase();
     const filter = this.filter();
-    const map = new Map<AdPlacement, SponsoredAd[]>();
-    for (const ad of this.ads()) {
-      if (filter === 'active' && !ad.active) continue;
-      if (filter === 'paused' && ad.active) continue;
-      if (query) {
-        const hay = `${ad.sponsorName} ${ad.title} ${ad.placement} ${ad.forumId ?? ''} ${ad.topicId ?? ''}`.toLowerCase();
-        if (!hay.includes(query)) continue;
-      }
-      const list = map.get(ad.placement) ?? [];
-      list.push(ad);
-      map.set(ad.placement, list);
-    }
-    const ordered = [
-      ...ADMIN_AD_PLACEMENTS.filter((p) => map.has(p)),
-      ...[...map.keys()].filter((p) => !ADMIN_AD_PLACEMENTS.includes(p)),
-    ];
-    return ordered.map((placement) => ({
-      placement,
-      ads: map.get(placement) ?? [],
-    }));
+    const focus = this.focusZone();
+
+    return ADMIN_AD_PLACEMENTS.filter((placement) => !focus || placement === focus).map(
+      (placement) => {
+        const ads = this.ads().filter((ad) => {
+          if (ad.placement !== placement) return false;
+          if (filter === 'active' && !ad.active) return false;
+          if (filter === 'paused' && ad.active) return false;
+          if (query) {
+            const hay =
+              `${ad.sponsorName} ${ad.title} ${ad.placement} ${ad.forumId ?? ''} ${ad.topicId ?? ''}`.toLowerCase();
+            if (!hay.includes(query)) return false;
+          }
+          return true;
+        });
+        const activeAds = ads.filter((ad) => ad.active);
+        const companyNames = [
+          ...new Set(activeAds.map((ad) => adDisplayName(ad))),
+        ].sort((a, b) => a.localeCompare(b, 'es'));
+        const missingLogoCount =
+          placement === 'forums_event'
+            ? ads.filter((ad) => !ad.sponsorLogoUrl?.trim()).length
+            : 0;
+
+        return {
+          placement,
+          label: placementCommercialName(placement),
+          shortLabel: placementShortName(placement),
+          hint: placementWhereHint(placement),
+          ads,
+          activeCount: activeAds.length,
+          companyNames,
+          missingLogoCount,
+          isEventZone: placement === 'forums_event',
+        };
+      },
+    );
+  });
+
+  /** Empresas para meter en la zona del formulario (un clic). */
+  readonly formCompanyChoices = computed(() => {
+    const placement = this.formPlacement;
+    const inZone = new Set(
+      this.ads()
+        .filter((ad) => ad.placement === placement)
+        .map((ad) => adDisplayName(ad).toLowerCase()),
+    );
+    return this.companies().map((company) => {
+      const needsLogo = adUsesEventLogo(placement);
+      const hasAsset = needsLogo
+        ? !!company.sponsorLogoUrl?.trim()
+        : !!company.imageUrl?.trim();
+      const alreadyInZone = inZone.has(company.key);
+      return {
+        company,
+        alreadyInZone,
+        hasAsset,
+        needsLogo,
+        /** Banner zones: un clic guarda. Eventos: un clic rellena (falta calendario). */
+        canOneClickPlace: hasAsset && !alreadyInZone && !needsLogo,
+      };
+    });
   });
 
   readonly reportRows = computed<ReportTableRow[]>(() => {
@@ -293,9 +401,14 @@ export class AdsPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const ads = await this.adsApi.fetchAdminAds();
+      const [ads, events] = await Promise.all([
+        this.adsApi.fetchAdminAds(),
+        this.eventsApi.listEvents({ status: 'published', range: 'upcoming', limit: 200 }),
+      ]);
       this.ads.set(ads);
+      this.companies.set(this.adsApi.listCompanies(ads));
       this.packSponsors.set(this.adsApi.packSponsorsFromAds(ads));
+      this.calendarEvents.set(events);
       if (this.tab() === 'report') await this.loadStats();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudieron cargar los anuncios');
@@ -309,6 +422,10 @@ export class AdsPageComponent implements OnInit {
     if (tab === 'report') void this.loadStats();
   }
 
+  setFocusZone(placement: AdPlacement | ''): void {
+    this.focusZone.set(this.focusZone() === placement ? '' : placement);
+  }
+
   openCreate(placement?: AdPlacement): void {
     this.editing.set(null);
     this.formTitle = '';
@@ -319,8 +436,12 @@ export class AdsPageComponent implements OnInit {
     this.formPlacement = placement ?? 'forums_top';
     this.formForumId = '';
     this.formTopicId = '';
+    this.formCalendarEventId = this.allEventsValue;
+    this.formCompanyKey = '';
     this.formPriority = AD_PRIORITY_EQUAL;
     this.formActive = true;
+    this.formZoneLocked.set(!!placement);
+    this.quickAddingKey.set(null);
     this.showForm.set(true);
   }
 
@@ -334,14 +455,25 @@ export class AdsPageComponent implements OnInit {
     this.formPlacement = ad.placement;
     this.formForumId = ad.forumId ?? '';
     this.formTopicId = ad.topicId ?? '';
+    this.formCalendarEventId = ad.calendarEventId?.trim()
+      ? ad.calendarEventId
+      : this.allEventsValue;
+    this.formCompanyKey =
+      this.companies().find(
+        (c) => c.key === adDisplayName(ad).toLowerCase(),
+      )?.key ?? '';
     this.formPriority = ad.priority;
     this.formActive = ad.active;
+    this.formZoneLocked.set(true);
+    this.quickAddingKey.set(null);
     this.showForm.set(true);
   }
 
   closeForm(): void {
     this.showForm.set(false);
     this.editing.set(null);
+    this.formZoneLocked.set(false);
+    this.quickAddingKey.set(null);
   }
 
   needsForum(): boolean {
@@ -350,6 +482,137 @@ export class AdsPageComponent implements OnInit {
 
   needsTopic(): boolean {
     return this.formPlacement === 'featured_topic';
+  }
+
+  needsEvent(): boolean {
+    return this.formPlacement === 'forums_event';
+  }
+
+  formIsEventZone(): boolean {
+    return adUsesEventLogo(this.formPlacement);
+  }
+
+  onPlacementChange(placement: AdPlacement): void {
+    if (this.formZoneLocked()) return;
+    this.formPlacement = placement;
+    if (!this.needsForum()) this.formForumId = '';
+    if (!this.needsTopic()) this.formTopicId = '';
+    if (!this.needsEvent()) this.formCalendarEventId = this.allEventsValue;
+    this.applyCompanyAssets(false);
+  }
+
+  onCompanyPick(key: string): void {
+    this.formCompanyKey = key;
+    if (!key) return;
+    const company = this.companies().find((c) => c.key === key);
+    if (!company) return;
+    this.formSponsor = company.name;
+    this.formTitle = company.name;
+    if (company.targetUrl) this.formUrl = company.targetUrl;
+    this.applyCompanyAssets(true);
+  }
+
+  /**
+   * Un clic: mete la empresa en la zona actual si tiene creativo.
+   * En eventos patrocinados solo rellena y pide el evento del calendario.
+   */
+  async quickPlaceCompany(company: CompanyProfile): Promise<void> {
+    const placement = this.formPlacement;
+    const already = this.ads().some(
+      (ad) =>
+        ad.placement === placement &&
+        adDisplayName(ad).toLowerCase() === company.key,
+    );
+    if (already) {
+      this.error.set(`${company.name} ya está en esta zona.`);
+      return;
+    }
+
+    this.onCompanyPick(company.key);
+
+    if (adUsesEventLogo(placement)) {
+      if (!company.sponsorLogoUrl?.trim()) {
+        this.error.set(
+          `${company.name} no tiene logo de eventos. Súbelo en Empresas.`,
+        );
+        return;
+      }
+      // Hace falta elegir evento: dejamos el formulario relleno.
+      this.error.set(null);
+      return;
+    }
+
+    if (!company.imageUrl?.trim()) {
+      this.error.set(
+        `${company.name} no tiene banner. Súbelo en Empresas o en el formulario.`,
+      );
+      return;
+    }
+
+    this.quickAddingKey.set(company.key);
+    this.error.set(null);
+    this.saving.set(true);
+    try {
+      await this.adsApi.saveAd({
+        title: company.name,
+        sponsorName: company.name,
+        targetUrl: company.targetUrl || 'https://',
+        imageUrl: company.imageUrl,
+        sponsorLogoUrl: company.sponsorLogoUrl,
+        placement,
+        forumId: null,
+        topicId: this.needsTopic() ? this.formTopicId || null : null,
+        calendarEventId: null,
+        priority: AD_PRIORITY_EQUAL,
+        maxImpressions: DEFAULT_MAX_IMPRESSIONS,
+        active: true,
+        description: '',
+        buttonText: 'Ver más',
+      });
+      this.closeForm();
+      await this.reload();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'No se pudo añadir');
+    } finally {
+      this.saving.set(false);
+      this.quickAddingKey.set(null);
+    }
+  }
+
+  /** Rellena banner/logo desde la ficha de empresa. */
+  applyCompanyAssets(force: boolean): void {
+    const key =
+      this.formCompanyKey ||
+      this.formSponsor.trim().toLowerCase() ||
+      this.formTitle.trim().toLowerCase();
+    if (!key) return;
+    const company = this.companies().find((c) => c.key === key);
+    if (!company) return;
+
+    if (this.formIsEventZone()) {
+      if ((force || !this.formLogoUrl.trim()) && company.sponsorLogoUrl) {
+        this.formLogoUrl = company.sponsorLogoUrl;
+      }
+    } else if ((force || !this.formImageUrl.trim()) && company.imageUrl) {
+      this.formImageUrl = company.imageUrl;
+    }
+  }
+
+  eventLabel(eventId: string | null | undefined): string {
+    if (!eventId?.trim()) return 'Todos los eventos (hoy y futuros)';
+    const event = this.calendarEvents().find((e) => e.id === eventId);
+    if (!event) return 'Evento vinculado';
+    return this.formatEventOption(event);
+  }
+
+  formatEventOption(event: CalendarEventRow): string {
+    const when = new Date(event.startsAt).toLocaleString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return `${event.title} · ${when}`;
   }
 
   setPriorityTier(value: number): void {
@@ -371,7 +634,9 @@ export class AdsPageComponent implements OnInit {
   async equalizeZone(placement: AdPlacement): Promise<void> {
     if (
       !confirm(
-        `¿Igualar la rotación en «${placementCommercialName(placement)}»?\nTodas las piezas activas tendrán la misma probabilidad de salida.`,
+        `¿Igualar la rotación en «${placementCommercialName(placement)}»?\n\n` +
+          `Todas las piezas ACTIVAS de esta zona pasarán a «Igualdad» (~mismo %).\n` +
+          `Si D'arte está en Máxima, perderá esa ventaja hasta que la vuelvas a subir.`,
       )
     ) {
       return;
@@ -398,6 +663,26 @@ export class AdsPageComponent implements OnInit {
       this.error.set('Indica un enlace destino.');
       return;
     }
+    if (this.needsEvent() && !this.formLogoUrl.trim()) {
+      this.error.set(
+        'Los eventos patrocinados necesitan el logo de eventos de la empresa. Súbelo o edítalo en Empresas.',
+      );
+      return;
+    }
+    if (!this.needsEvent() && !this.formImageUrl.trim()) {
+      this.error.set('Sube el banner de la zona (creativo horizontal).');
+      return;
+    }
+
+    this.applyCompanyAssets(false);
+
+    const calendarEventId = this.needsEvent()
+      ? this.formCalendarEventId.trim() === this.allEventsValue ||
+        !this.formCalendarEventId.trim()
+        ? null
+        : this.formCalendarEventId.trim()
+      : null;
+
     this.saving.set(true);
     this.error.set(null);
     try {
@@ -406,12 +691,14 @@ export class AdsPageComponent implements OnInit {
         title: this.formTitle,
         sponsorName: this.formSponsor || this.formTitle,
         targetUrl: this.formUrl,
-        imageUrl: this.formImageUrl,
+        imageUrl: this.needsEvent()
+          ? this.formImageUrl.trim() || this.editing()?.imageUrl || null
+          : this.formImageUrl,
         sponsorLogoUrl: this.formLogoUrl,
         placement: this.formPlacement,
         forumId: this.needsForum() ? this.formForumId || null : null,
         topicId: this.needsTopic() ? this.formTopicId || null : null,
-        calendarEventId: null,
+        calendarEventId,
         priority: this.formPriority,
         maxImpressions: this.editing()?.maxImpressions ?? DEFAULT_MAX_IMPRESSIONS,
         active: this.formActive,
