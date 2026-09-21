@@ -9,23 +9,23 @@
   <main class="login-stage">
     <section class="brand-panel">
       <img class="brand-mark" src="/logo-mark.png" alt="" width="72" height="72" />
-      <p class="brand-eyebrow">Acceso staff</p>
+      <p class="brand-eyebrow">Acceso Cofradeo</p>
       <h1 class="brand-name">Círculo Cofrade</h1>
-      <p class="brand-line">Panel de Junta</p>
+      <p class="brand-line">Junta y hermandades</p>
       <p class="brand-copy">
-        Centro de control web con la misma cuenta staff que en la app.
+        Entra con tu cuenta de Junta o con la cuenta oficial de tu hermandad.
       </p>
       <ul class="brand-points">
-        <li>Moderación y comunidad</li>
-        <li>Calendario y temporada</li>
-        <li>Patrocinios y finanzas</li>
+        <li>Junta: moderación y ciudad</li>
+        <li>Hermandad: tu canal oficial</li>
+        <li>Misma cuenta que en la app</li>
       </ul>
     </section>
 
     <section class="auth-panel">
       <header class="auth-head">
         <h2>Entrar</h2>
-        <p>Usa tu email y contraseña de staff.</p>
+        <p>Email y contraseña de Junta o de hermandad.</p>
       </header>
 
       @if (!configured) {
@@ -37,7 +37,7 @@
 
       @if (denied) {
         <div class="banner warn">
-          Sesión cerrada: esa cuenta no es admin ni moderador.
+          Sesión cerrada: esa cuenta no es de Junta ni de hermandad.
         </div>
       }
 
@@ -74,7 +74,7 @@
         </button>
       </form>
 
-      <p class="auth-foot">Solo cuentas de Junta · Círculo Cofrade</p>
+      <p class="auth-foot">Junta · Hermandades · Círculo Cofrade</p>
     </section>
   </main>
 </div>

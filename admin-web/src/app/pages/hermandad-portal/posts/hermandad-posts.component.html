@@ -1,0 +1,34 @@
+<section class="hp-page">
+  <header class="hp-head">
+    <div>
+      <p class="eyebrow">Historial</p>
+      <h1>Mis publicaciones</h1>
+      <p class="lead">Todo lo que has publicado como cuenta oficial.</p>
+    </div>
+    <a routerLink="/hermandad/publicar" class="btn btn-primary">Nueva</a>
+  </header>
+
+  @if (store.loading()) {
+    <div class="state-box">Cargando…</div>
+  } @else if (visiblePosts().length === 0) {
+    <div class="empty-box">
+      Todavía no hay publicaciones.
+      <a routerLink="/hermandad/publicar" class="btn btn-soft">Publicar</a>
+    </div>
+  } @else {
+    <div class="queue-list">
+      @for (post of visiblePosts(); track post.id) {
+        <article class="queue-card">
+          <h2>{{ categoryLabel(post.category) }}</h2>
+          <p class="queue-meta">
+            {{ boardTitle(post.topicId) }} · {{ timeAgo(post.createdAt) }}
+          </p>
+          <p class="queue-excerpt">{{ post.body }}</p>
+          @if (post.imageUrl) {
+            <img [src]="post.imageUrl" alt="" class="post-thumb" />
+          }
+        </article>
+      }
+    </div>
+  }
+</section>

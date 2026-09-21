@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import {
   StaffProfile,
   StaffRole,
+  canAccessHermandadPortal,
   canAccessJunta,
   isAdminRole,
 } from '../models/staff-profile';
@@ -32,6 +33,17 @@ export class AuthService {
       moderatedForumCount: this.moderatedForumIdsSignal().size,
     }),
   );
+  readonly isHermandadAccount = computed(() =>
+    canAccessHermandadPortal({
+      accountType: this.profileSignal()?.accountType,
+    }),
+  );
+  /** Junta tiene prioridad si alguien fuera ambas cosas. */
+  readonly homePath = computed(() => {
+    if (this.canAccess()) return '/app/resumen';
+    if (this.isHermandadAccount()) return '/hermandad';
+    return '/login';
+  });
 
   private initPromise: Promise<void> | null = null;
 
@@ -83,7 +95,9 @@ export class AuthService {
       await Promise.all([
         supabase
           .from('profiles')
-          .select('id, handle, display_name, role, avatar_url')
+          .select(
+            'id, handle, display_name, role, avatar_url, account_type, verified',
+          )
           .eq('id', userId)
           .maybeSingle(),
         supabase
@@ -105,6 +119,8 @@ export class AuthService {
             displayName: (profileRow.display_name as string | null) ?? null,
             role,
             avatarUrl: (profileRow.avatar_url as string | null) ?? null,
+            accountType: String(profileRow.account_type ?? 'cofrade'),
+            verified: Boolean(profileRow.verified),
           }
         : {
             id: userId,
@@ -112,6 +128,8 @@ export class AuthService {
             displayName: null,
             role: 'member',
             avatarUrl: null,
+            accountType: 'cofrade',
+            verified: false,
           },
     );
     this.moderatedForumIdsSignal.set(
@@ -125,10 +143,10 @@ export class AuthService {
     if (error) throw error;
     const { data } = await supabase.auth.getSession();
     await this.applySession(data.session);
-    if (!this.canAccess()) {
+    if (!this.canAccess() && !this.isHermandadAccount()) {
       await this.signOut();
       throw new Error(
-        'Esta cuenta no tiene acceso a la Junta. Hace falta ser admin o moderador.',
+        'Esta cuenta no tiene acceso. Usa una cuenta de Junta o de hermandad verificada.',
       );
     }
   }

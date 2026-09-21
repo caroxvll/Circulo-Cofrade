@@ -4,13 +4,16 @@
       <p class="eyebrow">Comunidad · solo admin</p>
       <h1>Hermandades</h1>
       <p class="lead">
-        Crea cuentas oficiales (Edge Function), vincula tablones y revisa
-        asignaciones activas.
+        Gestiona el directorio (tablones por día), las cuentas oficiales y quién
+        publica en cada tablón. Es la base del área privada de cada hermandad.
       </p>
     </div>
     <div class="queue-toolbar">
       <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
         Actualizar
+      </button>
+      <button type="button" class="btn btn-primary" (click)="openCreateBoard()">
+        + Nuevo tablón
       </button>
     </div>
   </header>
@@ -34,9 +37,104 @@
     </div>
   }
 
+  <!-- Tablones -->
+  <div class="section-head">
+    <h2 class="block-title">Tablones del directorio</h2>
+    <label class="inline-search">
+      <input
+        [(ngModel)]="boardSearch"
+        placeholder="Buscar por nombre de hermandad…"
+      />
+    </label>
+  </div>
+
+  <div class="day-filter" role="tablist" aria-label="Filtrar por día">
+    <button
+      type="button"
+      class="day-chip"
+      [class.on]="dayFilter() === null"
+      (click)="setDayFilter(null)"
+    >
+      Todos
+      <span class="n">{{ topics().length }}</span>
+    </button>
+    @for (day of stationDays; track day) {
+      <button
+        type="button"
+        class="day-chip"
+        [class.on]="dayFilter() === day"
+        [title]="day"
+        (click)="setDayFilter(day)"
+      >
+        {{ shortDayLabel(day) }}
+        @if (countForDay(day) > 0) {
+          <span class="n">{{ countForDay(day) }}</span>
+        }
+      </button>
+    }
+  </div>
+
+  @if (dayFilter(); as activeDay) {
+    <p class="filter-hint">
+      Mostrando <strong>{{ activeDay }}</strong>
+      · {{ filteredTopics().length }} tablón{{ filteredTopics().length === 1 ? '' : 'es' }}
+      <button type="button" class="btn btn-ghost linkish" (click)="setDayFilter(null)">
+        Quitar filtro
+      </button>
+    </p>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando…</div>
+  } @else if (filteredTopics().length === 0) {
+    <div class="empty-box">
+      @if (boardSearch.trim() || dayFilter()) {
+        No hay tablones con ese filtro.
+      } @else {
+        No hay tablones.
+      }
+      <button type="button" class="btn btn-soft" (click)="openCreateBoard()">
+        {{ dayFilter() ? 'Añadir en este día' : 'Crear el primero' }}
+      </button>
+    </div>
+  } @else {
+    <div class="queue-list">
+      @for (board of filteredTopics(); track board.id) {
+        <article class="queue-card">
+          <div class="card-row">
+            <div>
+              <h2>{{ board.hermandadName }}</h2>
+              <p class="queue-meta">
+                <span class="day-pill">{{ board.processionDay || 'Sin día' }}</span>
+                · {{ assignmentCount(board.id) }} cuenta{{
+                  assignmentCount(board.id) === 1 ? '' : 's'
+                }}
+              </p>
+            </div>
+            <div class="queue-actions">
+              <button type="button" class="btn btn-soft" (click)="openEditBoard(board)">
+                Editar
+              </button>
+              <button
+                type="button"
+                class="btn btn-danger"
+                [disabled]="busyKey() === 'board:' + board.id"
+                (click)="deleteBoard(board)"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </article>
+      }
+    </div>
+  }
+
+  <!-- Cuentas -->
+  <h2 class="block-title">Cuentas oficiales</h2>
   <div class="two-col">
     <div class="panel">
-      <h2>Crear cuenta oficial</h2>
+      <h2>Crear cuenta</h2>
       <label>
         Nombre oficial
         <input [(ngModel)]="displayName" />
@@ -79,7 +177,7 @@
     </div>
 
     <div class="panel">
-      <h2>Vincular cuenta existente</h2>
+      <h2>Vincular cuenta a tablón</h2>
       <label>
         Cuenta
         <app-handle-search [(ngModel)]="selected"></app-handle-search>
@@ -104,11 +202,9 @@
   </div>
 
   <h2 class="block-title">Asignaciones activas</h2>
-  @if (loading()) {
-    <div class="state-box">Cargando…</div>
-  } @else if (assignments().length === 0) {
+  @if (!loading() && assignments().length === 0) {
     <div class="empty-box">No hay vinculaciones de tablón.</div>
-  } @else {
+  } @else if (assignments().length > 0) {
     <div class="queue-list">
       @for (row of assignments(); track row.profileId + ':' + row.topicId) {
         <article class="queue-card">
@@ -138,14 +234,102 @@
     <div class="queue-list">
       @for (user of brotherhoods(); track user.id) {
         <article class="queue-card">
-          <h2>{{ user.displayName }}</h2>
-          <p class="queue-meta">
-            {{ '@' + user.handle }}
-            · {{ user.verified ? 'verificada' : 'sin verificar' }}
-            · {{ timeAgo(user.createdAt) }}
-          </p>
+          <div class="card-row">
+            <div>
+              <h2>{{ user.displayName }}</h2>
+              <p class="queue-meta">
+                {{ '@' + user.handle }}
+                · {{ user.verified ? 'verificada' : 'sin verificar' }}
+                · {{ timeAgo(user.createdAt) }}
+              </p>
+            </div>
+            <div class="queue-actions">
+              <button
+                type="button"
+                class="btn btn-soft"
+                [disabled]="busyKey() === 'user:' + user.id"
+                (click)="renameAccount(user)"
+              >
+                Renombrar
+              </button>
+              <button
+                type="button"
+                class="btn btn-soft"
+                [disabled]="busyKey() === 'user:' + user.id"
+                (click)="toggleVerified(user)"
+              >
+                {{ user.verified ? 'Quitar verificación' : 'Verificar' }}
+              </button>
+            </div>
+          </div>
         </article>
       }
     </div>
   }
 </section>
+
+@if (boardDialog(); as mode) {
+  <div class="modal-backdrop" (click)="closeBoardDialog()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <header>
+        <h2>{{ mode === 'create' ? 'Nuevo tablón' : 'Editar tablón' }}</h2>
+        <button type="button" class="btn btn-ghost" (click)="closeBoardDialog()">
+          Cerrar
+        </button>
+      </header>
+
+      <p class="field-label">1. ¿Qué día sale?</p>
+      <div class="day-picker">
+        @for (day of stationDays; track day) {
+          <button
+            type="button"
+            class="day-chip"
+            [class.on]="boardDay === day"
+            (click)="boardDay = day"
+          >
+            {{ shortDayLabel(day) }}
+          </button>
+        }
+      </div>
+      <p class="picked-day">{{ boardDay }}</p>
+
+      <label>
+        2. Nombre de la hermandad
+        <input
+          [(ngModel)]="boardName"
+          placeholder="Ej. La Borriquita, El Amor, San Gonzalo…"
+          autofocus
+        />
+      </label>
+
+      <div class="title-preview" aria-live="polite">
+        <span class="kicker">Así se verá en la app</span>
+        <strong>{{ boardDay }} · {{ boardName.trim() || '…' }}</strong>
+      </div>
+
+      <label>
+        Portada (URL, opcional)
+        <input [(ngModel)]="boardCoverUrl" placeholder="https://…" />
+      </label>
+      @if (mode === 'edit') {
+        <label class="check">
+          <input type="checkbox" [(ngModel)]="boardResetBody" />
+          Restaurar texto de presentación a la plantilla
+        </label>
+      }
+      <div class="queue-actions">
+        <button type="button" class="btn btn-soft" (click)="closeBoardDialog()">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="savingBoard() || boardName.trim().length < 2"
+          (click)="saveBoard()"
+        >
+          {{ savingBoard() ? 'Guardando…' : 'Guardar tablón' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
