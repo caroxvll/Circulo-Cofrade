@@ -46,7 +46,9 @@ import 'widgets/reply_card.dart';
 import 'widgets/reply_edit_sheet.dart';
 
 import 'utils/forum_navigation.dart';
+import 'utils/noticias_forum.dart';
 import 'utils/reply_tree.dart';
+import 'widgets/forum_editorial_title.dart';
 import 'utils/season_hub_context.dart';
 
 import 'widgets/replies_load_more_button.dart';
@@ -1192,6 +1194,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                         child: TopicDetailRepliesHeader(
                           isHermandadBoard: false,
                           commentCount: displayCommentCount,
+                          isNoticias: isNoticiasForum(widget.forumId),
                         ),
                       ),
                     ),
@@ -1349,36 +1352,24 @@ class _TopicDetailAppBarTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isHermandadBoard) {
-      return Text(
-        parseHermandadTopicTitle(topic.title).hermandadName,
-        style: TopicDetailTypography.appBarTitle(),
+      return ForumEditorialTitle(
+        title: parseHermandadTopicTitle(topic.title).hermandadName,
+        forumId: 'hermandades',
       );
     }
 
     final season = seasonHubLabel(topic.seasonKey);
     if (season != null && isSeasonCommunityTopicDetail(topic)) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            season,
-            style: TopicDetailTypography.appBarTitle(),
-          ),
-          Text(
-            'Tema · ${forumName ?? 'Foro'}',
-            style: TopicDetailTypography.meta(
-              color: AppColors.textSecondary,
-            ).copyWith(fontSize: 11, height: 1.1),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+      return ForumEditorialTitle(
+        title: season,
+        forumId: topic.forumId,
+        kicker: 'TEMA · ${(forumName ?? 'Foro').toUpperCase()}',
       );
     }
 
-    return Text(
-      forumName ?? 'Foro',
-      style: TopicDetailTypography.appBarTitle(),
+    return ForumEditorialTitle(
+      title: forumName ?? 'Foro',
+      forumId: topic.forumId,
     );
   }
 }

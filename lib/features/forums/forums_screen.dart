@@ -79,15 +79,6 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
                     onRefresh: () => _refreshForums(ref),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        const sectionHeaderHeight = 36.0;
-                        final noticiasBlock = noticias == null
-                            ? 0.0
-                            : NoticiasPremiumBanner.height + 8 + 12;
-                        final forumsHeight = (constraints.maxHeight -
-                                noticiasBlock -
-                                sectionHeaderHeight)
-                            .clamp(160.0, constraints.maxHeight);
-
                         return SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(
                             parent: BouncingScrollPhysics(),
@@ -97,30 +88,16 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                if (noticias != null) ...[
+                                if (noticias != null)
                                   NoticiasPremiumBanner(
                                     forum: noticias,
                                     onTap: () => context.push(
                                       '/foros/${noticias.id}',
                                     ),
                                   ),
-                                  const SizedBox(height: 12),
-                                ],
-                                const Padding(
-                                  padding: EdgeInsets.fromLTRB(20, 0, 20, 0),
-                                  child: SizedBox(
-                                    height: sectionHeaderHeight,
-                                    child: Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: _FeaturedSectionHeader(),
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(
-                                  height: forumsHeight,
-                                  child: _ForumsCardsList(
+                                Expanded(
+                                  child: _CenteredForumsBlock(
                                     pillars: forums,
-                                    listHeight: forumsHeight,
                                   ),
                                 ),
                               ],
@@ -154,25 +131,86 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
   }
 }
 
-class _ForumsCardsList extends StatelessWidget {
-  const _ForumsCardsList({
-    required this.pillars,
-    required this.listHeight,
-  });
+class _CenteredForumsBlock extends StatelessWidget {
+  const _CenteredForumsBlock({required this.pillars});
 
   final List<ForumCategory> pillars;
-  final double listHeight;
 
   @override
   Widget build(BuildContext context) {
     if (pillars.isEmpty) return const SizedBox.shrink();
 
-    final gaps = (pillars.length - 1) * ForumCategoryCard.cardGap;
-    final cardHeight = (listHeight - gaps - 12) / pillars.length;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const sectionHeaderHeight = 30.0;
+        const afterHeaderGap = 8.0;
+        const safety = 12.0;
+        final gaps = (pillars.length - 1) * ForumCategoryCard.cardGap;
+        final availableForCards = (constraints.maxHeight -
+                sectionHeaderHeight -
+                afterHeaderGap -
+                safety)
+            .clamp(0.0, constraints.maxHeight);
+
+        final idealCard = ForumCategoryCard.cardHeight;
+        final idealBlock = pillars.length * idealCard + gaps;
+
+        final double cardHeight;
+        final double sidePad;
+        if (idealBlock <= availableForCards) {
+          cardHeight = idealCard;
+          sidePad = (availableForCards - idealBlock) / 2;
+        } else {
+          // Encaja sí o sí (Samsung / 360x740): floor evita desbordes por decimales.
+          final raw = (availableForCards - gaps) / pillars.length;
+          cardHeight = raw.floorToDouble().clamp(1.0, idealCard);
+          sidePad = 0;
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (sidePad > 0) SizedBox(height: sidePad),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 0),
+              child: SizedBox(
+                height: sectionHeaderHeight,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _FeaturedSectionHeader(),
+                ),
+              ),
+            ),
+            const SizedBox(height: afterHeaderGap),
+            _ForumsCardsList(
+              pillars: pillars,
+              cardHeight: cardHeight,
+            ),
+            if (sidePad > 0) SizedBox(height: sidePad),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ForumsCardsList extends StatelessWidget {
+  const _ForumsCardsList({
+    required this.pillars,
+    required this.cardHeight,
+  });
+
+  final List<ForumCategory> pillars;
+  final double cardHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    if (pillars.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           for (var i = 0; i < pillars.length; i++) ...[
             if (i > 0) const SizedBox(height: ForumCategoryCard.cardGap),
@@ -205,7 +243,7 @@ class _FeaturedSectionHeader extends StatelessWidget {
             color: AppColors.textPrimary,
           ).copyWith(fontSize: 18, letterSpacing: 0.08),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Container(
           width: 44,
           height: 1.5,

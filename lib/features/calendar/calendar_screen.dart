@@ -7,12 +7,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/models/calendar_event.dart';
 import '../auth/auth_provider.dart';
-import '../ads/models/sponsored_ad.dart';
-import '../ads/widgets/sponsored_placement_slot.dart';
 import '../forums/widgets/forums_beige_background.dart';
 import '../notifications/widgets/notifications_bell_button.dart';
 import '../../core/widgets/cofrade_countdown_banner.dart';
-import '../../core/widgets/cofradeo_bottom_nav.dart';
 import '../../core/widgets/cofradeo_error_panel.dart';
 import 'calendar_design_tokens.dart';
 import 'calendar_provider.dart';
@@ -334,7 +331,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               label: const Text('Evento'),
             )
           : null,
-      floatingActionButtonLocation: const CofradeoFabLocation(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -532,12 +529,7 @@ class _CalendarBody extends ConsumerWidget {
         ),
         if (!isSearchActive && countdown != null)
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              CalendarDesign.screenPadding,
-              8,
-              CalendarDesign.screenPadding,
-              0,
-            ),
+            padding: const EdgeInsets.only(top: 8),
             sliver: SliverToBoxAdapter(
               child: CofradeCountdownBanner(
                 countdown: countdown,
@@ -638,93 +630,143 @@ class _CalendarBody extends ConsumerWidget {
             ),
           ),
         ),
-        if (!isSearchActive)
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              CalendarDesign.screenPadding,
-              10,
-              CalendarDesign.screenPadding,
-              0,
-            ),
-            sliver: const SliverToBoxAdapter(
-              child: SponsoredPlacementSlot(
-                placement: AdPlacement.calendar,
-                compact: true,
-              ),
-            ),
-          ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            CalendarDesign.screenPadding,
-            10,
-            CalendarDesign.screenPadding,
-            8,
-          ),
-          sliver: SliverToBoxAdapter(
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    isSearchActive ? 'Resultados' : daySectionTitle,
-                    style: CalendarDesign.sectionTitle(),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (!isSearchActive && selectedDayEvents.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceAlt,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppColors.border.withValues(alpha: 0.7),
-                      ),
-                    ),
-                    child: Text(
-                      eventCountLabel,
-                      style: AppTypography.labelSmall(
-                        color: AppColors.textSecondary,
-                      ).copyWith(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(
-            CalendarDesign.screenPadding,
-            0,
-            CalendarDesign.screenPadding,
-            cofradeoBottomScrollPadding(context),
-          ),
-          sliver: SliverToBoxAdapter(
-            child: _EventsSectionBody(
-              dayEvents: selectedDayEvents,
-              listEvents: listEvents,
-              isSearchActive: isSearchActive,
-              searchQuery: searchQuery,
-              searchResults: searchResults,
-              isSearching: isSearching,
-              onEventTap: onEventTap,
-              onSearchEventTap: onSearchEventTap,
-              onClearSearch: onClearSearch,
-              bookmarkedIds: bookmarkIds,
-              onBookmarkToggle: onBookmarkToggle,
-              isTodaySelected: isTodaySelected,
-            ),
-          ),
+        ..._calendarEventsSlivers(
+          isSearchActive: isSearchActive,
+          daySectionTitle: daySectionTitle,
+          eventCountLabel: eventCountLabel,
+          selectedDayEvents: selectedDayEvents,
+          listEvents: listEvents,
+          searchQuery: searchQuery,
+          searchResults: searchResults,
+          isSearching: isSearching,
+          onEventTap: onEventTap,
+          onSearchEventTap: onSearchEventTap,
+          onClearSearch: onClearSearch,
+          bookmarkIds: bookmarkIds,
+          onBookmarkToggle: onBookmarkToggle,
+          isTodaySelected: isTodaySelected,
+          bottomPadding: canManageLibrary ? 12 : 8,
         ),
       ],
     );
   }
+}
+
+List<Widget> _calendarEventsSlivers({
+  required bool isSearchActive,
+  required String daySectionTitle,
+  required String eventCountLabel,
+  required List<CalendarEvent> selectedDayEvents,
+  required List<CalendarEvent> listEvents,
+  required String searchQuery,
+  required List<CalendarEvent> searchResults,
+  required bool isSearching,
+  required ValueChanged<CalendarEvent> onEventTap,
+  required ValueChanged<CalendarEvent> onSearchEventTap,
+  required VoidCallback onClearSearch,
+  required Set<String> bookmarkIds,
+  required Future<void> Function(CalendarEvent) onBookmarkToggle,
+  required bool isTodaySelected,
+  required double bottomPadding,
+}) {
+  final title = Row(
+    children: [
+      Expanded(
+        child: Text(
+          isSearchActive ? 'Resultados' : daySectionTitle,
+          style: CalendarDesign.sectionTitle(),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      if (!isSearchActive && selectedDayEvents.isNotEmpty)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: AppColors.border.withValues(alpha: 0.7),
+            ),
+          ),
+          child: Text(
+            eventCountLabel,
+            style: AppTypography.labelSmall(
+              color: AppColors.textSecondary,
+            ).copyWith(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+    ],
+  );
+
+  final body = _EventsSectionBody(
+    dayEvents: selectedDayEvents,
+    listEvents: listEvents,
+    isSearchActive: isSearchActive,
+    searchQuery: searchQuery,
+    searchResults: searchResults,
+    isSearching: isSearching,
+    onEventTap: onEventTap,
+    onSearchEventTap: onSearchEventTap,
+    onClearSearch: onClearSearch,
+    bookmarkedIds: bookmarkIds,
+    onBookmarkToggle: onBookmarkToggle,
+    isTodaySelected: isTodaySelected,
+  );
+
+  final visibleCount =
+      isSearchActive ? searchResults.length : listEvents.length;
+  // Con pocos ítems: título pegado al buscador; el aire queda debajo del evento.
+  final fillRemaining = !isSearchActive && visibleCount <= 2;
+
+  if (fillRemaining) {
+    return [
+      SliverFillRemaining(
+        hasScrollBody: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            CalendarDesign.screenPadding,
+            10,
+            CalendarDesign.screenPadding,
+            bottomPadding,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              title,
+              const SizedBox(height: 8),
+              body,
+              const Spacer(),
+            ],
+          ),
+        ),
+      ),
+    ];
+  }
+
+  return [
+    SliverPadding(
+      padding: const EdgeInsets.fromLTRB(
+        CalendarDesign.screenPadding,
+        10,
+        CalendarDesign.screenPadding,
+        8,
+      ),
+      sliver: SliverToBoxAdapter(child: title),
+    ),
+    SliverPadding(
+      padding: EdgeInsets.fromLTRB(
+        CalendarDesign.screenPadding,
+        0,
+        CalendarDesign.screenPadding,
+        bottomPadding,
+      ),
+      sliver: SliverToBoxAdapter(child: body),
+    ),
+  ];
 }
 
 class _CalendarFilterBar extends StatelessWidget {

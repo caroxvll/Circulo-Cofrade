@@ -85,9 +85,9 @@ void main() {
     expect(countdown.usesArtworkBanner, isTrue);
   });
 
-  test('Cifras del banner en tres casillas', () {
-    expect(CountdownBannerArtboard.digitsForDays(267), ['2', '6', '7']);
-    expect(CountdownBannerArtboard.digitsForDays(45), ['0', '4', '5']);
-    expect(CountdownBannerArtboard.digitsForDays(5), ['0', '0', '5']);
+  test('Etiqueta de días del banner entre Faltan y días', () {
+    expect(CountdownBannerArtboard.labelForDays(267), '267');
+    expect(CountdownBannerArtboard.labelForDays(45), '45');
+    expect(CountdownBannerArtboard.labelForDays(5), '5');
   });
 }

@@ -8,7 +8,7 @@ import 'forum_topics_typography.dart';
 /// Métricas compartidas del hero de foros (lista y detalle de pilar).
 abstract final class ForumsHeroTokens {
   static const horizontalPadding = 20.0;
-  static const bottomPadding = 12.0;
+  static const bottomPadding = 8.0;
   static const topExtraPadding = 4.0;
   /// Detalle de foro: sin aire extra bajo la status bar (la flecha no queda flotando).
   static const detailTopExtraPadding = 0.0;
