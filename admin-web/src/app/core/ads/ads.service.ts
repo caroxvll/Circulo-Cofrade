@@ -4,6 +4,7 @@ import { FinanceService } from '../finance/finance.service';
 import {
   AdPlacement,
   AdStatisticsRow,
+  COMPANY_CATALOG_PLACEMENT,
   CompanyProfile,
   DEFAULT_MAX_ACTIVE_COMPANIES,
   PackSponsorOption,
@@ -12,6 +13,7 @@ import {
   WaitlistEntry,
   adDisplayName,
   companyKeyFromName,
+  isCompanyCatalogPlacement,
   normalizeAdTargetUrl,
 } from './ads.models';
 
@@ -304,17 +306,25 @@ export class AdsService {
     for (const ad of ads) {
       const name = adDisplayName(ad);
       const key = name.toLowerCase();
-      const imageUrl = ad.imageUrl || ad.sponsorLogoUrl;
-      if (!imageUrl) continue;
-      if (byKey.has(key)) continue;
-      byKey.set(key, {
-        name,
-        targetUrl: ad.targetUrl,
-        imageUrl: ad.imageUrl,
-        sponsorLogoUrl: ad.sponsorLogoUrl,
-      });
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, {
+          name,
+          targetUrl: ad.targetUrl,
+          imageUrl: ad.imageUrl,
+          sponsorLogoUrl: ad.sponsorLogoUrl,
+        });
+        continue;
+      }
+      if (!existing.imageUrl && ad.imageUrl) existing.imageUrl = ad.imageUrl;
+      if (!existing.sponsorLogoUrl && ad.sponsorLogoUrl) {
+        existing.sponsorLogoUrl = ad.sponsorLogoUrl;
+      }
+      if (!existing.targetUrl && ad.targetUrl) existing.targetUrl = ad.targetUrl;
     }
-    return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    return [...byKey.values()]
+      .filter((s) => !!s.imageUrl)
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
   }
 
   /** Catálogo de marcas a partir de las piezas `ads` (sin tabla propia). */
@@ -324,6 +334,9 @@ export class AdsService {
       const name = adDisplayName(ad);
       const key = name.toLowerCase();
       const existing = byKey.get(key);
+      const zonePlacement = isCompanyCatalogPlacement(ad.placement)
+        ? null
+        : ad.placement;
       if (!existing) {
         byKey.set(key, {
           key,
@@ -331,9 +344,9 @@ export class AdsService {
           targetUrl: ad.targetUrl,
           imageUrl: ad.imageUrl,
           sponsorLogoUrl: ad.sponsorLogoUrl,
-          placements: [ad.placement],
+          placements: zonePlacement ? [zonePlacement] : [],
           adIds: [ad.id],
-          activeCount: ad.active ? 1 : 0,
+          activeCount: ad.active && zonePlacement ? 1 : 0,
         });
         continue;
       }
@@ -342,15 +355,53 @@ export class AdsService {
         existing.sponsorLogoUrl = ad.sponsorLogoUrl;
       }
       if (!existing.targetUrl && ad.targetUrl) existing.targetUrl = ad.targetUrl;
-      if (!existing.placements.includes(ad.placement)) {
-        existing.placements.push(ad.placement);
+      if (zonePlacement && !existing.placements.includes(zonePlacement)) {
+        existing.placements.push(zonePlacement);
       }
       existing.adIds.push(ad.id);
-      if (ad.active) existing.activeCount += 1;
+      if (ad.active && zonePlacement) existing.activeCount += 1;
     }
     return [...byKey.values()].sort((a, b) =>
       a.name.localeCompare(b.name, 'es'),
     );
+  }
+
+  /**
+   * Alta de marca en el catálogo (ficha inactiva en placement reservado).
+   * Luego se coloca en zonas desde Patrocinios.
+   */
+  async createCompany(input: {
+    name: string;
+    targetUrl: string;
+    imageUrl: string | null;
+    sponsorLogoUrl: string | null;
+  }): Promise<void> {
+    const name = input.name.trim();
+    if (name.length < 2) {
+      throw new Error('El nombre debe tener al menos 2 caracteres.');
+    }
+
+    const ads = await this.fetchAdminAds();
+    if (this.listCompanies(ads).some((c) => c.key === companyKeyFromName(name))) {
+      throw new Error('Esa empresa ya está creada.');
+    }
+
+    await this.saveAd({
+      title: name,
+      description: '',
+      sponsorName: name,
+      buttonText: 'Ver más',
+      targetUrl: input.targetUrl,
+      placement: COMPANY_CATALOG_PLACEMENT,
+      imageUrl: input.imageUrl,
+      sponsorLogoUrl: input.sponsorLogoUrl,
+      forumId: null,
+      topicId: null,
+      calendarEventId: null,
+      priority: 1,
+      maxImpressions: 1,
+      active: false,
+    });
   }
 
   /**

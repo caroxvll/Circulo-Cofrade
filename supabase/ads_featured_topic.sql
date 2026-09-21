@@ -21,7 +21,8 @@ alter table public.ads
       'search',
       'profile',
       'hermandades',
-      'featured_topic'
+      'featured_topic',
+      'noticias'
     )
   );
 
@@ -32,7 +33,7 @@ create or replace function public.get_ad_for_placement(
 )
 returns setof public.ads
 language plpgsql
-stable
+volatile
 security definer
 set search_path = public
 as $$

@@ -36,8 +36,13 @@ final adsRepositoryProvider = Provider<AdsRepository>((ref) {
 });
 
 final adForPlacementProvider =
-    FutureProvider.family<SponsoredAd?, AdPlacementQuery>(
+    FutureProvider.autoDispose.family<SponsoredAd?, AdPlacementQuery>(
   (ref, query) {
+    // Calendario / Foros: no desechar al cambiar de pestaña (evita salto de layout).
+    if (query.placement == AdPlacement.forumsTop ||
+        query.placement == AdPlacement.calendar) {
+      ref.keepAlive();
+    }
     return ref.watch(adsRepositoryProvider).fetchAd(
           query.placement,
           forumId: query.forumId,

@@ -5,9 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_branding.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../admin/admin_provider.dart';
+import '../../../core/widgets/cofrade_confirm_dialog.dart';
 import '../../auth/auth_provider.dart';
-import '../../auth/data/auth_repository.dart';
 import '../../permissions/permissions_provider.dart';
 import '../profile_provider.dart';
 
@@ -112,27 +111,13 @@ Future<void> showOwnProfileMenu(BuildContext context, WidgetRef ref) async {
               ),
               onTap: () async {
                 Navigator.pop(ctx);
-                final confirmed = await showDialog<bool>(
+                final confirmed = await showCofradeConfirmDialog(
                   context: context,
-                  builder: (dialogCtx) => AlertDialog(
-                    title: const Text('Cerrar sesión'),
-                    content: Text(AppBranding.logoutConfirm),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(dialogCtx, false),
-                        child: const Text('Cancelar'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(dialogCtx, true),
-                        child: Text(
-                          'Salir',
-                          style: AppTypography.bodyMedium(
-                            color: AppColors.accentRed,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  title: 'Cerrar sesión',
+                  message: AppBranding.logoutConfirm,
+                  cancelLabel: 'Cancelar',
+                  confirmLabel: 'Salir',
+                  destructive: true,
                 );
                 if (confirmed != true || !context.mounted) return;
 

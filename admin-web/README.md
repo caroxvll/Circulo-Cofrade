@@ -10,7 +10,7 @@ Dashboard Angular para gestionar Cofradeo desde el PC. Misma verdad que la app (
 - **Colas reales:** temas, rechazos, reportes, eventos (admin), cierres
 - **Comunidad (admin):** usuarios/altas, moderadores por foro, hermandades
 - **Patrocinios (admin):** mapa por zona, CRUD, informe mes/CSV, pack todas las zonas
-- **Empresas (admin):** cupo configurable (`sponsor_settings`), quitar marca (cascada), lista de espera
+- **Empresas (admin):** alta de marca (ficha catálogo), cupo (`sponsor_settings`), editar creativos, quitar (cascada), lista de espera
   - SQL: `supabase/sponsor_settings.sql` (+ `sponsor_waitlist.sql` si falta)
 - **Finanzas (admin):** cobros por empresa + gastos + resumen neto del mes
 - **Foros (admin):** hero FOROS, portadas, textos, temas destacados (temporada)

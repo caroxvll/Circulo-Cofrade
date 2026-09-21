@@ -10,8 +10,8 @@ import '../../ads/widgets/sponsored_placement_slot.dart';
 import '../../auth/auth_provider.dart';
 import '../../forums/data/mock_forums.dart';
 import '../../forums/forums_provider.dart';
-import '../../forums/topic_detail_typography.dart';
 import '../../forums/utils/forum_navigation.dart';
+import '../../forums/widgets/forum_editorial_title.dart';
 import '../semana_santa_provider.dart';
 import '../utils/semana_santa_topic.dart';
 import '../widgets/ss_hub_header.dart';
@@ -76,9 +76,9 @@ class SemanaSantaHubScreen extends ConsumerWidget {
               onPressed: () => popForumTopic(context, forumId: forumId),
               icon: const Icon(Icons.chevron_left, color: AppColors.burgundy),
             ),
-            title: Text(
-              forumName,
-              style: TopicDetailTypography.appBarTitle(),
+            title: ForumEditorialTitle(
+              title: forumName,
+              forumId: forumId,
             ),
             centerTitle: true,
           ),

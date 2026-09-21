@@ -10,6 +10,7 @@ import '../../core/widgets/cofradeo_bottom_nav.dart';
 import '../../shared/models/forum.dart';
 import '../calendar/calendar_provider.dart';
 import '../calendar/models/calendar_focus_request.dart';
+import '../calendar/utils/calendar_event_utils.dart';
 import '../../shared/models/calendar_event.dart';
 import '../ads/ads_provider.dart';
 import '../ads/models/sponsored_ad.dart';
@@ -28,10 +29,12 @@ import 'utils/forum_navigation.dart';
 import 'utils/hermandad_board_display.dart';
 import 'utils/hermandad_local_assets.dart';
 import 'utils/noticias_forum.dart';
+import 'widgets/forum_editorial_title.dart';
 import 'utils/topic_list_order.dart';
 import 'utils/topic_permissions.dart';
 import 'widgets/forum_about_tab.dart';
 import 'widgets/forum_pillar_icon_mark.dart';
+import 'widgets/noticias_editorial_feed.dart';
 import 'widgets/noticias_follow_button.dart';
 import 'widgets/topic_card.dart';
 import 'widgets/topic_compose_sheet.dart';
@@ -67,6 +70,8 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
   var _tabIndex = 0;
   var _sort = TopicListSort.lastActivity;
   var _filter = TopicListFilter.all;
+  var _pinnedCollapsed = false;
+  var _noticiasShowAllLatest = false;
   String? _selectedHermandadesDay;
 
   @override
@@ -140,6 +145,7 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
         onRefresh: () async {
           ref.invalidate(forumTopicsProvider(forumId));
           ref.invalidate(forumPillarProvider(forumId));
+          invalidateForumAds(ref);
           await ref.read(forumTopicsProvider(forumId).future);
         },
         child: CustomScrollView(
@@ -282,10 +288,39 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
       _sort,
     );
 
+    if (isNoticiasForum(forumId)) {
+      return buildNoticiasEditorialSlivers(
+        topics: processed,
+        showAllLatest: _noticiasShowAllLatest,
+        onToggleShowAll: () =>
+            setState(() => _noticiasShowAllLatest = !_noticiasShowAllLatest),
+        onOpenTopic: (topic) async {
+          await context.push('/foros/$forumId/tema/${topic.id}');
+          if (context.mounted) {
+            ref.invalidate(forumTopicsProvider(forumId));
+          }
+        },
+        sponsoredSlot: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ForumTopicsSponsoredEventSlot(forumId: forumId),
+            _ForumTopicsListBanner(
+              placement: _listBannerPlacement(forumId),
+              forumId: forumId,
+              dense: true,
+            ),
+          ],
+        ),
+        bottomPadding: cofradeoBottomScrollPadding(context, extra: 16),
+      );
+    }
+
     final listBannerPlacement = _listBannerPlacement(forumId);
-    final showInFeedBanners = _showInFeedListBanners(query);
-    final hasSponsoredEvent = _hasSponsoredEventContext(ref, forumId);
-    final showTopListBanner = !hasSponsoredEvent;
+    final showInFeedBanners =
+        !isNoticias && _showInFeedListBanners(query);
+    final hasSponsoredEvent =
+        !isNoticias && _hasSponsoredEventContext(ref, forumId);
+    final showTopListBanner = !isNoticias && !hasSponsoredEvent;
 
     final listTop = forumId == 'hermandades' ? 0.0 : _listTopPadding;
 
@@ -341,23 +376,50 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
 
     final split = splitForumTopics(processed);
     final slivers = <Widget>[];
+    final isHermandades = forumId == 'hermandades';
+    final isNoticias = isNoticiasForum(forumId);
 
     if (split.pinned.isNotEmpty) {
       slivers.add(
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(16, listTop, 16, 0),
-          sliver: SliverList.separated(
-            itemCount: split.pinned.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, index) => _buildTopicCard(
-              context,
-              ref,
-              split.pinned[index],
-              pinned: true,
+          padding: EdgeInsets.fromLTRB(16, listTop, 16, 8),
+          sliver: SliverToBoxAdapter(
+            child: _TopicsSectionHeader(
+              icon: isNoticias ? Icons.star_outline_rounded : Icons.push_pin_outlined,
+              title: isNoticias ? 'Noticias destacadas' : 'TEMAS DESTACADOS',
+              subtitle: _pinnedCollapsed
+                  ? '${split.pinned.length} oculta${split.pinned.length == 1 ? '' : 's'}'
+                  : (isNoticias
+                      ? 'Selección editorial'
+                      : 'Fijados por la comunidad'),
+              editorial: isNoticias,
+              trailing: _PinnedCollapseButton(
+                collapsed: _pinnedCollapsed,
+                onPressed: () {
+                  setState(() => _pinnedCollapsed = !_pinnedCollapsed);
+                },
+              ),
             ),
           ),
         ),
       );
+      if (!_pinnedCollapsed) {
+        slivers.add(
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            sliver: SliverList.separated(
+              itemCount: split.pinned.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, index) => _buildTopicCard(
+                context,
+                ref,
+                split.pinned[index],
+                pinned: true,
+              ),
+            ),
+          ),
+        );
+      }
     }
 
     slivers.add(
@@ -392,13 +454,42 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
         showInFeedBanners: showInFeedBanners,
         hasSponsoredEvent: hasSponsoredEvent,
       );
+      final communityTop = isHermandades
+          ? 0.0
+          : (split.pinned.isEmpty ? listTop : 14.0);
+      if (!isHermandades) {
+        slivers.add(
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(16, communityTop, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: _TopicsSectionHeader(
+                icon: isNoticias
+                    ? Icons.newspaper_outlined
+                    : Icons.forum_outlined,
+                title: isNoticias ? 'Últimas noticias' : 'TODOS LOS TEMAS',
+                subtitle: isNoticias
+                    ? 'Lo más reciente'
+                    : 'Conversaciones de la comunidad',
+                editorial: isNoticias,
+                trailing: Text(
+                  isNoticias
+                      ? '${split.community.length} noticia${split.community.length == 1 ? '' : 's'}'
+                      : '${split.community.length} tema${split.community.length == 1 ? '' : 's'}',
+                  style: ForumTopicsTypography.card(
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w600,
+                  ).copyWith(fontSize: 10),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
       slivers.add(
         SliverPadding(
           padding: EdgeInsets.fromLTRB(
             16,
-            forumId == 'hermandades'
-                ? 0
-                : (split.pinned.isEmpty ? listTop : 6),
+            isHermandades ? communityTop : 0,
             16,
             0,
           ),
@@ -442,10 +533,22 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
       data: (ad) {
         if (ad == null) return false;
         final eventId = ad.calendarEventId?.trim();
-        if (eventId == null || eventId.isEmpty) return false;
+        if (eventId == null || eventId.isEmpty) {
+          // «Todos los eventos»: hay tarjeta si existe alguno hoy/futuro.
+          final upcoming = ref.watch(sponsorshipEventPickerProvider);
+          return upcoming.when(
+            data: (events) =>
+                events.any((e) => !isCalendarEventPast(e)),
+            loading: () => true,
+            error: (_, _) => false,
+          );
+        }
 
         return ref.watch(calendarEventByIdProvider(eventId)).when(
-          data: (event) => event != null,
+          data: (event) {
+            if (event == null) return false;
+            return !isCalendarEventPast(event);
+          },
           loading: () => true,
           error: (_, _) => false,
         );
@@ -592,10 +695,13 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
     ForumTopic topic, {
     bool pinned = false,
   }) {
+    final isNoticias = isNoticiasForum(widget.forumId);
     return TopicCard(
       topic: topic,
       pinned: pinned || topic.isPinned,
-      variant: TopicCardVariant.premium,
+      variant: isNoticias
+          ? TopicCardVariant.noticias
+          : TopicCardVariant.premium,
       forumId: widget.forumId,
       onTap: () async {
         await context.push('/foros/${widget.forumId}/tema/${topic.id}');
@@ -777,49 +883,33 @@ class _ForumDetailHero extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 2),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _ForumHeroMedallion(
-                      forum: forum,
-                      size: isHermandades ? 52 : 44,
-                    ),
-                    const SizedBox(height: 6),
-                    ForumActivityBadge(level: activity, compact: true),
-                  ],
-                ),
-                const SizedBox(width: 12),
+                if (!isNoticias) ...[
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _ForumHeroMedallion(
+                        forum: forum,
+                        size: isHermandades ? 52 : 44,
+                      ),
+                      const SizedBox(height: 6),
+                      ForumActivityBadge(level: activity, compact: true),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (isHermandades) ...[
-                        Text(
-                          'CANAL OFICIAL',
-                          style: ForumTopicsTypography.onDark(
-                            color: AppColors.goldPale,
-                            fontWeight: FontWeight.w600,
-                          ).copyWith(
-                            fontSize: 9,
-                            letterSpacing: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                      ],
-                      Text(
-                        forum.name.toUpperCase(),
-                        style: isHermandades
-                            ? AppTypography.displaySmall(
-                                color: AppColors.gold,
-                              ).copyWith(
-                                fontSize: 20,
-                                letterSpacing: 1.0,
-                                height: 1.05,
-                                fontWeight: FontWeight.w600,
-                              )
-                            : ForumTopicsTypography.heroTitle(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      ForumEditorialTitle(
+                        title: isHermandades
+                            ? forum.name.toUpperCase()
+                            : forum.name,
+                        forumId: forum.id,
+                        onDark: true,
+                        center: false,
+                        titleFontSize: isHermandades ? 20 : 22,
+                        maxTitleLines: 2,
                       ),
                       if (isHermandades) ...[
                         const SizedBox(height: 8),
@@ -1083,6 +1173,7 @@ class _ForumDetailPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHermandades = forum.isHermandadesChannel;
+    final isNoticias = isNoticiasForum(forum.id);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1099,59 +1190,63 @@ class _ForumDetailPanel extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
               child: hermandadesDayFilter,
             ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(16, isHermandades ? 8 : 10, 16, 0),
-            child: isHermandades
-                ? _HermandadesToolbar(
-                    searchController: searchController,
-                    onSearchChanged: onSearchChanged,
-                    sort: sort,
-                    onSortChanged: onSortChanged,
-                    selectedDay: selectedHermandadesDay,
-                    onDaySelected: onHermandadesDaySelected,
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 40,
-                          child: TextField(
-                            controller: searchController,
-                            onChanged: onSearchChanged,
-                            style: ForumTopicsTypography.style(),
-                            decoration: InputDecoration(
-                              hintText: 'Buscar en este foro...',
-                              hintStyle: ForumTopicsTypography.style(
-                                color: AppColors.textMuted,
-                              ),
-                              prefixIcon: const Icon(
-                                Icons.search,
-                                color: AppColors.textMuted,
-                                size: 18,
-                              ),
-                              filled: true,
-                              fillColor: AppColors.backgroundElevated,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 0,
-                              ),
-                              isDense: true,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
+          if (isHermandades)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: _HermandadesToolbar(
+                searchController: searchController,
+                onSearchChanged: onSearchChanged,
+                sort: sort,
+                onSortChanged: onSortChanged,
+                selectedDay: selectedHermandadesDay,
+                onDaySelected: onHermandadesDaySelected,
+              ),
+            )
+          else if (!isNoticias)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: TextField(
+                        controller: searchController,
+                        onChanged: onSearchChanged,
+                        style: ForumTopicsTypography.style(),
+                        decoration: InputDecoration(
+                          hintText: 'Buscar en este foro...',
+                          hintStyle: ForumTopicsTypography.style(
+                            color: AppColors.textMuted,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: AppColors.textMuted,
+                            size: 18,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.backgroundElevated,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 0,
+                          ),
+                          isDense: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      _FilterIconButton(
-                        active: filter != TopicListFilter.all,
-                        onTap: onFilterTap,
-                      ),
-                    ],
+                    ),
                   ),
-          ),
-          if (!isHermandades)
+                  const SizedBox(width: 8),
+                  _FilterIconButton(
+                    active: filter != TopicListFilter.all,
+                    onTap: onFilterTap,
+                  ),
+                ],
+              ),
+            ),
+          if (!isHermandades && !isNoticias)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
               child: Row(
@@ -1192,14 +1287,45 @@ class _ForumDetailPanel extends StatelessWidget {
                 ],
               ),
             ),
-          if (isNoticiasForum(forum.id))
+          if (isNoticias && showNewTopic)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: onNewTopic,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.burgundy,
+                    foregroundColor: AppColors.textOnDark,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: Text(
+                    newTopicLabel,
+                    style: ForumTopicsTypography.style(
+                      color: AppColors.textOnDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (isNoticias)
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: NoticiasFollowButton(),
             ),
         ] else
           ForumAboutTab(forum: forum),
-        ],
+      ],
     );
   }
 }
@@ -1407,6 +1533,7 @@ class _ForumDetailTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHermandades = forum.isHermandadesChannel;
+    final isNoticias = isNoticiasForum(forum.id);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
@@ -1414,8 +1541,12 @@ class _ForumDetailTabs extends StatelessWidget {
         children: [
           Expanded(
             child: _ForumTab(
-              label: isHermandades ? 'Publicaciones' : 'Temas de discusión',
-              icon: isHermandades
+              label: isHermandades
+                  ? 'Publicaciones'
+                  : isNoticias
+                      ? 'Portada'
+                      : 'Temas de discusión',
+              icon: isHermandades || isNoticias
                   ? Icons.newspaper_outlined
                   : Icons.article_outlined,
               selected: tabIndex == 0,
@@ -1425,7 +1556,11 @@ class _ForumDetailTabs extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: _ForumTab(
-              label: isHermandades ? 'Acerca del apartado' : 'Acerca del foro',
+              label: isHermandades
+                  ? 'Acerca del apartado'
+                  : isNoticias
+                      ? 'Acerca'
+                      : 'Acerca del foro',
               icon: Icons.info_outline,
               selected: tabIndex == 1,
               onTap: () => onTabChanged(1),
@@ -1655,9 +1790,10 @@ class _LockedForumView extends StatelessWidget {
           onPressed: onBack,
           icon: const Icon(Icons.chevron_left),
         ),
-        title: Text(
-          forum.name,
-          style: ForumTopicsTypography.style(fontWeight: FontWeight.w600),
+        centerTitle: true,
+        title: ForumEditorialTitle(
+          title: forum.name,
+          forumId: forum.id,
         ),
       ),
       body: Center(
@@ -1909,6 +2045,127 @@ class _ForumTopicRow {
   final String? forumId;
 }
 
+class _TopicsSectionHeader extends StatelessWidget {
+  const _TopicsSectionHeader({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+    this.editorial = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+  final bool editorial;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: AppColors.burgundy.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 15, color: AppColors.burgundy),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: editorial
+                    ? AppTypography.displaySmall(
+                        color: AppColors.burgundyDark,
+                      ).copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        height: 1.1,
+                      )
+                    : AppTypography.labelSmall(
+                        color: AppColors.burgundyDark,
+                      ).copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                        height: 1.1,
+                      ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: ForumTopicsTypography.card(
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: trailing!,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _PinnedCollapseButton extends StatelessWidget {
+  const _PinnedCollapseButton({
+    required this.collapsed,
+    required this.onPressed,
+  });
+
+  final bool collapsed;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.burgundy.withValues(alpha: 0.07),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                collapsed ? 'Mostrar' : 'Ocultar',
+                style: ForumTopicsTypography.card(
+                  color: AppColors.burgundyDark,
+                  fontWeight: FontWeight.w700,
+                ).copyWith(fontSize: 10),
+              ),
+              const SizedBox(width: 2),
+              Icon(
+                collapsed
+                    ? Icons.keyboard_arrow_down_rounded
+                    : Icons.keyboard_arrow_up_rounded,
+                size: 14,
+                color: AppColors.burgundyDark,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _HermandadesDayHeader extends StatelessWidget {
   const _HermandadesDayHeader({required this.label});
 
@@ -1963,6 +2220,8 @@ class _ForumTopicsSponsoredEventSlot extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (isNoticiasForum(forumId)) return const SizedBox.shrink();
+
     final adAsync = ref.watch(
       adForPlacementProvider(
         AdPlacementQuery(
@@ -1978,13 +2237,36 @@ class _ForumTopicsSponsoredEventSlot extends ConsumerWidget {
 
         final eventId = ad.calendarEventId?.trim();
         if (eventId == null || eventId.isEmpty) {
-          return const SizedBox.shrink();
+          final upcomingAsync = ref.watch(sponsorshipEventPickerProvider);
+          return upcomingAsync.when(
+            data: (events) {
+              CalendarEvent? next;
+              for (final event in events) {
+                if (!isCalendarEventPast(event)) {
+                  next = event;
+                  break;
+                }
+              }
+              if (next == null) return const SizedBox.shrink();
+              return SponsoredAdCard(
+                ad: ad,
+                style: SponsoredAdCardStyle.event,
+                event: next,
+                onEventTap: (linkedEvent) =>
+                    _openSponsoredCalendarEvent(context, ref, linkedEvent),
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
+          );
         }
 
         final eventAsync = ref.watch(calendarEventByIdProvider(eventId));
         return eventAsync.when(
           data: (event) {
-            if (event == null) return const SizedBox.shrink();
+            if (event == null || isCalendarEventPast(event)) {
+              return const SizedBox.shrink();
+            }
 
             return SponsoredAdCard(
               ad: ad,

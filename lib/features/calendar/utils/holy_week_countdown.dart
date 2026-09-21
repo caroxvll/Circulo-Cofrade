@@ -27,7 +27,7 @@ class CofradeCountdown {
   final CofradeCountdownMilestone milestone;
   final bool usesManualDates;
 
-  /// Días restantes para el hito del banner con cifras (p. ej. 267 → 2·6·7).
+  /// Días restantes para el hito del banner (p. ej. entre «Faltan» y «días»).
   final int? countdownDays;
 
   bool get usesArtworkBanner =>

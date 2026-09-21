@@ -20,7 +20,9 @@ create table if not exists public.ads (
       'calendar',
       'search',
       'profile',
-      'hermandades'
+      'hermandades',
+      'featured_topic',
+      'noticias'
     )
   ),
   priority int not null default 1 check (priority between 1 and 100),

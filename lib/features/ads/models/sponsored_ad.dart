@@ -7,7 +7,8 @@ enum AdPlacement {
   calendar('calendar'),
   search('search'),
   profile('profile'),
-  hermandades('hermandades');
+  hermandades('hermandades'),
+  noticias('noticias');
 
   const AdPlacement(this.value);
 

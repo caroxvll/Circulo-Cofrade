@@ -302,7 +302,7 @@ Deno.serve(async (req) => {
     const { data: prefs, error: prefsError } = await supabase
       .from("notification_preferences")
       .select(
-        "push_enabled, notify_hashtags, notify_profiles, notify_topics, notify_mentions, notify_followers, notify_reactions, notify_calendar, notify_quiz",
+        "push_enabled, notify_hashtags, notify_profiles, notify_topics, notify_mentions, notify_followers, notify_reactions, notify_calendar, notify_quiz, notify_news",
       )
       .eq("user_id", record.user_id)
       .maybeSingle();
