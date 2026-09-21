@@ -9,6 +9,7 @@ import '../../auth/auth_provider.dart';
 import '../../permissions/permissions_provider.dart';
 import '../forums_provider.dart';
 import '../utils/forum_navigation.dart';
+import '../utils/noticias_forum.dart';
 
 Future<void> showTopicModerationSheet(
   BuildContext context,
@@ -72,13 +73,16 @@ class _TopicModerationSheetState extends ConsumerState<_TopicModerationSheet> {
   Future<void> _togglePin() async {
     final topic = widget.topic;
     if (topic.isSystem) return;
+    final isNoticias = isNoticiasForum(widget.forumId);
 
     await _run(
       () => ref.read(adminRepositoryProvider).setTopicPinned(
             topicId: topic.id,
             isPinned: !topic.isPinned,
           ),
-      topic.isPinned ? 'Tema desfijado' : 'Tema fijado',
+      topic.isPinned
+          ? (isNoticias ? 'Noticia ya no destacada' : 'Tema desfijado')
+          : (isNoticias ? 'Noticia destacada' : 'Tema fijado'),
     );
   }
 
@@ -265,14 +269,30 @@ class _TopicModerationSheetState extends ConsumerState<_TopicModerationSheet> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(
-                topic.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                isNoticiasForum(widget.forumId)
+                    ? (topic.isPinned
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded)
+                    : (topic.isPinned
+                        ? Icons.push_pin
+                        : Icons.push_pin_outlined),
                 color: AppColors.burgundy,
               ),
-              title: Text(topic.isPinned ? 'Quitar fijado' : 'Fijar tema'),
+              title: Text(
+                isNoticiasForum(widget.forumId)
+                    ? (topic.isPinned
+                        ? 'Quitar de destacadas'
+                        : 'Destacar noticia')
+                    : (topic.isPinned ? 'Quitar fijado' : 'Fijar tema'),
+              ),
               subtitle: Text(
-                topic.isPinned
-                    ? 'Deja de aparecer arriba del foro'
-                    : 'Mantener visible arriba del foro',
+                isNoticiasForum(widget.forumId)
+                    ? (topic.isPinned
+                        ? 'Deja de aparecer en Noticias destacadas'
+                        : 'Mostrar arriba en Noticias destacadas')
+                    : (topic.isPinned
+                        ? 'Deja de aparecer arriba del foro'
+                        : 'Mantener visible arriba del foro'),
                 style: AppTypography.bodyMedium(color: AppColors.textMuted),
               ),
               onTap: _busy ? null : _togglePin,

@@ -51,15 +51,15 @@ abstract final class CalendarDesign {
 
   // Tarjetas de evento
   static const eventCardRadius = 12.0;
-  static const eventCardPadding = 6.0;
+  static const eventCardPadding = 8.0;
   static const eventCardGap = 8.0;
-  static const eventThumbWidth = 84.0;
-  static const eventThumbHeight = 62.0;
-  static const eventThumbRadius = 8.0;
-  static const eventTitleSize = 12.0;
-  static const eventMetaSize = 9.5;
-  static const eventTimeFontSize = 9.0;
-  static const eventBookmarkSize = 16.0;
+  static const eventThumbWidth = 72.0;
+  static const eventThumbHeight = 72.0;
+  static const eventThumbRadius = 10.0;
+  static const eventTitleSize = 13.0;
+  static const eventMetaSize = 10.0;
+  static const eventTimeFontSize = 13.0;
+  static const eventBookmarkSize = 18.0;
 
   static TextStyle sectionTitle({Color? color}) =>
       AppTypography.displaySmall(color: color).copyWith(

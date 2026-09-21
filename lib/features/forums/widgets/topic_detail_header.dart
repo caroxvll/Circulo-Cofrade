@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/text_normalize.dart';
 import '../../../core/widgets/forum_post_content.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
@@ -14,6 +15,7 @@ import '../utils/reply_reactions.dart';
 import 'cofrade_rank_label.dart';
 import 'forum_post_image.dart';
 import 'hermandad_board_header.dart';
+import 'noticias_article_header.dart';
 import 'related_forum_chip.dart';
 import 'topic_author_badge.dart';
 import 'topic_follow_button.dart';
@@ -53,6 +55,18 @@ class TopicDetailHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isHermandadBoard) {
       return HermandadBoardHeader(
+        topic: topic,
+        forumId: forumId,
+        topicId: topicId,
+        displayCommentCount: displayCommentCount,
+        displayViewCount: displayViewCount,
+        displayTotalReactions: displayTotalReactions,
+        reactionBreakdown: reactionBreakdown,
+      );
+    }
+
+    if (isNoticiasForum(forumId)) {
+      return NoticiasArticleHeader(
         topic: topic,
         forumId: forumId,
         topicId: topicId,
@@ -304,14 +318,47 @@ class TopicDetailRepliesHeader extends StatelessWidget {
     required this.isHermandadBoard,
     required this.commentCount,
     this.sectionSubtitle,
+    this.isNoticias = false,
   });
 
   final bool isHermandadBoard;
   final int commentCount;
   final String? sectionSubtitle;
+  final bool isNoticias;
 
   @override
   Widget build(BuildContext context) {
+    if (isNoticias) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '¿Qué opinas?',
+            style: AppTypography.displaySmall(
+              color: AppColors.burgundyDark,
+            ).copyWith(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            commentCount > 0
+                ? '$commentCount comentario${commentCount == 1 ? '' : 's'} · más recientes primero'
+                : 'Sé el primero en comentar.',
+            style: TopicDetailTypography.sectionSubtitle(),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 40,
+            height: 1,
+            color: AppColors.gold.withValues(alpha: 0.55),
+          ),
+        ],
+      );
+    }
+
     final title = isHermandadBoard
         ? 'Información oficial'
         : commentCount > 0

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
@@ -9,7 +10,7 @@ import '../data/mock_forums.dart';
 import '../utils/forum_activity_badge.dart';
 import 'forum_category_card.dart';
 
-/// Card editorial de Noticias: crema a la izquierda + foto difuminada a la derecha.
+/// Card editorial de Noticias: descripción + spoiler de la última noticia.
 class NoticiasPremiumBanner extends StatelessWidget {
   const NoticiasPremiumBanner({
     super.key,
@@ -20,7 +21,7 @@ class NoticiasPremiumBanner extends StatelessWidget {
   final ForumCategory forum;
   final VoidCallback onTap;
 
-  static const height = 136.0;
+  static const height = 148.0;
 
   static const _shortDescription =
       'Última hora de la Semana Santa de Sevilla.';
@@ -30,13 +31,21 @@ class NoticiasPremiumBanner extends StatelessWidget {
     final activity = forumActivityLevel(forum);
     final locked = forum.isLocked;
     final description = _editorialDescription(forum.description);
+    final topicTitle = forum.lastTopicTitle?.trim();
+    final topicId = forum.lastTopicId?.trim();
+    final hasTopic =
+        topicTitle != null &&
+        topicTitle.isNotEmpty &&
+        topicId != null &&
+        topicId.isNotEmpty;
+    final ago = forum.lastMessageAgo.trim();
     final imageCache = ImageDecodeCache.px(
       context,
       MediaQuery.sizeOf(context).width * 0.75,
     );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(ForumCategoryCard.cardRadius),
@@ -66,7 +75,6 @@ class NoticiasPremiumBanner extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Foto a la derecha; máscara larga para que no se note el borde.
                   Align(
                     alignment: Alignment.centerRight,
                     child: FractionallySizedBox(
@@ -104,7 +112,6 @@ class NoticiasPremiumBanner extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Crema suave encima: texto legible + transición continua.
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -113,8 +120,8 @@ class NoticiasPremiumBanner extends StatelessWidget {
                         colors: [
                           AppColors.surfaceAlt,
                           AppColors.surfaceAlt,
-                          Color(0xE6F5EFE8), // ~90%
-                          Color(0x73F5EFE8), // ~45%
+                          Color(0xE6F5EFE8),
+                          Color(0x73F5EFE8),
                           Color(0x00F5EFE8),
                         ],
                         stops: [0.0, 0.30, 0.48, 0.66, 0.86],
@@ -122,7 +129,7 @@ class NoticiasPremiumBanner extends StatelessWidget {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 12, 10),
+                    padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -137,7 +144,7 @@ class NoticiasPremiumBanner extends StatelessWidget {
                                       ? AppColors.textMuted
                                       : AppColors.burgundyDark,
                                 ).copyWith(
-                                  fontSize: 20,
+                                  fontSize: 19,
                                   fontWeight: FontWeight.w600,
                                   height: 1.05,
                                   letterSpacing: 0.12,
@@ -163,7 +170,7 @@ class NoticiasPremiumBanner extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Container(
                           width: 44,
                           height: 1.5,
@@ -174,8 +181,7 @@ class NoticiasPremiumBanner extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        // Descripción solo en zona crema segura.
+                        const SizedBox(height: 6),
                         FractionallySizedBox(
                           widthFactor: 0.58,
                           alignment: Alignment.centerLeft,
@@ -186,60 +192,60 @@ class NoticiasPremiumBanner extends StatelessWidget {
                                   ? AppColors.textMuted
                                   : AppColors.textPrimary,
                             ).copyWith(
-                              fontSize: 13.5,
-                              height: 1.28,
+                              fontSize: 13,
+                              height: 1.25,
                               fontWeight: FontWeight.w500,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const Spacer(),
-                        FractionallySizedBox(
-                          widthFactor: 0.62,
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.chat_bubble_outline,
-                                size: 13,
-                                color: AppColors.textMuted,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${_shortCount(forum.messageCount)} mensajes',
-                                style: AppTypography.labelSmall(
-                                  color: AppColors.textMuted,
-                                ).copyWith(fontSize: 11, height: 1.1),
-                              ),
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
-                                child: Container(
-                                  width: 1,
-                                  height: 11,
-                                  color: AppColors.border.withValues(alpha: 0.7),
+                        if (hasTopic) ...[
+                          const SizedBox(height: 10),
+                          FractionallySizedBox(
+                            widthFactor: 0.58,
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              height: 1,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.gold.withValues(alpha: 0.55),
+                                    AppColors.gold.withValues(alpha: 0.12),
+                                    Colors.transparent,
+                                  ],
                                 ),
                               ),
-                              Icon(
-                                Icons.newspaper_outlined,
-                                size: 13,
-                                color: AppColors.textMuted,
-                              ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  '${_shortCount(forum.topicCount)} ${_topicLabel(forum.topicCount)}',
-                                  style: AppTypography.labelSmall(
-                                    color: AppColors.textMuted,
-                                  ).copyWith(fontSize: 11, height: 1.1),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          FractionallySizedBox(
+                            widthFactor: 0.68,
+                            alignment: Alignment.centerLeft,
+                            child: _LatestNewsSpoiler(
+                              title: topicTitle,
+                              ago: ago,
+                              locked: locked,
+                              onOpen: locked
+                                  ? null
+                                  : () => context.push(
+                                        '/foros/${forum.id}/tema/$topicId',
+                                      ),
+                            ),
+                          ),
+                        ] else ...[
+                          const Spacer(),
+                          FractionallySizedBox(
+                            widthFactor: 0.62,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '${_shortCount(forum.topicCount)} ${_topicLabel(forum.topicCount)}',
+                              style: AppTypography.labelSmall(
+                                color: AppColors.textMuted,
+                              ).copyWith(fontSize: 11, height: 1.1),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -252,7 +258,6 @@ class NoticiasPremiumBanner extends StatelessWidget {
     );
   }
 
-  /// Evita el texto largo de Junta aunque el pilar remoto aún lo tenga.
   static String _editorialDescription(String raw) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return _shortDescription;
@@ -265,6 +270,74 @@ class NoticiasPremiumBanner extends StatelessWidget {
   }
 
   static String _topicLabel(int count) => count == 1 ? 'noticia' : 'noticias';
+}
+
+/// Línea inferior del card: spoiler de la última noticia.
+class _LatestNewsSpoiler extends StatelessWidget {
+  const _LatestNewsSpoiler({
+    required this.title,
+    required this.ago,
+    required this.locked,
+    this.onOpen,
+  });
+
+  final String title;
+  final String ago;
+  final bool locked;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'ÚLTIMA NOTICIA',
+          style: AppTypography.labelSmall(
+            color: AppColors.burgundy,
+          ).copyWith(
+            fontSize: 8.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.9,
+            height: 1,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          title,
+          style: AppTypography.displaySmall(
+            color: locked ? AppColors.textMuted : AppColors.burgundyDark,
+          ).copyWith(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            height: 1.15,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (ago.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            ago,
+            style: AppTypography.labelSmall(
+              color: AppColors.textMuted,
+            ).copyWith(fontSize: 10.5, height: 1.1),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+
+    if (onOpen == null) return content;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onOpen,
+      child: content,
+    );
+  }
 }
 
 class _NoticiasActivityChip extends StatelessWidget {

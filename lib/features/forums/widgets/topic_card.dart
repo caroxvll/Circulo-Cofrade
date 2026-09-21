@@ -21,7 +21,7 @@ import '../utils/topic_list_order.dart';
 import 'related_forum_chip.dart';
 import 'topic_status_badge.dart';
 
-enum TopicCardVariant { standard, premium }
+enum TopicCardVariant { standard, premium, noticias }
 
 class TopicCard extends StatelessWidget {
   const TopicCard({
@@ -41,6 +41,14 @@ class TopicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (variant == TopicCardVariant.noticias) {
+      return _NoticiasTopicCard(
+        topic: topic,
+        onTap: onTap,
+        featured: pinned,
+      );
+    }
+
     if (variant == TopicCardVariant.premium) {
       return _PremiumTopicCard(
         topic: topic,
@@ -248,12 +256,16 @@ class _PremiumTopicCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(cardRadius),
             color: AppColors.surface,
             border: Border.all(
-              color: AppColors.gold.withValues(alpha: 0.22),
+              color: pinned
+                  ? AppColors.goldDark.withValues(alpha: 0.42)
+                  : AppColors.gold.withValues(alpha: 0.22),
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.burgundyDark.withValues(alpha: 0.06),
-                blurRadius: 16,
+                color: AppColors.burgundyDark.withValues(
+                  alpha: pinned ? 0.09 : 0.06,
+                ),
+                blurRadius: pinned ? 18 : 16,
                 offset: const Offset(0, 4),
               ),
               BoxShadow(
@@ -275,7 +287,10 @@ class _PremiumTopicCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Container(width: 4, color: accent),
+                      Container(
+                        width: 4,
+                        color: pinned ? AppColors.burgundy : accent,
+                      ),
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
@@ -284,8 +299,8 @@ class _PremiumTopicCard extends StatelessWidget {
                             children: [
                               PinnedTopicMark(
                                 topic: topic,
-                                size: 44,
-                                circular: true,
+                                size: pinned ? 52 : 44,
+                                circular: !pinned,
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -349,6 +364,7 @@ class _PremiumTopicCard extends StatelessWidget {
                                               label: 'Destacado',
                                               foreground: AppColors.goldDark,
                                               background: AppColors.goldPale,
+                                              icon: Icons.push_pin,
                                             ),
                                           if (isNew)
                                             _HermandadMetaPill(
@@ -447,6 +463,344 @@ class _PremiumTopicStatsRow extends StatelessWidget {
   }
 }
 
+/// Card editorial del foro Noticias (destacada o compacta).
+class _NoticiasTopicCard extends StatelessWidget {
+  const _NoticiasTopicCard({
+    required this.topic,
+    required this.onTap,
+    required this.featured,
+  });
+
+  static const cardRadius = 14.0;
+
+  final ForumTopic topic;
+  final VoidCallback onTap;
+  final bool featured;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(cardRadius),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(cardRadius),
+        splashColor: AppColors.burgundy.withValues(alpha: 0.06),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(cardRadius),
+            color: AppColors.surface,
+            border: Border.all(
+              color: featured
+                  ? AppColors.goldDark.withValues(alpha: 0.38)
+                  : AppColors.gold.withValues(alpha: 0.2),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.burgundyDark.withValues(
+                  alpha: featured ? 0.1 : 0.06,
+                ),
+                blurRadius: featured ? 18 : 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(cardRadius),
+            child: featured
+                ? _NoticiasFeaturedBody(topic: topic)
+                : _NoticiasCompactBody(topic: topic),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NoticiasFeaturedBody extends StatelessWidget {
+  const _NoticiasFeaturedBody({required this.topic});
+
+  final ForumTopic topic;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _NoticiasCoverImage(
+          topic: topic,
+          width: 112,
+          square: true,
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const _DestacadaBadge(),
+                    const Spacer(),
+                    Text(
+                      topic.timeAgo,
+                      style: ForumTopicsTypography.card(
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: AppColors.textMuted.withValues(alpha: 0.75),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  topic.title,
+                  style: AppTypography.displaySmall(
+                    color: AppColors.textPrimary,
+                  ).copyWith(fontSize: 18, height: 1.15),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  topic.excerpt,
+                  style: ForumTopicsTypography.card(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w400,
+                  ).copyWith(fontSize: 12, height: 1.35),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 10),
+                _NoticiasStatsRow(topic: topic),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NoticiasCompactBody extends StatelessWidget {
+  const _NoticiasCompactBody({required this.topic});
+
+  final ForumTopic topic;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _NoticiasCoverImage(
+            topic: topic,
+            width: 86,
+            height: 64,
+            square: false,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        topic.title,
+                        style: AppTypography.displaySmall(
+                          color: AppColors.textPrimary,
+                        ).copyWith(fontSize: 16, height: 1.15),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: AppColors.textMuted.withValues(alpha: 0.75),
+                    ),
+                  ],
+                ),
+                if (topic.relatedForumId != null) ...[
+                  const SizedBox(height: 6),
+                  RelatedForumChip(
+                    relatedForumId: topic.relatedForumId!,
+                    compact: true,
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      topic.timeAgo,
+                      style: ForumTopicsTypography.card(
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                if (topic.excerpt.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    topic.excerpt,
+                    style: ForumTopicsTypography.card(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w400,
+                    ).copyWith(fontSize: 12, height: 1.3),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 8),
+                _NoticiasStatsRow(topic: topic),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DestacadaBadge extends StatelessWidget {
+  const _DestacadaBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(7, 3, 8, 3),
+      decoration: BoxDecoration(
+        color: AppColors.gold.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.goldDark.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.star_rounded, size: 12, color: AppColors.goldDark),
+          const SizedBox(width: 3),
+          Text(
+            'Destacada',
+            style: ForumTopicsTypography.card(
+              color: AppColors.goldDark,
+              fontWeight: FontWeight.w700,
+            ).copyWith(fontSize: 10, height: 1),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoticiasStatsRow extends StatelessWidget {
+  const _NoticiasStatsRow({required this.topic});
+
+  final ForumTopic topic;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = ForumTopicsTypography.card(
+      color: AppColors.textMuted,
+      fontWeight: FontWeight.w500,
+    );
+
+    return Row(
+      children: [
+        Icon(Icons.visibility_outlined, size: 12, color: AppColors.textMuted),
+        const SizedBox(width: 3),
+        Text('${formatCount(topic.viewCount)}', style: style),
+        const SizedBox(width: 10),
+        Icon(Icons.chat_bubble_outline, size: 12, color: AppColors.textMuted),
+        const SizedBox(width: 3),
+        Text('${topic.commentCount}', style: style),
+      ],
+    );
+  }
+}
+
+class _NoticiasCoverImage extends StatelessWidget {
+  const _NoticiasCoverImage({
+    required this.topic,
+    required this.width,
+    this.height,
+    required this.square,
+  });
+
+  final ForumTopic topic;
+  final double width;
+  final double? height;
+  final bool square;
+
+  @override
+  Widget build(BuildContext context) {
+    final cover = topicCoverImageSource(topic);
+    final icon = topicDisplayIcon(topic);
+    final resolvedHeight = square ? width : (height ?? width * 0.75);
+
+    Widget placeholder() => ColoredBox(
+      color: AppColors.burgundy.withValues(alpha: 0.92),
+      child: Center(
+        child: Icon(icon, color: AppColors.gold, size: width * 0.28),
+      ),
+    );
+
+    Widget buildImage({required double? imageHeight}) {
+      if (cover == null) return placeholder();
+      if (topicCoverIsAsset(cover)) {
+        return Image.asset(
+          cover,
+          fit: BoxFit.cover,
+          width: width,
+          height: imageHeight,
+          filterQuality: FilterQuality.low,
+          cacheWidth: ImageDecodeCache.px(context, width),
+          cacheHeight: ImageDecodeCache.px(
+            context,
+            imageHeight ?? resolvedHeight,
+          ),
+          gaplessPlayback: true,
+          errorBuilder: (_, _, _) => placeholder(),
+        );
+      }
+      return CofradeoNetworkImage(
+        url: cover,
+        fit: BoxFit.cover,
+        width: width,
+        height: imageHeight,
+        cacheSize: width,
+        errorWidget: placeholder(),
+      );
+    }
+
+    if (square) {
+      return SizedBox(
+        width: width,
+        height: width,
+        child: buildImage(imageHeight: width),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        width: width,
+        height: resolvedHeight,
+        child: buildImage(imageHeight: resolvedHeight),
+      ),
+    );
+  }
+}
+
 /// Foto de hermandad suave: se ve a la izquierda y se funde a blanco.
 /// Sin Opacity/ShaderMask (capas offscreen caras en listas).
 class _HermandadCardWash extends StatelessWidget {
@@ -497,11 +851,13 @@ class _HermandadMetaPill extends StatelessWidget {
     required this.label,
     required this.foreground,
     required this.background,
+    this.icon,
   });
 
   final String label;
   final Color foreground;
   final Color background;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -511,12 +867,21 @@ class _HermandadMetaPill extends StatelessWidget {
         color: background,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(
-        label,
-        style: ForumTopicsTypography.card(
-          color: foreground,
-          fontWeight: FontWeight.w600,
-        ).copyWith(fontSize: 10, letterSpacing: 0.1),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 10, color: foreground),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: ForumTopicsTypography.card(
+              color: foreground,
+              fontWeight: FontWeight.w600,
+            ).copyWith(fontSize: 10, letterSpacing: 0.1),
+          ),
+        ],
       ),
     );
   }

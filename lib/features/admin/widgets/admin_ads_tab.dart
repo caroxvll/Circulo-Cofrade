@@ -1699,7 +1699,7 @@ String _placementWhereHint(AdPlacement placement) {
       'Banner dentro de Cuaresma, Semana Santa o Glorias (tema destacado).',
     AdPlacement.hermandades =>
       'Banner en el canal Hermandades (listado por días).',
-    AdPlacement.calendar => 'Banner en la pestaña Calendario.',
+    AdPlacement.calendar => 'Banner fijo encima de la bottom nav en Calendario.',
     AdPlacement.search => 'Banner en Buscar (pantalla inicial, sin resultados).',
     AdPlacement.profile => 'Reservado · perfil.',
     AdPlacement.home => 'Reservado · inicio.',
