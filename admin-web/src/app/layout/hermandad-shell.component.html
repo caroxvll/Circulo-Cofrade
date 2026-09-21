@@ -1,0 +1,54 @@
+<div class="h-shell" [class.menu-open]="menuOpen()">
+  <div class="backdrop" [class.visible]="menuOpen()" (click)="closeMenu()"></div>
+
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="brand-mark" src="/logo-mark.png" alt="" width="40" height="40" />
+      <div class="brand-text">
+        <strong>{{ boardTitle() }}</strong>
+        <small>Área privada · oficial</small>
+      </div>
+      <button type="button" class="icon-btn close-mobile" (click)="closeMenu()" aria-label="Cerrar">
+        ✕
+      </button>
+    </div>
+
+    <nav aria-label="Portal hermandad">
+      @for (item of nav; track item.id) {
+        <a
+          [routerLink]="item.route"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: item.id === 'home' }"
+          (click)="closeMenu()"
+        >
+          {{ item.label }}
+        </a>
+      }
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="who">
+        <strong>{{ profile()?.displayName || 'Hermandad' }}</strong>
+        <span>{{ '@' + (profile()?.handle || '—') }}</span>
+        @if (profile()?.verified) {
+          <em class="ok">Verificada</em>
+        } @else {
+          <em class="warn">Sin verificar</em>
+        }
+      </div>
+      <button type="button" class="btn-out" (click)="logout()">Salir</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button type="button" class="icon-btn menu" (click)="toggleMenu()" aria-label="Menú">
+        ☰
+      </button>
+      <p class="crumb">Canal oficial</p>
+    </header>
+    <div class="page">
+      <router-outlet />
+    </div>
+  </div>
+</div>

@@ -1,0 +1,66 @@
+<section class="hp-page">
+  <header class="hp-head">
+    <div>
+      <p class="eyebrow">Canal oficial</p>
+      <h1>Hola, {{ profile()?.displayName || 'hermandad' }}</h1>
+      <p class="lead">
+        Desde aquí publicas en tu tablón de Cofradeo. Lo mismo que en la app,
+        con más comodidad para redactar.
+      </p>
+    </div>
+    <a routerLink="/hermandad/publicar" class="btn btn-primary">Publicar</a>
+  </header>
+
+  @if (store.error()) {
+    <div class="error-box">{{ store.error() }}</div>
+  }
+
+  @if (!profile()?.verified) {
+    <div class="warn-box">
+      Tu cuenta aún no está verificada. Puedes entrar, pero no publicar hasta
+      que la Junta la active.
+    </div>
+  }
+
+  <h2 class="block-title">Tu tablón</h2>
+  @if (store.loading()) {
+    <div class="state-box">Cargando…</div>
+  } @else if (store.boards().length === 0) {
+    <div class="empty-box">
+      Todavía no tienes un tablón vinculado. Escribe a la Junta de Cofradeo
+      para que te asignen.
+    </div>
+  } @else {
+    <div class="board-grid">
+      @for (board of store.boards(); track board.topicId) {
+        <article class="board-card">
+          <p class="day">{{ board.processionDay || 'Hermandad' }}</p>
+          <h3>{{ board.hermandadName }}</h3>
+          <p>{{ board.excerpt }}</p>
+        </article>
+      }
+    </div>
+  }
+
+  <div class="section-row">
+    <h2 class="block-title">Últimas publicaciones</h2>
+    <a routerLink="/hermandad/publicaciones" class="btn btn-ghost">Ver todas</a>
+  </div>
+  @if (recentPosts().length === 0) {
+    <div class="empty-box">
+      Aún no has publicado.
+      <a routerLink="/hermandad/publicar" class="btn btn-soft">Crear la primera</a>
+    </div>
+  } @else {
+    <div class="queue-list">
+      @for (post of recentPosts(); track post.id) {
+        <article class="queue-card">
+          <p class="queue-meta">
+            {{ categoryLabel(post.category) }} · {{ timeAgo(post.createdAt) }}
+          </p>
+          <p class="queue-excerpt">{{ post.body }}</p>
+        </article>
+      }
+    </div>
+  }
+</section>

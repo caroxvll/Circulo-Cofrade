@@ -129,6 +129,40 @@ class ForumsRepository {
         .toList();
   }
 
+  /// Posts oficiales recientes de varios tablones (feed «Tus Hermandades»).
+  Future<List<ForumReply>> fetchOfficialRepliesForTopics(
+    List<String> topicIds, {
+    int limit = 40,
+  }) async {
+    if (topicIds.isEmpty) return [];
+    if (!_useRemote) {
+      return topicIds
+          .expand(repliesForTopic)
+          .where((r) => r.isOfficial && !r.isDeleted)
+          .toList()
+        ..sort((a, b) {
+          final aMs = a.createdAt?.millisecondsSinceEpoch ?? 0;
+          final bMs = b.createdAt?.millisecondsSinceEpoch ?? 0;
+          return bMs.compareTo(aMs);
+        });
+    }
+
+    final rows = await _client!
+        .from('forum_replies')
+        .select('*, $_profileAuthorSelect')
+        .eq('is_official', true)
+        .inFilter('topic_id', topicIds)
+        .isFilter('deleted_at', null)
+        .isFilter('parent_reply_id', null)
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return rows
+        .where((row) => !_isAuthorSuspended(row))
+        .map(_replyFromRow)
+        .toList();
+  }
+
   Future<void> incrementTopicView(
     String topicId, {
     required String viewerId,

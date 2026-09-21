@@ -26,6 +26,7 @@ import '../../features/quiz/screens/quiz_play_screen.dart';
 import '../../features/quiz/screens/quiz_ranking_screen.dart';
 
 import '../../features/forums/topic_detail_screen.dart';
+import '../../features/forums/mis_hermandades_screen.dart';
 
 import '../../features/auth/login_screen.dart';
 
@@ -308,19 +309,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
 
               GoRoute(
-
                 path: '/foros',
-
                 builder: (context, state) => const ForumsScreen(),
-
               ),
-
               GoRoute(
-
+                path: '/foros/mis-hermandades',
+                builder: (context, state) => const MisHermandadesScreen(),
+              ),
+              GoRoute(
                 path: '/quiz',
-
                 builder: (context, state) => const QuizPlayScreen(),
-
               ),
 
               GoRoute(

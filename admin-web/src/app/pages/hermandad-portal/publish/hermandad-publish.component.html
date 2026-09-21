@@ -1,0 +1,138 @@
+<section class="hp-page">
+  <header class="hp-head">
+    <div>
+      <p class="eyebrow">Nueva publicación</p>
+      <h1>Publicar</h1>
+      <p class="lead">
+        Elige el <strong>tipo</strong>: eso decide dónde sale (tablón, calendario…).
+        Noticias de ciudad queda apagado para no saturar la portada.
+      </p>
+    </div>
+  </header>
+
+  @if (store.boards().length === 0) {
+    <div class="empty-box">
+      No tienes tablón asignado. Contacta con la Junta.
+    </div>
+  } @else {
+    <div class="panel publish-panel">
+      @if (store.boards().length > 1) {
+        <label>
+          Tablón
+          <select [(ngModel)]="topicId">
+            @for (board of store.boards(); track board.topicId) {
+              <option [value]="board.topicId">{{ board.title }}</option>
+            }
+          </select>
+        </label>
+      } @else {
+        <p class="board-fixed">
+          Tablón: <strong>{{ store.boards()[0].title }}</strong>
+        </p>
+      }
+
+      <p class="field-label">1. ¿Qué estás publicando?</p>
+      <div class="kind-grid">
+        @for (kind of kinds; track kind.id) {
+          <button
+            type="button"
+            class="kind-card"
+            [class.on]="kindId === kind.id"
+            (click)="onKindChange(kind.id)"
+          >
+            <strong>{{ kind.label }}</strong>
+            <span>{{ kind.hint }}</span>
+          </button>
+        }
+      </div>
+
+      <p class="field-label">2. Dónde sale</p>
+      <div class="dest-box">
+        <label class="check">
+          <input type="checkbox" [(ngModel)]="destBoard" disabled />
+          En mi tablón (app) · obligatorio
+        </label>
+        <label class="check">
+          <input
+            type="checkbox"
+            [(ngModel)]="destCalendar"
+            [disabled]="!activeKind.calendarType"
+          />
+          En el calendario Cofradeo
+          @if (!activeKind.calendarType) {
+            <em> · no aplica a este tipo</em>
+          }
+        </label>
+        <label class="check muted">
+          <input type="checkbox" [(ngModel)]="destNoticias" disabled />
+          En Noticias (portada) · desactivado por ahora
+        </label>
+        <p class="dest-note">
+          Así no se llena Noticias de cultos e igualás. Eso vive en tu hermandad
+          y, si tiene fecha, en el calendario.
+        </p>
+      </div>
+
+      <label>
+        Título corto
+        <input
+          [(ngModel)]="title"
+          placeholder="Ej. Culto de regla · Iguala de costaleros"
+        />
+      </label>
+
+      <label>
+        Texto
+        <textarea
+          [(ngModel)]="body"
+          rows="8"
+          placeholder="Detalles, horario, avisos…"
+        ></textarea>
+      </label>
+
+      @if (destCalendar && activeKind.needsDate) {
+        <div class="two-fields">
+          <label>
+            Fecha y hora
+            <input type="datetime-local" [(ngModel)]="startsAtLocal" />
+          </label>
+          <label>
+            Lugar (opcional)
+            <input [(ngModel)]="location" placeholder="Templo, casa de hermandad…" />
+          </label>
+        </div>
+      }
+
+      <p class="field-label">3. Imagen (una, opcional)</p>
+      <div class="image-row">
+        @if (imagePreview) {
+          <img [src]="imagePreview" alt="Vista previa" class="image-preview" />
+          <button type="button" class="btn btn-soft" (click)="clearImage()">
+            Quitar
+          </button>
+        } @else {
+          <label class="file-btn">
+            Elegir cartel o foto
+            <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onImagePicked($event)" />
+          </label>
+          <span class="hint">Máx. 5 MB · una por publicación</span>
+        }
+      </div>
+
+      @if (error()) {
+        <div class="error-box">{{ error() }}</div>
+      }
+
+      <div class="queue-actions">
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="saving() || body.trim().length < 3"
+          (click)="submit()"
+        >
+          {{ saving() ? 'Publicando…' : 'Publicar' }}
+        </button>
+      </div>
+    </div>
+  }
+</section>

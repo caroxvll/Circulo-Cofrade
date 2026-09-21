@@ -1,0 +1,269 @@
+.hp-page {
+  width: 100%;
+}
+
+.hp-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--burgundy);
+  font-weight: 700;
+}
+
+.hp-head h1 {
+  margin: 6px 0 8px;
+  font-family: var(--font-serif);
+  font-size: clamp(1.55rem, 2.2vw, 2rem);
+}
+
+.lead {
+  margin: 0;
+  color: var(--text-secondary);
+  max-width: 54ch;
+  line-height: 1.5;
+}
+
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.board-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.board-card .day {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--burgundy);
+  font-weight: 700;
+}
+
+.board-card h3 {
+  margin: 0 0 8px;
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+}
+
+.board-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.section-row .block-title {
+  margin: 0;
+}
+
+.warn-box {
+  border: 1px solid #e8d4a8;
+  background: #fff8ea;
+  color: #7a5a18;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.publish-panel {
+  max-width: 720px;
+}
+
+.board-fixed {
+  margin: 0 0 14px;
+  color: var(--text-secondary);
+}
+
+.field-label {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.kind-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.kind-card {
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  font: inherit;
+}
+
+.kind-card strong {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.kind-card span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.kind-card.on {
+  border-color: var(--burgundy);
+  background: color-mix(in srgb, var(--burgundy) 8%, var(--surface));
+}
+
+.kind-card.on strong {
+  color: var(--burgundy);
+}
+
+.dest-box {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: var(--bg-elevated);
+  display: grid;
+  gap: 8px;
+}
+
+.dest-box .check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.dest-box .check.muted {
+  opacity: 0.65;
+}
+
+.dest-box em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.dest-note {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.two-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.image-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.image-preview {
+  width: 120px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.file-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface);
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--burgundy);
+}
+
+.file-btn input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.publish-panel textarea,
+.publish-panel input[type='text'],
+.publish-panel input[type='datetime-local'],
+.publish-panel select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  background: var(--surface);
+}
+
+.publish-panel textarea {
+  min-height: 160px;
+  resize: vertical;
+  line-height: 1.5;
+  background: var(--bg-elevated);
+}
+
+.empty-box .btn,
+.empty-box a.btn {
+  margin-top: 10px;
+  display: inline-flex;
+}
+
+.post-thumb {
+  margin-top: 10px;
+  max-width: 220px;
+  max-height: 140px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+@media (max-width: 700px) {
+  .two-fields {
+    grid-template-columns: 1fr;
+  }
+}
