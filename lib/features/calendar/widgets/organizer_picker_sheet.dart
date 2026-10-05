@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_bottom_nav.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../../core/widgets/event_type_icon.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../calendar_provider.dart';
@@ -235,7 +236,7 @@ class _OrganizerPickerSheetState extends ConsumerState<OrganizerPickerSheet> {
               const Divider(height: 1),
               Expanded(
                 child: _loading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const PeopleListSkeleton(itemCount: 6)
                     : _results.isEmpty
                         ? ListView(
                             controller: scrollController,

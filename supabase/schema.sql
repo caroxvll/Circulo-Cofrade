@@ -17,6 +17,7 @@ create table if not exists public.profiles (
   website text default '',
   publication_count int not null default 0,
   follower_count int not null default 0,
+  is_private boolean not null default false,
   suspended_at timestamptz,
   suspended_reason text,
   created_at timestamptz not null default now(),
@@ -212,6 +213,7 @@ create table if not exists public.forum_topics (
     ),
   icon_key text,
   cover_image_url text,
+  icon_image_url text,
   is_listed boolean not null default true,
   created_at timestamptz not null default now()
 );

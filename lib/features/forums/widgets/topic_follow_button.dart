@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../auth/auth_provider.dart';
 import '../forum_topics_typography.dart';
 import '../../auth/email_verification_gate.dart';
@@ -17,6 +18,8 @@ class TopicFollowButton extends ConsumerWidget {
     this.isHermandadBoard = false,
     this.compact = false,
     this.heroStyle = false,
+    this.appBarStyle = false,
+    this.overlayStyle = false,
   });
 
   final String forumId;
@@ -25,6 +28,10 @@ class TopicFollowButton extends ConsumerWidget {
   final bool compact;
   /// CTA ancho filled (hero del tablón oficial).
   final bool heroStyle;
+  /// Iconos compactos para la AppBar (seguir + campana).
+  final bool appBarStyle;
+  /// Iconos claros sobre el hero/imagen (esquina superior).
+  final bool overlayStyle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,33 +41,55 @@ class TopicFollowButton extends ConsumerWidget {
     final followingAsync = ref.watch(isFollowingTopicProvider(topicId));
 
     return followingAsync.when(
-      loading: () => heroStyle
-          ? const SizedBox(
-              height: 28,
-              child: Center(
-                child: SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.textOnDark,
-                  ),
-                ),
-              ),
-            )
-          : SizedBox(
-              height: compact ? 28 : 36,
-              width: compact ? 88 : 120,
-              child: const Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
+      skipLoadingOnReload: true,
+      loading: () {
+        if (overlayStyle) {
+          return _HermandadOverlayFollowActions(
+            isFollowing: false,
+            onFollowTap: () => _onHermandadTap(context, ref, false),
+          );
+        }
+        if (appBarStyle) {
+          return _HermandadAppBarFollowActions(
+            isFollowing: false,
+            onFollowTap: () => _onHermandadTap(context, ref, false),
+          );
+        }
+        if (heroStyle) {
+          return _HermandadHeroFollowButton(
+            isFollowing: false,
+            onTap: () => _onHermandadTap(context, ref, false),
+          );
+        }
+        return _TopicFollowChip(
+          isFollowing: false,
+          isHermandadBoard: isHermandadBoard,
+          compact: compact,
+          onTap: () => isHermandadBoard
+              ? _onHermandadTap(context, ref, false)
+              : _onTap(context, ref, false),
+        );
+      },
       error: (_, _) => const SizedBox.shrink(),
       data: (isFollowing) {
+        if (overlayStyle) {
+          return _HermandadOverlayFollowActions(
+            isFollowing: isFollowing,
+            onFollowTap: () => _onHermandadTap(context, ref, isFollowing),
+            onBellTap: isFollowing
+                ? () => _onHermandadTap(context, ref, true)
+                : null,
+          );
+        }
+        if (appBarStyle) {
+          return _HermandadAppBarFollowActions(
+            isFollowing: isFollowing,
+            onFollowTap: () => _onHermandadTap(context, ref, isFollowing),
+            onBellTap: isFollowing
+                ? () => _onHermandadTap(context, ref, true)
+                : null,
+          );
+        }
         if (heroStyle) {
           return _HermandadHeroFollowButton(
             isFollowing: isFollowing,
@@ -75,6 +104,7 @@ class TopicFollowButton extends ConsumerWidget {
           final categoriesAsync =
               ref.watch(topicFollowNotifyCategoriesProvider(topicId));
           return categoriesAsync.when(
+            skipLoadingOnReload: true,
             loading: () => _HermandadFollowingRow(
               notifyLabel: null,
               onTapChip: () => _onHermandadTap(context, ref, true),
@@ -211,6 +241,124 @@ class TopicFollowButton extends ConsumerWidget {
   }
 }
 
+class _HermandadOverlayFollowActions extends StatelessWidget {
+  const _HermandadOverlayFollowActions({
+    required this.isFollowing,
+    required this.onFollowTap,
+    this.onBellTap,
+  });
+
+  final bool isFollowing;
+  final VoidCallback onFollowTap;
+  final VoidCallback? onBellTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _OverlayIconButton(
+          onTap: onFollowTap,
+          tooltip: isFollowing ? 'Siguiendo' : 'Seguir hermandad',
+          icon: isFollowing
+              ? Icons.favorite_rounded
+              : Icons.favorite_border_rounded,
+        ),
+        if (isFollowing && onBellTap != null) ...[
+          const SizedBox(width: 6),
+          _OverlayIconButton(
+            onTap: onBellTap!,
+            tooltip: 'Avisos del tablón',
+            icon: Icons.notifications_outlined,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _OverlayIconButton extends StatelessWidget {
+  const _OverlayIconButton({
+    required this.onTap,
+    required this.icon,
+    required this.tooltip,
+  });
+
+  final VoidCallback onTap;
+  final IconData icon;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Ink(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.black.withValues(alpha: 0.42),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.55),
+                width: 1.1,
+              ),
+            ),
+            child: Icon(icon, color: AppColors.textOnDark, size: 17),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HermandadAppBarFollowActions extends StatelessWidget {
+  const _HermandadAppBarFollowActions({
+    required this.isFollowing,
+    required this.onFollowTap,
+    this.onBellTap,
+  });
+
+  final bool isFollowing;
+  final VoidCallback onFollowTap;
+  final VoidCallback? onBellTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          onPressed: onFollowTap,
+          tooltip: isFollowing ? 'Siguiendo' : 'Seguir hermandad',
+          visualDensity: VisualDensity.compact,
+          icon: Icon(
+            isFollowing
+                ? Icons.favorite_rounded
+                : Icons.favorite_border_rounded,
+            color: AppColors.burgundy,
+          ),
+        ),
+        if (isFollowing && onBellTap != null)
+          IconButton(
+            onPressed: onBellTap,
+            tooltip: 'Avisos del tablón',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(
+              Icons.notifications_outlined,
+              color: AppColors.burgundy,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _HermandadHeroFollowButton extends StatelessWidget {
   const _HermandadHeroFollowButton({
     required this.isFollowing,
@@ -222,46 +370,54 @@ class _HermandadHeroFollowButton extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onSettings;
 
+  static const _height = 36.0;
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Material(
-            color: isFollowing
-                ? Colors.white.withValues(alpha: 0.12)
-                : AppColors.burgundy,
+    return SizedBox(
+      height: _height,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Material(
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(999),
             child: InkWell(
               onTap: onTap,
               borderRadius: BorderRadius.circular(999),
-              child: Container(
-                height: 28,
-                alignment: Alignment.center,
+              child: Ink(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                height: _height,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(999),
+                  color: isFollowing
+                      ? Colors.black.withValues(alpha: 0.42)
+                      : AppColors.burgundy.withValues(alpha: 0.92),
                   border: Border.all(
-                    color: isFollowing
-                        ? AppColors.gold.withValues(alpha: 0.55)
-                        : AppColors.burgundyDark.withValues(alpha: 0.35),
+                    color: Colors.white.withValues(alpha: 0.55),
+                    width: 1.2,
                   ),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
                       isFollowing
                           ? Icons.favorite_rounded
                           : Icons.favorite_border_rounded,
-                      size: 13,
+                      size: 14,
                       color: AppColors.textOnDark,
                     ),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 6),
                     Text(
-                      isFollowing ? 'Siguiendo' : 'Seguir hermandad',
-                      style: ForumTopicsTypography.style(
+                      isFollowing ? 'Siguiendo' : 'Seguir',
+                      style: AppTypography.buttonLabel(
                         color: AppColors.textOnDark,
+                      ).copyWith(
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: 0.15,
                       ),
                     ),
                   ],
@@ -269,28 +425,36 @@ class _HermandadHeroFollowButton extends StatelessWidget {
               ),
             ),
           ),
-        ),
-        if (isFollowing && onSettings != null) ...[
-          const SizedBox(width: 6),
-          Material(
-            color: Colors.white.withValues(alpha: 0.12),
-            shape: const CircleBorder(),
-            child: InkWell(
-              onTap: onSettings,
-              customBorder: const CircleBorder(),
-              child: const SizedBox(
-                width: 28,
-                height: 28,
-                child: Icon(
-                  Icons.tune_outlined,
-                  color: AppColors.textOnDark,
-                  size: 14,
+          if (isFollowing && onSettings != null) ...[
+            const SizedBox(width: 8),
+            Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              child: InkWell(
+                onTap: onSettings,
+                customBorder: const CircleBorder(),
+                child: Ink(
+                  width: _height,
+                  height: _height,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withValues(alpha: 0.42),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.notifications_outlined,
+                    color: AppColors.textOnDark,
+                    size: 16,
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

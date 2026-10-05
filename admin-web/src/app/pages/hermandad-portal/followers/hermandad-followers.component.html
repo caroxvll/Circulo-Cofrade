@@ -1,0 +1,135 @@
+<section class="followers-page">
+  <header class="followers-head">
+    <div>
+      <p class="eyebrow">Comunidad</p>
+      <h1>Seguidores del tablón</h1>
+      <p class="lead">
+        Personas que siguen las publicaciones oficiales de
+        <strong>{{ displayName() }}</strong>.
+      </p>
+    </div>
+    <div class="total-pill" aria-live="polite">
+      <strong>{{ total().toLocaleString('es-ES') }}</strong>
+      <span>en total</span>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (store.loading() && !topicId()) {
+    <div class="state-box">Cargando…</div>
+  } @else if (!topicId()) {
+    <div class="empty-panel">
+      <p class="empty-title">Sin tablón asignado</p>
+      <p>Cuando la Junta vincule tu cuenta, verás aquí a quienes siguen el canal.</p>
+    </div>
+  } @else if (total() === 0 && !loading()) {
+    <div class="empty-panel">
+      <p class="empty-title">Aún no hay seguidores</p>
+      <p>
+        Cuando cofrades sigan tu tablón en la app, aparecerán en esta lista (sin datos
+        privados extra).
+      </p>
+      <a routerLink="/hermandad/publicar" class="link-arrow">
+        Publicar para dar visibilidad
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M5 12h14M13 6l6 6-6 6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </a>
+    </div>
+  } @else {
+    <div class="list-toolbar">
+      <p class="range" aria-live="polite">{{ rangeLabel() }}</p>
+      @if (pageCount() > 1) {
+        <nav class="pager" aria-label="Paginación de seguidores">
+          <button
+            type="button"
+            class="pager-btn"
+            [disabled]="loading() || pageIndex() <= 0"
+            (click)="shiftPage(-1)"
+            aria-label="Página anterior"
+          >
+            ‹
+          </button>
+          <span class="pager-status">
+            {{ pageIndex() + 1 }} / {{ pageCount().toLocaleString('es-ES') }}
+          </span>
+          <button
+            type="button"
+            class="pager-btn"
+            [disabled]="loading() || pageIndex() >= pageCount() - 1"
+            (click)="shiftPage(1)"
+            aria-label="Página siguiente"
+          >
+            ›
+          </button>
+        </nav>
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="state-box">Cargando seguidores…</div>
+    } @else if (rows().length === 0) {
+      <div class="empty-panel soft">
+        <p>No hay resultados en esta página.</p>
+      </div>
+    } @else {
+      <ul class="follower-list">
+        @for (row of rows(); track row.followerId) {
+          <li class="follower-row">
+            @if (row.avatarUrl) {
+              <img [src]="row.avatarUrl" alt="" class="avatar" />
+            } @else {
+              <div class="avatar placeholder">
+                {{ row.displayName.slice(0, 1) || row.handle.slice(0, 1) }}
+              </div>
+            }
+            <div class="meta">
+              <strong>{{ row.displayName }}</strong>
+              <span>{{ handleLabel(row.handle) }}</span>
+            </div>
+            <time class="when">Desde {{ formatFollowedAt(row.followedAt) }}</time>
+          </li>
+        }
+      </ul>
+    }
+
+    @if (pageCount() > 1 && !loading() && rows().length > 0) {
+      <div class="list-toolbar bottom">
+        <p class="range">{{ rangeLabel() }}</p>
+        <nav class="pager" aria-label="Paginación de seguidores">
+          <button
+            type="button"
+            class="pager-btn"
+            [disabled]="pageIndex() <= 0"
+            (click)="shiftPage(-1)"
+            aria-label="Página anterior"
+          >
+            ‹
+          </button>
+          <span class="pager-status">
+            {{ pageIndex() + 1 }} / {{ pageCount().toLocaleString('es-ES') }}
+          </span>
+          <button
+            type="button"
+            class="pager-btn"
+            [disabled]="pageIndex() >= pageCount() - 1"
+            (click)="shiftPage(1)"
+            aria-label="Página siguiente"
+          >
+            ›
+          </button>
+        </nav>
+      </div>
+    }
+  }
+</section>

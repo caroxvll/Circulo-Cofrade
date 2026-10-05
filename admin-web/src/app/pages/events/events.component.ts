@@ -55,6 +55,7 @@ export class EventsPageComponent implements OnInit {
   formLocation = '';
   formOrganizer = '';
   formStartsAtLocal = '';
+  formEndsAtLocal = '';
   formCoverUrl = '';
   formIconUrl = '';
 
@@ -155,6 +156,9 @@ export class EventsPageComponent implements OnInit {
     this.formLocation = event.location ?? '';
     this.formOrganizer = event.organizerLabel ?? '';
     this.formStartsAtLocal = toDatetimeLocalValue(new Date(event.startsAt));
+    this.formEndsAtLocal = event.endsAt
+      ? toDatetimeLocalValue(new Date(event.endsAt))
+      : '';
     this.formCoverUrl = event.coverImageUrl ?? '';
     this.formIconUrl = event.customIconUrl ?? '';
     this.showForm.set(true);
@@ -230,6 +234,8 @@ export class EventsPageComponent implements OnInit {
     this.formType = 'evento';
     this.formLocation = '';
     this.formOrganizer = '';
+    this.formStartsAtLocal = '';
+    this.formEndsAtLocal = '';
     this.formCoverUrl = '';
     this.formIconUrl = '';
     this.organizerSearch = '';
@@ -290,6 +296,9 @@ export class EventsPageComponent implements OnInit {
         subtitle: this.formSubtitle.trim(),
         eventType: this.formType,
         startsAt: fromDatetimeLocalValue(this.formStartsAtLocal),
+        endsAt: this.formEndsAtLocal.trim()
+          ? fromDatetimeLocalValue(this.formEndsAtLocal)
+          : null,
         location: this.formLocation,
         organizerLabel,
         coverImageUrl,
@@ -390,6 +399,42 @@ export class EventsPageComponent implements OnInit {
       await this.moderation.refreshCounts();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo eliminar');
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  liveForceLabel(event: CalendarEventRow): string {
+    return event.liveForceState === 'closed'
+      ? 'Live cerrado'
+      : event.liveForceState === 'open'
+        ? 'Live forzado'
+        : 'Live auto';
+  }
+
+  async setLiveForce(
+    event: CalendarEventRow,
+    forceState: 'auto' | 'open' | 'closed',
+  ): Promise<void> {
+    const action =
+      forceState === 'closed'
+        ? 'cerrar el live (p. ej. lluvia / fin anticipado)'
+        : forceState === 'open'
+          ? 'forzar el live abierto'
+          : 'volver al modo automático';
+    if (!confirm(`¿${action} en «${event.title}»?`)) return;
+
+    this.busyId.set(event.id);
+    this.error.set(null);
+    try {
+      await this.eventsApi.setLiveForceState(event.id, forceState);
+      await this.reloadCalendar();
+    } catch (err) {
+      this.error.set(
+        err instanceof Error
+          ? `${err.message} · ¿Ejecutaste calendar_event_live_window.sql?`
+          : 'No se pudo actualizar el live',
+      );
     } finally {
       this.busyId.set(null);
     }

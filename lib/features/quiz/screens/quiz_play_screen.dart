@@ -15,6 +15,7 @@ import '../../forums/forum_topics_typography.dart';
 import '../data/quiz_repository.dart';
 import '../models/quiz_models.dart';
 import '../quiz_provider.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 
 class QuizPlayScreen extends ConsumerStatefulWidget {
   const QuizPlayScreen({super.key});
@@ -294,7 +295,7 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
   @override
   Widget build(BuildContext context) {
     final liveVisible =
-        ref.watch(quizLiveVisibleProvider).asData?.value ?? true;
+        ref.watch(quizLiveVisibleProvider).asData?.value == true;
     if (!liveVisible) {
       return Scaffold(
         backgroundColor: AppColors.background,
@@ -399,7 +400,8 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
         ],
       ),
       body: liveAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        skipLoadingOnReload: true,
+        loading: () => const QuizScreenSkeleton(),
         error: (_, _) => Center(
           child: Text(
             'No se pudo cargar la pregunta.\n¿Ejecutaste quiz_daily.sql?',
@@ -467,7 +469,7 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
           }
 
           if (_opening && _openedAt == null) {
-            return const Center(child: CircularProgressIndicator());
+            return const QuizScreenSkeleton();
           }
 
           final imageUrl = payload.imageUrl?.trim();

@@ -29,6 +29,8 @@ abstract final class ImageUploadLimits {
   static const pillarIconMaxSide = 512;
   static const pillarCoverMaxBytes = 800 * 1024;
   static const pillarCoverMaxSide = 1200;
+  static const profileCoverMaxBytes = 800 * 1024;
+  static const profileCoverMaxSide = 1600;
 
   /// Tamaño máximo del archivo original antes de optimizar (calendario).
   static const eventIconPickMaxBytes = 5 * 1024 * 1024;

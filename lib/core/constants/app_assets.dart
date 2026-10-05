@@ -18,6 +18,15 @@ abstract final class AppAssets {
   /// Fondo editorial del card de Noticias (nazarenos / Semana Santa).
   static const noticiasCover = 'assets/images/fondo_noticias.png';
 
+  /// Portada por defecto del perfil (header).
+  static const profileHeaderCover = 'assets/images/Fondoperfil.webp';
+
+  /// Fondo de card del directorio de hermandades (escudo + tipografía).
+  static const hermandadCardBackground = 'assets/fondoCardHdad.webp';
+
+  /// Empty state del perfil (sin temas): Catedral / Giralda.
+  static const profileEmptyCathedral = 'assets/images/imagenCatedral.png';
+
   static const splashLogo = 'assets/images/logo.png';
   static const quizLiveLogo = 'assets/images/logopreguntavivo.png';
   static const adCostalesLaTrasera = 'assets/anuncio/clatrasera.png';

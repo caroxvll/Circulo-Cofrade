@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 import 'forum_post_image_viewer.dart';
 
 /// Cartel o foto adjunta a una publicación oficial (vista previa en el hilo).
@@ -49,13 +50,11 @@ class ForumPostImage extends StatelessWidget {
                   fit: BoxFit.contain,
                   width: double.infinity,
                   cacheSize: width.clamp(320.0, 1080.0),
-                  placeholder: SizedBox(
+                  placeholder: const SizedBox(
                     height: 180,
-                    child: _placeholder(
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.gold,
-                      ),
+                    child: CofradeoSkeletonBone(
+                      height: 180,
+                      borderRadius: 0,
                     ),
                   ),
                   errorWidget: _placeholder(),

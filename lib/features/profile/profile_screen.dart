@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 import '../../shared/models/user_profile.dart';
 import '../auth/auth_provider.dart';
 import '../forums/widgets/forums_beige_background.dart';
@@ -33,7 +34,7 @@ class ProfileScreen extends ConsumerWidget {
         context.go('/login?redirect=${Uri.encodeComponent('/perfil')}');
       });
       return const _ProfileTextureBackground(
-        child: Center(child: CircularProgressIndicator()),
+        child: SizedBox.shrink(),
       );
     }
 
@@ -41,7 +42,8 @@ class ProfileScreen extends ConsumerWidget {
 
     return _ProfileTextureBackground(
       child: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        skipLoadingOnReload: true,
+        loading: () => const ProfileHomeSkeleton(),
         error: (_, __) => _ProfileBody(
           profile: userProfileFromAuth(user),
           isAuthenticated: true,
@@ -83,95 +85,84 @@ class _ProfileBody extends ConsumerWidget {
       length: tabCount,
       child: SafeArea(
         bottom: false,
-        child: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) => [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  ProfileDesign.screenPadding,
-                  10,
-                  ProfileDesign.screenPadding,
-                  12,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ProfileScreenHeader(
-                      menuButton: isAuthenticated
-                          ? IconButton(
-                              tooltip: 'Opciones de cuenta',
-                              onPressed: () => showOwnProfileMenu(context, ref),
-                              icon: const Icon(
-                                Icons.more_horiz_rounded,
-                                color: AppColors.burgundy,
-                              ),
-                            )
-                          : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ProfileDesign.screenPadding,
+                10,
+                ProfileDesign.screenPadding,
+                0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ProfileScreenHeader(
+                    menuButton: isAuthenticated
+                        ? IconButton(
+                            tooltip: 'Opciones de cuenta',
+                            onPressed: () =>
+                                showOwnProfileMenu(context, ref),
+                            icon: const Icon(
+                              Icons.more_horiz_rounded,
+                              color: AppColors.burgundy,
+                            ),
+                          )
+                        : null,
+                  ),
+                  if (isAuthenticated && profile.isSuspended) ...[
+                    const SizedBox(height: 12),
+                    SuspendedAccountBanner(
+                      reason: profile.suspendedReason,
                     ),
-                    if (isAuthenticated && profile.isSuspended) ...[
-                      const SizedBox(height: 12),
-                      SuspendedAccountBanner(reason: profile.suspendedReason),
-                    ],
-                    if (isAuthenticated)
-                      Consumer(
-                        builder: (context, ref, _) {
-                          if (ref.watch(isEmailVerifiedProvider)) {
-                            return const SizedBox.shrink();
-                          }
-                          return const Padding(
-                            padding: EdgeInsets.only(top: 12),
-                            child: EmailVerificationBanner(),
-                          );
-                        },
-                      ),
-                    const SizedBox(height: 14),
-                    ProfileHeader(
-                      profile: profile,
-                      showFollowingCount: true,
-                      onFollowingTap: () {
-                        DefaultTabController.of(context).animateTo(1);
+                  ],
+                  if (isAuthenticated)
+                    Consumer(
+                      builder: (context, ref, _) {
+                        if (ref.watch(isEmailVerifiedProvider)) {
+                          return const SizedBox.shrink();
+                        }
+                        return const Padding(
+                          padding: EdgeInsets.only(top: 12),
+                          child: EmailVerificationBanner(),
+                        );
                       },
                     ),
-                  ],
-                ),
+                ],
               ),
             ),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: ProfileTabBarDelegate(
-                tabBar: ProfilePillTabBar(
-                  tabs: [
-                    const ProfilePillTab(
-                      icon: Icons.grid_view_rounded,
-                      label: 'Actividad',
-                    ),
-                    if (isAuthenticated)
-                      const ProfilePillTab(
-                        icon: Icons.bookmark_outline_rounded,
-                        label: 'Siguiendo',
-                      ),
-                    const ProfilePillTab(
-                      icon: Icons.info_outline_rounded,
-                      label: 'Información',
-                    ),
-                  ],
-                ),
+            const SizedBox(height: 4),
+            // Portada a ancho completo; se compacta sola en pantallas bajas.
+            ProfileHeader(
+              profile: profile,
+              showFollowingCount: true,
+            ),
+            const SizedBox(height: 2),
+            ProfilePillTabBar(
+              tabs: [
+                const ProfilePillTab(label: 'Temas'),
+                if (isAuthenticated)
+                  const ProfilePillTab(label: 'Siguiendo'),
+                const ProfilePillTab(label: 'Información'),
+              ],
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  PublicationsTab(
+                    userId: profile.id,
+                    isAuthenticated: isAuthenticated,
+                  ),
+                  if (isAuthenticated) const FollowingTab(),
+                  ProfileInfoTab(
+                    profile: profile,
+                    isAuthenticated: isAuthenticated,
+                  ),
+                ],
               ),
             ),
           ],
-          body: TabBarView(
-            children: [
-              PublicationsTab(
-                userId: profile.id,
-                isAuthenticated: isAuthenticated,
-              ),
-              if (isAuthenticated) const FollowingTab(),
-              ProfileInfoTab(
-                profile: profile,
-                isAuthenticated: isAuthenticated,
-              ),
-            ],
-          ),
         ),
       ),
     );

@@ -1171,8 +1171,7 @@ String ensayoLiveFeedSubtitle({
 }
 
 bool ensayoLiveAllowsPosting(CalendarEvent event, {DateTime? now}) {
-  final timing = calendarEventTiming(event, now: now);
-  return timing?.kind == CalendarEventTimingKind.inProgress;
+  return eventLiveAllowsPosting(event, now: now);
 }
 
 String ensayoLiveComposeHint(CalendarEvent event) {

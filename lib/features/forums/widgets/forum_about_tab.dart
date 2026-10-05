@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_bottom_nav.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../../shared/models/forum.dart';
 import '../../admin/admin_provider.dart';
 import '../data/forum_about_moderator.dart';
@@ -126,14 +127,8 @@ class ForumAboutTab extends ConsumerWidget {
               title: 'Moderadores',
               child: moderatorsAsync!.when(
               loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: HubSectionListSkeleton(itemCount: 2),
               ),
               error: (_, _) => Text(
                 'No se pudieron cargar los moderadores.',

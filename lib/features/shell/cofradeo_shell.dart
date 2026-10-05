@@ -10,9 +10,9 @@ import '../calendar/widgets/calendar_shell_ad_bar.dart';
 import '../auth/auth_provider.dart';
 import '../forums/forums_provider.dart';
 import '../forums/widgets/forums_shell_ad_bar.dart';
-import '../forums/widgets/noticias_shell_ad_bar.dart';
 import '../notifications/notifications_provider.dart';
 import '../permissions/permissions_provider.dart';
+import '../quiz/quiz_provider.dart';
 
 class CofradeoShell extends ConsumerWidget {
   const CofradeoShell({
@@ -34,6 +34,10 @@ class CofradeoShell extends ConsumerWidget {
         () => ref.read(notificationsProvider.notifier).silentRefresh(),
       );
     }
+    // Prefetch quiz flag al ir a Foros: el FAB no “aparece tarde”.
+    if (index == 1) {
+      Future.microtask(() => ref.read(quizLiveVisibleProvider.future));
+    }
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -52,10 +56,11 @@ class CofradeoShell extends ConsumerWidget {
     final showCalendarDot = ref.watch(calendarHasEventTodayProvider);
     final showNotificationsDot = ref.watch(hasUnreadNotificationsProvider);
 
-    final showForumsAd = navigationShell.currentIndex == 1 &&
-        GoRouterState.of(context).uri.path == '/foros';
-    final showCalendarAd = navigationShell.currentIndex == 0 &&
-        GoRouterState.of(context).uri.path == '/calendario';
+    final path = GoRouterState.of(context).uri.path;
+    final showForumsAd =
+        navigationShell.currentIndex == 1 && path == '/foros';
+    final showCalendarAd =
+        navigationShell.currentIndex == 0 && path == '/calendario';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -66,7 +71,6 @@ class CofradeoShell extends ConsumerWidget {
         children: [
           if (showCalendarAd) const CalendarShellAdBar(),
           if (showForumsAd) const ForumsShellAdBar(),
-          if (showNoticiasAd) const NoticiasShellAdBar(),
           CofradeoBottomNav(
             currentIndex: navigationShell.currentIndex,
             onTap: (index) => _onTap(context, index, ref),

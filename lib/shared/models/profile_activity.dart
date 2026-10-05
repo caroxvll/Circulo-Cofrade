@@ -14,6 +14,7 @@ class ProfileActivity {
     required this.timeAgo,
     this.topicStatus,
     this.forumIconKey,
+    this.coverImageUrl,
     this.viewCount = 0,
     this.commentCount = 0,
     this.reactionCount = 0,
@@ -29,6 +30,7 @@ class ProfileActivity {
   final String timeAgo;
   final TopicStatus? topicStatus;
   final String? forumIconKey;
+  final String? coverImageUrl;
   final int viewCount;
   final int commentCount;
   final int reactionCount;

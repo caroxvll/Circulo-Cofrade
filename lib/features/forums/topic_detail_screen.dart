@@ -12,6 +12,7 @@ import '../../core/utils/forum_share_urls.dart';
 import '../../core/utils/forum_text_format.dart';
 import '../../core/widgets/calendar_quick_access_button.dart';
 import '../../core/widgets/cofradeo_avatar.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 
 import '../../shared/models/forum.dart';
 import '../ads/models/sponsored_ad.dart';
@@ -25,6 +26,7 @@ import '../profile/profile_provider.dart';
 import '../profile/widgets/suspended_account_banner.dart';
 import '../moderation/widgets/report_content_dialog.dart';
 import 'data/hermandad_board_tab_store.dart';
+import 'data/hermandad_board_seen_store.dart';
 import 'data/mock_forums.dart';
 import 'data/reply_likes_repository.dart';
 import 'data/reply_moderation_exception.dart';
@@ -42,6 +44,7 @@ import 'widgets/hermandad_official_edit_sheet.dart';
 import 'widgets/hermandad_official_confirm_dialogs.dart';
 import 'widgets/hermandad_pinned_post_header.dart';
 import 'widgets/hermandad_pending_posts_banner.dart';
+import 'widgets/hermandad_comunicado_card.dart';
 import 'widgets/reply_card.dart';
 import 'widgets/reply_edit_sheet.dart';
 
@@ -88,7 +91,10 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
   final _replyAnchorKeys = <String, GlobalKey>{};
   var _didScrollToReply = false;
   var _didPublishDueHermandadPosts = false;
-  String? _hermandadCategoryFilter;
+  String _hermandadCategoryFilter = HermandadBoardTabStore.defaultCategory;
+  Map<String, DateTime> _hermandadSeenAt = {};
+  /// Primera entrada a tamaño completo; el resto en carrusel (como Noticias).
+  static const _hermandadFeedHeadCount = 1;
 
   @override
   void initState() {
@@ -111,24 +117,28 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
 
   Future<void> _initHermandadBoardTab() async {
     final params = GoRouterState.of(context).uri.queryParameters;
-    final String? filter;
-    if (params.containsKey(hermandadSectionQueryKey)) {
-      filter = parseHermandadSectionQuery(params[hermandadSectionQueryKey]);
-    } else {
-      filter = await HermandadBoardTabStore.load(widget.topicId);
-    }
-    if (!mounted || _hermandadCategoryFilter == filter) return;
-    setState(() => _hermandadCategoryFilter = filter);
+    final hasSectionQuery = params.containsKey(hermandadSectionQueryKey);
+    final queryFilter = hasSectionQuery
+        ? parseHermandadSectionQuery(params[hermandadSectionQueryKey])
+        : null;
+
+    await HermandadBoardSeenStore.seedIfNeeded(widget.topicId);
+    final seen = await HermandadBoardSeenStore.loadAll(widget.topicId);
+    final filter = queryFilter ?? await HermandadBoardTabStore.load(widget.topicId);
+    if (!mounted) return;
+    setState(() {
+      _hermandadSeenAt = seen;
+      if (_hermandadCategoryFilter != filter) {
+        _hermandadCategoryFilter = filter;
+      }
+    });
+    await _markHermandadCategorySeen(filter);
   }
 
-  void _syncHermandadSectionInUrl(String? category) {
+  void _syncHermandadSectionInUrl(String category) {
     final state = GoRouterState.of(context);
     final params = Map<String, String>.from(state.uri.queryParameters);
-    if (category == null) {
-      params.remove(hermandadSectionQueryKey);
-    } else {
-      params[hermandadSectionQueryKey] = hermandadSectionQueryValue(category);
-    }
+    params[hermandadSectionQueryKey] = hermandadSectionQueryValue(category);
     final path = '/foros/${widget.forumId}/tema/${widget.topicId}';
     final nextUri = Uri(
       path: path,
@@ -138,10 +148,22 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     context.replace(nextUri.toString());
   }
 
-  void _onHermandadCategorySelected(String? value) {
-    setState(() => _hermandadCategoryFilter = value);
+  Future<void> _markHermandadCategorySeen(String category) async {
+    final at = DateTime.now();
+    await HermandadBoardSeenStore.markSeen(widget.topicId, category, at: at);
+    if (!mounted) return;
+    setState(() {
+      _hermandadSeenAt = {..._hermandadSeenAt, category: at};
+    });
+  }
+
+  void _onHermandadCategorySelected(String value) {
+    setState(() {
+      _hermandadCategoryFilter = value;
+    });
     HermandadBoardTabStore.save(widget.topicId, value);
     _syncHermandadSectionInUrl(value);
+    _markHermandadCategorySeen(value);
   }
 
   @override
@@ -193,6 +215,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     setState(() => _hermandadCategoryFilter = category);
     HermandadBoardTabStore.save(widget.topicId, category);
     _syncHermandadSectionInUrl(category);
+    _markHermandadCategorySeen(category);
   }
 
   void _scrollToReply(String replyId, {List<ReplyTreeNode>? nodes}) {
@@ -600,6 +623,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     if (supabaseReady && topic != null && topic.isPublished) {
       ref.watch(topicViewTrackerProvider(topicKey));
       ref.watch(topicReplyReactionsRealtimeProvider(widget.topicId));
+      ref.watch(topicReactionsRealtimeProvider(widget.topicId));
     }
 
     if (topic == null) {
@@ -615,7 +639,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
             title: const Text('Foro'),
           ),
 
-          body: const Center(child: CircularProgressIndicator()),
+          body: const TopicDetailSkeleton(),
         );
       }
 
@@ -736,8 +760,8 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
       allBoardReplies,
       excludePinned: pinnedHermandadReply,
     );
-    final officialCategoryCounts = isHermandadBoard
-        ? _officialCategoryCounts(allBoardReplies)
+    final officialCategoryNewCounts = isHermandadBoard
+        ? _officialCategoryNewCounts(allBoardReplies)
         : const <String, int>{};
     final boardOfficialReplyIds = isHermandadBoard
         ? allBoardReplies
@@ -787,23 +811,32 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     }) {
       return ReplyThreadList(
         sliver: sliver,
+        officialChannelStyle: isHermandadBoard,
         nodes: buildReplyTree(replies),
         topicAuthorId: topic.authorId,
         highlightReplyId: widget.highlightReplyId,
         replyAnchorKeys: _replyAnchorKeys,
+        onOfficialOpen: isHermandadBoard
+            ? (r) => _openHermandadComunicadoSheet(
+                  r,
+                  manageContext: manageContext,
+                )
+            : null,
         onAuthorTap: (r) {
           if (r.authorId != null) {
             context.push('/perfil/usuario/${r.authorId}');
           }
         },
-        onReplyTap: (r) => showReplyComposeSheet(
-          context,
-          ref,
-          forumId: widget.forumId,
-          topicId: widget.topicId,
-          mentionHandle: r.authorHandle,
-          parentReplyId: r.id,
-        ),
+        onReplyTap: isHermandadBoard
+            ? null
+            : (r) => showReplyComposeSheet(
+                  context,
+                  ref,
+                  forumId: widget.forumId,
+                  topicId: widget.topicId,
+                  mentionHandle: r.authorHandle,
+                  parentReplyId: r.id,
+                ),
         reactionCountsFor: (r) {
           final fromDb = reactionCountsByReply[r.id.toLowerCase()];
           if (fromDb != null && fromDb.isNotEmpty) {
@@ -837,6 +870,82 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
       16,
       16,
     );
+
+    List<Widget> buildHermandadFeedSlivers(
+      List<ForumReply> replies, {
+      required List<ForumReply> manageContext,
+      bool hasMoreRemote = false,
+      bool isLoadingMore = false,
+    }) {
+      final head = replies.take(_hermandadFeedHeadCount).toList();
+      final rest = replies.length > _hermandadFeedHeadCount
+          ? replies.skip(_hermandadFeedHeadCount).toList()
+          : const <ForumReply>[];
+
+      return [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          sliver: buildReplyThreadList(
+            head,
+            manageContext: manageContext,
+            sliver: true,
+          ),
+        ),
+        if (rest.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+              child: Text(
+                'ANTERIORES EN ESTA SECCIÓN',
+                style: AppTypography.labelSmall(
+                  color: AppColors.textMuted,
+                ).copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11.5,
+                  letterSpacing: 1.15,
+                ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 248,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                itemCount: rest.length + (isLoadingMore ? 1 : 0),
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  if (index >= rest.length) {
+                    return const SizedBox(
+                      width: 72,
+                      height: 248,
+                      child: Center(
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    );
+                  }
+                  final reply = rest[index];
+                  return HermandadComunicadoRailCard(
+                    key: ValueKey('rail_${reply.id}'),
+                    reply: reply,
+                    onTap: () => _openHermandadComunicadoSheet(
+                      reply,
+                      manageContext: manageContext,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ] else
+          const SliverToBoxAdapter(child: SizedBox(height: 4)),
+      ];
+    }
 
     List<Widget> buildRepliesSlivers() {
       SliverPadding statusSliver(Widget child) {
@@ -873,6 +982,12 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
         if (replies.isEmpty) {
           return const [SliverToBoxAdapter(child: SizedBox.shrink())];
         }
+        if (isHermandadBoard) {
+          return buildHermandadFeedSlivers(
+            replies,
+            manageContext: _visibleRepliesForBoard(allBoardReplies),
+          );
+        }
         return [
           SliverPadding(
             padding: repliesPadding,
@@ -888,14 +1003,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
       final page = repliesState;
 
       if (page.isLoading) {
-        return [
-          statusSliver(
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          ),
-        ];
+        return [const TopicRepliesSkeleton()];
       }
 
       final visibleReplies = filteredBoardReplies;
@@ -922,14 +1030,18 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
         ];
       }
 
+      if (isHermandadBoard) {
+        return buildHermandadFeedSlivers(
+          visibleReplies,
+          manageContext: _visibleRepliesForBoard(page.replies),
+          hasMoreRemote: page.hasMore,
+          isLoadingMore: page.isLoadingMore,
+        );
+      }
+
       return [
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            isHermandadBoard ? 4 : 8,
-            16,
-            0,
-          ),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           sliver: buildReplyThreadList(
             visibleReplies,
             manageContext: _visibleRepliesForBoard(page.replies),
@@ -1203,7 +1315,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                       pinned: true,
                       delegate: HermandadBoardTabsDelegate(
                         selected: _hermandadCategoryFilter,
-                        counts: officialCategoryCounts,
+                        newCounts: officialCategoryNewCounts,
                         onSelected: _onHermandadCategorySelected,
                         boardSubtitle: hermandadBoardSectionSubtitle(
                           selectedCategory: _hermandadCategoryFilter,
@@ -1272,6 +1384,111 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     );
   }
 
+  Future<void> _openHermandadComunicadoSheet(
+    ForumReply reply, {
+    required List<ForumReply> manageContext,
+  }) async {
+    final topic = ref.read(forumTopicProvider(_topicKey)).asData?.value ??
+        topicById(widget.forumId, widget.topicId);
+    if (!mounted || topic == null) return;
+
+    final manage = _manageOptionsFor(reply, manageContext, topic);
+    final reactionCountsByReply =
+        ref.read(replyReactionCountsProvider(widget.topicId)).asData?.value ??
+            {};
+    final userReactions =
+        ref.read(replyUserReactionsProvider(widget.topicId)).asData?.value ??
+            {};
+    final fromDb = reactionCountsByReply[reply.id.toLowerCase()];
+    final reactionCounts = (fromDb != null && fromDb.isNotEmpty)
+        ? normalizeReactionCounts(fromDb)
+        : (reply.likeCount > 0
+            ? {'❤️': reply.likeCount}
+            : const <String, int>{});
+
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final maxH = MediaQuery.sizeOf(ctx).height * 0.94;
+        return SizedBox(
+          height: maxH,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              10,
+              16,
+              12 + MediaQuery.paddingOf(ctx).bottom,
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const SizedBox(width: 40),
+                    Expanded(
+                      child: Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.border,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      tooltip: 'Cerrar',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        size: 22,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: HermandadComunicadoCard(
+                      reply: reply,
+                      detailView: true,
+                      manageOptions: manage,
+                      reactionCounts: reactionCounts,
+                      userReaction: userReactions[reply.id.toLowerCase()],
+                      onShareTap: topic.isPublished
+                          ? () => shareForumReplyLink(
+                                context,
+                                forumId: widget.forumId,
+                                topicId: widget.topicId,
+                                replyId: reply.id,
+                                section: reply.officialCategory,
+                                excerpt: plainTextForExcerpt(
+                                  reply.content,
+                                  maxLength: 90,
+                                ),
+                                authorHandle: reply.authorHandle,
+                              )
+                          : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   ForumReply? _pinnedHermandadReply(List<ForumReply> replies) {
     if (widget.forumId != 'hermandades') return null;
     for (final reply in _visibleRepliesForBoard(replies)) {
@@ -1300,11 +1517,18 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     ];
   }
 
-  Map<String, int> _officialCategoryCounts(List<ForumReply> replies) {
+  Map<String, int> _officialCategoryNewCounts(List<ForumReply> replies) {
     final counts = <String, int>{};
     for (final reply in _officialReplies(replies)) {
+      if (reply.isDeleted) continue;
       final category = reply.officialCategory;
       if (category == null) continue;
+      // La sección abierta no muestra badge: ya la estás viendo.
+      if (category == _hermandadCategoryFilter) continue;
+      final createdAt = reply.createdAt;
+      if (createdAt == null) continue;
+      final seenAt = _hermandadSeenAt[category];
+      if (seenAt != null && !createdAt.isAfter(seenAt)) continue;
       counts[category] = (counts[category] ?? 0) + 1;
     }
     return counts;
@@ -1315,11 +1539,6 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
 
     final official = _officialReplies(replies);
     final filter = _hermandadCategoryFilter;
-    if (filter == null) {
-      official.sort(_compareOfficialReplies);
-      return official;
-    }
-
     final filtered = [
       for (final reply in official)
         if (reply.officialCategory == filter) reply,
@@ -1355,6 +1574,7 @@ class _TopicDetailAppBarTitle extends StatelessWidget {
       return ForumEditorialTitle(
         title: parseHermandadTopicTitle(topic.title).hermandadName,
         forumId: 'hermandades',
+        kicker: 'CANAL OFICIAL',
       );
     }
 
@@ -1382,25 +1602,25 @@ class _HermandadBoardEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final section = category == null
-        ? 'ninguna sección'
+        ? null
         : officialCategoryLabel(category!);
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.18)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
       ),
-      child: Column(
+      child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: AppColors.goldPale.withValues(alpha: 0.45),
-              shape: BoxShape.circle,
+              color: AppColors.goldPale.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               category == null
@@ -1412,24 +1632,34 @@ class _HermandadBoardEmptyState extends StatelessWidget {
                       )
                       .icon,
               color: AppColors.burgundy,
-              size: 22,
+              size: 18,
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            category == null
-                ? 'Aún no hay información oficial'
-                : 'Sin publicaciones en $section',
-            style: AppTypography.titleLarge().copyWith(fontSize: 15),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            category == null
-                ? 'Cuando la hermandad publique noticias, cultos, actos o patrimonio aparecerán aquí.'
-                : 'Prueba otra pestaña o publica la primera entrada en esta sección.',
-            style: AppTypography.bodyMedium(color: AppColors.textMuted),
-            textAlign: TextAlign.center,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  section == null
+                      ? 'Aún no hay comunicados'
+                      : 'Sin publicaciones en $section',
+                  style: AppTypography.hermandadName().copyWith(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  section == null
+                      ? 'Cuando la hermandad publique, aparecerán aquí.'
+                      : 'Prueba otra sección o publica la primera entrada.',
+                  style: AppTypography.labelSmall(
+                    color: AppColors.textMuted,
+                  ).copyWith(fontSize: 11.5, height: 1.25),
+                ),
+              ],
+            ),
           ),
         ],
       ),

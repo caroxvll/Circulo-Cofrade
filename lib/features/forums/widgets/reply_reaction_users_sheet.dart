@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../data/reply_likes_repository.dart';
 import '../forums_provider.dart';
 import '../utils/reply_reactions.dart';
@@ -84,9 +85,9 @@ class _ReplyReactionUsersSheet extends ConsumerWidget {
               ),
             ),
             usersAsync.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(child: CircularProgressIndicator()),
+              loading: () => const SizedBox(
+                height: 220,
+                child: PeopleListSkeleton(itemCount: 4),
               ),
               error: (_, __) => Padding(
                 padding: const EdgeInsets.all(24),

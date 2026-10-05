@@ -1,5 +1,7 @@
 export type CalendarEventStatus = 'published' | 'pending_review' | 'rejected';
 
+export type EventLiveForceState = 'auto' | 'open' | 'closed';
+
 export type CalendarEventType =
   | 'procesion'
   | 'gloria'
@@ -14,6 +16,8 @@ export interface CalendarEventRow {
   subtitle: string;
   eventType: CalendarEventType;
   startsAt: string;
+  endsAt: string | null;
+  liveForceState: EventLiveForceState;
   dayLabel: string | null;
   location: string | null;
   organizerLabel: string | null;
@@ -31,6 +35,7 @@ export interface CalendarEventInput {
   subtitle: string;
   eventType: CalendarEventType;
   startsAt: string;
+  endsAt?: string | null;
   dayLabel?: string | null;
   location?: string | null;
   organizerLabel?: string | null;

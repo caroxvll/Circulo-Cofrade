@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/followed_topic.dart';
 import '../mis_hermandades_provider.dart';
+import '../utils/forum_navigation.dart';
 import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
 
@@ -46,13 +48,13 @@ class MisHermandadesHomeStrip extends ConsumerWidget {
   }
 }
 
-class _FollowingStrip extends StatelessWidget {
+class _FollowingStrip extends ConsumerWidget {
   const _FollowingStrip({required this.boards});
 
   final List<FollowedTopic> boards;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 0, 8),
       child: Column(
@@ -114,8 +116,11 @@ class _FollowingStrip extends StatelessWidget {
                 final board = boards[index];
                 return _HermandadChip(
                   board: board,
-                  onTap: () => context.push(
-                    '/foros/${board.forumId}/tema/${board.topicId}',
+                  onTap: () => pushForumTopic(
+                    context,
+                    ref,
+                    forumId: board.forumId,
+                    topicId: board.topicId,
                   ),
                 );
               },
@@ -214,7 +219,9 @@ class _HermandadChip extends StatelessWidget {
     final parsed = parseHermandadTopicTitle(board.title);
     final name = parsed.hermandadName;
     final accent = hermandadDayAccentColor(parsed.processionDay);
-    final avatar = HermandadLocalAssets.avatar(
+    final remote = board.iconImageUrl?.trim();
+    final hasRemote = remote != null && remote.isNotEmpty;
+    final localAvatar = HermandadLocalAssets.avatar(
       processionDay: parsed.processionDay,
       hermandadName: name,
     );
@@ -247,8 +254,21 @@ class _HermandadChip extends StatelessWidget {
                   ),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: avatar != null
-                    ? Image.asset(avatar, fit: BoxFit.cover)
+                child: hasRemote
+                    ? CofradeoNetworkImage(
+                        url: remote,
+                        fit: BoxFit.contain,
+                        width: 36,
+                        height: 36,
+                        cacheSize: 72,
+                        errorWidget: Icon(
+                          Icons.church_outlined,
+                          size: 18,
+                          color: accent,
+                        ),
+                      )
+                    : localAvatar != null
+                    ? Image.asset(localAvatar, fit: BoxFit.cover)
                     : Icon(Icons.church_outlined, size: 18, color: accent),
               ),
               const SizedBox(width: 8),

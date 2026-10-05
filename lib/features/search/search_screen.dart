@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/calendar_quick_access_button.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 import '../auth/auth_provider.dart';
 import '../auth/email_verification_gate.dart';
 import '../ads/models/sponsored_ad.dart';
@@ -309,23 +310,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 const SliverToBoxAdapter(child: SizedBox.shrink())
               else
                 searchAsync.when(
-                  loading: () => SliverPadding(
-                    padding: const EdgeInsets.symmetric(
+                  skipLoadingOnReload: true,
+                  loading: () => const SliverPadding(
+                    padding: EdgeInsets.symmetric(
                       horizontal: SearchDesign.screenPadding,
-                      vertical: 32,
+                      vertical: 12,
                     ),
-                    sliver: SliverToBoxAdapter(
-                      child: Center(
-                        child: SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: AppColors.burgundy.withValues(alpha: 0.85),
-                          ),
-                        ),
-                      ),
-                    ),
+                    sliver: ForumTopicsListSkeleton(),
                   ),
                   error: (_, __) => SliverPadding(
                     padding: const EdgeInsets.symmetric(

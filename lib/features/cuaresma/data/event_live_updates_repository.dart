@@ -30,14 +30,52 @@ class EventLiveUpdatesRepository {
         .order('created_at', ascending: false);
 
     return (rows as List)
-        .map((row) => _fromRow(row as Map<String, dynamic>))
+        .map((row) => updateFromRow(row as Map<String, dynamic>))
         .toList();
+  }
+
+  /// Payload Realtime (sin join de profiles).
+  EventLiveUpdate? fromRealtimeRecord(
+    Map<String, dynamic> row, {
+    EventLiveUpdate? previous,
+  }) {
+    final id = row['id']?.toString();
+    final eventId = row['calendar_event_id']?.toString();
+    final userId = row['user_id']?.toString();
+    final createdRaw = row['created_at'] as String?;
+    if (id == null ||
+        id.isEmpty ||
+        eventId == null ||
+        eventId.isEmpty ||
+        userId == null ||
+        userId.isEmpty ||
+        createdRaw == null) {
+      return null;
+    }
+    final place = (row['place_label'] as String?)?.trim() ?? '';
+    final handleCol = (row['author_handle'] as String?)?.trim();
+    final handleRaw = (handleCol != null && handleCol.isNotEmpty)
+        ? handleCol
+        : (previous?.authorHandle.replaceFirst(RegExp(r'^@'), '') ?? 'cofrade');
+    final handle = handleRaw.startsWith('@') ? handleRaw : '@$handleRaw';
+    return EventLiveUpdate(
+      id: id,
+      calendarEventId: eventId,
+      userId: userId,
+      authorHandle: handle,
+      message: (row['message'] as String?)?.trim() ?? '',
+      createdAt: DateTime.parse(createdRaw).toLocal(),
+      placeLabel: place.isEmpty ? null : place,
+      latitude: (row['latitude'] as num?)?.toDouble(),
+      longitude: (row['longitude'] as num?)?.toDouble(),
+    );
   }
 
   Future<EventLiveUpdate> postUpdate({
     required String eventId,
     required String userId,
     required String message,
+    String? authorHandle,
     String? placeLabel,
     double? latitude,
     double? longitude,
@@ -56,7 +94,7 @@ class EventLiveUpdatesRepository {
       return addMockEventLiveUpdate(
         eventId: eventId,
         userId: userId,
-        authorHandle: '@cofrade',
+        authorHandle: _normalizeHandle(authorHandle) ?? '@cofrade',
         message: trimmed,
         placeLabel: placeLabel,
         latitude: latitude,
@@ -80,6 +118,7 @@ class EventLiveUpdatesRepository {
       }
     }
 
+    final handleForDb = _normalizeHandle(authorHandle)?.replaceFirst('@', '');
     final row = await _client!
         .from('event_live_updates')
         .insert({
@@ -87,18 +126,23 @@ class EventLiveUpdatesRepository {
           'user_id': userId,
           'message': trimmed,
           'place_label': placeLabel?.trim() ?? '',
+          if (handleForDb != null && handleForDb.isNotEmpty)
+            'author_handle': handleForDb,
           if (latitude != null) 'latitude': latitude,
           if (longitude != null) 'longitude': longitude,
         })
         .select('*, profiles!user_id(handle)')
         .single();
 
-    return _fromRow(row);
+    return updateFromRow(row);
   }
 
-  EventLiveUpdate _fromRow(Map<String, dynamic> row) {
+  EventLiveUpdate updateFromRow(Map<String, dynamic> row) {
     final profile = row['profiles'] as Map<String, dynamic>?;
-    final handleRaw = profile?['handle'] as String? ?? 'cofrade';
+    final handleCol = (row['author_handle'] as String?)?.trim();
+    final handleRaw = (handleCol != null && handleCol.isNotEmpty)
+        ? handleCol
+        : (profile?['handle'] as String? ?? 'cofrade');
     final handle = handleRaw.startsWith('@') ? handleRaw : '@$handleRaw';
     final place = (row['place_label'] as String?)?.trim() ?? '';
 
@@ -113,6 +157,12 @@ class EventLiveUpdatesRepository {
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
     );
+  }
+
+  static String? _normalizeHandle(String? raw) {
+    final t = raw?.trim();
+    if (t == null || t.isEmpty) return null;
+    return t.startsWith('@') ? t : '@$t';
   }
 }
 

@@ -120,6 +120,7 @@ class SearchRepository {
       isSystem: row['is_system'] as bool? ?? false,
       seasonKey: row['season_key'] as String?,
       iconKey: row['icon_key'] as String?,
+      iconImageUrl: row['icon_image_url'] as String?,
       coverImageUrl: row['cover_image_url'] as String?,
       isListed: row['is_listed'] as bool? ?? true,
       createdAt: createdAt,

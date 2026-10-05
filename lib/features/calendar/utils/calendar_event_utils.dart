@@ -126,7 +126,7 @@ int? timeStringToMinutes(String? time) {
 
 int? _timeToMinutes(String? time) => timeStringToMinutes(time);
 
-enum CalendarEventTimingKind { inProgress, startsSoon, scheduled }
+enum CalendarEventTimingKind { inProgress, startsSoon, scheduled, finished }
 
 class CalendarEventTiming {
   const CalendarEventTiming({
@@ -141,10 +141,11 @@ class CalendarEventTiming {
 }
 
 Duration _defaultEventDuration(EventType type) => switch (type) {
+      // Estimación para “en curso” / fin de ventana en la app (no es duración real del cortejo).
       EventType.procesion => const Duration(hours: 4),
       EventType.gloria => const Duration(hours: 2),
-      EventType.ensayo => const Duration(hours: 2),
-      EventType.iguala => const Duration(hours: 1, minutes: 30),
+      EventType.ensayo => const Duration(hours: 4),
+      EventType.iguala => const Duration(hours: 4),
       EventType.concierto => const Duration(hours: 2),
       EventType.evento => const Duration(hours: 2),
     };
@@ -164,6 +165,7 @@ DateTime? eventStartDateTime(CalendarEvent event) {
 Duration calendarEventDuration(EventType type) => _defaultEventDuration(type);
 
 DateTime? eventEndDateTime(CalendarEvent event) {
+  if (event.endsAt != null) return event.endsAt;
   final start = eventStartDateTime(event);
   if (start == null) return null;
   return start.add(calendarEventDuration(event.type));
@@ -173,6 +175,20 @@ String formatEventClockTime(DateTime dateTime) {
   final hours = dateTime.hour.toString().padLeft(2, '0');
   final minutes = dateTime.minute.toString().padLeft(2, '0');
   return '$hours:$minutes';
+}
+
+/// ¿El live admite avisos ahora? (alineado con SQL can_post_event_live_update).
+bool eventLiveAllowsPosting(CalendarEvent event, {DateTime? now}) {
+  if (!event.isPublished) return false;
+  switch (event.liveForceState) {
+    case EventLiveForceState.closed:
+      return false;
+    case EventLiveForceState.open:
+      return true;
+    case EventLiveForceState.auto:
+      final timing = calendarEventTiming(event, now: now);
+      return timing?.kind == CalendarEventTimingKind.inProgress;
+  }
 }
 
 /// Estado temporal del evento (solo relevante el día de hoy).
@@ -188,10 +204,28 @@ CalendarEventTiming? calendarEventTiming(
     return null;
   }
 
+  if (event.liveForceState == EventLiveForceState.closed) {
+    return const CalendarEventTiming(
+      kind: CalendarEventTimingKind.finished,
+      label: 'Finalizado',
+      color: Color(0xFF9E9E9E),
+    );
+  }
+
   final start = eventStartDateTime(event);
   if (start == null) return null;
 
-  final end = start.add(_defaultEventDuration(event.type));
+  final end = eventEndDateTime(event) ?? start.add(_defaultEventDuration(event.type));
+
+  if (event.liveForceState == EventLiveForceState.open) {
+    if (clock.isBefore(start)) {
+      return const CalendarEventTiming(
+        kind: CalendarEventTimingKind.inProgress,
+        label: 'En curso',
+        color: Color(0xFF2E7D32),
+      );
+    }
+  }
 
   if (!clock.isBefore(start) && clock.isBefore(end)) {
     return const CalendarEventTiming(
@@ -223,7 +257,11 @@ CalendarEventTiming? calendarEventTiming(
     );
   }
 
-  return null;
+  return const CalendarEventTiming(
+    kind: CalendarEventTimingKind.finished,
+    label: 'Finalizado',
+    color: Color(0xFF9E9E9E),
+  );
 }
 
 String formatCalendarDayHeading(DateTime date) {

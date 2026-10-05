@@ -20,6 +20,7 @@ import 'widgets/hermandad_official_post_preview.dart';
 import 'widgets/hermandad_post_image_picker.dart';
 import 'widgets/official_post_categories_picker.dart';
 import 'widgets/scheduled_post_datetime_picker.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 
 class HermandadScheduledPostsScreen extends ConsumerWidget {
   const HermandadScheduledPostsScreen({super.key});
@@ -45,7 +46,8 @@ class HermandadScheduledPostsScreen extends ConsumerWidget {
         centerTitle: true,
       ),
       body: pendingAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        skipLoadingOnReload: true,
+        loading: () => const PeopleListSkeleton(itemCount: 5),
         error: (_, __) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),

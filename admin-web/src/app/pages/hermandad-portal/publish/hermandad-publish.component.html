@@ -1,23 +1,26 @@
-<section class="hp-page">
-  <header class="hp-head">
-    <div>
-      <p class="eyebrow">Nueva publicación</p>
-      <h1>Publicar</h1>
-      <p class="lead">
-        Elige el <strong>tipo</strong>: eso decide dónde sale (tablón, calendario…).
-        Noticias de ciudad queda apagado para no saturar la portada.
-      </p>
-    </div>
-  </header>
-
+<section class="publish-page">
   @if (store.boards().length === 0) {
     <div class="empty-box">
       No tienes tablón asignado. Contacta con la Junta.
     </div>
   } @else {
-    <div class="panel publish-panel">
+    <div class="composer">
+      <header class="composer-head">
+        <div>
+          <p class="eyebrow">Canal oficial</p>
+          <h1>Nueva publicación</h1>
+        </div>
+        <p class="board-pill">
+          {{
+            store.boards().length > 1
+              ? 'Elige tablón ↓'
+              : store.boards()[0].hermandadName || store.boards()[0].title
+          }}
+        </p>
+      </header>
+
       @if (store.boards().length > 1) {
-        <label>
+        <label class="field">
           Tablón
           <select [(ngModel)]="topicId">
             @for (board of store.boards(); track board.topicId) {
@@ -25,114 +28,148 @@
             }
           </select>
         </label>
-      } @else {
-        <p class="board-fixed">
-          Tablón: <strong>{{ store.boards()[0].title }}</strong>
-        </p>
       }
 
-      <p class="field-label">1. ¿Qué estás publicando?</p>
-      <div class="kind-grid">
-        @for (kind of kinds; track kind.id) {
-          <button
-            type="button"
-            class="kind-card"
-            [class.on]="kindId === kind.id"
-            (click)="onKindChange(kind.id)"
-          >
-            <strong>{{ kind.label }}</strong>
-            <span>{{ kind.hint }}</span>
-          </button>
-        }
-      </div>
-
-      <p class="field-label">2. Dónde sale</p>
-      <div class="dest-box">
-        <label class="check">
-          <input type="checkbox" [(ngModel)]="destBoard" disabled />
-          En mi tablón (app) · obligatorio
-        </label>
-        <label class="check">
-          <input
-            type="checkbox"
-            [(ngModel)]="destCalendar"
-            [disabled]="!activeKind.calendarType"
-          />
-          En el calendario Cofradeo
-          @if (!activeKind.calendarType) {
-            <em> · no aplica a este tipo</em>
+      <div class="row-block">
+        <span class="row-label">Tipo</span>
+        <div class="chips" role="listbox" aria-label="Tipo de publicación">
+          @for (kind of kinds; track kind.id) {
+            <button
+              type="button"
+              class="chip"
+              role="option"
+              [attr.aria-selected]="kindId === kind.id"
+              [class.on]="kindId === kind.id"
+              (click)="onKindChange(kind.id)"
+            >
+              {{ kind.label }}
+            </button>
           }
-        </label>
-        <label class="check muted">
-          <input type="checkbox" [(ngModel)]="destNoticias" disabled />
-          En Noticias (portada) · desactivado por ahora
-        </label>
-        <p class="dest-note">
-          Así no se llena Noticias de cultos e igualás. Eso vive en tu hermandad
-          y, si tiene fecha, en el calendario.
-        </p>
+        </div>
       </div>
 
-      <label>
-        Título corto
+      <div class="meta-row">
+        <div class="where-box">
+          <span class="row-label">Dónde se verá</span>
+          <p class="where-summary">
+            Siempre en el <strong>tablón</strong> de tu hermandad en la app.
+            @if (!activeKind.calendarType) {
+              Este tipo no va al calendario.
+            }
+          </p>
+          @if (activeKind.calendarType) {
+            <label class="switch-line">
+              <input type="checkbox" [(ngModel)]="destCalendar" />
+              <span
+                >También en el <strong>calendario</strong> de Círculo Cofrade (fecha y
+                lugar del acto)</span
+              >
+            </label>
+          }
+        </div>
+
+        <div class="meta-group">
+          <span class="row-label">Cuándo sale en el tablón</span>
+          <div class="seg">
+            <button
+              type="button"
+              [class.on]="timing === 'now'"
+              (click)="timing = 'now'"
+            >
+              Ahora
+            </button>
+            <button
+              type="button"
+              [class.on]="timing === 'later'"
+              (click)="timing = 'later'"
+            >
+              Programar
+            </button>
+          </div>
+          @if (timing === 'later') {
+            <input
+              type="datetime-local"
+              class="when-input"
+              [(ngModel)]="scheduleAtLocal"
+              aria-label="Fecha de publicación"
+            />
+          }
+        </div>
+      </div>
+
+      @if (destCalendar && activeKind.needsDate) {
+        <div class="event-row">
+          <label class="field grow">
+            Fecha del acto
+            <input type="datetime-local" [(ngModel)]="startsAtLocal" />
+          </label>
+          <label class="field grow">
+            Lugar
+            <input
+              [(ngModel)]="location"
+              placeholder="Templo, casa de hermandad…"
+            />
+          </label>
+        </div>
+      }
+
+      <label class="field">
+        Título
         <input
           [(ngModel)]="title"
           placeholder="Ej. Culto de regla · Iguala de costaleros"
         />
       </label>
 
-      <label>
+      <label class="field body-field">
         Texto
         <textarea
           [(ngModel)]="body"
-          rows="8"
           placeholder="Detalles, horario, avisos…"
         ></textarea>
       </label>
 
-      @if (destCalendar && activeKind.needsDate) {
-        <div class="two-fields">
-          <label>
-            Fecha y hora
-            <input type="datetime-local" [(ngModel)]="startsAtLocal" />
-          </label>
-          <label>
-            Lugar (opcional)
-            <input [(ngModel)]="location" placeholder="Templo, casa de hermandad…" />
-          </label>
-        </div>
-      }
-
-      <p class="field-label">3. Imagen (una, opcional)</p>
-      <div class="image-row">
-        @if (imagePreview) {
-          <img [src]="imagePreview" alt="Vista previa" class="image-preview" />
-          <button type="button" class="btn btn-soft" (click)="clearImage()">
-            Quitar
-          </button>
-        } @else {
-          <label class="file-btn">
-            Elegir cartel o foto
-            <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onImagePicked($event)" />
-          </label>
-          <span class="hint">Máx. 5 MB · una por publicación</span>
-        }
-      </div>
-
       @if (error()) {
-        <div class="error-box">{{ error() }}</div>
+        <div class="error-box compact">{{ error() }}</div>
       }
 
-      <div class="queue-actions">
+      <footer class="composer-foot">
+        <div class="image-slot">
+          @if (imagePreview) {
+            <img [src]="imagePreview" alt="" class="thumb" />
+            <button type="button" class="linkish" (click)="clearImage()">
+              Quitar
+            </button>
+          } @else {
+            <label class="file-btn">
+              + Imagen
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                (change)="onImagePicked($event)"
+              />
+            </label>
+            <span class="muted">opcional · 5 MB</span>
+          }
+        </div>
+
         <button
           type="button"
-          class="btn btn-primary"
+          class="btn btn-primary publish-btn"
           [disabled]="saving() || body.trim().length < 3"
           (click)="submit()"
         >
-          {{ saving() ? 'Publicando…' : 'Publicar' }}
+          {{
+            saving()
+              ? timing === 'later'
+                ? 'Programando…'
+                : 'Publicando…'
+              : timing === 'later'
+                ? 'Programar'
+                : 'Publicar'
+          }}
         </button>
-      </div>
+      </footer>
     </div>
   }
 </section>

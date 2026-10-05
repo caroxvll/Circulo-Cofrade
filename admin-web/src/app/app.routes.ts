@@ -39,6 +39,13 @@ export const routes: Routes = [
             './pages/hermandad-portal/posts/hermandad-posts.component'
           ).then((m) => m.HermandadPostsPageComponent),
       },
+      {
+        path: 'seguidores',
+        loadComponent: () =>
+          import(
+            './pages/hermandad-portal/followers/hermandad-followers.component'
+          ).then((m) => m.HermandadFollowersPageComponent),
+      },
     ],
   },
   {
@@ -117,6 +124,14 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/moderators/moderators.component').then(
             (m) => m.ModeratorsPageComponent,
+          ),
+      },
+      {
+        path: 'reporteros-ss',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./pages/ss-reporters/ss-reporters.component').then(
+            (m) => m.SsReportersPageComponent,
           ),
       },
       {

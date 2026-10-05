@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../auth/auth_provider.dart';
 import '../models/quiz_models.dart';
 import '../quiz_provider.dart';
@@ -48,7 +49,7 @@ class QuizRankingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final liveVisible =
-        ref.watch(quizLiveVisibleProvider).asData?.value ?? true;
+        ref.watch(quizLiveVisibleProvider).asData?.value == true;
     if (!liveVisible) {
       return Scaffold(
         backgroundColor: AppColors.background,
@@ -133,8 +134,23 @@ class QuizRankingScreen extends ConsumerWidget {
             ),
           ),
           boardAsync.when(
-            loading: () => const Center(
-              child: CircularProgressIndicator(color: AppColors.gold),
+            loading: () => const Padding(
+              padding: EdgeInsets.fromLTRB(20, 88, 20, 24),
+              child: Column(
+                children: [
+                  CofradeoSkeletonBone(height: 40, borderRadius: 10),
+                  SizedBox(height: 20),
+                  CofradeoSkeletonBone(height: 120, borderRadius: 16),
+                  SizedBox(height: 16),
+                  CofradeoSkeletonBone(height: 56, borderRadius: 12),
+                  SizedBox(height: 10),
+                  CofradeoSkeletonBone(height: 56, borderRadius: 12),
+                  SizedBox(height: 10),
+                  CofradeoSkeletonBone(height: 56, borderRadius: 12),
+                  SizedBox(height: 10),
+                  CofradeoSkeletonBone(height: 56, borderRadius: 12),
+                ],
+              ),
             ),
             error: (e, _) => Center(
               child: Padding(

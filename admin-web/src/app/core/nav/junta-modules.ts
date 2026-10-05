@@ -10,6 +10,7 @@ export type JuntaModuleId =
   | 'conversations'
   | 'news'
   | 'moderators'
+  | 'ss-reporters'
   | 'hermandades'
   | 'forums'
   | 'season'
@@ -130,6 +131,16 @@ export const JUNTA_MODULES: JuntaModuleDef[] = [
     route: '/app/moderadores',
     section: 'community',
     adminOnly: true,
+    comingSoon: false,
+  },
+  {
+    id: 'ss-reporters',
+    label: 'Reporteros SS',
+    shortLabel: 'Reporteros SS',
+    route: '/app/reporteros-ss',
+    section: 'community',
+    adminOnly: true,
+    webOnly: true,
     comingSoon: false,
   },
   {

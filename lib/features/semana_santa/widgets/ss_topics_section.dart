@@ -13,6 +13,7 @@ import '../../forums/topic_detail_typography.dart';
 import '../../forums/utils/topic_list_order.dart';
 import '../../forums/widgets/topic_compose_sheet.dart';
 import '../utils/semana_santa_topic.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 
 const _defaultVisibleTopics = 4;
 
@@ -38,15 +39,10 @@ class _SemanaSantaTopicsPanelState extends ConsumerState<SemanaSantaTopicsPanel>
     final topicsAsync = ref.watch(forumTopicsProvider(widget.forumId));
 
     return topicsAsync.when(
+      skipLoadingOnReload: true,
       loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: HubSectionListSkeleton(),
       ),
       error: (_, _) => CuaresmaHubElevatedCard(
         child: Text(

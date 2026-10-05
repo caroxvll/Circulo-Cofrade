@@ -9,6 +9,7 @@ import '../cuaresma_ensayos_provider.dart';
 import '../utils/ensayos_day_groups.dart';
 import 'cuaresma_hub_design.dart';
 import 'ensayo_live_design.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 
 const _listMaxHeight = 280.0;
 const _rowHeight = 54.0;
@@ -48,15 +49,10 @@ class _CuaresmaEnsayosPanelState extends ConsumerState<CuaresmaEnsayosPanel> {
 
     return ensayosAsync.when(
       data: (ensayos) => _buildContent(ensayos),
+      skipLoadingOnReload: true,
       loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: HubSectionListSkeleton(),
       ),
       error: (_, _) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),

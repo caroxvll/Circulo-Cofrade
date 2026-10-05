@@ -241,6 +241,7 @@ create table if not exists public.forum_topics (
     ),
   icon_key text,
   cover_image_url text,
+  icon_image_url text,
   is_listed boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -4218,6 +4219,9 @@ alter table public.forum_topics
 alter table public.forum_topics
   add column if not exists cover_image_url text;
 
+alter table public.forum_topics
+  add column if not exists icon_image_url text;
+
 update public.forum_topics set icon_key = 'filter_vintage_outlined'
 where id = 'circulo-cuaresma';
 
@@ -6870,6 +6874,9 @@ alter table public.forum_topics
 alter table public.forum_topics
   add column if not exists cover_image_url text;
 
+alter table public.forum_topics
+  add column if not exists icon_image_url text;
+
 create index if not exists forum_topics_pinned_idx
   on public.forum_topics (forum_id, is_pinned, pin_sort_order);
 
@@ -8256,60 +8263,60 @@ alter table public.ads
 -- FILE: ads_rpc_fix.sql
 -- ###########################################################################
 
--- Corrige get_ad_for_placement cuando la RPC devolvía error 42804
--- (columnas en orden distinto al de public.ads en BDs ya desplegadas).
--- Incluye filtro opcional por foro (forum_id).
--- Ejecutar en Supabase → SQL Editor.
-
-create or replace function public.get_ad_for_placement(
-  p_placement text,
-  p_forum_id text default null
-)
-returns setof public.ads
-language plpgsql
-stable
-security definer
-set search_path = public
-as $$
-begin
-  return query
-  with eligible as (
-    select a.*, sum(a.priority) over () as total_priority
-    from public.ads a
-    where a.placement = p_placement
-      and a.active = true
-      and a.start_date <= now()
-      and (a.end_date is null or a.end_date >= now())
-      and a.current_impressions < a.max_impressions
-      and (
-        p_forum_id is null
-        or a.forum_id is null
-        or a.forum_id = p_forum_id
-      )
-  ),
-  pick as (
-    select random() * coalesce(max(total_priority), 0) as ticket
-    from eligible
-  ),
-  weighted as (
-    select
-      e.id,
-      e.priority,
-      e.created_at,
-      sum(e.priority) over (order by e.priority desc, e.created_at asc) as cumulative
-    from eligible e
-  ),
-  picked as (
-    select w.id
-    from weighted w, pick p
-    where w.cumulative >= p.ticket
-    order by w.cumulative asc
-    limit 1
-  )
-  select a.*
-  from public.ads a
-  join picked on picked.id = a.id;
-end;
+-- Corrige get_ad_for_placement cuando la RPC devolvía error 42804
+-- (columnas en orden distinto al de public.ads en BDs ya desplegadas).
+-- Incluye filtro opcional por foro (forum_id).
+-- Ejecutar en Supabase → SQL Editor.
+
+create or replace function public.get_ad_for_placement(
+  p_placement text,
+  p_forum_id text default null
+)
+returns setof public.ads
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  return query
+  with eligible as (
+    select a.*, sum(a.priority) over () as total_priority
+    from public.ads a
+    where a.placement = p_placement
+      and a.active = true
+      and a.start_date <= now()
+      and (a.end_date is null or a.end_date >= now())
+      and a.current_impressions < a.max_impressions
+      and (
+        p_forum_id is null
+        or a.forum_id is null
+        or a.forum_id = p_forum_id
+      )
+  ),
+  pick as (
+    select random() * coalesce(max(total_priority), 0) as ticket
+    from eligible
+  ),
+  weighted as (
+    select
+      e.id,
+      e.priority,
+      e.created_at,
+      sum(e.priority) over (order by e.priority desc, e.created_at asc) as cumulative
+    from eligible e
+  ),
+  picked as (
+    select w.id
+    from weighted w, pick p
+    where w.cumulative >= p.ticket
+    order by w.cumulative asc
+    limit 1
+  )
+  select a.*
+  from public.ads a
+  join picked on picked.id = a.id;
+end;
 $$;
 
 

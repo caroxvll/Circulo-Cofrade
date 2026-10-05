@@ -27,13 +27,9 @@ abstract final class ProfileDesign {
   /// Alias histórico usado en estados vacíos y secciones.
   static TextStyle compactScreenTitle() => screenTitle();
 
-  static TextStyle sectionTitle() => AppTypography.titleLarge(
+  static TextStyle sectionTitle() => AppTypography.sectionTitle(
         color: AppColors.burgundy,
-      ).copyWith(
-        fontSize: sectionTitleSize,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.15,
-      );
+      ).copyWith(fontSize: sectionTitleSize);
 
   static TextStyle identityName() => AppTypography.titleLarge(
         color: AppColors.textPrimary,

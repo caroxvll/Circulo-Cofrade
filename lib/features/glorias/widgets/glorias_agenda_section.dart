@@ -10,6 +10,7 @@ import '../../calendar/models/calendar_focus_request.dart';
 import '../../cuaresma/widgets/cuaresma_hub_design.dart';
 import '../../forums/topic_detail_typography.dart';
 import '../glorias_provider.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 
 const _visibleAgendaCount = 5;
 
@@ -21,15 +22,10 @@ class GloriasAgendaPanel extends ConsumerWidget {
     final agendaAsync = ref.watch(gloriasUpcomingEventsProvider);
 
     return agendaAsync.when(
+      skipLoadingOnReload: true,
       loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: HubSectionListSkeleton(),
       ),
       error: (_, _) => CuaresmaHubElevatedCard(
         child: Text(

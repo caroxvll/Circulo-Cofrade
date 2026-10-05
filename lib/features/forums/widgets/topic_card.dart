@@ -314,7 +314,7 @@ class _PremiumTopicCard extends StatelessWidget {
                                         Expanded(
                                           child: Text(
                                             name,
-                                            style: AppTypography.displaySmall(
+                                            style: AppTypography.hermandadName(
                                               color: AppColors.textPrimary,
                                             ).copyWith(
                                               fontSize: 16,
@@ -559,7 +559,7 @@ class _NoticiasFeaturedBody extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   topic.title,
-                  style: AppTypography.displaySmall(
+                  style: AppTypography.newsHeadline(
                     color: AppColors.textPrimary,
                   ).copyWith(fontSize: 18, height: 1.15),
                   maxLines: 2,
@@ -615,7 +615,7 @@ class _NoticiasCompactBody extends StatelessWidget {
                     Expanded(
                       child: Text(
                         topic.title,
-                        style: AppTypography.displaySmall(
+                        style: AppTypography.newsHeadline(
                           color: AppColors.textPrimary,
                         ).copyWith(fontSize: 16, height: 1.15),
                         maxLines: 2,
@@ -1108,13 +1108,11 @@ class TopicCardFollowMark extends ConsumerWidget {
     final followingAsync = ref.watch(isFollowingTopicProvider(topicId));
 
     return followingAsync.when(
-      loading: () => SizedBox(
-        width: iconSize,
-        height: iconSize,
-        child: CircularProgressIndicator(
-          strokeWidth: 1.5,
-          color: AppColors.textMuted.withValues(alpha: 0.5),
-        ),
+      skipLoadingOnReload: true,
+      loading: () => Icon(
+        Icons.bookmark_border,
+        size: iconSize,
+        color: AppColors.textMuted.withValues(alpha: 0.7),
       ),
       error: (_, _) => Icon(
         Icons.bookmark_border,
@@ -1191,24 +1189,31 @@ class PinnedTopicMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final parsed = parseHermandadTopicTitle(topic.title);
+    final remoteEscudo = topic.iconImageUrl?.trim();
+    final hasRemoteEscudo =
+        remoteEscudo != null && remoteEscudo.isNotEmpty;
     final localEscudo = HermandadLocalAssets.avatar(
       processionDay: parsed.processionDay,
       hermandadName: parsed.hermandadName,
     );
-    final cover = localEscudo ?? topicCoverImageSource(topic);
+    final cover = hasRemoteEscudo
+        ? remoteEscudo
+        : (localEscudo ?? topicCoverImageSource(topic));
     final icon = topicDisplayIcon(topic);
     final radius = size >= 48 ? 14.0 : 12.0;
-    final isLocalEscudo = localEscudo != null;
+    final isEscudo = hasRemoteEscudo || localEscudo != null;
+    final isLocalAsset = (!hasRemoteEscudo && localEscudo != null) ||
+        (cover != null && topicCoverIsAsset(cover));
 
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: isLocalEscudo ? AppColors.surface : AppColors.burgundy,
+        color: isEscudo ? AppColors.surface : AppColors.burgundy,
         shape: circular ? BoxShape.circle : BoxShape.rectangle,
         borderRadius: circular ? null : BorderRadius.circular(radius),
         border: Border.all(
-          color: isLocalEscudo
+          color: isEscudo
               ? AppColors.gold.withValues(alpha: 0.55)
               : AppColors.goldDark.withValues(alpha: 0.45),
         ),
@@ -1216,10 +1221,10 @@ class PinnedTopicMark extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: cover == null
           ? Icon(icon, color: AppColors.gold, size: size * 0.5)
-          : topicCoverIsAsset(cover) || isLocalEscudo
+          : isLocalAsset
           ? Image.asset(
               cover,
-              fit: isLocalEscudo ? BoxFit.contain : BoxFit.cover,
+              fit: isEscudo ? BoxFit.contain : BoxFit.cover,
               filterQuality: FilterQuality.low,
               cacheWidth: ImageDecodeCache.px(context, size),
               cacheHeight: ImageDecodeCache.px(context, size),
@@ -1229,7 +1234,7 @@ class PinnedTopicMark extends StatelessWidget {
             )
           : CofradeoNetworkImage(
               url: cover,
-              fit: BoxFit.cover,
+              fit: isEscudo ? BoxFit.contain : BoxFit.cover,
               width: size,
               height: size,
               cacheSize: size,

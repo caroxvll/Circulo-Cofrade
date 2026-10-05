@@ -6,6 +6,8 @@ enum AppNotificationKind {
   userPost,
   mention,
   newFollower,
+  followRequest,
+  followAccepted,
   calendarEvent,
   topicPendingReview,
   newReport,
@@ -16,6 +18,7 @@ enum AppNotificationKind {
   replyReaction,
   cofradeRankUp,
   newsPublished,
+  ssLiveOfficial,
   system,
 }
 
@@ -34,6 +37,7 @@ class AppNotification {
     this.topicId,
     this.replyId,
     this.profileId,
+    this.requestId,
     this.route,
     this.officialCategory,
     this.eventId,
@@ -55,6 +59,7 @@ class AppNotification {
   final String? topicId;
   final String? replyId;
   final String? profileId;
+  final String? requestId;
   final String? route;
   final String? officialCategory;
   final String? eventId;
@@ -77,6 +82,7 @@ class AppNotification {
       topicId: topicId,
       replyId: replyId,
       profileId: profileId,
+      requestId: requestId,
       route: route,
       officialCategory: officialCategory,
       eventId: eventId,

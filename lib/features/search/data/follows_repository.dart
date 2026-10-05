@@ -78,6 +78,79 @@ class FollowsRepository {
     return rows.map((r) => r['target_id'] as String).toSet();
   }
 
+  /// Solicitudes de follow pendientes enviadas por [userId].
+  Future<Set<String>> fetchPendingOutgoingFollowRequests(String userId) async {
+    if (_client == null) return {};
+
+    try {
+      final rows = await _client!
+          .from('follow_requests')
+          .select('target_id')
+          .eq('requester_id', userId)
+          .eq('status', 'pending');
+      return rows.map((r) => r['target_id'] as String).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> requestFollow({
+    required String userId,
+    required String profileId,
+  }) async {
+    if (_client == null) {
+      throw const FollowsUnavailableException();
+    }
+
+    await _client!.from('follow_requests').upsert(
+      {
+        'requester_id': userId,
+        'target_id': profileId,
+        'status': 'pending',
+        'responded_at': null,
+      },
+      onConflict: 'requester_id,target_id',
+    );
+  }
+
+  Future<void> cancelFollowRequest({
+    required String userId,
+    required String profileId,
+  }) async {
+    if (_client == null) {
+      throw const FollowsUnavailableException();
+    }
+
+    await _client!
+        .from('follow_requests')
+        .delete()
+        .eq('requester_id', userId)
+        .eq('target_id', profileId)
+        .eq('status', 'pending');
+  }
+
+  Future<void> acceptFollowRequest(String requestId) async {
+    if (_client == null) {
+      throw const FollowsUnavailableException();
+    }
+
+    await _client!.rpc(
+      'accept_follow_request',
+      params: {'p_request_id': requestId},
+    );
+  }
+
+  Future<void> rejectFollowRequest(String requestId) async {
+    if (_client == null) {
+      throw const FollowsUnavailableException();
+    }
+
+    await _client!.rpc(
+      'reject_follow_request',
+      params: {'p_request_id': requestId},
+    );
+  }
+
   /// Cuentas que siguen a [profileId] (requiere policy follows_see_followers.sql).
   Future<List<String>> fetchFollowerProfileIds(String profileId) async {
     if (_client == null) return const [];
@@ -161,6 +234,30 @@ class FollowsRepository {
         .maybeSingle();
 
     return row != null;
+  }
+
+  /// Nº de perfiles que siguen el hilo / tablón de hermandad.
+  /// Usa RPC security definer: RLS en follows solo deja ver filas propias.
+  Future<int> countTopicFollowers(String topicId) async {
+    if (_client == null) return 0;
+
+    try {
+      final raw = await _client!.rpc(
+        'count_topic_followers',
+        params: {'p_topic_id': topicId},
+      );
+      if (raw is int) return raw;
+      if (raw is num) return raw.toInt();
+      return int.tryParse('$raw') ?? 0;
+    } catch (_) {
+      // Fallback si el RPC aún no está desplegado.
+      final rows = await _client!
+          .from('follows')
+          .select('follower_id')
+          .eq('target_type', 'topic')
+          .eq('target_id', topicId);
+      return rows.length;
+    }
   }
 
   Future<List<String>?> fetchTopicFollowNotifyCategories({
@@ -289,7 +386,7 @@ class FollowsRepository {
     final topicIds = rows.map((r) => r['target_id'] as String).toList();
     final topicRows = await _client!
         .from('forum_topics')
-        .select('id, forum_id, title, excerpt')
+        .select('id, forum_id, title, excerpt, icon_image_url')
         .inFilter('id', topicIds);
 
     final byId = <String, Map<String, dynamic>>{
@@ -308,6 +405,7 @@ class FollowsRepository {
           forumId: topic['forum_id'] as String,
           title: topic['title'] as String,
           preview: topic['excerpt'] as String? ?? '',
+          iconImageUrl: topic['icon_image_url'] as String?,
           notifyOfficialCategories: _parseNotifyCategories(
             row['notify_official_categories'],
           ),

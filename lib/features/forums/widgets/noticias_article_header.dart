@@ -77,13 +77,13 @@ class NoticiasArticleHeader extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'Actualidad · $category',
-              style: AppTypography.displaySmall(
+              style: AppTypography.newsHeadline(
                 color: AppColors.textPrimary,
               ).copyWith(
-                fontSize: 22,
-                fontWeight: FontWeight.w400,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
                 height: 1.15,
-                letterSpacing: 0.2,
+                letterSpacing: 0.1,
               ),
             ),
             const SizedBox(height: 8),
@@ -99,12 +99,8 @@ class NoticiasArticleHeader extends StatelessWidget {
                 Expanded(
                   child: Text(
                     topic.title,
-                    style: AppTypography.displaySmall(
+                    style: AppTypography.newsHeadline(
                       color: AppColors.textPrimary,
-                    ).copyWith(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
                     ),
                   ),
                 ),
@@ -372,13 +368,13 @@ class _DropCapParagraph extends StatelessWidget {
         spans.add(
           TextSpan(
             text: first,
-            style: AppTypography.displaySmall(
+            style: AppTypography.newsHeadline(
               color: AppColors.burgundy,
             ).copyWith(
-              fontSize: 40,
-              height: 0.92,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.8,
+              fontSize: 36,
+              height: 0.95,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.6,
             ),
           ),
         );

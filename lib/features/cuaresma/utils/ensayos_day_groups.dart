@@ -78,12 +78,17 @@ EnsayosDayGroups groupTodayEnsayos(
 }
 
 EnsayoDayBucket _bucketFor(CalendarEvent event, DateTime clock) {
+  if (event.liveForceState == EventLiveForceState.closed) {
+    return EnsayoDayBucket.finished;
+  }
+
   final timing = calendarEventTiming(event, now: clock);
   if (timing != null) {
     return switch (timing.kind) {
       CalendarEventTimingKind.inProgress => EnsayoDayBucket.live,
       CalendarEventTimingKind.startsSoon => EnsayoDayBucket.soon,
       CalendarEventTimingKind.scheduled => EnsayoDayBucket.upcoming,
+      CalendarEventTimingKind.finished => EnsayoDayBucket.finished,
     };
   }
 
@@ -93,7 +98,7 @@ EnsayoDayBucket _bucketFor(CalendarEvent event, DateTime clock) {
         event.date,
         DateTime(clock.year, clock.month, clock.day),
       )) {
-    final end = start.add(const Duration(hours: 2));
+    final end = eventEndDateTime(event) ?? start.add(const Duration(hours: 4));
     if (!clock.isBefore(end)) return EnsayoDayBucket.finished;
   }
 

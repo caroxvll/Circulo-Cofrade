@@ -37,6 +37,7 @@ class SsLiveUpdate {
     this.placeLabel,
     this.latitude,
     this.longitude,
+    this.isOfficial = false,
   });
 
   final String id;
@@ -50,6 +51,7 @@ class SsLiveUpdate {
   final String? placeLabel;
   final double? latitude;
   final double? longitude;
+  final bool isOfficial;
 
   bool get hasCoordinates => latitude != null && longitude != null;
 

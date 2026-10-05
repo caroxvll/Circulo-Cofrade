@@ -31,6 +31,18 @@ final followedProfilesProvider = FutureProvider<Set<String>>((ref) async {
   return repo.fetchFollowedProfiles(user.id);
 });
 
+/// Perfiles a los que el usuario actual ha enviado solicitud (pendiente).
+final pendingOutgoingFollowRequestsProvider =
+    FutureProvider<Set<String>>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return {};
+
+  final repo = ref.watch(followsRepositoryProvider);
+  if (!repo.isAvailable) return {};
+
+  return repo.fetchPendingOutgoingFollowRequests(user.id);
+});
+
 final hashtagFollowControllerProvider = Provider<HashtagFollowController>((ref) {
   return HashtagFollowController(ref);
 });
@@ -82,6 +94,14 @@ final isFollowingTopicProvider =
   if (!repo.isAvailable) return false;
 
   return repo.isFollowingTopic(userId: user.id, topicId: topicId);
+});
+
+/// Conteo de seguidores de un hilo / tablón de hermandad.
+final topicFollowerCountProvider =
+    FutureProvider.family<int, String>((ref, topicId) async {
+  final repo = ref.watch(followsRepositoryProvider);
+  if (!repo.isAvailable) return 0;
+  return repo.countTopicFollowers(topicId);
 });
 
 final topicFollowNotifyCategoriesProvider =
@@ -146,6 +166,7 @@ class TopicFollowController {
     _ref.invalidate(followedTopicsDetailsProvider);
     _ref.invalidate(isFollowingTopicProvider(topicId));
     _ref.invalidate(topicFollowNotifyCategoriesProvider(topicId));
+    _ref.invalidate(topicFollowerCountProvider(topicId));
   }
 
   Future<void> toggle({
@@ -219,9 +240,24 @@ class ProfileFollowController {
 
   final Ref _ref;
 
+  void _invalidateProfileFollow(String profileId) {
+    _ref.invalidate(followedProfilesProvider);
+    _ref.invalidate(followedProfilesDetailsProvider);
+    _ref.invalidate(pendingOutgoingFollowRequestsProvider);
+    _ref.invalidate(followingCountProvider);
+    _ref.invalidate(myFollowersDetailsProvider);
+    _ref.invalidate(userProfileProvider(profileId));
+    _ref.invalidate(userFollowersDetailsProvider(profileId));
+    _ref.invalidate(userFollowingCountProvider(profileId));
+    _ref.read(notificationsProvider.notifier).refresh();
+  }
+
+  /// Seguir / dejar de seguir. En cuentas privadas crea o cancela solicitud.
   Future<void> toggle({
     required String profileId,
     required bool currentlyFollowing,
+    bool isPrivate = false,
+    bool currentlyRequested = false,
   }) async {
     final user = _ref.read(currentUserProvider);
     if (user == null) {
@@ -229,17 +265,58 @@ class ProfileFollowController {
     }
 
     final repo = _ref.read(followsRepositoryProvider);
-    await repo.toggleProfile(
-      userId: user.id,
-      profileId: profileId,
-      follow: !currentlyFollowing,
-    );
 
-    _ref.invalidate(followedProfilesProvider);
-    _ref.invalidate(followedProfilesDetailsProvider);
-    _ref.invalidate(followingCountProvider);
+    if (currentlyFollowing) {
+      await repo.toggleProfile(
+        userId: user.id,
+        profileId: profileId,
+        follow: false,
+      );
+    } else if (currentlyRequested) {
+      await repo.cancelFollowRequest(
+        userId: user.id,
+        profileId: profileId,
+      );
+    } else if (isPrivate) {
+      await repo.requestFollow(
+        userId: user.id,
+        profileId: profileId,
+      );
+    } else {
+      await repo.toggleProfile(
+        userId: user.id,
+        profileId: profileId,
+        follow: true,
+      );
+    }
+
+    _invalidateProfileFollow(profileId);
+  }
+
+  Future<void> acceptRequest(String requestId, {String? requesterId}) async {
+    final user = _ref.read(currentUserProvider);
+    if (user == null) {
+      throw const FollowRequiresAuthException();
+    }
+
+    await _ref.read(followsRepositoryProvider).acceptFollowRequest(requestId);
     _ref.invalidate(myFollowersDetailsProvider);
-    _ref.invalidate(userProfileProvider(profileId));
+    _ref.invalidate(followedProfilesProvider);
+    if (requesterId != null) {
+      _ref.invalidate(userProfileProvider(requesterId));
+      _ref.invalidate(userFollowingCountProvider(requesterId));
+      _ref.invalidate(userFollowersDetailsProvider(user.id));
+    }
+    _ref.read(notificationsProvider.notifier).refresh();
+  }
+
+  Future<void> rejectRequest(String requestId) async {
+    final user = _ref.read(currentUserProvider);
+    if (user == null) {
+      throw const FollowRequiresAuthException();
+    }
+
+    await _ref.read(followsRepositoryProvider).rejectFollowRequest(requestId);
     _ref.read(notificationsProvider.notifier).refresh();
   }
 }
@@ -281,5 +358,47 @@ final myFollowersDetailsProvider =
     final profile = await profileRepo.fetchByUserId(id);
     if (profile != null) profiles.add(profile);
   }
+  return profiles;
+});
+
+/// Nº de cuentas que sigue un usuario (perfil ajeno).
+final userFollowingCountProvider =
+    FutureProvider.autoDispose.family<int, String>((ref, userId) async {
+  final repo = ref.watch(followsRepositoryProvider);
+  if (!repo.isAvailable) return 0;
+  final ids = await repo.fetchFollowedProfiles(userId);
+  return ids.length;
+});
+
+/// Seguidores de un usuario concreto (cotilleo).
+final userFollowersDetailsProvider = FutureProvider.autoDispose
+    .family<List<UserProfile>, String>((ref, userId) async {
+  final followsRepo = ref.watch(followsRepositoryProvider);
+  final profileRepo = ref.watch(profileRepositoryProvider);
+  if (!followsRepo.isAvailable || !profileRepo.isAvailable) return [];
+
+  final ids = await followsRepo.fetchFollowerProfileIds(userId);
+  final profiles = <UserProfile>[];
+  for (final id in ids) {
+    final profile = await profileRepo.fetchByUserId(id);
+    if (profile != null) profiles.add(profile);
+  }
+  return profiles;
+});
+
+/// Cuentas que sigue un usuario concreto (cotilleo).
+final userFollowingDetailsProvider = FutureProvider.autoDispose
+    .family<List<UserProfile>, String>((ref, userId) async {
+  final followsRepo = ref.watch(followsRepositoryProvider);
+  final profileRepo = ref.watch(profileRepositoryProvider);
+  if (!followsRepo.isAvailable || !profileRepo.isAvailable) return [];
+
+  final ids = await followsRepo.fetchFollowedProfiles(userId);
+  final profiles = <UserProfile>[];
+  for (final id in ids) {
+    final profile = await profileRepo.fetchByUserId(id);
+    if (profile != null) profiles.add(profile);
+  }
+  profiles.sort((a, b) => a.displayName.compareTo(b.displayName));
   return profiles;
 });

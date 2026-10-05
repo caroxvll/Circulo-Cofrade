@@ -44,7 +44,7 @@ List<Widget> buildNoticiasEditorialSlivers({
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Text(
             'Destacada',
-            style: AppTypography.displaySmall(
+            style: AppTypography.newsHeadline(
               color: AppColors.burgundyDark,
             ).copyWith(fontSize: 18, fontWeight: FontWeight.w600),
           ),
@@ -96,7 +96,7 @@ List<Widget> buildNoticiasEditorialSlivers({
               Expanded(
                 child: Text(
                   'Últimas noticias',
-                  style: AppTypography.displaySmall(
+                  style: AppTypography.newsHeadline(
                     color: AppColors.burgundyDark,
                   ).copyWith(fontSize: 20, fontWeight: FontWeight.w600),
                 ),
@@ -332,7 +332,7 @@ class NoticiasFeaturedEditorialCard extends StatelessWidget {
                           const SizedBox(height: 8),
                           Text(
                             topic.title,
-                            style: AppTypography.displaySmall(
+                            style: AppTypography.newsHeadline(
                               color: AppColors.textPrimary,
                             ).copyWith(
                               fontSize: 16.5,
@@ -462,7 +462,7 @@ class NoticiasRailCard extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           topic.title,
-                          style: AppTypography.displaySmall(
+                          style: AppTypography.newsHeadline(
                             color: AppColors.textPrimary,
                           ).copyWith(fontSize: 14, height: 1.15),
                           maxLines: 2,
@@ -574,7 +574,7 @@ class NoticiasListEditorialCard extends StatelessWidget {
                     children: [
                       Text(
                         topic.title,
-                        style: AppTypography.displaySmall(
+                        style: AppTypography.newsHeadline(
                           color: AppColors.textPrimary,
                         ).copyWith(fontSize: 15, height: 1.15),
                         maxLines: 2,

@@ -7,6 +7,7 @@ import '../../core/theme/app_typography.dart';
 import '../../core/widgets/cofradeo_avatar.dart';
 import '../auth/auth_provider.dart';
 import '../moderation/moderation_provider.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 
 class BlockedAccountsScreen extends ConsumerWidget {
   const BlockedAccountsScreen({super.key});
@@ -41,7 +42,8 @@ class BlockedAccountsScreen extends ConsumerWidget {
         titleSpacing: 0,
       ),
       body: blockedAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        skipLoadingOnReload: true,
+        loading: () => const PeopleListSkeleton(),
         error: (_, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
