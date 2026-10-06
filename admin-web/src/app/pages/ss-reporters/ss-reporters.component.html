@@ -1,0 +1,83 @@
+<section class="queue-page">
+  <header>
+    <div>
+      <p class="eyebrow">Comunidad · solo admin</p>
+      <h1>Reporteros Semana Santa</h1>
+      <p class="lead">
+        Quién puede pulsar <strong>+ Informar</strong> en el directo de Semana
+        Santa (además de hermandades verificadas y admin). No es un rol global:
+        vive en <code>ss_live_reporters</code>. El resto puede reaccionar y
+        responder.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  <div class="panel">
+    <h2>Dar acceso</h2>
+    <div class="form-grid">
+      <label>
+        Usuario
+        <app-handle-search [(ngModel)]="selected"></app-handle-search>
+      </label>
+      <label>
+        Nota (opcional)
+        <input
+          type="text"
+          [(ngModel)]="note"
+          maxlength="200"
+          placeholder="Amigo de confianza, Viernes Santo…"
+        />
+      </label>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="assigning() || !selected"
+        (click)="assign()"
+      >
+        {{ assigning() ? 'Asignando…' : 'Dar acceso' }}
+      </button>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando reporteros…</div>
+  } @else if (reporters().length === 0) {
+    <div class="empty-box">
+      Todavía no hay reporteros. Mientras tanto solo informan admin y hermandades
+      verificadas.
+    </div>
+  } @else {
+    <div class="queue-list">
+      @for (row of reporters(); track row.profileId) {
+        <article class="queue-card">
+          <h2>{{ '@' + row.handle }}</h2>
+          <p class="queue-meta">
+            {{ timeAgo(row.assignedAt) }}
+            @if (row.note) {
+              · {{ row.note }}
+            }
+          </p>
+          <div class="queue-actions">
+            <button
+              type="button"
+              class="btn btn-danger"
+              [disabled]="busyId() === row.profileId"
+              (click)="remove(row)"
+            >
+              Quitar
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>

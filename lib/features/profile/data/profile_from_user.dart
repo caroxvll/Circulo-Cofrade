@@ -24,6 +24,7 @@ UserProfile userProfileFromAuth(User user) {
     address: meta['address'] as String? ?? '',
     foundedLabel: meta['founded_label'] as String? ?? '',
     website: meta['website'] as String? ?? '',
+    accountType: AccountType.fromDb(meta['account_type'] as String?),
   );
 }
 

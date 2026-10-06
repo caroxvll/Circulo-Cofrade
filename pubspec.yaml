@@ -107,7 +107,9 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/fondoCardHdad.webp
     - assets/images/
+    - assets/images/fondoCardHdad.webp
     - assets/images/bannerDias.png
     - assets/images/forums/
     - assets/images/hermandades/Viernes de Dolores/Bendición y Esperanza/

@@ -221,15 +221,13 @@ class _CalendarMonthSheetState extends ConsumerState<CalendarMonthSheet> {
                 ),
                 if (isLoading)
                   const Positioned(
-                    top: 10,
+                    top: 0,
                     left: 0,
                     right: 0,
-                    child: Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
+                    child: LinearProgressIndicator(
+                      minHeight: 2,
+                      color: AppColors.gold,
+                      backgroundColor: Colors.transparent,
                     ),
                   ),
               ],

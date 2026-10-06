@@ -397,6 +397,7 @@ class ForumsRepository {
       isSystem: row['is_system'] as bool? ?? false,
       seasonKey: row['season_key'] as String?,
       iconKey: row['icon_key'] as String?,
+      iconImageUrl: row['icon_image_url'] as String?,
       coverImageUrl: row['cover_image_url'] as String?,
       showHubTitle: row['show_hub_title'] as bool? ?? true,
       isListed: row['is_listed'] as bool? ?? true,
@@ -770,6 +771,77 @@ class ForumsRepository {
     if (slug.length > 40) slug = slug.substring(0, 40);
     final suffix = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
     return '$slug-$suffix';
+  }
+
+  /// Fila cruda de Realtime (`forum_topics`), sin joins extras.
+  ForumTopic? topicFromRealtimeRecord(
+    Map<String, dynamic> record, {
+    ForumTopic? previous,
+  }) {
+    if (record.isEmpty) return null;
+    try {
+      final map = Map<String, dynamic>.from(record);
+      final created = map['created_at'];
+      if (created != null && created is! String) {
+        map['created_at'] = created.toString();
+      }
+      final edited = map['edited_at'];
+      if (edited != null && edited is! String) {
+        map['edited_at'] = edited.toString();
+      }
+      final parsed = _topicFromRow(map);
+      if (previous == null) return parsed;
+      return previous.copyWith(
+        title: parsed.title,
+        excerpt: parsed.excerpt,
+        body: parsed.body,
+        authorHandle: parsed.authorHandle.isNotEmpty
+            ? parsed.authorHandle
+            : previous.authorHandle,
+        timeAgo: parsed.timeAgo,
+        commentCount: parsed.commentCount,
+        viewCount: parsed.viewCount,
+        isResolved: parsed.isResolved,
+        authorId: parsed.authorId ?? previous.authorId,
+        authorAvatarUrl: parsed.authorAvatarUrl ?? previous.authorAvatarUrl,
+        authorVerified: parsed.authorVerified,
+        authorTrophyPoints: parsed.authorTrophyPoints != 0
+            ? parsed.authorTrophyPoints
+            : previous.authorTrophyPoints,
+        status: parsed.status,
+        isPinned: parsed.isPinned,
+        pinSortOrder: parsed.pinSortOrder,
+        isSystem: parsed.isSystem,
+        seasonKey: parsed.seasonKey ?? previous.seasonKey,
+        iconKey: parsed.iconKey ?? previous.iconKey,
+        iconImageUrl: parsed.iconImageUrl ?? previous.iconImageUrl,
+        coverImageUrl: parsed.coverImageUrl ?? previous.coverImageUrl,
+        showHubTitle: parsed.showHubTitle,
+        isListed: parsed.isListed,
+        createdAt: parsed.createdAt ?? previous.createdAt,
+        closeStatus: parsed.closeStatus,
+        isClosed: parsed.isClosed,
+        editedAt: parsed.editedAt ?? previous.editedAt,
+        relatedForumId: parsed.relatedForumId ?? previous.relatedForumId,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fila cruda de Realtime (`forum_replies`), sin join de perfil.
+  ForumReply? replyFromRealtimeRecord(Map<String, dynamic> record) {
+    if (record.isEmpty) return null;
+    try {
+      final map = Map<String, dynamic>.from(record);
+      final created = map['created_at'];
+      if (created != null && created is! String) {
+        map['created_at'] = created.toString();
+      }
+      return _replyFromRow(map);
+    } catch (_) {
+      return null;
+    }
   }
 
   ForumReply _replyFromRow(Map<String, dynamic> row) {

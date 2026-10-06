@@ -16,6 +16,7 @@ import 'data/reply_likes_repository.dart';
 import 'data/topic_reactions_repository.dart';
 import 'topic_replies_provider.dart';
 import 'utils/noticias_forum.dart';
+import 'utils/topic_list_order.dart';
 import 'utils/topic_permissions.dart';
 import 'viewer_id_provider.dart';
 
@@ -99,12 +100,83 @@ final forumAboutModeratorsProvider =
   return ref.read(forumsRepositoryProvider).fetchForumModerators(forumId);
 });
 
-final forumTopicsProvider = FutureProvider.family<List<ForumTopic>, String>((
-  ref,
-  forumId,
-) async {
-  return ref.watch(forumsRepositoryProvider).fetchTopics(forumId);
-});
+final forumTopicsProvider = AsyncNotifierProvider.family<ForumTopicsNotifier,
+    List<ForumTopic>, String>(
+  ForumTopicsNotifier.new,
+);
+
+class ForumTopicsNotifier extends AsyncNotifier<List<ForumTopic>> {
+  ForumTopicsNotifier(this.forumId);
+
+  final String forumId;
+
+  @override
+  Future<List<ForumTopic>> build() {
+    return ref.watch(forumsRepositoryProvider).fetchTopics(forumId);
+  }
+
+  Future<void> reload({bool quiet = false}) async {
+    if (!quiet) state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(forumsRepositoryProvider).fetchTopics(forumId),
+    );
+  }
+
+  void upsert(ForumTopic topic) {
+    final current = state.asData?.value;
+    if (current == null) return;
+    final next = [
+      topic,
+      ...current.where((t) => t.id != topic.id),
+    ];
+    state = AsyncData(
+      List<ForumTopic>.unmodifiable(orderForumTopics(next)),
+    );
+  }
+
+  void removeById(String topicId) {
+    final current = state.asData?.value;
+    if (current == null) return;
+    state = AsyncData(
+      current.where((t) => t.id != topicId).toList(growable: false),
+    );
+  }
+
+  void applyRealtimePayload(PostgresChangePayload payload) {
+    final repo = ref.read(forumsRepositoryProvider);
+    switch (payload.eventType) {
+      case PostgresChangeEvent.delete:
+        final id = payload.oldRecord['id']?.toString();
+        if (id != null && id.isNotEmpty) removeById(id);
+        return;
+      case PostgresChangeEvent.insert:
+      case PostgresChangeEvent.update:
+        final id = payload.newRecord['id']?.toString();
+        if (id == null || id.isEmpty) return;
+        ForumTopic? previous;
+        for (final t in state.asData?.value ?? const <ForumTopic>[]) {
+          if (t.id == id) {
+            previous = t;
+            break;
+          }
+        }
+        final parsed = repo.topicFromRealtimeRecord(
+          Map<String, dynamic>.from(payload.newRecord),
+          previous: previous,
+        );
+        if (parsed == null) return;
+        // Solo publicados listados (igual que fetchTopics).
+        if (!parsed.isListed || !parsed.isPublished || parsed.isRejected) {
+          removeById(id);
+          return;
+        }
+        upsert(parsed);
+        return;
+      case PostgresChangeEvent.all:
+        return;
+    }
+  }
+}
 
 final forumTopicProvider = FutureProvider.autoDispose
     .family<ForumTopic?, ForumTopicKey>((ref, key) async {
@@ -133,51 +205,188 @@ void invalidateTopicData(
 }
 
 /// Registra visita al abrir el hilo. La BD deduplica: 1 por viewer y día.
+/// No invalida el topic: evita spinner a pantalla completa en cada apertura.
 final topicViewTrackerProvider = FutureProvider.autoDispose
     .family<void, ForumTopicKey>((ref, key) async {
       final viewerId = ref.read(viewerIdProvider);
       final repo = ref.read(forumsRepositoryProvider);
       try {
         await repo.incrementTopicView(key.topicId, viewerId: viewerId);
-        // Solo el tema abierto: no refetch de toda la lista del foro.
-        ref.invalidate(forumTopicProvider(key));
       } catch (_) {}
     });
 
-final replyUserReactionsProvider =
-    FutureProvider.family<Map<String, String>, String>((ref, topicId) async {
-  final user = ref.watch(currentUserProvider);
-  if (user == null) return {};
+final replyUserReactionsProvider = AsyncNotifierProvider.family<
+    ReplyUserReactionsNotifier, Map<String, String>, String>(
+  ReplyUserReactionsNotifier.new,
+);
 
-  final repliesState = ref.watch(topicRepliesStateProvider(topicId));
-  final replies = repliesState.replies;
-  if (replies.isEmpty) return {};
+class ReplyUserReactionsNotifier extends AsyncNotifier<Map<String, String>> {
+  ReplyUserReactionsNotifier(this.topicId);
 
-  final repo = ref.read(replyLikesRepositoryProvider);
-  if (!repo.isAvailable) return {};
+  final String topicId;
 
-  return repo.fetchUserReactions(
-    userId: user.id,
-    replyIds: replies.map((r) => r.id).toList(),
-  );
-});
+  @override
+  Future<Map<String, String>> build() async {
+    final user = ref.watch(currentUserProvider);
+    if (user == null) return {};
 
-final replyReactionCountsProvider =
-    FutureProvider.family<Map<String, Map<String, int>>, String>((
-  ref,
-  topicId,
-) async {
-  final repliesState = ref.watch(topicRepliesStateProvider(topicId));
-  final replies = repliesState.replies;
-  if (replies.isEmpty) return {};
+    final replies = ref.read(topicRepliesStateProvider(topicId)).replies;
+    if (replies.isEmpty) return {};
 
-  final repo = ref.read(replyLikesRepositoryProvider);
-  if (!repo.isAvailable) return {};
+    final repo = ref.read(replyLikesRepositoryProvider);
+    if (!repo.isAvailable) return {};
 
-  return repo.fetchReactionCounts(
-    replyIds: replies.map((r) => r.id).toList(),
-  );
-});
+    return repo.fetchUserReactions(
+      userId: user.id,
+      replyIds: replies.map((r) => r.id).toList(),
+    );
+  }
+
+  void applyLikePayload(PostgresChangePayload payload) {
+    final me = ref.read(currentUserProvider)?.id;
+    if (me == null) return;
+    final current = Map<String, String>.from(state.asData?.value ?? const {});
+
+    switch (payload.eventType) {
+      case PostgresChangeEvent.insert:
+      case PostgresChangeEvent.update:
+        final actor = payload.newRecord['user_id']?.toString();
+        final replyId = payload.newRecord['reply_id']?.toString().toLowerCase();
+        final reaction = payload.newRecord['reaction'] as String?;
+        if (actor != me || replyId == null || replyId.isEmpty) return;
+        if (reaction == null || reaction.isEmpty) {
+          current.remove(replyId);
+        } else {
+          current[replyId] = reaction;
+        }
+        state = AsyncData(current);
+        return;
+      case PostgresChangeEvent.delete:
+        final actor = payload.oldRecord['user_id']?.toString();
+        final replyId = payload.oldRecord['reply_id']?.toString().toLowerCase();
+        if (actor != me || replyId == null) return;
+        current.remove(replyId);
+        state = AsyncData(current);
+        return;
+      case PostgresChangeEvent.all:
+        return;
+    }
+  }
+}
+
+final replyReactionCountsProvider = AsyncNotifierProvider.family<
+    ReplyReactionCountsNotifier, Map<String, Map<String, int>>, String>(
+  ReplyReactionCountsNotifier.new,
+);
+
+class ReplyReactionCountsNotifier
+    extends AsyncNotifier<Map<String, Map<String, int>>> {
+  ReplyReactionCountsNotifier(this.topicId);
+
+  final String topicId;
+
+  /// replyId+userId → emoji (DELETE/UPDATE a veces no traen reaction).
+  final Map<String, String> _reactionByActor = {};
+
+  String _actorKey(String replyId, String userId) => '$replyId::$userId';
+
+  @override
+  Future<Map<String, Map<String, int>>> build() async {
+    final replies = ref.read(topicRepliesStateProvider(topicId)).replies;
+    if (replies.isEmpty) return {};
+
+    final repo = ref.read(replyLikesRepositoryProvider);
+    if (!repo.isAvailable) return {};
+
+    return repo.fetchReactionCounts(
+      replyIds: replies.map((r) => r.id).toList(),
+    );
+  }
+
+  void applyLikePayload(PostgresChangePayload payload) {
+    final current = <String, Map<String, int>>{
+      for (final e in (state.asData?.value ?? const {}).entries)
+        e.key: Map<String, int>.from(e.value),
+    };
+
+    String? replyId;
+    String? actor;
+    String? oldReaction;
+    String? newReaction;
+
+    switch (payload.eventType) {
+      case PostgresChangeEvent.insert:
+        replyId = payload.newRecord['reply_id']?.toString().toLowerCase();
+        actor = payload.newRecord['user_id']?.toString();
+        newReaction = payload.newRecord['reaction'] as String?;
+        if (replyId != null &&
+            actor != null &&
+            newReaction != null &&
+            newReaction.isNotEmpty) {
+          _reactionByActor[_actorKey(replyId, actor)] = newReaction;
+        }
+        break;
+      case PostgresChangeEvent.update:
+        replyId = payload.newRecord['reply_id']?.toString().toLowerCase();
+        actor = payload.newRecord['user_id']?.toString();
+        newReaction = payload.newRecord['reaction'] as String?;
+        oldReaction = payload.oldRecord['reaction'] as String?;
+        if ((oldReaction == null || oldReaction.isEmpty) &&
+            replyId != null &&
+            actor != null) {
+          oldReaction = _reactionByActor[_actorKey(replyId, actor)];
+        }
+        if (replyId != null && actor != null) {
+          if (newReaction == null || newReaction.isEmpty) {
+            _reactionByActor.remove(_actorKey(replyId, actor));
+          } else {
+            _reactionByActor[_actorKey(replyId, actor)] = newReaction;
+          }
+        }
+        break;
+      case PostgresChangeEvent.delete:
+        replyId = payload.oldRecord['reply_id']?.toString().toLowerCase();
+        actor = payload.oldRecord['user_id']?.toString();
+        oldReaction = payload.oldRecord['reaction'] as String?;
+        if ((oldReaction == null || oldReaction.isEmpty) &&
+            replyId != null &&
+            actor != null) {
+          oldReaction = _reactionByActor.remove(_actorKey(replyId, actor));
+        }
+        if ((oldReaction == null || oldReaction.isEmpty) &&
+            replyId != null &&
+            replyId.isNotEmpty) {
+          final existing = current[replyId];
+          if (existing != null && existing.length == 1) {
+            oldReaction = existing.keys.first;
+          }
+        }
+        break;
+      case PostgresChangeEvent.all:
+        return;
+    }
+    if (replyId == null || replyId.isEmpty) return;
+
+    final bucket = Map<String, int>.from(current[replyId] ?? const {});
+    if (oldReaction != null && oldReaction.isNotEmpty) {
+      final n = (bucket[oldReaction] ?? 0) - 1;
+      if (n <= 0) {
+        bucket.remove(oldReaction);
+      } else {
+        bucket[oldReaction] = n;
+      }
+    }
+    if (newReaction != null && newReaction.isNotEmpty) {
+      bucket[newReaction] = (bucket[newReaction] ?? 0) + 1;
+    }
+    if (bucket.isEmpty) {
+      current.remove(replyId);
+    } else {
+      current[replyId] = bucket;
+    }
+    state = AsyncData(current);
+  }
+}
 
 final replyLikesRepositoryProvider = Provider<ReplyLikesRepository>((ref) {
   return createReplyLikesRepository();
@@ -243,21 +452,11 @@ final topicReactionsRealtimeProvider = Provider.family<void, String>((
   });
 });
 
-/// Realtime: sincroniza reacciones entre pestañas/dispositivos en un hilo.
-/// Filtra por topic_id (tras scale_hardening_v1.sql) y debouncea invalidaciones.
+/// Realtime: reacciones de replies — parche local por reply_id.
 final topicReplyReactionsRealtimeProvider =
     Provider.family<void, String>((ref, topicId) {
   final client = SupabaseBootstrap.client;
   if (client == null) return;
-
-  Timer? debounce;
-  void scheduleRefresh() {
-    debounce?.cancel();
-    debounce = Timer(const Duration(milliseconds: 220), () {
-      ref.invalidate(replyUserReactionsProvider(topicId));
-      ref.invalidate(replyReactionCountsProvider(topicId));
-    });
-  }
 
   final channel = client
       .channel('reply-reactions-$topicId')
@@ -270,17 +469,23 @@ final topicReplyReactionsRealtimeProvider =
           column: 'topic_id',
           value: topicId,
         ),
-        callback: (_) => scheduleRefresh(),
+        callback: (payload) {
+          ref
+              .read(replyReactionCountsProvider(topicId).notifier)
+              .applyLikePayload(payload);
+          ref
+              .read(replyUserReactionsProvider(topicId).notifier)
+              .applyLikePayload(payload);
+        },
       )
       .subscribe();
 
   ref.onDispose(() {
-    debounce?.cancel();
     client.removeChannel(channel);
   });
 });
 
-/// Realtime: lista de temas del foro (altas, publicaciones, cierres, contadores).
+/// Realtime: lista de temas del foro — parche local (sin refetch total).
 final forumTopicsRealtimeProvider = Provider.family<void, String>((
   ref,
   forumId,
@@ -288,15 +493,12 @@ final forumTopicsRealtimeProvider = Provider.family<void, String>((
   final client = SupabaseBootstrap.client;
   if (client == null) return;
 
-  Timer? debounce;
-  void scheduleRefresh({bool immediate = false}) {
-    debounce?.cancel();
-    if (immediate) {
-      ref.invalidate(forumTopicsProvider(forumId));
-      return;
-    }
-    debounce = Timer(const Duration(milliseconds: 80), () {
-      ref.invalidate(forumTopicsProvider(forumId));
+  Timer? pillarDebounce;
+  void schedulePillarRefresh() {
+    pillarDebounce?.cancel();
+    pillarDebounce = Timer(const Duration(milliseconds: 1200), () {
+      ref.invalidate(forumPillarProvider(forumId));
+      refreshForumPillarsFromRemote(ref);
     });
   }
 
@@ -312,27 +514,32 @@ final forumTopicsRealtimeProvider = Provider.family<void, String>((
           value: forumId,
         ),
         callback: (payload) {
-          // Altas/bajas y cambios de status (p. ej. pending→published) al instante.
-          final immediate = payload.eventType == PostgresChangeEvent.delete ||
-              payload.eventType == PostgresChangeEvent.insert ||
-              payload.eventType == PostgresChangeEvent.update;
-          scheduleRefresh(immediate: immediate);
-          // Contadores de la tarjeta del foro (temas / msgs).
-          ref.invalidate(forumPillarProvider(forumId));
-          refreshForumPillarsFromRemote(ref);
+          ref
+              .read(forumTopicsProvider(forumId).notifier)
+              .applyRealtimePayload(payload);
+          // Contadores del pilar: solo altas/bajas o cambio de status, no cada view.
+          final statusChanged = payload.eventType == PostgresChangeEvent.update &&
+              payload.oldRecord['status']?.toString() !=
+                  payload.newRecord['status']?.toString();
+          if (payload.eventType == PostgresChangeEvent.insert ||
+              payload.eventType == PostgresChangeEvent.delete ||
+              statusChanged) {
+            schedulePillarRefresh();
+          }
         },
       )
       .subscribe((status, error) {
         if (status == RealtimeSubscribeStatus.subscribed) {
-          // Al conectar/reconectar, sincroniza por si se publicó desde el admin.
-          scheduleRefresh(immediate: true);
-          ref.invalidate(forumPillarProvider(forumId));
-          refreshForumPillarsFromRemote(ref);
+          // Reconexión: una sync completa basta.
+          unawaited(
+            ref.read(forumTopicsProvider(forumId).notifier).reload(quiet: true),
+          );
+          schedulePillarRefresh();
         }
       });
 
   ref.onDispose(() {
-    debounce?.cancel();
+    pillarDebounce?.cancel();
     client.removeChannel(channel);
   });
 });
@@ -343,11 +550,10 @@ final topicThreadRealtimeProvider =
   final client = SupabaseBootstrap.client;
   if (client == null) return;
 
-  Timer? debounce;
-  void scheduleFullRefresh() {
-    debounce?.cancel();
-    debounce = Timer(const Duration(milliseconds: 180), () {
-      refreshTopicRepliesFromRef(ref, key.topicId);
+  Timer? topicMetaDebounce;
+  void scheduleTopicMetaRefresh() {
+    topicMetaDebounce?.cancel();
+    topicMetaDebounce = Timer(const Duration(milliseconds: 220), () {
       ref.invalidate(forumTopicProvider(key));
     });
   }
@@ -359,14 +565,15 @@ final topicThreadRealtimeProvider =
         : payload.oldRecord;
     final replyId = record['id']?.toString();
     if (replyId == null || replyId.isEmpty) {
-      scheduleFullRefresh();
+      refreshTopicRepliesFromRef(ref, key.topicId);
+      scheduleTopicMetaRefresh();
       return;
     }
 
     switch (payload.eventType) {
       case PostgresChangeEvent.delete:
         patches.remove(key.topicId, replyId);
-        ref.invalidate(forumTopicProvider(key));
+        scheduleTopicMetaRefresh();
         break;
       case PostgresChangeEvent.update:
         final deletedRaw = payload.newRecord['deleted_at'];
@@ -374,9 +581,10 @@ final topicThreadRealtimeProvider =
           final deletedAt = DateTime.tryParse(deletedRaw.toString())?.toLocal();
           patches.markDeleted(key.topicId, replyId, deletedAt: deletedAt);
         } else {
-          final content = payload.newRecord['content']?.toString();
-          final handle = payload.newRecord['author_handle']?.toString();
-          if (content != null || handle != null) {
+          final parsed = ref
+              .read(forumsRepositoryProvider)
+              .replyFromRealtimeRecord(payload.newRecord);
+          if (parsed != null) {
             final existing = ref
                 .read(topicRepliesStateProvider(key.topicId))
                 .replies
@@ -385,26 +593,42 @@ final topicThreadRealtimeProvider =
             if (existing != null) {
               patches.upsert(
                 key.topicId,
-                existing.copyWith(
-                  content: content,
-                  authorHandle: handle,
-                  editedAt: DateTime.tryParse(
-                        payload.newRecord['edited_at']?.toString() ?? '',
-                      )?.toLocal() ??
-                      existing.editedAt,
+                parsed.copyWith(
+                  authorHandle: parsed.authorHandle.isNotEmpty
+                      ? parsed.authorHandle
+                      : existing.authorHandle,
+                  authorAvatarUrl:
+                      parsed.authorAvatarUrl ?? existing.authorAvatarUrl,
+                  authorVerified: existing.authorVerified,
+                  authorTrophyPoints: existing.authorTrophyPoints > 0
+                      ? existing.authorTrophyPoints
+                      : parsed.authorTrophyPoints,
+                  timeAgo: existing.timeAgo,
                 ),
               );
+            } else {
+              patches.upsert(key.topicId, parsed);
             }
+          } else {
+            refreshTopicRepliesFromRef(ref, key.topicId);
           }
         }
-        ref.invalidate(forumTopicProvider(key));
-        scheduleFullRefresh();
+        scheduleTopicMetaRefresh();
         break;
       case PostgresChangeEvent.insert:
-        scheduleFullRefresh();
+        final inserted = ref
+            .read(forumsRepositoryProvider)
+            .replyFromRealtimeRecord(payload.newRecord);
+        if (inserted != null) {
+          patches.upsert(key.topicId, inserted);
+        } else {
+          refreshTopicRepliesFromRef(ref, key.topicId);
+        }
+        scheduleTopicMetaRefresh();
         break;
       case PostgresChangeEvent.all:
-        scheduleFullRefresh();
+        refreshTopicRepliesFromRef(ref, key.topicId);
+        scheduleTopicMetaRefresh();
         break;
     }
   }
@@ -432,22 +656,24 @@ final topicThreadRealtimeProvider =
           value: key.topicId,
         ),
         callback: (payload) {
-          debounce?.cancel();
           if (payload.eventType == PostgresChangeEvent.delete) {
             ref.invalidate(forumTopicProvider(key));
-            ref.invalidate(forumTopicsProvider(key.forumId));
+            ref.read(forumTopicsProvider(key.forumId).notifier).removeById(
+                  key.topicId,
+                );
             return;
           }
-          debounce = Timer(const Duration(milliseconds: 80), () {
-            ref.invalidate(forumTopicProvider(key));
-            ref.invalidate(forumTopicsProvider(key.forumId));
-          });
+          // Parche lista + meta del hilo abierto (sin refetch de todos los temas).
+          ref
+              .read(forumTopicsProvider(key.forumId).notifier)
+              .applyRealtimePayload(payload);
+          scheduleTopicMetaRefresh();
         },
       )
       .subscribe();
 
   ref.onDispose(() {
-    debounce?.cancel();
+    topicMetaDebounce?.cancel();
     client.removeChannel(channel);
   });
 });

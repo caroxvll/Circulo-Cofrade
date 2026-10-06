@@ -1,37 +1,19 @@
--- Cofradero · disparar push al insertar en notifications (sin Dashboard Webhooks)
--- Usar si al crear el webhook sale: schema "supabase_functions" does not exist
--- Ejecutar en SQL Editor (una sola vez).
+-- Cofradeo · ANTES usaba 1 HTTP a send-push por cada fila de notifications.
+-- Sustituido por push_delivery_queue.sql (cola + drain-push).
+--
+-- Si aún tienes este trigger activo, ejecuta push_delivery_queue.sql:
+-- quita notifications_send_push y monta la cola.
+--
+-- NO ejecutes este archivo en proyectos nuevos.
+-- Se deja solo como referencia histórica / rollback de emergencia.
 
 create extension if not exists pg_net with schema extensions;
 
-create or replace function public.trigger_send_push_notification()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  perform net.http_post(
-    url := 'https://dcsxgppprfedrsrtbatx.supabase.co/functions/v1/send-push',
-    headers := jsonb_build_object('Content-Type', 'application/json'),
-    body := jsonb_build_object(
-      'type', 'INSERT',
-      'table', 'notifications',
-      'record', jsonb_build_object(
-        'user_id', new.user_id,
-        'type', new.type,
-        'title', new.title,
-        'subtitle', new.subtitle,
-        'payload', coalesce(new.payload, '{}'::jsonb)
-      )
-    )
-  );
-  return new;
-end;
-$$;
+-- Rollback de emergencia (NO recomendado si ya usas la cola):
+-- drop trigger if exists notifications_enqueue_push on public.notifications;
+-- Luego descomenta el bloque antiguo de send-push directo...
+--
+-- create or replace function public.trigger_send_push_notification() ...
+-- Ver historial git si hace falta el cuerpo exacto.
 
-drop trigger if exists notifications_send_push on public.notifications;
-create trigger notifications_send_push
-  after insert on public.notifications
-  for each row
-  execute function public.trigger_send_push_notification();
+select 'Usa supabase/push_delivery_queue.sql + functions/drain-push' as aviso;

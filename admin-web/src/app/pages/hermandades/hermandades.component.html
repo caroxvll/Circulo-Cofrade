@@ -42,7 +42,8 @@
     <h2 class="block-title">Tablones del directorio</h2>
     <label class="inline-search">
       <input
-        [(ngModel)]="boardSearch"
+        [ngModel]="boardSearch()"
+        (ngModelChange)="boardSearch.set($event)"
         placeholder="Buscar por nombre de hermandad…"
       />
     </label>
@@ -88,7 +89,7 @@
     <div class="state-box">Cargando…</div>
   } @else if (filteredTopics().length === 0) {
     <div class="empty-box">
-      @if (boardSearch.trim() || dayFilter()) {
+      @if (boardSearch().trim() || dayFilter()) {
         No hay tablones con ese filtro.
       } @else {
         No hay tablones.
@@ -247,6 +248,14 @@
               <button
                 type="button"
                 class="btn btn-soft"
+                [disabled]="busyKey() === 'user:' + user.id || credentialsLoading()"
+                (click)="openCredentials(user)"
+              >
+                Acceso
+              </button>
+              <button
+                type="button"
+                class="btn btn-soft"
                 [disabled]="busyKey() === 'user:' + user.id"
                 (click)="renameAccount(user)"
               >
@@ -307,10 +316,64 @@
         <strong>{{ boardDay }} · {{ boardName.trim() || '…' }}</strong>
       </div>
 
-      <label>
-        Portada (URL, opcional)
-        <input [(ngModel)]="boardCoverUrl" placeholder="https://…" />
-      </label>
+      <div class="media-grid">
+        <div class="media-block">
+          <span class="media-label">Escudo</span>
+          <p class="media-hint">Circular en cabecera y directorio.</p>
+          @if (boardIconUrl) {
+            <img [src]="boardIconUrl" alt="" class="preview icon-preview" />
+          } @else {
+            <div class="preview empty icon-preview">Sin escudo</div>
+          }
+          <label class="file-row">
+            Subir escudo
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              [disabled]="uploadingBoard() || savingBoard()"
+              (change)="onBoardUpload('escudo', $event)"
+            />
+          </label>
+          @if (boardIconUrl) {
+            <button type="button" class="btn btn-ghost" (click)="clearBoardIcon()">
+              Quitar
+            </button>
+          }
+          <label>
+            URL escudo
+            <input [(ngModel)]="boardIconUrl" placeholder="https://…" />
+          </label>
+        </div>
+
+        <div class="media-block">
+          <span class="media-label">Portada</span>
+          <p class="media-hint">Fondo del tablón (opcional).</p>
+          @if (boardCoverUrl) {
+            <img [src]="boardCoverUrl" alt="" class="preview cover-preview" />
+          } @else {
+            <div class="preview empty">Sin portada</div>
+          }
+          <label class="file-row">
+            Subir portada
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              [disabled]="uploadingBoard() || savingBoard()"
+              (change)="onBoardUpload('cover', $event)"
+            />
+          </label>
+          @if (boardCoverUrl) {
+            <button type="button" class="btn btn-ghost" (click)="clearBoardCover()">
+              Quitar
+            </button>
+          }
+          <label>
+            URL portada
+            <input [(ngModel)]="boardCoverUrl" placeholder="https://…" />
+          </label>
+        </div>
+      </div>
+
       @if (mode === 'edit') {
         <label class="check">
           <input type="checkbox" [(ngModel)]="boardResetBody" />
@@ -318,18 +381,106 @@
         </label>
       }
       <div class="queue-actions">
-        <button type="button" class="btn btn-soft" (click)="closeBoardDialog()">
+        <button
+          type="button"
+          class="btn btn-soft"
+          (click)="closeBoardDialog()"
+          [disabled]="savingBoard() || uploadingBoard()"
+        >
           Cancelar
         </button>
         <button
           type="button"
           class="btn btn-primary"
-          [disabled]="savingBoard() || boardName.trim().length < 2"
+          [disabled]="
+            savingBoard() || uploadingBoard() || boardName.trim().length < 2
+          "
           (click)="saveBoard()"
         >
           {{ savingBoard() ? 'Guardando…' : 'Guardar tablón' }}
         </button>
       </div>
+    </div>
+  </div>
+}
+
+@if (credentialsUser(); as user) {
+  <div class="modal-backdrop" (click)="closeCredentials()">
+    <div class="modal-card credentials-card" (click)="$event.stopPropagation()">
+      <header>
+        <h2>Acceso · {{ user.displayName }}</h2>
+        <button
+          type="button"
+          class="btn btn-ghost"
+          (click)="closeCredentials()"
+          [disabled]="credentialsSaving()"
+        >
+          Cerrar
+        </button>
+      </header>
+      <p class="picked-day">{{ '@' + user.handle }}</p>
+      <p class="media-hint">
+        Email y contraseña para entrar en la web (/login → portal /hermandad) y
+        en la app. La contraseña solo se cambia si rellenas el campo nuevo.
+      </p>
+
+      @if (credentialsLoading()) {
+        <div class="state-box">Cargando email desde Auth…</div>
+      } @else {
+        @if (credentialsSuccess(); as ok) {
+          <div class="success-box">{{ ok }}</div>
+        }
+        <label>
+          Email de acceso
+          <input
+            type="email"
+            [(ngModel)]="credEmail"
+            autocomplete="off"
+            [disabled]="credentialsSaving()"
+          />
+        </label>
+        <label>
+          Nueva contraseña (opcional)
+          <input
+            [type]="showCredPassword ? 'text' : 'password'"
+            [(ngModel)]="credPassword"
+            autocomplete="new-password"
+            placeholder="Mín. 8 caracteres"
+            [disabled]="credentialsSaving()"
+          />
+        </label>
+        <label>
+          Repetir contraseña
+          <input
+            [type]="showCredPassword ? 'text' : 'password'"
+            [(ngModel)]="credPasswordConfirm"
+            autocomplete="new-password"
+            [disabled]="credentialsSaving() || !credPassword.trim()"
+          />
+        </label>
+        <label class="check">
+          <input type="checkbox" [(ngModel)]="showCredPassword" />
+          Mostrar contraseña
+        </label>
+        <div class="queue-actions">
+          <button
+            type="button"
+            class="btn btn-soft"
+            (click)="closeCredentials()"
+            [disabled]="credentialsSaving()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="credentialsSaving() || !credEmail.trim()"
+            (click)="saveCredentials()"
+          >
+            {{ credentialsSaving() ? 'Guardando…' : 'Guardar acceso' }}
+          </button>
+        </div>
+      }
     </div>
   </div>
 }

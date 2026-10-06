@@ -98,6 +98,15 @@ class NotificationsRepository {
     await _client!.from('notifications').delete().eq('user_id', userId);
   }
 
+  AppNotification? fromRealtimeRecord(Map<String, dynamic> record) {
+    if (record.isEmpty) return null;
+    try {
+      return _fromRow(record);
+    } catch (_) {
+      return null;
+    }
+  }
+
   AppNotification _fromRow(Map<String, dynamic> row) {
     final payload = row['payload'] as Map<String, dynamic>? ?? {};
     final type = row['type'] as String? ?? 'system';
@@ -115,6 +124,7 @@ class NotificationsRepository {
       topicId: _payloadString(payload, 'topicId'),
       replyId: _payloadString(payload, 'replyId'),
       profileId: _payloadString(payload, 'profileId'),
+      requestId: _payloadString(payload, 'requestId'),
       route: _payloadString(payload, 'route'),
       officialCategory: _payloadString(payload, 'officialCategory'),
       eventId: _payloadString(payload, 'eventId'),
@@ -135,6 +145,8 @@ class NotificationsRepository {
       'user_post' || 'user_reply' => AppNotificationKind.userPost,
       'mention' => AppNotificationKind.mention,
       'new_follower' => AppNotificationKind.newFollower,
+      'follow_request' => AppNotificationKind.followRequest,
+      'follow_accepted' => AppNotificationKind.followAccepted,
       'calendar' => AppNotificationKind.calendarEvent,
       'topic_pending_review' => AppNotificationKind.topicPendingReview,
       'new_report' => AppNotificationKind.newReport,
@@ -145,6 +157,7 @@ class NotificationsRepository {
       'reply_reaction' => AppNotificationKind.replyReaction,
       'cofrade_rank_up' => AppNotificationKind.cofradeRankUp,
       'news_published' => AppNotificationKind.newsPublished,
+      'ss_live_official' => AppNotificationKind.ssLiveOfficial,
       _ => AppNotificationKind.system,
     };
   }
@@ -155,6 +168,8 @@ class NotificationsRepository {
       'topic_activity' => Icons.forum_outlined,
       'user_post' || 'user_reply' => Icons.chat_bubble_outline,
       'new_follower' => Icons.person_add_outlined,
+      'follow_request' => Icons.person_add_alt_1_outlined,
+      'follow_accepted' => Icons.how_to_reg_outlined,
       'mention' => Icons.alternate_email,
       'calendar' => Icons.calendar_month_outlined,
       'topic_pending_review' => Icons.gavel_outlined,
@@ -166,6 +181,7 @@ class NotificationsRepository {
       'reply_reaction' => Icons.add_reaction_outlined,
       'cofrade_rank_up' => Icons.military_tech_outlined,
       'news_published' => Icons.newspaper_outlined,
+      'ss_live_official' => Icons.campaign_outlined,
       _ => Icons.notifications_outlined,
     };
   }

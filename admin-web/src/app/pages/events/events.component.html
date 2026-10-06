@@ -85,6 +85,12 @@
                 <div class="event-kicker">
                   <span class="type-pill">{{ typeLabel(event.eventType) }}</span>
                   <span>{{ dateTime(event.startsAt) }}</span>
+                  @if (event.endsAt) {
+                    <span>· fin {{ dateTime(event.endsAt) }}</span>
+                  }
+                  <span class="live-pill" [class.closed]="event.liveForceState === 'closed'">
+                    {{ liveForceLabel(event) }}
+                  </span>
                 </div>
                 <h2>{{ event.title }}</h2>
                 <p class="queue-meta">
@@ -105,6 +111,26 @@
             </div>
             <div class="queue-actions">
               <button type="button" class="btn btn-ghost" (click)="openEdit(event)">Editar</button>
+              @if (event.liveForceState !== 'closed') {
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === event.id"
+                  (click)="setLiveForce(event, 'closed')"
+                  title="Finalizar live (lluvia, cortejo a casa…)"
+                >
+                  Cerrar live
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === event.id"
+                  (click)="setLiveForce(event, 'auto')"
+                >
+                  Reabrir auto
+                </button>
+              }
               <button
                 type="button"
                 class="btn btn-danger"
@@ -220,9 +246,20 @@
 
       <div class="form-row">
         <label>
-          Fecha y hora
+          Inicio
           <input type="datetime-local" [(ngModel)]="formStartsAtLocal" />
         </label>
+        <label>
+          Fin estimado (live)
+          <input type="datetime-local" [(ngModel)]="formEndsAtLocal" />
+        </label>
+      </div>
+      <p class="form-hint">
+        Si dejas el fin vacío, la app usa la duración por defecto (procesión/ensayo/iguala 4 h).
+        En lluvia o fin anticipado usa «Cerrar live» en la lista.
+      </p>
+
+      <div class="form-row">
         <label>
           Lugar
           <input [(ngModel)]="formLocation" maxlength="160" placeholder="Calle, templo…" />

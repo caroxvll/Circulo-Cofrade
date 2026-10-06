@@ -139,7 +139,7 @@ class NoticiasPremiumBanner extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 forum.name,
-                                style: AppTypography.displaySmall(
+                                style: AppTypography.newsHeadline(
                                   color: locked
                                       ? AppColors.textMuted
                                       : AppColors.burgundyDark,
@@ -306,7 +306,7 @@ class _LatestNewsSpoiler extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           title,
-          style: AppTypography.displaySmall(
+          style: AppTypography.newsHeadline(
             color: locked ? AppColors.textMuted : AppColors.burgundyDark,
           ).copyWith(
             fontSize: 13.5,

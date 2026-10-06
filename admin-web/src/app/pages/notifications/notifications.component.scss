@@ -480,6 +480,15 @@ th {
   color: var(--text-secondary);
 }
 
+.dispatch-panel {
+  margin-bottom: 1.75rem;
+}
+
+.push-fcm-panel {
+  padding-top: 1rem;
+  border-top: 1px solid rgba(122, 8, 20, 0.12);
+}
+
 .dispatch-panel .lead.compact {
   margin: 0 0 14px;
   max-width: 60ch;
@@ -594,6 +603,58 @@ th {
   font-style: normal;
 }
 
+.progress-cell {
+  min-width: 7.5rem;
+}
+
+.progress-cell strong {
+  display: block;
+  font-size: 0.88rem;
+  margin-bottom: 4px;
+}
+
+.progress-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #efe8de;
+  overflow: hidden;
+}
+
+.progress-track.large {
+  height: 10px;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7a0814, #a31d2a);
+  transition: width 0.35s ease;
+}
+
+.fcm-progress-block {
+  margin: 0 0 14px;
+  max-width: 42rem;
+}
+
+.fcm-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.help-errors {
+  max-width: 70ch !important;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.help-errors strong {
+  color: var(--text-primary);
+}
+
 .status-pill {
   display: inline-block;
   padding: 3px 8px;
@@ -621,6 +682,11 @@ th {
 .status-pill[data-status='failed'] {
   background: #f8e4e4;
   color: #9b2c2c;
+}
+
+.status-pill[data-status='skipped'] {
+  background: #eceaf0;
+  color: #5c5668;
 }
 
 @media (max-width: 900px) {

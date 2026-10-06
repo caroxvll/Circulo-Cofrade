@@ -175,6 +175,7 @@ class ForumTopic {
     this.isSystem = false,
     this.seasonKey,
     this.iconKey,
+    this.iconImageUrl,
     this.coverImageUrl,
     this.showHubTitle = true,
     this.isListed = true,
@@ -210,6 +211,9 @@ class ForumTopic {
   /// `cuaresma`, `semana_santa` o `glorias` para reorden estacional.
   final String? seasonKey;
   final String? iconKey;
+
+  /// Escudo / icono remoto (p. ej. tablones de hermandad).
+  final String? iconImageUrl;
   final String? coverImageUrl;
 
   /// En hubs estacionales: mostrar icono + título sobre la portada.
@@ -232,6 +236,76 @@ class ForumTopic {
   bool get acceptsReplies => isPublished && !isClosed;
 
   int get sortTimestamp => createdAt?.millisecondsSinceEpoch ?? 0;
+
+  ForumTopic copyWith({
+    String? id,
+    String? forumId,
+    String? title,
+    String? excerpt,
+    String? body,
+    String? authorHandle,
+    String? timeAgo,
+    int? commentCount,
+    int? viewCount,
+    bool? isResolved,
+    IconData? avatarIcon,
+    String? authorId,
+    String? authorAvatarUrl,
+    bool? authorVerified,
+    int? authorTrophyPoints,
+    TopicStatus? status,
+    bool? isPinned,
+    int? pinSortOrder,
+    bool? isSystem,
+    String? seasonKey,
+    String? iconKey,
+    String? iconImageUrl,
+    String? coverImageUrl,
+    bool? showHubTitle,
+    bool? isListed,
+    DateTime? createdAt,
+    TopicCloseStatus? closeStatus,
+    bool? isClosed,
+    DateTime? editedAt,
+    String? rejectionReason,
+    DateTime? rejectedAt,
+    String? relatedForumId,
+  }) {
+    return ForumTopic(
+      id: id ?? this.id,
+      forumId: forumId ?? this.forumId,
+      title: title ?? this.title,
+      excerpt: excerpt ?? this.excerpt,
+      body: body ?? this.body,
+      authorHandle: authorHandle ?? this.authorHandle,
+      timeAgo: timeAgo ?? this.timeAgo,
+      commentCount: commentCount ?? this.commentCount,
+      viewCount: viewCount ?? this.viewCount,
+      isResolved: isResolved ?? this.isResolved,
+      avatarIcon: avatarIcon ?? this.avatarIcon,
+      authorId: authorId ?? this.authorId,
+      authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+      authorVerified: authorVerified ?? this.authorVerified,
+      authorTrophyPoints: authorTrophyPoints ?? this.authorTrophyPoints,
+      status: status ?? this.status,
+      isPinned: isPinned ?? this.isPinned,
+      pinSortOrder: pinSortOrder ?? this.pinSortOrder,
+      isSystem: isSystem ?? this.isSystem,
+      seasonKey: seasonKey ?? this.seasonKey,
+      iconKey: iconKey ?? this.iconKey,
+      iconImageUrl: iconImageUrl ?? this.iconImageUrl,
+      coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      showHubTitle: showHubTitle ?? this.showHubTitle,
+      isListed: isListed ?? this.isListed,
+      createdAt: createdAt ?? this.createdAt,
+      closeStatus: closeStatus ?? this.closeStatus,
+      isClosed: isClosed ?? this.isClosed,
+      editedAt: editedAt ?? this.editedAt,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      rejectedAt: rejectedAt ?? this.rejectedAt,
+      relatedForumId: relatedForumId ?? this.relatedForumId,
+    );
+  }
 }
 
 class ForumReply {
@@ -301,12 +375,14 @@ class ForumReply {
     int? authorTrophyPoints,
     bool? isOfficial,
     String? officialCategory,
+    bool clearOfficialCategory = false,
     String? parentReplyId,
     DateTime? createdAt,
     DateTime? editedAt,
     DateTime? deletedAt,
     bool? isFeatured,
     String? imageUrl,
+    bool clearImageUrl = false,
   }) {
     return ForumReply(
       id: id ?? this.id,
@@ -322,13 +398,15 @@ class ForumReply {
       authorVerified: authorVerified ?? this.authorVerified,
       authorTrophyPoints: authorTrophyPoints ?? this.authorTrophyPoints,
       isOfficial: isOfficial ?? this.isOfficial,
-      officialCategory: officialCategory ?? this.officialCategory,
+      officialCategory: clearOfficialCategory
+          ? null
+          : (officialCategory ?? this.officialCategory),
       parentReplyId: parentReplyId ?? this.parentReplyId,
       createdAt: createdAt ?? this.createdAt,
       editedAt: editedAt ?? this.editedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       isFeatured: isFeatured ?? this.isFeatured,
-      imageUrl: imageUrl ?? this.imageUrl,
+      imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
     );
   }
 }

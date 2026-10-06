@@ -8,3 +8,6 @@ begin
 exception
   when duplicate_object then null;
 end $$;
+
+-- DELETE/UPDATE con filtro o lectura de starts_at/status en oldRecord.
+alter table public.calendar_events replica identity full;

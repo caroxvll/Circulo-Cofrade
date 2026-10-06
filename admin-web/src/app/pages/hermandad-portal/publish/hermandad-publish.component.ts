@@ -15,7 +15,7 @@ import { HermandadPortalStore } from '../../../core/hermandad/hermandad-portal.s
   standalone: true,
   imports: [FormsModule],
   templateUrl: './hermandad-publish.component.html',
-  styleUrl: '../hermandad-portal-shared.scss',
+  styleUrl: './hermandad-publish.component.scss',
 })
 export class HermandadPublishPageComponent implements OnInit {
   private readonly auth = inject(AuthService);
@@ -38,6 +38,8 @@ export class HermandadPublishPageComponent implements OnInit {
   destBoard = true;
   destCalendar = false;
   destNoticias = false;
+  timing: 'now' | 'later' = 'now';
+  scheduleAtLocal = '';
 
   get activeKind() {
     return publishKindById(this.kindId);
@@ -64,9 +66,12 @@ export class HermandadPublishPageComponent implements OnInit {
     const kind = publishKindById(id);
     this.destBoard = true;
     this.destCalendar = kind.calendarDefault;
-    this.destNoticias = kind.noticiasDefault;
+    this.destNoticias = false;
     if (!kind.needsDate) {
       this.startsAtLocal = '';
+    }
+    if (!kind.calendarType) {
+      this.destCalendar = false;
     }
   }
 
@@ -100,6 +105,19 @@ export class HermandadPublishPageComponent implements OnInit {
       this.error.set('Selecciona tu tablón.');
       return;
     }
+    if (this.timing === 'later') {
+      if (!this.scheduleAtLocal) {
+        this.error.set('Indica cuándo debe publicarse.');
+        return;
+      }
+      const when = new Date(this.scheduleAtLocal).getTime();
+      if (Number.isNaN(when) || when <= Date.now() + 5 * 60 * 1000) {
+        this.error.set(
+          'La programación debe ser al menos 5 minutos en el futuro.',
+        );
+        return;
+      }
+    }
 
     const destinations: PublishDestinations = {
       board: this.destBoard,
@@ -118,11 +136,15 @@ export class HermandadPublishPageComponent implements OnInit {
         startsAtLocal: this.startsAtLocal || null,
         location: this.location || null,
         imageFile: this.imageFile,
+        scheduleAtLocal:
+          this.timing === 'later' ? this.scheduleAtLocal || null : null,
       });
       this.title = '';
       this.body = '';
       this.location = '';
       this.startsAtLocal = '';
+      this.scheduleAtLocal = '';
+      this.timing = 'now';
       this.clearImage();
       this.applyKindDefaults(this.kindId);
       await this.router.navigateByUrl('/hermandad/publicaciones');

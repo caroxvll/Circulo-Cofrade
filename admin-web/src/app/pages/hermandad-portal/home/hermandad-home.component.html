@@ -1,66 +1,513 @@
-<section class="hp-page">
-  <header class="hp-head">
-    <div>
-      <p class="eyebrow">Canal oficial</p>
-      <h1>Hola, {{ profile()?.displayName || 'hermandad' }}</h1>
-      <p class="lead">
-        Desde aquí publicas en tu tablón de Cofradeo. Lo mismo que en la app,
-        con más comodidad para redactar.
-      </p>
-    </div>
-    <a routerLink="/hermandad/publicar" class="btn btn-primary">Publicar</a>
-  </header>
-
+<section class="home">
   @if (store.error()) {
     <div class="error-box">{{ store.error() }}</div>
   }
 
   @if (!profile()?.verified) {
     <div class="warn-box">
-      Tu cuenta aún no está verificada. Puedes entrar, pero no publicar hasta
-      que la Junta la active.
+      Tu cuenta aún no está verificada. Puedes explorar el área, pero no publicar
+      hasta que la Junta la active.
     </div>
   }
 
-  <h2 class="block-title">Tu tablón</h2>
-  @if (store.loading()) {
-    <div class="state-box">Cargando…</div>
-  } @else if (store.boards().length === 0) {
-    <div class="empty-box">
-      Todavía no tienes un tablón vinculado. Escribe a la Junta de Cofradeo
-      para que te asignen.
-    </div>
-  } @else {
-    <div class="board-grid">
-      @for (board of store.boards(); track board.topicId) {
-        <article class="board-card">
-          <p class="day">{{ board.processionDay || 'Hermandad' }}</p>
-          <h3>{{ board.hermandadName }}</h3>
-          <p>{{ board.excerpt }}</p>
-        </article>
-      }
-    </div>
-  }
-
-  <div class="section-row">
-    <h2 class="block-title">Últimas publicaciones</h2>
-    <a routerLink="/hermandad/publicaciones" class="btn btn-ghost">Ver todas</a>
-  </div>
-  @if (recentPosts().length === 0) {
-    <div class="empty-box">
-      Aún no has publicado.
-      <a routerLink="/hermandad/publicar" class="btn btn-soft">Crear la primera</a>
-    </div>
-  } @else {
-    <div class="queue-list">
-      @for (post of recentPosts(); track post.id) {
-        <article class="queue-card">
-          <p class="queue-meta">
-            {{ categoryLabel(post.category) }} · {{ timeAgo(post.createdAt) }}
+  <div class="home-layout">
+    <div class="home-main">
+      <header
+        class="hero"
+        [class.has-cover]="!!board()?.coverImageUrl"
+        [style.--hero-cover]="
+          board()?.coverImageUrl
+            ? 'url(' + board()!.coverImageUrl + ')'
+            : null
+        "
+      >
+        <div class="hero-veil"></div>
+        <div class="hero-copy">
+          <p class="eyebrow">Canal oficial</p>
+          <h1>{{ greeting() }}, {{ displayName() }}</h1>
+          <p class="lead">
+            Gestiona la comunicación oficial de tu hermandad en Círculo Cofrade.
           </p>
-          <p class="queue-excerpt">{{ post.body }}</p>
+          <div class="hero-actions">
+            <a routerLink="/hermandad/publicar" class="btn-ico primary">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 5v14M5 12h14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <span>Nueva publicación</span>
+              <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M5 12h14M13 6l6 6-6 6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </a>
+            <a routerLink="/hermandad/publicaciones" class="btn-ico ghost">
+              <span>Ver publicaciones</span>
+              <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M5 12h14M13 6l6 6-6 6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <div class="stats">
+        <article>
+          <span class="stat-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M7 4h10a1 1 0 0 1 1 1v15l-6-3-6 3V5a1 1 0 0 1 1-1Z"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+          <strong>{{ postsThisYear() }}</strong>
+          <span>Publicaciones este año</span>
         </article>
+        <article>
+          <span class="stat-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect
+                x="4"
+                y="5"
+                width="16"
+                height="15"
+                rx="2"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+              <path
+                d="M8 3v4M16 3v4M4 10h16"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              />
+            </svg>
+          </span>
+          <strong>{{ store.upcomingEvents().length }}</strong>
+          <span>Próximos eventos</span>
+        </article>
+        <a routerLink="/hermandad/seguidores" class="stat-link">
+          <span class="stat-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle
+                cx="9"
+                cy="8"
+                r="3"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+              <circle
+                cx="16.5"
+                cy="9.5"
+                r="2.2"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+              <path
+                d="M3.5 18c.6-2.8 2.7-4.2 5.5-4.2S14 15.2 14.5 18"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              />
+            </svg>
+          </span>
+          <strong>{{ formatCount(store.followerCount()) }}</strong>
+          <span>Seguidores del tablón</span>
+        </a>
+        <article>
+          <span class="stat-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="2.6"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+            </svg>
+          </span>
+          <strong>{{ formatCount(board()?.viewCount ?? 0) }}</strong>
+          <span>Visualizaciones</span>
+        </article>
+      </div>
+
+      @if (store.upcomingEvents().length > 0) {
+        <section class="block">
+          <div class="block-head">
+            <h2>Próximos eventos</h2>
+            @if (eventsPageCount() > 1) {
+              <div class="pager">
+                <button
+                  type="button"
+                  class="pager-btn"
+                  [disabled]="eventsPage() <= 0"
+                  (click)="shiftEvents(-1)"
+                  aria-label="Anterior"
+                >
+                  ‹
+                </button>
+                <span>{{ eventsPage() + 1 }}/{{ eventsPageCount() }}</span>
+                <button
+                  type="button"
+                  class="pager-btn"
+                  [disabled]="eventsPage() >= eventsPageCount() - 1"
+                  (click)="shiftEvents(1)"
+                  aria-label="Siguiente"
+                >
+                  ›
+                </button>
+              </div>
+            }
+          </div>
+          <div class="filter-chips" role="group" aria-label="Filtrar por tipo de evento">
+            @for (opt of eventTypeOptions; track opt.value) {
+              <button
+                type="button"
+                class="chip"
+                [class.active]="eventFilter() === opt.value"
+                (click)="setEventFilter(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            }
+          </div>
+          @if (filteredUpcomingEvents().length === 0) {
+            <div class="empty-panel soft">
+              <p>No hay eventos de este tipo en el calendario.</p>
+            </div>
+          } @else {
+            <div class="events">
+              @for (ev of visibleEvents(); track ev.id) {
+                <article class="event-card">
+                  <div class="event-date">
+                    <span class="d">{{ formatEventDay(ev.startsAt).day }}</span>
+                    <span class="m">{{ formatEventDay(ev.startsAt).month }}</span>
+                  </div>
+                  @if (ev.coverImageUrl) {
+                    <img [src]="ev.coverImageUrl" alt="" class="event-cover" />
+                  } @else {
+                    <div class="event-cover empty"></div>
+                  }
+                  <div class="event-body">
+                    <span class="event-type">{{ eventTypeLabel(ev.eventType) }}</span>
+                    <h3>{{ ev.title }}</h3>
+                    <p>
+                      {{ formatEventTime(ev.startsAt)
+                      }}{{ ev.location ? ' · ' + ev.location : '' }}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-ico soft event-delete"
+                    title="Quitar del calendario"
+                    aria-label="Quitar del calendario"
+                    (click)="deleteEvent(ev.id, ev.title)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M6 7h12M10 7V5h4v2m-6 3v8m4-8v8m4-8v8M8 7l1 12a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2l1-12"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </article>
+              }
+            </div>
+          }
+        </section>
       }
+
     </div>
-  }
+
+    <aside class="home-side">
+      <div class="channel-card">
+        @if (board()?.iconImageUrl; as icon) {
+          <img [src]="icon" alt="" class="crest" />
+        } @else {
+          <div class="crest placeholder">
+            {{ displayName().slice(0, 1) }}
+          </div>
+        }
+        <div>
+          <strong>{{ displayName() }}</strong>
+          @if (board()?.processionDay) {
+            <span>{{ board()!.processionDay }}</span>
+          }
+          @if (profile()?.verified) {
+            <em class="ok">Canal activo</em>
+          } @else {
+            <em class="warn">Pendiente de verificación</em>
+          }
+        </div>
+      </div>
+
+      <a routerLink="/hermandad/publicar" class="cta">
+        <span class="cta-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M12 5v14M5 12h14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </span>
+        <span class="cta-copy">
+          <strong>Nueva publicación</strong>
+          <small>Escribir y publicar ahora</small>
+        </span>
+        <svg class="cta-arrow" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M5 12h14M13 6l6 6-6 6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </a>
+
+      <nav class="quick" aria-label="Accesos rápidos">
+        <a routerLink="/hermandad/publicaciones" class="quick-item">
+          <span class="qi" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M7 4h10v16l-5-2.5L7 20V4Z"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+          <span class="ql">
+            <strong>Mis publicaciones</strong>
+            <small>Historial del tablón</small>
+          </span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M9 6l6 6-6 6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </a>
+        <a routerLink="/hermandad/publicar" class="quick-item">
+          <span class="qi" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle
+                cx="12"
+                cy="12"
+                r="8"
+                stroke="currentColor"
+                stroke-width="1.7"
+              />
+              <path
+                d="M12 8v4l2.5 1.5"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+          <span class="ql">
+            <strong>Programar publicación</strong>
+            <small>Elegir fecha y hora</small>
+          </span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M9 6l6 6-6 6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </a>
+      </nav>
+
+      @if (store.scheduledPosts().length > 0) {
+        <a routerLink="/hermandad/publicaciones" class="tip action">
+          <strong
+            >{{ store.scheduledPosts().length }} programada{{
+              store.scheduledPosts().length === 1 ? '' : 's'
+            }}</strong
+          >
+          <p>Listas para salir más adelante. Revisar →</p>
+        </a>
+      } @else if (board()) {
+        <div class="tip">
+          <strong>Tu tablón</strong>
+          <p>
+            {{
+              board()!.excerpt ||
+                'Espacio oficial de la hermandad en Cofradeo.'
+            }}
+          </p>
+        </div>
+      }
+
+      <div class="tip soft">
+        <strong>Consejo</strong>
+        <p>
+          Usa «Culto / misa» o «Ensayo» con fecha para que también aparezca en el
+          calendario.
+        </p>
+      </div>
+    </aside>
+  </div>
+
+  <section class="block block-full">
+    <div class="block-head">
+      <h2>Últimas publicaciones</h2>
+      <div class="block-tools">
+        <a routerLink="/hermandad/publicaciones" class="link-arrow">
+          Ver todas
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M5 12h14M13 6l6 6-6 6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    @if (store.loading()) {
+      <div class="state-box">Cargando…</div>
+    } @else if (recentPosts().length === 0) {
+      <div class="empty-panel">
+        <p class="empty-title">Aún no has publicado en el tablón</p>
+        <p>Comparte noticias, cultos y ensayos con hermanos y devotos.</p>
+        <a routerLink="/hermandad/publicar" class="btn-ico soft">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 5v14M5 12h14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+          <span>Crear la primera</span>
+          <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M5 12h14M13 6l6 6-6 6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </a>
+      </div>
+    } @else {
+      <div
+        class="filter-chips"
+        role="group"
+        aria-label="Filtrar publicaciones por sección"
+      >
+        @for (opt of postCategoryOptions; track opt.value) {
+          <button
+            type="button"
+            class="chip"
+            [class.active]="postCategoryFilter() === opt.value"
+            (click)="setPostCategoryFilter(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        }
+      </div>
+      @if (filteredRecentPosts().length === 0) {
+        <div class="empty-panel soft">
+          <p>No hay publicaciones en esta sección.</p>
+        </div>
+      } @else {
+        @if (featuredPost(); as featured) {
+          <article class="post-card post-card-featured">
+            <span class="tag">{{ categoryLabel(featured.category) }}</span>
+            <div class="post-featured-body">
+              @if (featured.imageUrl) {
+                <img
+                  [src]="featured.imageUrl"
+                  alt=""
+                  class="post-cover featured"
+                />
+              } @else {
+                <div class="post-cover empty featured"></div>
+              }
+              <div class="post-featured-copy">
+                <h3>{{ postTitle(featured.body) }}</h3>
+                <p>{{ postExcerpt(featured.body) }}</p>
+                <footer>{{ timeAgo(featured.createdAt) }}</footer>
+              </div>
+            </div>
+          </article>
+        }
+        @if (olderPosts().length > 0) {
+          <p class="posts-rail-label">Anteriores</p>
+          <div
+            class="posts-rail"
+            tabindex="0"
+            aria-label="Publicaciones anteriores"
+          >
+            @for (post of olderPosts(); track post.id) {
+              <article class="post-card post-card-rail">
+                <span class="tag">{{ categoryLabel(post.category) }}</span>
+                @if (post.imageUrl) {
+                  <img [src]="post.imageUrl" alt="" class="post-cover" />
+                } @else {
+                  <div class="post-cover empty"></div>
+                }
+                <h3>{{ postTitle(post.body) }}</h3>
+                <p>{{ postExcerpt(post.body) }}</p>
+                <footer>{{ timeAgo(post.createdAt) }}</footer>
+              </article>
+            }
+          </div>
+        }
+      }
+    }
+  </section>
 </section>

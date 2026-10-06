@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import 'cofradeo_skeleton.dart';
 
 /// Imagen remota con caché en disco/memoria y decode acotado al tamaño en pantalla.
 class CofradeoNetworkImage extends StatelessWidget {
@@ -107,7 +108,10 @@ class CofradeoNetworkImage extends StatelessWidget {
   static Widget _defaultPlaceholder(double? _) {
     return const ColoredBox(
       color: AppColors.backgroundElevated,
-      child: SizedBox.expand(),
+      child: CofradeoSkeletonBone(
+        height: double.infinity,
+        borderRadius: 0,
+      ),
     );
   }
 }

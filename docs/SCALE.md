@@ -6,6 +6,10 @@
 2. `scale_hardening_v2.sql`  
 3. `notification_dispatch_cron.sql` ← Cron automático + reintentos  
 4. `notification_dispatch_admin.sql` ← panel web admin  
+5. `push_delivery_queue.sql` ← cola de **entrega FCM** + cron `drain-push`  
+6. `push_delivery_admin.sql` ← panel admin (cola FCM)  
+7. `notification_dispatch_progress.sql` ← progreso X/Y en cola de creación  
+   (luego: `npx supabase functions deploy drain-push`)  
 
 (Al final de cada script ya va `notify pgrst, 'reload schema';` — no hace falta un paso aparte.)
 

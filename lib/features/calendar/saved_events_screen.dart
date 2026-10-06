@@ -10,6 +10,7 @@ import 'event_bookmarks_provider.dart';
 import 'utils/calendar_event_utils.dart';
 import 'widgets/event_card.dart';
 import 'widgets/event_detail_sheet.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 
 class SavedEventsScreen extends ConsumerWidget {
   const SavedEventsScreen({super.key});
@@ -45,7 +46,8 @@ class SavedEventsScreen extends ConsumerWidget {
         titleSpacing: 0,
       ),
       body: eventsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        skipLoadingOnReload: true,
+        loading: () => const CalendarHomeSkeleton(),
         error: (_, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),

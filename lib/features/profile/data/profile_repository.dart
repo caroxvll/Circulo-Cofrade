@@ -31,7 +31,44 @@ class ProfileRepository {
         .maybeSingle();
 
     if (row == null) return null;
-    return _fromRow(row);
+    final profile = _fromRow(row);
+    final topicCount = await countUserTopics(userId);
+    return UserProfile(
+      id: profile.id,
+      displayName: profile.displayName,
+      handle: profile.handle,
+      bio: profile.bio,
+      publicationCount: topicCount,
+      followerCount: profile.followerCount,
+      avatarIcon: profile.avatarIcon,
+      avatarUrl: profile.avatarUrl,
+      isVerified: profile.isVerified,
+      address: profile.address,
+      foundedLabel: profile.foundedLabel,
+      website: profile.website,
+      role: profile.role,
+      isSuspended: profile.isSuspended,
+      suspendedReason: profile.suspendedReason,
+      trophyPoints: profile.trophyPoints,
+      isPrivate: profile.isPrivate,
+      coverImageUrl: profile.coverImageUrl,
+      accountType: profile.accountType,
+    );
+  }
+
+  /// Temas creados por el usuario (publicados o pendientes; sin rechazados).
+  Future<int> countUserTopics(String userId) async {
+    if (_client == null) return 0;
+    try {
+      final rows = await _client!
+          .from('forum_topics')
+          .select('id')
+          .eq('author_id', userId)
+          .neq('status', 'rejected');
+      return rows.length;
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<UserProfile> updateProfile({
@@ -42,6 +79,7 @@ class ProfileRepository {
     String? address,
     String? foundedLabel,
     String? website,
+    bool? isPrivate,
   }) async {
     if (_client == null) {
       throw const ProfileUnavailableException();
@@ -57,6 +95,9 @@ class ProfileRepository {
     };
     if (handle != null) {
       payload['handle'] = _normalizeHandle(handle);
+    }
+    if (isPrivate != null) {
+      payload['is_private'] = isPrivate;
     }
 
     final row = await _client!
@@ -109,6 +150,61 @@ class ProfileRepository {
         .eq('id', userId);
 
     return cacheBusted;
+  }
+
+  Future<String> uploadCover({
+    required String userId,
+    required Uint8List bytes,
+    required String mimeType,
+  }) async {
+    if (_client == null) {
+      throw const ProfileUnavailableException();
+    }
+    if (bytes.length > _maxAvatarBytes * 3) {
+      throw const AvatarTooLargeException();
+    }
+
+    final extension = switch (mimeType) {
+      'image/png' => 'png',
+      'image/webp' => 'webp',
+      _ => 'jpg',
+    };
+    final path = '$userId/cover.$extension';
+
+    await _client!.storage
+        .from(_avatarBucket)
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(upsert: true, contentType: mimeType),
+        );
+
+    final publicUrl = _client!.storage.from(_avatarBucket).getPublicUrl(path);
+    final cacheBusted = '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+
+    await _client!
+        .from('profiles')
+        .update({
+          'cover_image_url': cacheBusted,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', userId);
+
+    return cacheBusted;
+  }
+
+  Future<void> clearCover({required String userId}) async {
+    if (_client == null) {
+      throw const ProfileUnavailableException();
+    }
+
+    await _client!
+        .from('profiles')
+        .update({
+          'cover_image_url': null,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', userId);
   }
 
   Future<String?> findProfileIdByHandle(String handle) async {
@@ -164,7 +260,7 @@ class ProfileRepository {
           .from('forum_topics')
           .select(
             'id, forum_id, title, excerpt, created_at, status, '
-            'view_count, comment_count',
+            'view_count, comment_count, cover_image_url',
           )
           .eq('author_id', userId)
           .order('created_at', ascending: false)
@@ -174,7 +270,7 @@ class ProfileRepository {
           .from('forum_replies')
           .select(
             'id, topic_id, content, created_at, like_count, '
-            'forum_topics(forum_id, title, view_count, comment_count)',
+            'forum_topics(forum_id, title, view_count, comment_count, cover_image_url)',
           )
           .eq('author_id', userId)
           .order('created_at', ascending: false)
@@ -206,6 +302,7 @@ class ProfileRepository {
             preview: row['excerpt'] as String? ?? '',
             timeAgo: formatTimeAgo(createdAt),
             topicStatus: _topicStatusFromRow(row['status'] as String?),
+            coverImageUrl: row['cover_image_url'] as String?,
             viewCount: row['view_count'] as int? ?? 0,
             commentCount: row['comment_count'] as int? ?? 0,
           ),
@@ -233,6 +330,7 @@ class ProfileRepository {
                 ? '${content.substring(0, 97)}...'
                 : content,
             timeAgo: formatTimeAgo(createdAt),
+            coverImageUrl: topic['cover_image_url'] as String?,
             viewCount: topic['view_count'] as int? ?? 0,
             commentCount: topic['comment_count'] as int? ?? 0,
             reactionCount: row['like_count'] as int? ?? 0,
@@ -301,6 +399,9 @@ class ProfileRepository {
       isSuspended: row['suspended_at'] != null,
       suspendedReason: row['suspended_reason'] as String?,
       trophyPoints: row['trophy_points'] as int? ?? 0,
+      isPrivate: row['is_private'] as bool? ?? false,
+      coverImageUrl: row['cover_image_url'] as String?,
+      accountType: AccountType.fromDb(row['account_type'] as String?),
     );
   }
 

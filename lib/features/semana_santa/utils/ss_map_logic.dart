@@ -100,7 +100,12 @@ List<SsLiveUpdate> filterSsUpdates(
     if (kind != null && u.kind != kind) return false;
     if (hermandadKey != null && hermandadKey.isNotEmpty) {
       final label = u.hermandadLabel?.trim().toLowerCase() ?? '';
-      if (label != hermandadKey) return false;
+      if (label.isEmpty) return false;
+      if (label != hermandadKey &&
+          !label.contains(hermandadKey) &&
+          !hermandadKey.contains(label)) {
+        return false;
+      }
     }
     return true;
   }).toList();

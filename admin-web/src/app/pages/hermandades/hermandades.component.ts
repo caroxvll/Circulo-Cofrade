@@ -8,6 +8,7 @@ import {
   HandleHit,
   HermandadAssignment,
   HermandadTopicOption,
+  hermandadBoardTopicId,
 } from '../../core/community/community.service';
 import { HandleSearchComponent } from '../../shared/handle-search.component';
 import { formatTimeAgo } from '../../core/utils/date';
@@ -32,20 +33,26 @@ export class HermandadesPageComponent implements OnInit {
   readonly creating = signal(false);
   readonly linking = signal(false);
   readonly savingBoard = signal(false);
+  readonly uploadingBoard = signal(false);
   readonly busyKey = signal<string | null>(null);
   readonly created = signal<CreatedHermandadAccount | null>(null);
   readonly boardDialog = signal<BoardDialog>(null);
   readonly editingBoard = signal<HermandadTopicOption | null>(null);
+  readonly credentialsUser = signal<AdminUserRow | null>(null);
+  readonly credentialsLoading = signal(false);
+  readonly credentialsSaving = signal(false);
+  readonly credentialsSuccess = signal<string | null>(null);
 
   readonly stationDays = HERMANDAD_STATION_DAYS;
   readonly timeAgo = formatTimeAgo;
   /** `null` = todos los días. */
   readonly dayFilter = signal<string | null>(null);
+  readonly boardSearch = signal('');
 
-  boardSearch = '';
   boardDay: string = HERMANDAD_STATION_DAYS[2];
   boardName = '';
   boardCoverUrl = '';
+  boardIconUrl = '';
   boardResetBody = false;
 
   displayName = '';
@@ -57,8 +64,13 @@ export class HermandadesPageComponent implements OnInit {
   linkTopicId = '';
   selected: HandleHit | null = null;
 
+  credEmail = '';
+  credPassword = '';
+  credPasswordConfirm = '';
+  showCredPassword = false;
+
   readonly filteredTopics = computed(() => {
-    const q = this.boardSearch.trim().toLowerCase();
+    const q = this.boardSearch().trim().toLowerCase();
     const day = this.dayFilter();
     return this.topics().filter((t) => {
       if (day && t.processionDay !== day) return false;
@@ -127,6 +139,7 @@ export class HermandadesPageComponent implements OnInit {
     this.boardDay = this.dayFilter() ?? HERMANDAD_STATION_DAYS[2];
     this.boardName = '';
     this.boardCoverUrl = '';
+    this.boardIconUrl = '';
     this.boardResetBody = false;
     this.boardDialog.set('create');
   }
@@ -140,13 +153,58 @@ export class HermandadesPageComponent implements OnInit {
         : HERMANDAD_STATION_DAYS[2];
     this.boardName = board.hermandadName;
     this.boardCoverUrl = board.coverImageUrl ?? '';
+    this.boardIconUrl = board.iconImageUrl ?? '';
     this.boardResetBody = false;
     this.boardDialog.set('edit');
   }
 
   closeBoardDialog(): void {
+    if (this.savingBoard() || this.uploadingBoard()) return;
     this.boardDialog.set(null);
     this.editingBoard.set(null);
+  }
+
+  private boardUploadTopicId(): string | null {
+    const editing = this.editingBoard();
+    if (editing) return editing.id;
+    const name = this.boardName.trim();
+    if (name.length < 2) return null;
+    return hermandadBoardTopicId(this.boardDay, name);
+  }
+
+  async onBoardUpload(kind: 'cover' | 'escudo', event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    const topicId = this.boardUploadTopicId();
+    if (!topicId) {
+      this.error.set('Escribe primero el nombre de la hermandad (mín. 2 caracteres).');
+      return;
+    }
+
+    this.uploadingBoard.set(true);
+    this.error.set(null);
+    try {
+      const url = await this.community.uploadHermandadBoardAsset(topicId, kind, file);
+      if (kind === 'cover') this.boardCoverUrl = url;
+      else this.boardIconUrl = url;
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo subir la imagen',
+      );
+    } finally {
+      this.uploadingBoard.set(false);
+    }
+  }
+
+  clearBoardCover(): void {
+    this.boardCoverUrl = '';
+  }
+
+  clearBoardIcon(): void {
+    this.boardIconUrl = '';
   }
 
   async saveBoard(): Promise<void> {
@@ -159,6 +217,7 @@ export class HermandadesPageComponent implements OnInit {
           processionDay: this.boardDay,
           hermandadName: this.boardName,
           coverImageUrl: this.boardCoverUrl || null,
+          iconImageUrl: this.boardIconUrl || null,
         });
       } else if (mode === 'edit') {
         const current = this.editingBoard();
@@ -168,16 +227,18 @@ export class HermandadesPageComponent implements OnInit {
           processionDay: this.boardDay,
           hermandadName: this.boardName,
           coverImageUrl: this.boardCoverUrl || null,
+          iconImageUrl: this.boardIconUrl || null,
           resetBodyToTemplate: this.boardResetBody,
         });
       }
-      this.closeBoardDialog();
+      this.boardDialog.set(null);
+      this.editingBoard.set(null);
       await this.reload();
     } catch (err) {
       this.error.set(
         err instanceof Error
           ? err.message
-          : 'No se pudo guardar el tablón (¿SQL hermandad_boards_admin.sql ejecutado?)',
+          : 'No se pudo guardar el tablón (¿SQL hermandad_boards_admin.sql / hermandad_topic_icons.sql ejecutado?)',
       );
     } finally {
       this.savingBoard.set(false);
@@ -327,6 +388,93 @@ export class HermandadesPageComponent implements OnInit {
     const pwd = this.created()?.temporaryPassword;
     if (!pwd) return;
     await navigator.clipboard.writeText(pwd);
+  }
+
+  async openCredentials(user: AdminUserRow): Promise<void> {
+    this.credentialsUser.set(user);
+    this.credentialsSuccess.set(null);
+    this.credEmail = '';
+    this.credPassword = '';
+    this.credPasswordConfirm = '';
+    this.showCredPassword = false;
+    this.credentialsLoading.set(true);
+    this.error.set(null);
+    try {
+      const creds = await this.community.fetchHermandadAccountCredentials(
+        user.id,
+      );
+      this.credEmail = creds.email;
+    } catch (err) {
+      this.error.set(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo cargar el email (¿Edge Function manage-hermandad-account desplegada?)',
+      );
+      this.credentialsUser.set(null);
+    } finally {
+      this.credentialsLoading.set(false);
+    }
+  }
+
+  closeCredentials(): void {
+    if (this.credentialsSaving()) return;
+    this.credentialsUser.set(null);
+    this.credentialsSuccess.set(null);
+    this.credEmail = '';
+    this.credPassword = '';
+    this.credPasswordConfirm = '';
+  }
+
+  async saveCredentials(): Promise<void> {
+    const user = this.credentialsUser();
+    if (!user) return;
+
+    const email = this.credEmail.trim().toLowerCase();
+    const password = this.credPassword.trim();
+    const confirm = this.credPasswordConfirm.trim();
+
+    if (!email.includes('@')) {
+      this.error.set('Email no válido.');
+      return;
+    }
+    if (password && password.length < 8) {
+      this.error.set('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+    if (password && password !== confirm) {
+      this.error.set('Las contraseñas no coinciden.');
+      return;
+    }
+
+    this.credentialsSaving.set(true);
+    this.error.set(null);
+    this.credentialsSuccess.set(null);
+    try {
+      const result = await this.community.updateHermandadAccountCredentials({
+        profileId: user.id,
+        email,
+        password: password || null,
+      });
+      this.credEmail = result.email;
+      this.credPassword = '';
+      this.credPasswordConfirm = '';
+      const parts: string[] = [];
+      if (result.emailUpdated) parts.push('email actualizado');
+      if (result.passwordUpdated) parts.push('contraseña actualizada');
+      this.credentialsSuccess.set(
+        parts.length
+          ? parts.join(' · ')
+          : 'Sin cambios (mismo email y sin contraseña nueva)',
+      );
+    } catch (err) {
+      this.error.set(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo guardar (¿Edge Function desplegada?)',
+      );
+    } finally {
+      this.credentialsSaving.set(false);
+    }
   }
 
   assignmentCount(topicId: string): number {

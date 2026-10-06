@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 
 import 'user_role.dart';
 
+enum AccountType {
+  cofrade,
+  brotherhood;
+
+  static AccountType fromDb(String? raw) => switch (raw) {
+        'brotherhood' => AccountType.brotherhood,
+        _ => AccountType.cofrade,
+      };
+
+  bool get isBrotherhood => this == AccountType.brotherhood;
+}
+
 class UserProfile {
   const UserProfile({
     required this.id,
@@ -20,6 +32,9 @@ class UserProfile {
     this.isSuspended = false,
     this.suspendedReason,
     this.trophyPoints = 0,
+    this.isPrivate = false,
+    this.coverImageUrl,
+    this.accountType = AccountType.cofrade,
   });
 
   final String id;
@@ -51,7 +66,19 @@ class UserProfile {
   /// Puntos de trofeo del foro (cache en Supabase).
   final int trophyPoints;
 
+  /// Perfil privado: solo seguidores ven el contenido completo.
+  final bool isPrivate;
+
+  /// Portada del header. Null = asset por defecto.
+  final String? coverImageUrl;
+
+  final AccountType accountType;
+
   bool get isAdmin => role.isAdmin;
+
+  /// Cuenta oficial de hermandad lista para avisos oficiales (live SS, etc.).
+  bool get isOfficialHermandad =>
+      accountType.isBrotherhood && isVerified && !isSuspended;
 }
 
 class ProfileInfoItem {

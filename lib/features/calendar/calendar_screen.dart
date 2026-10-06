@@ -11,6 +11,7 @@ import '../forums/widgets/forums_beige_background.dart';
 import '../notifications/widgets/notifications_bell_button.dart';
 import '../../core/widgets/cofrade_countdown_banner.dart';
 import '../../core/widgets/cofradeo_error_panel.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 import 'calendar_design_tokens.dart';
 import 'calendar_provider.dart';
 import 'event_bookmarks_provider.dart';
@@ -339,7 +340,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           SafeArea(
             bottom: false,
             child: eventsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            skipLoadingOnReload: true,
+            loading: () => const CalendarHomeSkeleton(),
             error: (_, _) => CofradeoErrorPanel(
               message: 'No se pudieron cargar los eventos del calendario.',
               subtitle: 'Comprueba tu conexión e inténtalo de nuevo.',

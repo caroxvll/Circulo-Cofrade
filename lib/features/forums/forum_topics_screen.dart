@@ -6,7 +6,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/image_decode_cache.dart';
-import '../../core/widgets/cofradeo_bottom_nav.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 import '../../shared/models/forum.dart';
 import '../calendar/calendar_provider.dart';
 import '../calendar/models/calendar_focus_request.dart';
@@ -15,6 +15,7 @@ import '../../shared/models/calendar_event.dart';
 import '../ads/ads_provider.dart';
 import '../ads/models/sponsored_ad.dart';
 import '../ads/widgets/sponsored_ad_card.dart';
+import '../ads/widgets/sponsored_ad_skeleton.dart';
 import '../ads/widgets/sponsored_placement_slot.dart';
 import '../auth/auth_provider.dart';
 import '../permissions/permissions_provider.dart';
@@ -79,7 +80,8 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     if (widget.forumId == 'hermandades') {
-      HermandadLocalAssets.ensureLoaded(force: true).then((_) {
+      // Sin force: si ya se calentó desde Foros, no reescanea el AssetManifest.
+      HermandadLocalAssets.ensureLoaded().then((_) {
         if (mounted) setState(() {});
       });
     }
@@ -233,13 +235,9 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
   }) {
     if (supabaseReady) {
       return topicsAsync.when(
+        skipLoadingOnReload: true,
         loading: () => [
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 48),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          ),
+          const ForumTopicsListSkeleton(),
         ],
         error: (_, _) => [
           SliverToBoxAdapter(
@@ -295,7 +293,12 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
         onToggleShowAll: () =>
             setState(() => _noticiasShowAllLatest = !_noticiasShowAllLatest),
         onOpenTopic: (topic) async {
-          await context.push('/foros/$forumId/tema/${topic.id}');
+          await pushForumTopic(
+            context,
+            ref,
+            forumId: forumId,
+            topicId: topic.id,
+          );
           if (context.mounted) {
             ref.invalidate(forumTopicsProvider(forumId));
           }
@@ -311,18 +314,22 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
             ),
           ],
         ),
-        bottomPadding: cofradeoBottomScrollPadding(context, extra: 16),
+        // Misma corrección que Círculo / otros foros: el shell ya reserva la
+        // bottom nav (extendBody: false), no sumar otra vez su altura.
+        bottomPadding: 16,
       );
     }
 
     final listBannerPlacement = _listBannerPlacement(forumId);
+    final isHermandades = forumId == 'hermandades';
+    final isNoticias = isNoticiasForum(forumId);
     final showInFeedBanners =
         !isNoticias && _showInFeedListBanners(query);
     final hasSponsoredEvent =
         !isNoticias && _hasSponsoredEventContext(ref, forumId);
     final showTopListBanner = !isNoticias && !hasSponsoredEvent;
 
-    final listTop = forumId == 'hermandades' ? 0.0 : _listTopPadding;
+    final listTop = isHermandades ? 0.0 : _listTopPadding;
 
     if (processed.isEmpty) {
       return [
@@ -353,12 +360,7 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
         ),
         if (showTopListBanner)
           SliverPadding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              cofradeoBottomScrollPadding(context),
-            ),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             sliver: SliverToBoxAdapter(
               child: _ForumTopicsListBanner(
                 placement: listBannerPlacement,
@@ -367,17 +369,15 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
             ),
           )
         else
-          SliverPadding(
-            padding: EdgeInsets.only(bottom: cofradeoBottomScrollPadding(context)),
-            sliver: const SliverToBoxAdapter(child: SizedBox.shrink()),
+          const SliverPadding(
+            padding: EdgeInsets.only(bottom: 16),
+            sliver: SliverToBoxAdapter(child: SizedBox.shrink()),
           ),
       ];
     }
 
     final split = splitForumTopics(processed);
     final slivers = <Widget>[];
-    final isHermandades = forumId == 'hermandades';
-    final isNoticias = isNoticiasForum(forumId);
 
     if (split.pinned.isNotEmpty) {
       slivers.add(
@@ -504,9 +504,9 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
     }
 
     slivers.add(
-      SliverPadding(
-        padding: EdgeInsets.only(bottom: cofradeoBottomScrollPadding(context)),
-        sliver: const SliverToBoxAdapter(child: SizedBox.shrink()),
+      const SliverPadding(
+        padding: EdgeInsets.only(bottom: 16),
+        sliver: SliverToBoxAdapter(child: SizedBox.shrink()),
       ),
     );
 
@@ -539,7 +539,7 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
           return upcoming.when(
             data: (events) =>
                 events.any((e) => !isCalendarEventPast(e)),
-            loading: () => true,
+            loading: () => false,
             error: (_, _) => false,
           );
         }
@@ -549,11 +549,11 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
             if (event == null) return false;
             return !isCalendarEventPast(event);
           },
-          loading: () => true,
+          loading: () => false,
           error: (_, _) => false,
         );
       },
-      loading: () => true,
+      loading: () => false,
       error: (_, _) => false,
     );
   }
@@ -704,7 +704,12 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
           : TopicCardVariant.premium,
       forumId: widget.forumId,
       onTap: () async {
-        await context.push('/foros/${widget.forumId}/tema/${topic.id}');
+        await pushForumTopic(
+          context,
+          ref,
+          forumId: widget.forumId,
+          topicId: topic.id,
+        );
         if (context.mounted) {
           ref.invalidate(forumTopicsProvider(widget.forumId));
         }
@@ -2218,6 +2223,9 @@ class _ForumTopicsSponsoredEventSlot extends ConsumerWidget {
 
   final String forumId;
 
+  static const _loadingKey = ValueKey('forum-event-ad-loading');
+  static const _emptyKey = ValueKey('forum-event-ad-empty');
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (isNoticiasForum(forumId)) return const SizedBox.shrink();
@@ -2231,14 +2239,16 @@ class _ForumTopicsSponsoredEventSlot extends ConsumerWidget {
       ),
     );
 
-    return adAsync.when(
+    final child = adAsync.when(
+      skipLoadingOnReload: true,
       data: (ad) {
-        if (ad == null) return const SizedBox.shrink();
+        if (ad == null) return const SizedBox.shrink(key: _emptyKey);
 
         final eventId = ad.calendarEventId?.trim();
         if (eventId == null || eventId.isEmpty) {
           final upcomingAsync = ref.watch(sponsorshipEventPickerProvider);
           return upcomingAsync.when(
+            skipLoadingOnReload: true,
             data: (events) {
               CalendarEvent? next;
               for (final event in events) {
@@ -2247,42 +2257,60 @@ class _ForumTopicsSponsoredEventSlot extends ConsumerWidget {
                   break;
                 }
               }
-              if (next == null) return const SizedBox.shrink();
-              return SponsoredAdCard(
-                ad: ad,
-                style: SponsoredAdCardStyle.event,
-                event: next,
-                onEventTap: (linkedEvent) =>
-                    _openSponsoredCalendarEvent(context, ref, linkedEvent),
+              if (next == null) return const SizedBox.shrink(key: _emptyKey);
+              return KeyedSubtree(
+                key: ValueKey('forum-event-ad-${ad.id}-${next.id}'),
+                child: SponsoredAdCard(
+                  ad: ad,
+                  style: SponsoredAdCardStyle.event,
+                  event: next,
+                  onEventTap: (linkedEvent) =>
+                      _openSponsoredCalendarEvent(context, ref, linkedEvent),
+                ),
               );
             },
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
+            loading: () => const KeyedSubtree(
+              key: _loadingKey,
+              child: SponsoredAdSkeleton(style: SponsoredAdCardStyle.event),
+            ),
+            error: (_, _) => const SizedBox.shrink(key: _emptyKey),
           );
         }
 
         final eventAsync = ref.watch(calendarEventByIdProvider(eventId));
         return eventAsync.when(
+          skipLoadingOnReload: true,
           data: (event) {
             if (event == null || isCalendarEventPast(event)) {
-              return const SizedBox.shrink();
+              return const SizedBox.shrink(key: _emptyKey);
             }
 
-            return SponsoredAdCard(
-              ad: ad,
-              style: SponsoredAdCardStyle.event,
-              event: event,
-              onEventTap: (linkedEvent) =>
-                  _openSponsoredCalendarEvent(context, ref, linkedEvent),
+            return KeyedSubtree(
+              key: ValueKey('forum-event-ad-${ad.id}-${event.id}'),
+              child: SponsoredAdCard(
+                ad: ad,
+                style: SponsoredAdCardStyle.event,
+                event: event,
+                onEventTap: (linkedEvent) =>
+                    _openSponsoredCalendarEvent(context, ref, linkedEvent),
+              ),
             );
           },
-          loading: () => const SizedBox.shrink(),
-          error: (_, _) => const SizedBox.shrink(),
+          loading: () => const KeyedSubtree(
+            key: _loadingKey,
+            child: SponsoredAdSkeleton(style: SponsoredAdCardStyle.event),
+          ),
+          error: (_, _) => const SizedBox.shrink(key: _emptyKey),
         );
       },
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
+      loading: () => const KeyedSubtree(
+        key: _loadingKey,
+        child: SponsoredAdSkeleton(style: SponsoredAdCardStyle.event),
+      ),
+      error: (_, _) => const SizedBox.shrink(key: _emptyKey),
     );
+
+    return SponsoredAdReveal(child: child);
   }
 }
 

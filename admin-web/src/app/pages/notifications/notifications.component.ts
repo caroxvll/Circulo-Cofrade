@@ -13,6 +13,8 @@ import {
   DispatchOverview,
   NotificationsAdminService,
   NotificationsOverview,
+  PushDeliveryJobRow,
+  PushDeliveryOverview,
   PushUserFilter,
   PushUserRow,
   TABLE_PREF_KEYS,
@@ -52,6 +54,8 @@ export class NotificationsPageComponent implements OnInit, OnDestroy {
   readonly queueInfo = signal<string | null>(null);
   readonly dispatchOverview = signal<DispatchOverview | null>(null);
   readonly dispatchJobs = signal<DispatchJobRow[]>([]);
+  readonly pushDeliveryOverview = signal<PushDeliveryOverview | null>(null);
+  readonly pushDeliveryJobs = signal<PushDeliveryJobRow[]>([]);
   readonly liveQueue = signal(true);
 
   selected: HandleHit | null = null;
@@ -142,21 +146,53 @@ export class NotificationsPageComponent implements OnInit, OnDestroy {
     if (!silent) this.queueLoading.set(true);
     if (!silent) this.error.set(null);
     try {
-      const [overview, jobs] = await Promise.all([
+      const results = await Promise.allSettled([
         this.api.fetchDispatchOverview(),
         this.api.listDispatchJobs(50),
+        this.api.fetchPushDeliveryOverview(),
+        this.api.listPushDeliveryJobs(40),
       ]);
-      this.dispatchOverview.set(overview);
-      this.dispatchJobs.set(jobs);
+
+      const [overviewR, jobsR, pushOverviewR, pushJobsR] = results;
+
+      if (overviewR.status === 'fulfilled') {
+        this.dispatchOverview.set(overviewR.value);
+      }
+      if (jobsR.status === 'fulfilled') {
+        this.dispatchJobs.set(jobsR.value);
+      }
+      if (pushOverviewR.status === 'fulfilled') {
+        this.pushDeliveryOverview.set(pushOverviewR.value);
+      }
+      if (pushJobsR.status === 'fulfilled') {
+        this.pushDeliveryJobs.set(pushJobsR.value);
+      }
+
+      const failed = results
+        .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+        .map((r) => this.errorMessage(r.reason));
+
+      if (failed.length && !silent) {
+        this.error.set(
+          `${failed[0]} — ¿Ejecutaste push_delivery_admin.sql (y notification_dispatch_admin.sql)?`,
+        );
+      }
     } catch (err) {
       this.error.set(
-        err instanceof Error
-          ? `${err.message} ¿Ejecutaste notification_dispatch_admin.sql (y v1/v2/cron)?`
-          : 'No se pudo cargar la cola',
+        `${this.errorMessage(err)} — ¿Ejecutaste notification_dispatch_admin.sql y push_delivery_admin.sql?`,
       );
     } finally {
       this.queueLoading.set(false);
     }
+  }
+
+  private errorMessage(err: unknown): string {
+    if (err instanceof Error && err.message) return err.message;
+    if (err && typeof err === 'object' && 'message' in err) {
+      const msg = (err as { message?: unknown }).message;
+      if (typeof msg === 'string' && msg.length) return msg;
+    }
+    return 'No se pudo cargar la cola';
   }
 
   async processNow(): Promise<void> {
@@ -201,6 +237,46 @@ export class NotificationsPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  async kickPushNow(): Promise<void> {
+    this.queueBusy.set(true);
+    this.queueInfo.set(null);
+    this.error.set(null);
+    try {
+      await this.api.kickPushDelivery();
+      this.queueInfo.set(
+        'Worker FCM despertado. En unos segundos debería drenar la cola.',
+      );
+      await this.reloadQueue(true);
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo despertar el worker FCM',
+      );
+    } finally {
+      this.queueBusy.set(false);
+    }
+  }
+
+  async retryFailedPush(): Promise<void> {
+    this.queueBusy.set(true);
+    this.queueInfo.set(null);
+    this.error.set(null);
+    try {
+      const n = await this.api.retryFailedPushJobs();
+      this.queueInfo.set(
+        n > 0
+          ? `${n} push(es) fallido(s) vueltos a la cola FCM.`
+          : 'No había pushes fallidos.',
+      );
+      await this.reloadQueue(true);
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudieron reintentar pushes',
+      );
+    } finally {
+      this.queueBusy.set(false);
+    }
+  }
+
   async reloadApiSchema(): Promise<void> {
     this.queueBusy.set(true);
     this.queueInfo.set(null);
@@ -224,6 +300,45 @@ export class NotificationsPageComponent implements OnInit, OnDestroy {
 
   statusCount(status: string): number {
     return Number(this.dispatchOverview()?.byStatus?.[status] ?? 0);
+  }
+
+  dispatchProgressLabel(job: DispatchJobRow): string {
+    const done = job.processedCount;
+    const total = job.audienceEstimate;
+    if (total != null && total > 0) {
+      return `${this.formatInt(done)} / ${this.formatInt(total)}`;
+    }
+    if (job.status === 'done') {
+      return `${this.formatInt(done)} / ${this.formatInt(done)}`;
+    }
+    return done > 0
+      ? `${this.formatInt(done)} creados…`
+      : '—';
+  }
+
+  dispatchProgressPct(job: DispatchJobRow): number {
+    const total = job.audienceEstimate;
+    if (total != null && total > 0) {
+      return Math.min(100, Math.round((job.processedCount / total) * 100));
+    }
+    if (job.status === 'done') return 100;
+    return 0;
+  }
+
+  fcmRemaining(): number {
+    const p = this.pushDeliveryOverview();
+    if (!p) return 0;
+    return p.pending + p.processing;
+  }
+
+  fcmProgressPct(): number {
+    const p = this.pushDeliveryOverview();
+    if (!p) return 0;
+    const remaining = p.pending + p.processing;
+    const sent = p.doneLast24h;
+    const denom = remaining + sent;
+    if (denom <= 0) return 0;
+    return Math.min(100, Math.round((sent / denom) * 100));
   }
 
   async reloadPushUsers(): Promise<void> {

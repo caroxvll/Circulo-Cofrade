@@ -1,23 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/forum.dart';
+import '../../search/follows_provider.dart';
 import '../data/mock_forums.dart';
-import '../forum_topics_typography.dart';
-import '../topic_detail_typography.dart';
 import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
 import 'hermandad_board_stats_sheet.dart';
 import 'topic_card.dart';
 import 'topic_follow_button.dart';
 
-/// Cabecera del tablón oficial: hero a sangre, escala tipográfica del resto de foros.
-///
-/// Fondo: mismo `fondo_*` local del card (`HermandadLocalAssets`), y si no hay
-/// asset, la `coverImageUrl` del tema (red o `assets/…`).
-class HermandadBoardHeader extends StatefulWidget {
+/// Cabecera del canal oficial: hero a sangre con escudo, CTA y stats.
+class HermandadBoardHeader extends ConsumerStatefulWidget {
   const HermandadBoardHeader({
     super.key,
     required this.topic,
@@ -38,10 +36,11 @@ class HermandadBoardHeader extends StatefulWidget {
   final Map<String, int> reactionBreakdown;
 
   @override
-  State<HermandadBoardHeader> createState() => _HermandadBoardHeaderState();
+  ConsumerState<HermandadBoardHeader> createState() =>
+      _HermandadBoardHeaderState();
 }
 
-class _HermandadBoardHeaderState extends State<HermandadBoardHeader> {
+class _HermandadBoardHeaderState extends ConsumerState<HermandadBoardHeader> {
   @override
   void initState() {
     super.initState();
@@ -57,14 +56,17 @@ class _HermandadBoardHeaderState extends State<HermandadBoardHeader> {
     final topic = widget.topic;
     final parsed = parseHermandadTopicTitle(topic.title);
     final customBody = hermandadBoardCustomBody(topic.body);
+    final coverUrl = topic.coverImageUrl?.trim();
+    final hasRemoteCover = coverUrl != null && coverUrl.isNotEmpty;
     final washAsset = HermandadLocalAssets.cardWash(
       processionDay: parsed.processionDay,
       hermandadName: parsed.hermandadName,
     );
-    final coverUrl = topic.coverImageUrl?.trim();
-    final hasLocalWash = washAsset != null;
-    final hasRemoteCover =
-        !hasLocalWash && coverUrl != null && coverUrl.isNotEmpty;
+    // Portada remota (admin) gana; si no, fondo local empaquetado.
+    final hasLocalWash = !hasRemoteCover && washAsset != null;
+    final followers =
+        ref.watch(topicFollowerCountProvider(widget.topicId)).asData?.value ??
+            0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -77,19 +79,19 @@ class _HermandadBoardHeaderState extends State<HermandadBoardHeader> {
                 fit: StackFit.expand,
                 children: [
                   const ColoredBox(color: AppColors.burgundyDark),
-                  if (hasLocalWash)
-                    _BoardHeroCover(assetPath: washAsset)
-                  else if (hasRemoteCover)
-                    _BoardHeroCover(imageUrl: coverUrl),
+                  if (hasRemoteCover)
+                    _BoardHeroCover(imageUrl: coverUrl)
+                  else if (hasLocalWash)
+                    _BoardHeroCover(assetPath: washAsset),
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Color(0x66000000),
-                          Color(0x99000000),
-                          Color(0xE64D0008),
+                          Color(0x40000000),
+                          Color(0x88000000),
+                          Color(0xF23D0006),
                         ],
                         stops: [0.0, 0.42, 1.0],
                       ),
@@ -98,95 +100,93 @@ class _HermandadBoardHeaderState extends State<HermandadBoardHeader> {
                 ],
               ),
             ),
+            // Sin Positioned: da altura al Stack (si todo es Positioned, no se ve nada).
+            // Padding inferior holgado para que el pill verificado no lo tape la stats card.
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 36),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _CrestBadge(topic: topic),
-                  const SizedBox(height: 6),
-                  Text(
-                    parsed.hermandadName,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TopicDetailTypography.heroTitle(
-                      color: AppColors.textOnDark,
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 46),
+              child: SizedBox(
+                width: double.infinity,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _CrestBadge(topic: topic),
+                    const SizedBox(height: 6),
+                    Text(
+                      parsed.hermandadName,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.hermandadName(
+                        color: AppColors.textOnDark,
+                      ).copyWith(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        height: 1.05,
+                        letterSpacing: 0.2,
+                      ),
                     ),
-                  ),
-                  if (parsed.processionDay != null) ...[
-                    const SizedBox(height: 3),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _GoldRule(),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            parsed.processionDay!,
-                            textAlign: TextAlign.center,
-                            style: ForumTopicsTypography.style(
-                              color: AppColors.gold,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                    if (parsed.processionDay != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        '— ${parsed.processionDay!} —',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.rankTitle(
+                          color: AppColors.gold,
+                        ).copyWith(
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.15,
                         ),
-                        const SizedBox(width: 6),
-                        _GoldRule(),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 5),
-                  const _VerifiedPill(),
-                  if (topic.isPublished) ...[
+                      ),
+                    ],
                     const SizedBox(height: 8),
-                    TopicFollowButton(
-                      forumId: widget.forumId,
-                      topicId: widget.topicId,
-                      isHermandadBoard: true,
-                      heroStyle: true,
-                    ),
+                    const _VerifiedPill(),
                   ],
-                ],
+                ),
               ),
             ),
+            if (topic.isPublished)
+              Positioned(
+                top: 8,
+                right: 10,
+                child: TopicFollowButton(
+                  forumId: widget.forumId,
+                  topicId: widget.topicId,
+                  isHermandadBoard: true,
+                  overlayStyle: true,
+                ),
+              ),
             Positioned(
               left: 16,
               right: 16,
               bottom: -18,
               child: _StatsCard(
                 displayCommentCount: widget.displayCommentCount,
-                displayViewCount: widget.displayViewCount,
+                displayFollowerCount: followers,
                 displayTotalReactions: widget.displayTotalReactions,
+                displayViewCount: widget.displayViewCount,
                 reactionBreakdown: widget.reactionBreakdown,
               ),
             ),
           ],
         ),
-        SizedBox(height: customBody != null ? 26 : 22),
+        SizedBox(height: customBody != null ? 26 : 24),
         if (customBody != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 2),
             child: Text(
               customBody,
               textAlign: TextAlign.center,
-              style: TopicDetailTypography.meta(
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.bodyMedium(
                 color: AppColors.textSecondary,
-              ),
+              ).copyWith(fontSize: 12, height: 1.3),
             ),
           ),
       ],
-    );
-  }
-}
-
-class _GoldRule extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 16,
-      height: 1,
-      color: AppColors.gold.withValues(alpha: 0.7),
     );
   }
 }
@@ -198,47 +198,56 @@ class _CrestBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const size = 56.0;
     return SizedBox(
-      width: 44,
-      height: 44,
+      width: size,
+      height: size,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: size,
+            height: size,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.gold, width: 1.4),
+              color: Colors.white,
+              border: Border.all(color: Colors.white, width: 2.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 6,
+                  color: Colors.black.withValues(alpha: 0.28),
+                  blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
               ],
             ),
             child: PinnedTopicMark(
               topic: topic,
-              size: 38,
+              size: size - 6,
               circular: true,
             ),
           ),
           Positioned(
-            right: -1,
-            bottom: -1,
+            right: 0,
+            bottom: 0,
             child: Container(
-              width: 14,
-              height: 14,
+              width: 16,
+              height: 16,
               decoration: BoxDecoration(
                 color: AppColors.gold,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.burgundyDark, width: 1.2),
+                border: Border.all(color: AppColors.burgundyDark, width: 1.3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
               ),
               child: const Icon(
                 Icons.check_rounded,
-                size: 9,
+                size: 10,
                 color: AppColors.burgundyDark,
               ),
             ),
@@ -302,23 +311,22 @@ class _VerifiedPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.22),
+        color: Colors.black.withValues(alpha: 0.32),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.5)),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.55)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.verified_rounded, size: 11, color: AppColors.gold),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           Text(
-            'Tablón oficial verificado',
-            style: ForumTopicsTypography.style(
-              color: AppColors.goldPale,
-              fontWeight: FontWeight.w600,
-            ),
+            'Canal oficial verificado',
+            style: AppTypography.labelSmall(
+              color: AppColors.textOnDark,
+            ).copyWith(fontWeight: FontWeight.w600, fontSize: 9.5),
           ),
         ],
       ),
@@ -329,28 +337,30 @@ class _VerifiedPill extends StatelessWidget {
 class _StatsCard extends StatelessWidget {
   const _StatsCard({
     required this.displayCommentCount,
-    required this.displayViewCount,
+    required this.displayFollowerCount,
     required this.displayTotalReactions,
+    required this.displayViewCount,
     required this.reactionBreakdown,
   });
 
   final int displayCommentCount;
-  final int displayViewCount;
+  final int displayFollowerCount;
   final int displayTotalReactions;
+  final int displayViewCount;
   final Map<String, int> reactionBreakdown;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textPrimary.withValues(alpha: 0.05),
-            blurRadius: 8,
+            color: AppColors.textPrimary.withValues(alpha: 0.08),
+            blurRadius: 10,
             offset: const Offset(0, 3),
           ),
         ],
@@ -366,19 +376,20 @@ class _StatsCard extends StatelessWidget {
           const _StatDivider(),
           Expanded(
             child: _StatCell(
-              label: 'Vistas',
-              value: formatCount(displayViewCount),
+              label: 'Seguidores',
+              value: formatCount(displayFollowerCount),
             ),
           ),
           const _StatDivider(),
           Expanded(
             child: _StatCell(
               label: 'Reacciones',
-              value: '$displayTotalReactions',
-              onTap: displayTotalReactions > 0
+              value: formatCount(displayTotalReactions),
+              onTap: displayTotalReactions > 0 || displayFollowerCount > 0
                   ? () => showHermandadBoardStatsSheet(
                         context,
                         viewCount: displayViewCount,
+                        followerCount: displayFollowerCount,
                         comunicadoCount: displayCommentCount,
                         reactionBreakdown: reactionBreakdown,
                       )
@@ -411,10 +422,9 @@ class _StatCell extends StatelessWidget {
         children: [
           Text(
             value,
-            style: TopicDetailTypography.title().copyWith(
-              fontSize: TopicDetailTypography.titleSize,
-              height: 1.1,
-            ),
+            style: AppTypography.hermandadName(
+              color: AppColors.textPrimary,
+            ).copyWith(fontSize: 16, fontWeight: FontWeight.w700, height: 1.05),
           ),
           const SizedBox(height: 1),
           Text(
@@ -422,9 +432,9 @@ class _StatCell extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: ForumTopicsTypography.style(
+            style: AppTypography.labelSmall(
               color: AppColors.textMuted,
-            ),
+            ).copyWith(fontSize: 10, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -445,8 +455,8 @@ class _StatDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 1,
-      height: 22,
-      color: AppColors.border,
+      height: 24,
+      color: AppColors.border.withValues(alpha: 0.85),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/cofradeo_error_panel.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 import '../../shared/models/app_notification.dart';
 import '../../core/utils/forum_topic_query.dart';
 import '../forums/utils/forum_navigation.dart';
@@ -13,6 +14,7 @@ import '../forums/forums_provider.dart';
 import '../forums/widgets/forums_beige_background.dart';
 import '../calendar/utils/calendar_notification_navigation.dart';
 import '../calendar/calendar_provider.dart';
+import '../search/follows_provider.dart';
 import 'notifications_design.dart';
 import 'notifications_provider.dart';
 import 'widgets/notification_card.dart';
@@ -27,6 +29,8 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  String? _busyFollowRequestId;
+
   @override
   void initState() {
     super.initState();
@@ -53,6 +57,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   Future<void> _onNotificationTap(AppNotification notification) async {
     final notifier = ref.read(notificationsProvider.notifier);
+
+    if (notification.kind == AppNotificationKind.ssLiveOfficial) {
+      final route = notification.route ??
+          (notification.forumId != null && notification.topicId != null
+              ? '/foros/${notification.forumId}/tema/${notification.topicId}'
+              : null);
+      if (!mounted) return;
+      if (route != null) {
+        context.go(route);
+      }
+      unawaited(notifier.dismiss(notification.id));
+      return;
+    }
 
     if (notification.kind == AppNotificationKind.topicRejected) {
       if (!mounted) return;
@@ -106,6 +123,15 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       return;
     }
 
+    // Solicitud pendiente: ver perfil sin descartar la notif (aún se puede aceptar).
+    if (notification.kind == AppNotificationKind.followRequest &&
+        notification.profileId != null) {
+      if (!mounted) return;
+      unawaited(notifier.markRead(notification.id));
+      context.go('/perfil/usuario/${notification.profileId}');
+      return;
+    }
+
     if (notification.profileId != null) {
       if (!mounted) return;
       context.go('/perfil/usuario/${notification.profileId}');
@@ -128,6 +154,49 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       context.go(route);
     }
     unawaited(notifier.dismiss(notification.id));
+  }
+
+  Future<void> _acceptFollowRequest(AppNotification notification) async {
+    final requestId = notification.requestId;
+    if (requestId == null) return;
+
+    setState(() => _busyFollowRequestId = requestId);
+    try {
+      await ref.read(profileFollowControllerProvider).acceptRequest(
+            requestId,
+            requesterId: notification.profileId,
+          );
+      await ref.read(notificationsProvider.notifier).dismiss(notification.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Solicitud aceptada')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo aceptar la solicitud')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyFollowRequestId = null);
+    }
+  }
+
+  Future<void> _rejectFollowRequest(AppNotification notification) async {
+    final requestId = notification.requestId;
+    if (requestId == null) return;
+
+    setState(() => _busyFollowRequestId = requestId);
+    try {
+      await ref.read(profileFollowControllerProvider).rejectRequest(requestId);
+      await ref.read(notificationsProvider.notifier).dismiss(notification.id);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo rechazar la solicitud')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyFollowRequestId = null);
+    }
   }
 
   Future<void> _showTopicRejectedSheet(AppNotification notification) async {
@@ -237,7 +306,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       child: SafeArea(
         bottom: false,
         child: notificationsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          skipLoadingOnReload: true,
+          loading: () => const NotificationsListSkeleton(),
           error: (_, _) => CofradeoErrorPanel(
             message: 'No se pudieron cargar las notificaciones.',
             subtitle: 'Comprueba tu conexión e inténtalo de nuevo.',
@@ -248,7 +318,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 ref.read(notificationsProvider.notifier).silentRefresh(),
             child: _NotificationsList(
               notifications: notifications,
+              busyFollowRequestId: _busyFollowRequestId,
               onTap: _onNotificationTap,
+              onAcceptFollowRequest: _acceptFollowRequest,
+              onRejectFollowRequest: _rejectFollowRequest,
               onDismiss: (n) =>
                   ref.read(notificationsProvider.notifier).dismiss(n.id),
               onMarkAllRead: () =>
@@ -269,11 +342,19 @@ class _NotificationsList extends StatefulWidget {
     required this.onDismiss,
     required this.onMarkAllRead,
     required this.onClearAll,
+    required this.onAcceptFollowRequest,
+    required this.onRejectFollowRequest,
+    this.busyFollowRequestId,
   });
 
   final List<AppNotification> notifications;
+  final String? busyFollowRequestId;
   final Future<void> Function(AppNotification notification) onTap;
   final Future<void> Function(AppNotification notification) onDismiss;
+  final Future<void> Function(AppNotification notification)
+      onAcceptFollowRequest;
+  final Future<void> Function(AppNotification notification)
+      onRejectFollowRequest;
   final VoidCallback onMarkAllRead;
   final VoidCallback onClearAll;
 
@@ -374,6 +455,13 @@ class _NotificationsListState extends State<_NotificationsList> {
                   child: NotificationCard(
                     notification: notification,
                     onTap: () => widget.onTap(notification),
+                    onAcceptFollowRequest: () =>
+                        widget.onAcceptFollowRequest(notification),
+                    onRejectFollowRequest: () =>
+                        widget.onRejectFollowRequest(notification),
+                    followRequestBusy:
+                        notification.requestId != null &&
+                        notification.requestId == widget.busyFollowRequestId,
                   ),
                 );
               },

@@ -58,13 +58,13 @@ abstract final class TopicDetailTypography {
         fontWeight: FontWeight.w600,
       ).copyWith(fontSize: 13);
 
-  /// Título editorial del AppBar (detalle de tema / noticia).
-  static TextStyle editorialAppBarTitle() => AppTypography.displaySmall(
+  /// Título del AppBar en detalle de noticia (Inter, sin serifa editorial).
+  static TextStyle editorialAppBarTitle() => AppTypography.titleLarge(
         color: AppColors.burgundyDark,
       ).copyWith(
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: FontWeight.w700,
-        height: 1.05,
+        height: 1.15,
       );
 
   /// Kicker en mayúsculas bajo el nombre del foro.

@@ -3,7 +3,11 @@
 
   <aside class="sidebar">
     <div class="brand">
-      <img class="brand-mark" src="/logo-mark.png" alt="" width="40" height="40" />
+      @if (boards().at(0)?.iconImageUrl; as icon) {
+        <img class="brand-mark crest" [src]="icon" alt="" width="40" height="40" />
+      } @else {
+        <img class="brand-mark" src="/logo-mark.png" alt="" width="40" height="40" />
+      }
       <div class="brand-text">
         <strong>{{ boardTitle() }}</strong>
         <small>Área privada · oficial</small>

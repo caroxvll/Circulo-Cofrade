@@ -8,9 +8,12 @@ import '../../core/theme/app_typography.dart';
 import '../../core/utils/image_decode_cache.dart';
 import '../../core/widgets/cofradeo_error_panel.dart';
 import '../../core/widgets/cofradeo_network_image.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 import '../../shared/models/forum.dart';
+import '../semana_santa/widgets/ss_forums_live_chip.dart';
 import 'forums_provider.dart';
 import 'utils/forum_pillar_image_cache.dart';
+import 'utils/hermandad_local_assets.dart';
 import 'utils/topic_list_order.dart';
 import 'widgets/forum_category_card.dart';
 import 'widgets/forums_beige_background.dart';
@@ -27,6 +30,13 @@ class ForumsScreen extends ConsumerStatefulWidget {
 }
 
 class _ForumsScreenState extends ConsumerState<ForumsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Calentar escudos/fondos locales antes de abrir Hermandades.
+    HermandadLocalAssets.ensureLoaded();
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(forumPillarsProvider, (previous, next) {
@@ -50,7 +60,8 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
       children: [
         const ForumsBeigeBackground(),
         pillarsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          skipLoadingOnReload: true,
+          loading: () => const ForumsHomeSkeleton(),
           error: (_, _) => CofradeoErrorPanel(
             message: 'No se pudieron cargar los foros.',
             subtitle: 'Comprueba tu conexión e inténtalo de nuevo.',
@@ -112,7 +123,8 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
             );
           },
         ),
-        if (ref.watch(quizLiveVisibleProvider).asData?.value ?? true)
+        const SemanaSantaForumsLiveChip(),
+        if (ref.watch(quizLiveVisibleProvider).asData?.value == true)
           const QuizForumsFab(),
       ],
     );

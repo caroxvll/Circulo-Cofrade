@@ -12,6 +12,7 @@ import '../cuaresma_ensayos_provider.dart';
 import '../utils/ensayos_day_groups.dart';
 import 'cuaresma_hub_design.dart';
 import 'ensayo_live_design.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 
 String cuaresmaHubEnsayoTimingLabel(CalendarEvent event, {DateTime? now}) {
   final timing = calendarEventTiming(event, now: now);
@@ -24,6 +25,7 @@ String cuaresmaHubEnsayoTimingLabel(CalendarEvent event, {DateTime? now}) {
         'Sale',
       ),
     CalendarEventTimingKind.scheduled => timing.label,
+    CalendarEventTimingKind.finished => 'Finalizado',
   };
 }
 
@@ -99,15 +101,10 @@ class CuaresmaHubLiveSection extends ConsumerWidget {
     final ensayosAsync = ref.watch(todayEnsayosProvider);
 
     return ensayosAsync.when(
+      skipLoadingOnReload: true,
       loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: HubSectionListSkeleton(),
       ),
       error: (_, _) => CuaresmaHubElevatedCard(
         child: Text(

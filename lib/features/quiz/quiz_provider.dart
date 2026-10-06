@@ -78,7 +78,9 @@ final quizSeasonInfoProvider =
 });
 
 /// Si es false, se oculta el FAB y el acceso público a /quiz.
+/// keepAlive: evita parpadeo al volver a Foros (no refetch + FAB a medias).
 final quizLiveVisibleProvider = FutureProvider.autoDispose<bool>((ref) async {
+  ref.keepAlive();
   return ref.watch(quizRepositoryProvider).fetchLiveVisible();
 });
 

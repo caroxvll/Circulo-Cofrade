@@ -43,6 +43,7 @@ const TYPE_PREF: Record<string, keyof NotificationPreferences> = {
   new_follower: "notify_followers",
   reply_reaction: "notify_reactions",
   calendar: "notify_calendar",
+  ss_live_official: "notify_calendar",
   quiz: "notify_quiz",
   news_published: "notify_news",
 };

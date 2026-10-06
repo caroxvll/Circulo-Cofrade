@@ -45,9 +45,7 @@ abstract final class NotificationsDesign {
         ],
       );
 
-  static TextStyle sectionTitle() => AppTypography.titleLarge().copyWith(
-        fontSize: 15,
-        fontWeight: FontWeight.w700,
+  static TextStyle sectionTitle() => AppTypography.sectionTitle(
         color: AppColors.textPrimary,
       );
 

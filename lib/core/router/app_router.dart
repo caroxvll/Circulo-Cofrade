@@ -1,71 +1,49 @@
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:go_router/go_router.dart';
 
-
-
 import '../../features/auth/auth_provider.dart';
-
 import '../../features/calendar/calendar_screen.dart';
-
 import '../../features/forums/forum_topics_screen.dart';
-
 import '../../features/forums/forums_screen.dart';
-
 import '../../features/cuaresma/screens/cuaresma_hub_screen.dart';
 import '../../features/cuaresma/screens/ensayo_live_screen.dart';
 import '../../features/cuaresma/utils/cuaresma_topic.dart';
 import '../../features/glorias/screens/glorias_hub_screen.dart';
 import '../../features/glorias/utils/glorias_topic.dart';
 import '../../features/semana_santa/screens/semana_santa_hub_screen.dart';
-import '../../features/semana_santa/screens/ss_live_screen.dart';
+import '../../features/semana_santa/screens/ss_informar_compose_screen.dart';
+import '../../features/semana_santa/screens/ss_informar_kind_screen.dart';
+import '../../features/semana_santa/models/ss_live_update.dart';
 import '../../features/semana_santa/utils/semana_santa_topic.dart';
 import '../../features/quiz/screens/quiz_play_screen.dart';
 import '../../features/quiz/screens/quiz_ranking_screen.dart';
-
 import '../../features/forums/topic_detail_screen.dart';
 import '../../features/forums/mis_hermandades_screen.dart';
-
 import '../../features/auth/login_screen.dart';
-
 import '../../features/auth/register_screen.dart';
-
 import '../../features/auth/splash_screen.dart';
-
 import '../../features/auth/welcome_screen.dart';
-
 import '../../features/auth/forgot_password_screen.dart';
-
 import '../../features/auth/reset_password_screen.dart';
-
 import '../../features/auth/verify_email_screen.dart';
-
 import '../../features/profile/complete_profile_screen.dart';
 import '../../features/profile/profile_onboarding.dart';
 import '../../features/profile/profile_provider.dart';
 import '../../features/profile/edit_profile_screen.dart';
-
 import '../../features/calendar/saved_events_screen.dart';
 import '../../features/forums/hermandad_scheduled_posts_screen.dart';
 import '../../features/profile/blocked_accounts_screen.dart';
 import '../../features/profile/widgets/followers_screen.dart';
+import '../../features/profile/widgets/profile_people_mode.dart';
 import '../../features/profile/user_profile_screen.dart';
-
 import '../../features/notifications/notification_preferences_screen.dart';
-
 import '../../features/notifications/notifications_screen.dart';
-
 import '../../features/profile/profile_screen.dart';
-
 import '../../features/admin/junta_screen.dart';
-
 import '../../features/search/search_screen.dart';
-
 import '../../features/shell/cofradeo_shell.dart';
-
-
+import 'cofradeo_page.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -147,418 +125,365 @@ Future<String?> _authRedirect(Ref ref, GoRouterState state) async {
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-
   final refresh = ValueNotifier<int>(0);
 
-  ref.listen(authStateChangesProvider, (_, __) {
-
+  ref.listen(authStateChangesProvider, (_, _) {
     refresh.value++;
-
   });
 
-  ref.listen(currentUserProfileProvider, (_, __) {
-
+  ref.listen(currentUserProfileProvider, (_, _) {
     refresh.value++;
-
   });
 
   ref.onDispose(refresh.dispose);
 
-
-
   return GoRouter(
-
     navigatorKey: _rootNavigatorKey,
-
     initialLocation: '/splash',
-
     refreshListenable: refresh,
-
     redirect: (context, state) async => _authRedirect(ref, state),
-
     routes: [
-
       GoRoute(
-
         path: '/splash',
-
         parentNavigatorKey: _rootNavigatorKey,
-
-        builder: (context, state) => const AuthSplashScreen(),
-
+        pageBuilder: (context, state) => cofradeoTabPage(
+          state: state,
+          child: const AuthSplashScreen(),
+        ),
       ),
-
       GoRoute(
-
         path: '/bienvenida',
-
         parentNavigatorKey: _rootNavigatorKey,
-
-        builder: (context, state) => const WelcomeScreen(),
-
+        pageBuilder: (context, state) => cofradeoFadePage(
+          state: state,
+          child: const WelcomeScreen(),
+        ),
       ),
-
       GoRoute(
-
         path: '/login',
-
         parentNavigatorKey: _rootNavigatorKey,
-
-        builder: (context, state) {
-
-          final redirect = state.uri.queryParameters['redirect'];
-
-          return LoginScreen(redirect: redirect);
-
-        },
-
+        pageBuilder: (context, state) => cofradeoFadePage(
+          state: state,
+          child: LoginScreen(redirect: state.uri.queryParameters['redirect']),
+        ),
       ),
-
       GoRoute(
-
         path: '/registro',
-
         parentNavigatorKey: _rootNavigatorKey,
-
-        builder: (context, state) {
-
-          final redirect = state.uri.queryParameters['redirect'];
-
-          return RegisterScreen(redirect: redirect);
-
-        },
-
+        pageBuilder: (context, state) => cofradeoFadePage(
+          state: state,
+          child: RegisterScreen(redirect: state.uri.queryParameters['redirect']),
+        ),
       ),
-
       GoRoute(
-
         path: '/recuperar-contrasena',
-
         parentNavigatorKey: _rootNavigatorKey,
-
-        builder: (context, state) => const ForgotPasswordScreen(),
-
+        pageBuilder: (context, state) => cofradeoFadePage(
+          state: state,
+          child: const ForgotPasswordScreen(),
+        ),
       ),
-
       GoRoute(
-
         path: '/nueva-contrasena',
-
         parentNavigatorKey: _rootNavigatorKey,
-
-        builder: (context, state) => const ResetPasswordScreen(),
-
+        pageBuilder: (context, state) => cofradeoFadePage(
+          state: state,
+          child: const ResetPasswordScreen(),
+        ),
       ),
-
       GoRoute(
-
         path: '/verificar-email',
-
         parentNavigatorKey: _rootNavigatorKey,
-
-        builder: (context, state) => VerifyEmailScreen(
-
-          email: state.uri.queryParameters['email'],
-
-        ),
-
-      ),
-
-      GoRoute(
-
-        path: '/completar-perfil',
-
-        parentNavigatorKey: _rootNavigatorKey,
-
-        builder: (context, state) => CompleteProfileScreen(
-          redirect: state.uri.queryParameters['redirect'],
-        ),
-
-      ),
-
-      StatefulShellRoute.indexedStack(
-
-        builder: (context, state, navigationShell) {
-
-          return CofradeoShell(navigationShell: navigationShell);
-
-        },
-
-        branches: [
-
-          StatefulShellBranch(
-
-            routes: [
-
-              GoRoute(
-
-                path: '/calendario',
-
-                builder: (context, state) => const CalendarScreen(),
-
-              ),
-
-            ],
-
+        pageBuilder: (context, state) => cofradeoFadePage(
+          state: state,
+          child: VerifyEmailScreen(
+            email: state.uri.queryParameters['email'],
           ),
-
+        ),
+      ),
+      GoRoute(
+        path: '/completar-perfil',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) => cofradeoFadePage(
+          state: state,
+          child: CompleteProfileScreen(
+            redirect: state.uri.queryParameters['redirect'],
+          ),
+        ),
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return CofradeoShell(navigationShell: navigationShell);
+        },
+        branches: [
           StatefulShellBranch(
-
-            navigatorKey: _forumsNavigatorKey,
-
             routes: [
-
+              GoRoute(
+                path: '/calendario',
+                pageBuilder: (context, state) => cofradeoTabPage(
+                  state: state,
+                  child: const CalendarScreen(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _forumsNavigatorKey,
+            routes: [
               GoRoute(
                 path: '/foros',
-                builder: (context, state) => const ForumsScreen(),
+                pageBuilder: (context, state) => cofradeoTabPage(
+                  state: state,
+                  child: const ForumsScreen(),
+                ),
               ),
               GoRoute(
                 path: '/foros/mis-hermandades',
-                builder: (context, state) => const MisHermandadesScreen(),
+                pageBuilder: (context, state) => cofradeoFadePage(
+                  state: state,
+                  child: const MisHermandadesScreen(),
+                ),
               ),
               GoRoute(
                 path: '/quiz',
-                builder: (context, state) => const QuizPlayScreen(),
+                pageBuilder: (context, state) => cofradeoFadePage(
+                  state: state,
+                  child: const QuizPlayScreen(),
+                ),
               ),
-
               GoRoute(
-
                 path: '/quiz/ranking',
-
-                builder: (context, state) => const QuizRankingScreen(),
-
+                pageBuilder: (context, state) => cofradeoFadePage(
+                  state: state,
+                  child: const QuizRankingScreen(),
+                ),
               ),
-
               GoRoute(
-
                 path: '/foros/:forumId',
-
-                builder: (context, state) {
-
+                pageBuilder: (context, state) {
                   final forumId = state.pathParameters['forumId']!;
-
-                  return ForumTopicsScreen(forumId: forumId);
-
+                  return cofradeoFadePage(
+                    state: state,
+                    child: ForumTopicsScreen(forumId: forumId),
+                  );
                 },
-
               ),
-
               GoRoute(
-
                 path: '/foros/:forumId/tema/:topicId',
-
-                builder: (context, state) {
-
+                pageBuilder: (context, state) {
                   final forumId = state.pathParameters['forumId']!;
-
                   final topicId = state.pathParameters['topicId']!;
 
+                  final Widget child;
                   if (topicId == cuaresmaTopicId) {
-                    return CuaresmaHubScreen(
+                    child = CuaresmaHubScreen(
                       forumId: forumId,
                       topicId: topicId,
                     );
-                  }
-
-                  if (topicId == semanaSantaTopicId) {
-                    return SemanaSantaHubScreen(
+                  } else if (topicId == semanaSantaTopicId) {
+                    child = SemanaSantaHubScreen(
                       forumId: forumId,
                       topicId: topicId,
                     );
-                  }
-
-                  if (topicId == gloriasTopicId) {
-                    return GloriasHubScreen(
+                  } else if (topicId == gloriasTopicId) {
+                    child = GloriasHubScreen(
                       forumId: forumId,
                       topicId: topicId,
                     );
+                  } else {
+                    child = TopicDetailScreen(
+                      forumId: forumId,
+                      topicId: topicId,
+                      highlightReplyId: state.uri.queryParameters['reply'],
+                    );
                   }
 
-                  return TopicDetailScreen(
-
-                    forumId: forumId,
-
-                    topicId: topicId,
-
-                    highlightReplyId: state.uri.queryParameters['reply'],
-
-                  );
-
+                  return cofradeoFadePage(state: state, child: child);
                 },
-
                 routes: [
-
                   GoRoute(
-
                     path: 'ensayo/:eventId',
-
-                    builder: (context, state) {
-
-                      return EnsayoLiveScreen(
-
+                    pageBuilder: (context, state) => cofradeoFadePage(
+                      state: state,
+                      child: EnsayoLiveScreen(
                         forumId: state.pathParameters['forumId']!,
-
                         topicId: state.pathParameters['topicId']!,
-
                         eventId: state.pathParameters['eventId']!,
-
-                      );
-
-                    },
-
+                      ),
+                    ),
                   ),
-
                   GoRoute(
-                    path: 'en-directo',
-                    builder: (context, state) {
-                      return SsLiveScreen(
+                    path: 'informar',
+                    pageBuilder: (context, state) => cofradeoFadePage(
+                      state: state,
+                      child: SsInformarKindScreen(
                         forumId: state.pathParameters['forumId']!,
                         topicId: state.pathParameters['topicId']!,
+                      ),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: ':kind',
+                        pageBuilder: (context, state) {
+                          final kind = SsLiveUpdateKind.fromDb(
+                            state.pathParameters['kind'],
+                          );
+                          return cofradeoFadePage(
+                            state: state,
+                            child: SsInformarComposeScreen(
+                              forumId: state.pathParameters['forumId']!,
+                              topicId: state.pathParameters['topicId']!,
+                              kind: kind,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/buscar',
+                pageBuilder: (context, state) => cofradeoTabPage(
+                  state: state,
+                  child: const SearchScreen(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/notificaciones',
+                pageBuilder: (context, state) => cofradeoTabPage(
+                  state: state,
+                  child: const NotificationsScreen(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/perfil',
+                pageBuilder: (context, state) => cofradeoTabPage(
+                  state: state,
+                  child: const ProfileScreen(),
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'usuario/:userId',
+                    pageBuilder: (context, state) {
+                      final userId = state.pathParameters['userId']!;
+                      return cofradeoFadePage(
+                        state: state,
+                        child: UserProfileScreen(userId: userId),
+                      );
+                    },
+                    routes: [
+                      GoRoute(
+                        path: 'seguidores',
+                        pageBuilder: (context, state) {
+                          final userId = state.pathParameters['userId']!;
+                          return cofradeoFadePage(
+                            state: state,
+                            child: FollowersScreen(
+                              forUserId: userId,
+                              initialMode: ProfilePeopleMode.seguidores,
+                            ),
+                          );
+                        },
+                      ),
+                      GoRoute(
+                        path: 'siguiendo',
+                        pageBuilder: (context, state) {
+                          final userId = state.pathParameters['userId']!;
+                          return cofradeoFadePage(
+                            state: state,
+                            child: FollowersScreen(
+                              forUserId: userId,
+                              initialMode: ProfilePeopleMode.siguiendo,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'junta',
+                    pageBuilder: (context, state) => cofradeoFadePage(
+                      state: state,
+                      child: const JuntaScreen(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'editar',
+                    pageBuilder: (context, state) => cofradeoFadePage(
+                      state: state,
+                      child: const EditProfileScreen(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'notificaciones',
+                    pageBuilder: (context, state) => cofradeoFadePage(
+                      state: state,
+                      child: const NotificationPreferencesScreen(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'seguidores',
+                    pageBuilder: (context, state) {
+                      final modo = state.uri.queryParameters['modo'];
+                      return cofradeoFadePage(
+                        state: state,
+                        child: FollowersScreen(
+                          initialMode: modo == 'siguiendo'
+                              ? ProfilePeopleMode.siguiendo
+                              : ProfilePeopleMode.seguidores,
+                        ),
                       );
                     },
                   ),
-
-                ],
-
-              ),
-
-            ],
-
-          ),
-
-          StatefulShellBranch(
-
-            routes: [
-
-              GoRoute(
-
-                path: '/buscar',
-
-                builder: (context, state) => const SearchScreen(),
-
-              ),
-
-            ],
-
-          ),
-
-          StatefulShellBranch(
-
-            routes: [
-
-              GoRoute(
-
-                path: '/notificaciones',
-
-                builder: (context, state) => const NotificationsScreen(),
-
-              ),
-
-            ],
-
-          ),
-
-          StatefulShellBranch(
-
-            routes: [
-
-              GoRoute(
-
-                path: '/perfil',
-
-                builder: (context, state) => const ProfileScreen(),
-
-                routes: [
-
                   GoRoute(
-
-                    path: 'usuario/:userId',
-
-                    builder: (context, state) {
-
-                      final userId = state.pathParameters['userId']!;
-
-                      return UserProfileScreen(userId: userId);
-
-                    },
-
+                    path: 'siguiendo',
+                    pageBuilder: (context, state) => cofradeoFadePage(
+                      state: state,
+                      child: const FollowersScreen(
+                        initialMode: ProfilePeopleMode.siguiendo,
+                      ),
+                    ),
                   ),
-
                   GoRoute(
-
-                    path: 'junta',
-
-                    builder: (context, state) => const JuntaScreen(),
-
-                  ),
-
-                  GoRoute(
-
-                    path: 'editar',
-
-                    builder: (context, state) => const EditProfileScreen(),
-
-                  ),
-
-                  GoRoute(
-
-                    path: 'notificaciones',
-
-                    builder: (context, state) =>
-
-                        const NotificationPreferencesScreen(),
-
-                  ),
-
-                  GoRoute(
-
-                    path: 'seguidores',
-
-                    builder: (context, state) => const FollowersScreen(),
-
-                  ),
-
-                  GoRoute(
-
                     path: 'bloqueados',
-
-                    builder: (context, state) => const BlockedAccountsScreen(),
-
+                    pageBuilder: (context, state) => cofradeoFadePage(
+                      state: state,
+                      child: const BlockedAccountsScreen(),
+                    ),
                   ),
-
                   GoRoute(
-
                     path: 'eventos-guardados',
-
-                    builder: (context, state) => const SavedEventsScreen(),
-
+                    pageBuilder: (context, state) => cofradeoFadePage(
+                      state: state,
+                      child: const SavedEventsScreen(),
+                    ),
                   ),
-
                   GoRoute(
-
                     path: 'publicaciones-programadas',
-
-                    builder: (context, state) =>
-                        const HermandadScheduledPostsScreen(),
-
+                    pageBuilder: (context, state) => cofradeoFadePage(
+                      state: state,
+                      child: const HermandadScheduledPostsScreen(),
+                    ),
                   ),
-
                 ],
-
               ),
-
             ],
-
           ),
-
         ],
-
       ),
-
     ],
-
   );
-
 });
-
-

@@ -8,6 +8,7 @@ import {
   CalendarEventRow,
   CalendarEventStatus,
   CalendarEventType,
+  EventLiveForceState,
   OrganizerLogo,
   eventTypeCellLabel,
 } from './events.models';
@@ -26,7 +27,7 @@ export class EventsService {
     let req = getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, subtitle, event_type, starts_at, day_label, location, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
+        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
       )
       .limit(limit);
 
@@ -88,7 +89,7 @@ export class EventsService {
         status: input.status ?? 'published',
       })
       .select(
-        'id, title, subtitle, event_type, starts_at, day_label, location, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
+        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
       )
       .single();
     if (error) throw error;
@@ -106,7 +107,7 @@ export class EventsService {
       })
       .eq('id', eventId)
       .select(
-        'id, title, subtitle, event_type, starts_at, day_label, location, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
+        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
       )
       .single();
     if (error) throw error;
@@ -221,17 +222,44 @@ export class EventsService {
 
   private toDbPayload(input: CalendarEventInput): Record<string, unknown> {
     const type = input.eventType;
+    const endsAt =
+      input.endsAt === undefined
+        ? undefined
+        : input.endsAt
+          ? new Date(input.endsAt).toISOString()
+          : null;
     return {
       title: input.title.trim(),
       subtitle: input.subtitle.trim(),
       event_type: type,
       starts_at: new Date(input.startsAt).toISOString(),
+      ...(endsAt !== undefined ? { ends_at: endsAt } : {}),
       day_label: (input.dayLabel?.trim() || eventTypeCellLabel(type)).trim(),
       location: (input.location ?? '').trim(),
       organizer_label: (input.organizerLabel ?? '').trim(),
       custom_icon_url: (input.customIconUrl ?? '').trim(),
       cover_image_url: (input.coverImageUrl ?? '').trim(),
     };
+  }
+
+  async setLiveForceState(
+    eventId: string,
+    forceState: 'auto' | 'open' | 'closed',
+  ): Promise<void> {
+    const rpc = await getSupabase().rpc('admin_set_event_live_force_state', {
+      p_event_id: eventId,
+      p_force_state: forceState,
+    });
+    if (!rpc.error) return;
+
+    const { error } = await getSupabase()
+      .from('calendar_events')
+      .update({
+        live_force_state: forceState,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', eventId);
+    if (error) throw error;
   }
 
   private mapRow(row: Record<string, unknown>): CalendarEventRow {
@@ -246,6 +274,10 @@ export class EventsService {
         ? statusRaw
         : 'published'
     ) as CalendarEventStatus;
+    const forceRaw = String(row['live_force_state'] ?? 'auto');
+    const liveForceState = (
+      ['auto', 'open', 'closed'].includes(forceRaw) ? forceRaw : 'auto'
+    ) as EventLiveForceState;
 
     return {
       id: String(row['id'] ?? ''),
@@ -253,6 +285,8 @@ export class EventsService {
       subtitle: String(row['subtitle'] ?? ''),
       eventType,
       startsAt: String(row['starts_at'] ?? ''),
+      endsAt: (row['ends_at'] as string | null) ?? null,
+      liveForceState,
       dayLabel: (row['day_label'] as string | null) ?? null,
       location: emptyToNull(row['location'] as string | null),
       organizerLabel: emptyToNull(row['organizer_label'] as string | null),

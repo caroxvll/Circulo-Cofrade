@@ -4,15 +4,44 @@ Guía para activar notificaciones push fuera de la app. La bandeja in-app sigue 
 
 ## Arquitectura
 
+Hay **dos colas**:
+
+1. `notification_dispatch_jobs` — crea filas en `notifications` a ritmo (fan-out noticias/temas…).
+2. `push_delivery_jobs` — controla el envío a **Google FCM** (el “tubo” al móvil).
+
 ```
-INSERT en notifications (Supabase)
+Evento (noticia, mención…)
         │
-        ▼
-Database Webhook → Edge Function send-push
-        │
-        ▼
-Firebase Cloud Messaging → dispositivo (iOS / Android / Web)
+        ├─ fan-out masivo → notification_dispatch_jobs → cron → INSERT notifications
+        └─ aviso 1:1      → INSERT notifications al momento
+                │
+                ▼
+     trigger (por LOTE) → push_delivery_jobs (pending)
+                │
+                ▼
+     kick / cron cada minuto → Edge Function drain-push
+                │  (lotes ~40, hasta ~20 en paralelo)
+                ▼
+     Google FCM  →  banner en el móvil
 ```
+
+**Importante:** desactiva el Database Webhook antiguo `notifications-push` si existe.
+Con la cola, el disparo va por `push_delivery_queue.sql` + `drain-push`, no por 1 HTTP por fila a `send-push`.
+
+Setup SQL (una vez):
+
+```sql
+-- SQL Editor
+-- pega supabase/push_delivery_queue.sql
+```
+
+Deploy:
+
+```bash
+npx supabase functions deploy drain-push
+```
+
+`send-push` se puede dejar desplegada para pruebas manuales; el camino de producción es `drain-push`.
 
 ## 1. Firebase
 
@@ -105,21 +134,27 @@ Respuestas esperadas:
 
 `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` las inyecta Supabase automáticamente en funciones desplegadas.
 
-## 5. Database Webhook
+## 5. Cola de entrega (recomendado)
 
-En **Supabase Dashboard → Database → Webhooks → Create**:
+Ejecuta [`push_delivery_queue.sql`](../supabase/push_delivery_queue.sql) y despliega `drain-push`.
 
-| Campo | Valor |
-|-------|--------|
-| Name | `notifications-push` |
-| Table | `notifications` |
-| Events | **Insert** |
-| Type | Supabase Edge Function |
-| Function | `send-push` |
+| Pieza | Rol |
+|-------|-----|
+| Trigger `notifications_enqueue_push` | Encola 1 job por notificación (por statement/lote) |
+| `kick_push_delivery_drain` | Llama a `drain-push` como máx. 1 vez / 3 s |
+| Cron `cofradeo-push-delivery-drain` | Cada minuto, por si quedó cola |
+| `drain-push` | Reclama jobs, envía a FCM en paralelo, reintenta, borra tokens muertos |
 
-**Importante:** usa **solo el webhook** o **solo** el trigger SQL de [`push_webhook_trigger.sql`](../supabase/push_webhook_trigger.sql), **nunca los dos**. Si ambos están activos, cada aviso dispara `send-push` dos veces y llegan dos pushes idénticos.
+**Desactiva** el webhook Dashboard `notifications-push` si lo tenías (evita doble envío).
 
-Comprueba con [`verify_push_not_duplicated.sql`](../supabase/verify_push_not_duplicated.sql).
+Comprueba cola:
+
+```sql
+select status, count(*) from push_delivery_jobs group by status;
+select public.staff_push_delivery_overview(); -- solo admin
+```
+
+Legacy: [`push_webhook_trigger.sql`](../supabase/push_webhook_trigger.sql) y [`verify_push_not_duplicated.sql`](../supabase/verify_push_not_duplicated.sql).
 
 ## 6. Probar
 
@@ -168,7 +203,7 @@ Los pushes de reacciones incluyen `forumId`, `topicId`, `replyId` y `officialCat
 
 | Problema | Qué revisar |
 |----------|-------------|
-| **Push duplicado (mismo título dos veces)** | Webhook **y** trigger `notifications_send_push` activos a la vez → ejecuta `verify_push_not_duplicated.sql` y deja solo un disparador |
+| **Push duplicado (mismo título dos veces)** | Webhook Dashboard **y** cola `push_delivery` a la vez, o webhook + trigger antiguo → deja **solo** `push_delivery_queue.sql` + `drain-push` |
 | **Push duplicado solo en Chrome/web** | Service worker mostraba el banner dos veces (FCM + `showNotification` manual); corregido en `web/firebase-messaging-sw.js` |
 | **Varios pushes distintos por un reply** | Normal si aplica `user_reply` + `hashtag_activity` (lógica de negocio) |
 | No aparece toggle push | `FIREBASE_PROJECT_ID` en `env.json` + hot restart |

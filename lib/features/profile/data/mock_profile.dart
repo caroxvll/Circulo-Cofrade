@@ -12,6 +12,7 @@ const mockCurrentProfile = UserProfile(
   followerCount: 15200,
   avatarIcon: Icons.face_3,
   isVerified: true,
+  accountType: AccountType.brotherhood,
   address: 'Calle Sierpes, 12, Sevilla',
   foundedLabel: 'Fundada en 1565',
   website: 'www.hermandadsevilla.es',

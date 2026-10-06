@@ -10,10 +10,12 @@ import '../../core/widgets/cofradeo_network_image.dart';
 import '../../shared/models/followed_topic.dart';
 import '../search/follows_provider.dart';
 import 'mis_hermandades_provider.dart';
+import 'utils/forum_navigation.dart';
 import 'utils/hermandad_board_display.dart';
 import 'utils/hermandad_local_assets.dart';
 import 'utils/official_post_categories.dart';
 import 'widgets/forums_beige_background.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 
 class MisHermandadesScreen extends ConsumerStatefulWidget {
   const MisHermandadesScreen({super.key});
@@ -58,7 +60,8 @@ class _MisHermandadesScreenState extends ConsumerState<MisHermandadesScreen> {
             ],
           ),
           body: boardsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            skipLoadingOnReload: true,
+            loading: () => const PeopleListSkeleton(itemCount: 4),
             error: (_, _) => CofradeoErrorPanel(
               message: 'No se pudieron cargar tus hermandades.',
               onRetry: () {
@@ -99,7 +102,7 @@ class _MisHermandadesScreenState extends ConsumerState<MisHermandadesScreen> {
                     feedAsync.when(
                       loading: () => const SliverFillRemaining(
                         hasScrollBody: false,
-                        child: Center(child: CircularProgressIndicator()),
+                        child: PeopleListSkeleton(itemCount: 5),
                       ),
                       error: (_, _) => SliverFillRemaining(
                         hasScrollBody: false,
@@ -140,13 +143,13 @@ class _MisHermandadesScreenState extends ConsumerState<MisHermandadesScreen> {
   }
 }
 
-class _BoardsHeader extends StatelessWidget {
+class _BoardsHeader extends ConsumerWidget {
   const _BoardsHeader({required this.boards});
 
   final List<FollowedTopic> boards;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -175,8 +178,12 @@ class _BoardsHeader extends StatelessWidget {
               return _BoardTile(
                 name: parsed.hermandadName,
                 day: parsed.processionDay,
-                onTap: () => context.push(
-                  '/foros/${board.forumId}/tema/${board.topicId}',
+                iconImageUrl: board.iconImageUrl,
+                onTap: () => pushForumTopic(
+                  context,
+                  ref,
+                  forumId: board.forumId,
+                  topicId: board.topicId,
                 ),
               );
             },
@@ -192,16 +199,20 @@ class _BoardTile extends StatelessWidget {
     required this.name,
     required this.day,
     required this.onTap,
+    this.iconImageUrl,
   });
 
   final String name;
   final String? day;
+  final String? iconImageUrl;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final accent = hermandadDayAccentColor(day);
-    final avatar = HermandadLocalAssets.avatar(
+    final remote = iconImageUrl?.trim();
+    final hasRemote = remote != null && remote.isNotEmpty;
+    final localAvatar = HermandadLocalAssets.avatar(
       processionDay: day,
       hermandadName: name,
     );
@@ -237,8 +248,21 @@ class _BoardTile extends StatelessWidget {
                       ),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: avatar != null
-                        ? Image.asset(avatar, fit: BoxFit.cover)
+                    child: hasRemote
+                        ? CofradeoNetworkImage(
+                            url: remote,
+                            fit: BoxFit.contain,
+                            width: 34,
+                            height: 34,
+                            cacheSize: 68,
+                            errorWidget: Icon(
+                              Icons.church_outlined,
+                              size: 17,
+                              color: accent,
+                            ),
+                          )
+                        : localAvatar != null
+                        ? Image.asset(localAvatar, fit: BoxFit.cover)
                         : Icon(
                             Icons.church_outlined,
                             size: 17,
@@ -274,13 +298,13 @@ class _BoardTile extends StatelessWidget {
   }
 }
 
-class _FeedCard extends StatelessWidget {
+class _FeedCard extends ConsumerWidget {
   const _FeedCard({required this.item});
 
   final HermandadFeedItem item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final reply = item.reply;
     final category = reply.officialCategory ?? 'noticia';
     final excerpt = plainTextForExcerpt(reply.content, maxLength: 140);
@@ -291,10 +315,17 @@ class _FeedCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => context.push(
-          '/foros/${item.board.forumId}/tema/${item.board.topicId}'
-          '?reply=${reply.id}',
-        ),
+        onTap: () {
+          prefetchForumTopic(
+            ref,
+            forumId: item.board.forumId,
+            topicId: item.board.topicId,
+          );
+          context.push(
+            '/foros/${item.board.forumId}/tema/${item.board.topicId}'
+            '?reply=${reply.id}',
+          );
+        },
         borderRadius: BorderRadius.circular(14),
         child: Ink(
           decoration: BoxDecoration(

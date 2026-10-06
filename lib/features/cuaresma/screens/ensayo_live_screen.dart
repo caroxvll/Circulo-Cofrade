@@ -7,8 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../../shared/models/calendar_event.dart';
+import '../../calendar/calendar_provider.dart'
+    show calendarEventByIdProvider, calendarRepositoryProvider;
 import '../../forums/topic_detail_typography.dart';
+import '../../permissions/permissions_provider.dart';
 import '../../profile/profile_provider.dart';
 import '../../profile/widgets/suspended_account_banner.dart';
 import '../cuaresma_ensayos_provider.dart';
@@ -37,6 +41,7 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
   Timer? _refreshTimer;
   bool _isPosting = false;
   bool _isLocating = false;
+  bool _isClosingLive = false;
   double? _latitude;
   double? _longitude;
   String? _placeLabel;
@@ -44,9 +49,14 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
   @override
   void initState() {
     super.initState();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    // Respaldo suave si Realtime falla; el feed vive por websocket.
+    _refreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       if (!mounted) return;
-      ref.invalidate(eventLiveUpdatesProvider(widget.eventId));
+      unawaited(
+        ref
+            .read(eventLiveUpdatesProvider(widget.eventId).notifier)
+            .reload(quiet: true),
+      );
     });
   }
 
@@ -59,9 +69,70 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
   }
 
   Future<void> _refresh() async {
-    ref.invalidate(eventLiveUpdatesProvider(widget.eventId));
     ref.invalidate(calendarEventByIdProvider(widget.eventId));
-    await ref.read(eventLiveUpdatesProvider(widget.eventId).future);
+    await ref
+        .read(eventLiveUpdatesProvider(widget.eventId).notifier)
+        .reload(quiet: true);
+  }
+
+  Future<void> _toggleLiveForce(
+    CalendarEvent event, {
+    required bool close,
+  }) async {
+    final id = event.id;
+    if (id == null || id.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(close ? '¿Cerrar el live?' : '¿Reabrir el live?'),
+        content: Text(
+          close
+              ? 'Nadie podrá publicar más avisos. Úsalo si el ensayo termina '
+                  'antes (lluvia, cancelación, etc.).'
+              : 'Se volverá a permitir publicar avisos según la ventana horaria '
+                  '(o forzado abierto).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(close ? 'Cerrar live' : 'Reabrir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isClosingLive = true);
+    try {
+      await ref.read(calendarRepositoryProvider).setEventLiveForceState(
+            eventId: id,
+            state: close
+                ? EventLiveForceState.closed
+                : EventLiveForceState.auto,
+          );
+      ref.invalidate(calendarEventByIdProvider(widget.eventId));
+      ref.invalidate(todayEnsayosProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            close ? 'Live cerrado por la Junta' : 'Live reabierto',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo actualizar el live')),
+      );
+    } finally {
+      if (mounted) setState(() => _isClosingLive = false);
+    }
   }
 
   Future<void> _useMyLocation() async {
@@ -147,17 +218,18 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
 
     setState(() => _isPosting = true);
     try {
-      await ref.read(eventLiveUpdatesRepositoryProvider).postUpdate(
+      final created = await ref.read(eventLiveUpdatesRepositoryProvider).postUpdate(
             eventId: widget.eventId,
             userId: profile.id,
             message: message,
+            authorHandle: profile.handle,
             placeLabel: _placeLabel,
             latitude: _latitude,
             longitude: _longitude,
           );
       _messageController.clear();
       _clearLocation();
-      ref.invalidate(eventLiveUpdatesProvider(widget.eventId));
+      ref.read(eventLiveUpdatesProvider(widget.eventId).notifier).upsert(created);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Aviso publicado')),
@@ -204,8 +276,11 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
   Widget build(BuildContext context) {
     final eventAsync = ref.watch(calendarEventByIdProvider(widget.eventId));
     final updatesAsync = ref.watch(eventLiveUpdatesProvider(widget.eventId));
+    ref.watch(eventLiveUpdatesRealtimeProvider(widget.eventId));
     final profile = ref.watch(currentUserProfileProvider).asData?.value;
     final isSuspended = profile?.isSuspended ?? false;
+    final isStaff = ref.watch(isStaffProvider);
+    final isClosing = _isClosingLive;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -218,9 +293,43 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
           '¿Dónde está ahora?',
           style: TopicDetailTypography.appBarTitle(),
         ),
+        actions: [
+          if (isStaff)
+            eventAsync.maybeWhen(
+              data: (event) {
+                if (event == null) return const SizedBox.shrink();
+                final closed =
+                    event.liveForceState == EventLiveForceState.closed;
+                return TextButton(
+                  onPressed: isClosing
+                      ? null
+                      : () => _toggleLiveForce(
+                            event,
+                            close: !closed,
+                          ),
+                  child: Text(
+                    isClosing
+                        ? '…'
+                        : closed
+                            ? 'Reabrir'
+                            : 'Cerrar live',
+                    style: TextStyle(
+                      color: closed
+                          ? AppColors.burgundy
+                          : AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                );
+              },
+              orElse: () => const SizedBox.shrink(),
+            ),
+        ],
       ),
       body: eventAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        skipLoadingOnReload: true,
+        loading: () => const LiveFeedSkeleton(),
         error: (_, _) => _ErrorState(onBack: () => context.pop()),
         data: (event) {
           if (event == null || event.type != EventType.ensayo) {
@@ -282,7 +391,7 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
                           );
                         },
                         loading: () => const SliverFillRemaining(
-                          child: Center(child: CircularProgressIndicator()),
+                          child: LiveFeedSkeleton(),
                         ),
                         error: (_, _) => SliverFillRemaining(
                           child: Center(

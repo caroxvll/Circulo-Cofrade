@@ -5,9 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/time_ago.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
+import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../auth/auth_provider.dart';
 import '../../forums/topic_detail_typography.dart';
 import '../../forums/utils/reply_reactions.dart';
+import '../../forums/widgets/forum_post_image_viewer.dart';
 import '../models/ss_live_update.dart';
 import '../semana_santa_provider.dart';
 
@@ -123,12 +126,22 @@ class _SsLiveUpdateTileState extends ConsumerState<SsLiveUpdateTile> {
   Future<void> _setReaction(String? reaction) async {
     final user = ref.read(currentUserProvider);
     if (user == null) return;
+    final previous = ref
+        .read(ssLiveEngagementProvider)
+        .asData
+        ?.value
+        .userReactionFor(widget.update.id);
     await ref.read(ssLiveEngagementRepositoryProvider).setReaction(
           userId: user.id,
           updateId: widget.update.id,
           reaction: reaction,
         );
-    ref.invalidate(ssLiveEngagementProvider);
+    ref.read(ssLiveEngagementProvider.notifier).applyLocalReaction(
+          updateId: widget.update.id,
+          userId: user.id,
+          previous: previous,
+          next: reaction,
+        );
   }
 
   Future<void> _submitReply() async {
@@ -145,7 +158,10 @@ class _SsLiveUpdateTileState extends ConsumerState<SsLiveUpdateTile> {
           );
       _replyController.clear();
       ref.invalidate(ssLiveRepliesProvider(widget.update.id));
-      ref.invalidate(ssLiveEngagementProvider);
+      ref.read(ssLiveEngagementProvider.notifier).applyLocalReplyDelta(
+            widget.update.id,
+            1,
+          );
     } finally {
       if (mounted) setState(() => _postingReply = false);
     }
@@ -198,13 +214,40 @@ class _SsLiveUpdateTileState extends ConsumerState<SsLiveUpdateTile> {
                       children: [
                         Expanded(
                           child: Text(
-                            update.authorHandle,
+                            update.isOfficial
+                                ? update.authorHandle
+                                : (update.authorHandle.startsWith('@')
+                                    ? 'vía ${update.authorHandle}'
+                                    : 'vía @${update.authorHandle}'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TopicDetailTypography.body().copyWith(
                               fontWeight: FontWeight.w700,
                               fontSize: 13,
                             ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (update.isOfficial
+                                    ? AppColors.burgundy
+                                    : AppColors.gold)
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            update.isOfficial ? 'Oficial' : 'Reportero',
+                            style: TopicDetailTypography.meta(
+                              color: update.isOfficial
+                                  ? AppColors.burgundy
+                                  : AppColors.gold,
+                              fontWeight: FontWeight.w800,
+                            ).copyWith(fontSize: 10),
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -254,6 +297,29 @@ class _SsLiveUpdateTileState extends ConsumerState<SsLiveUpdateTile> {
               fontSize: 13.5,
             ),
           ),
+          if (update.hasImage) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => showForumPostImageViewer(
+                context,
+                imageUrl: update.imageUrl!,
+                shareText: update.message,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: CofradeoNetworkImage(
+                    url: update.imageUrl!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    cacheSize: 640,
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (place != null && place.isNotEmpty) ...[
             const SizedBox(height: 6),
             Row(
@@ -282,7 +348,7 @@ class _SsLiveUpdateTileState extends ConsumerState<SsLiveUpdateTile> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: _SsReactionsBar(
+                child: SsLiveReactionsBar(
                   reactionCounts: counts,
                   userReaction: userReaction,
                   enabled: canEngage,
@@ -301,7 +367,7 @@ class _SsLiveUpdateTileState extends ConsumerState<SsLiveUpdateTile> {
             const SizedBox(height: 8),
             const Divider(height: 1),
             const SizedBox(height: 8),
-            _SsRepliesPanel(
+            SsLiveRepliesPanel(
               updateId: update.id,
               controller: _replyController,
               posting: _postingReply,
@@ -364,20 +430,25 @@ class _ReplyToggle extends StatelessWidget {
   }
 }
 
-class _SsRepliesPanel extends ConsumerWidget {
-  const _SsRepliesPanel({
+class SsLiveRepliesPanel extends ConsumerWidget {
+  const SsLiveRepliesPanel({
+    super.key,
     required this.updateId,
     required this.controller,
     required this.posting,
     required this.canPost,
     required this.onSubmit,
+    this.focusNode,
+    this.showComposer = true,
   });
 
   final String updateId;
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final bool posting;
   final bool canPost;
   final VoidCallback onSubmit;
+  final bool showComposer;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -452,81 +523,110 @@ class _SsRepliesPanel extends ConsumerWidget {
             );
           },
           loading: () => const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Center(
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: HubSectionListSkeleton(itemCount: 2),
           ),
           error: (_, _) => Text(
             'No se pudieron cargar las respuestas.',
             style: TopicDetailTypography.meta(color: AppColors.textSecondary),
           ),
         ),
-        if (canPost)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  maxLength: 280,
-                  minLines: 1,
-                  maxLines: 3,
-                  enabled: !posting,
-                  style: TopicDetailTypography.body().copyWith(fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Escribe una respuesta…',
-                    hintStyle: TopicDetailTypography.meta(
-                      color: AppColors.textMuted,
-                    ),
-                    isDense: true,
-                    counterText: '',
-                    filled: true,
-                    fillColor: AppColors.surface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                  ),
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => onSubmit(),
-                ),
-              ),
-              const SizedBox(width: 6),
-              IconButton(
-                onPressed: posting ? null : onSubmit,
-                icon: posting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.send_rounded, size: 18),
-                color: AppColors.burgundy,
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          )
-        else
-          Text(
-            'Inicia sesión para responder.',
-            style: TopicDetailTypography.meta(color: AppColors.textMuted),
+        if (showComposer)
+          SsLiveReplyComposer(
+            controller: controller,
+            focusNode: focusNode,
+            posting: posting,
+            canPost: canPost,
+            onSubmit: onSubmit,
           ),
       ],
     );
   }
 }
 
-class _SsReactionsBar extends StatefulWidget {
-  const _SsReactionsBar({
+class SsLiveReplyComposer extends StatelessWidget {
+  const SsLiveReplyComposer({
+    super.key,
+    required this.controller,
+    required this.posting,
+    required this.canPost,
+    required this.onSubmit,
+    this.focusNode,
+  });
+
+  final TextEditingController controller;
+  final FocusNode? focusNode;
+  final bool posting;
+  final bool canPost;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!canPost) {
+      return Text(
+        'Inicia sesión para responder.',
+        style: TopicDetailTypography.meta(color: AppColors.textMuted),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              maxLength: 280,
+              minLines: 1,
+              maxLines: 3,
+              enabled: !posting,
+              style: TopicDetailTypography.body().copyWith(fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Escribe una respuesta…',
+                hintStyle: TopicDetailTypography.meta(
+                  color: AppColors.textMuted,
+                ),
+                isDense: true,
+                counterText: '',
+                filled: true,
+                fillColor: AppColors.backgroundElevated,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+              ),
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => onSubmit(),
+            ),
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            onPressed: posting ? null : onSubmit,
+            icon: posting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.send_rounded, size: 18),
+            color: AppColors.burgundy,
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SsLiveReactionsBar extends StatefulWidget {
+  const SsLiveReactionsBar({
+    super.key,
     required this.reactionCounts,
     required this.userReaction,
     required this.enabled,
@@ -539,10 +639,10 @@ class _SsReactionsBar extends StatefulWidget {
   final Future<void> Function(String? reaction)? onReactionChanged;
 
   @override
-  State<_SsReactionsBar> createState() => _SsReactionsBarState();
+  State<SsLiveReactionsBar> createState() => _SsLiveReactionsBarState();
 }
 
-class _SsReactionsBarState extends State<_SsReactionsBar> {
+class _SsLiveReactionsBarState extends State<SsLiveReactionsBar> {
   var _hasOptimistic = false;
   String? _optimisticReaction;
   Map<String, int>? _optimisticCounts;
@@ -550,7 +650,7 @@ class _SsReactionsBarState extends State<_SsReactionsBar> {
   var _pickerOpen = false;
 
   @override
-  void didUpdateWidget(_SsReactionsBar oldWidget) {
+  void didUpdateWidget(SsLiveReactionsBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_hasOptimistic) return;
     final userSynced = reactionsEqual(widget.userReaction, _optimisticReaction);
@@ -743,205 +843,3 @@ class _SsReactionPill extends StatelessWidget {
   }
 }
 
-class SsLiveComposeBar extends StatelessWidget {
-  const SsLiveComposeBar({
-    super.key,
-    required this.controller,
-    required this.hermandadController,
-    required this.placeController,
-    required this.kind,
-    required this.onKindChanged,
-    required this.isPosting,
-    required this.onSubmit,
-  });
-
-  final TextEditingController controller;
-  final TextEditingController hermandadController;
-  final TextEditingController placeController;
-  final SsLiveUpdateKind kind;
-  final ValueChanged<SsLiveUpdateKind> onKindChanged;
-  final bool isPosting;
-  final VoidCallback onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          border: Border(
-            top: BorderSide(color: AppColors.border.withValues(alpha: 0.9)),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final k in SsLiveUpdateKind.values)
-                      SsKindChip(
-                        kind: k,
-                        selected: kind == k,
-                        onTap: () => onKindChanged(k),
-                        compact: true,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: hermandadController,
-                  maxLength: 120,
-                  style: TopicDetailTypography.body().copyWith(fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Hermandad (opcional)',
-                    hintStyle: TopicDetailTypography.meta(
-                      color: AppColors.textMuted,
-                    ),
-                    isDense: true,
-                    counterText: '',
-                    filled: true,
-                    fillColor: AppColors.backgroundElevated,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: placeController,
-                  maxLength: 160,
-                  style: TopicDetailTypography.body().copyWith(fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Lugar (opcional)',
-                    hintStyle: TopicDetailTypography.meta(
-                      color: AppColors.textMuted,
-                    ),
-                    isDense: true,
-                    counterText: '',
-                    filled: true,
-                    fillColor: AppColors.backgroundElevated,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        maxLength: 280,
-                        minLines: 1,
-                        maxLines: 3,
-                        style: TopicDetailTypography.body().copyWith(fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: '¿Qué está pasando ahora?',
-                          hintStyle: TopicDetailTypography.meta(
-                            color: AppColors.textMuted,
-                          ),
-                          filled: true,
-                          fillColor: AppColors.backgroundElevated,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide.none,
-                          ),
-                          counterText: '',
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                        ),
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => onSubmit(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _ComposeIconButton(
-                      onTap: isPosting ? null : onSubmit,
-                      isLoading: isPosting,
-                      icon: Icons.send_rounded,
-                      primary: true,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ComposeIconButton extends StatelessWidget {
-  const _ComposeIconButton({
-    required this.icon,
-    this.onTap,
-    this.isLoading = false,
-    this.primary = false,
-  });
-
-  final IconData icon;
-  final VoidCallback? onTap;
-  final bool isLoading;
-  final bool primary;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = primary ? AppColors.burgundy : AppColors.backgroundElevated;
-    final fg = primary ? Colors.white : AppColors.textSecondary;
-
-    return Material(
-      color: bg,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 42,
-          height: 42,
-          child: Center(
-            child: isLoading
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: fg,
-                    ),
-                  )
-                : Icon(icon, size: 20, color: fg),
-          ),
-        ),
-      ),
-    );
-  }
-}
