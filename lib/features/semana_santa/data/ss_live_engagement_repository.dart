@@ -44,6 +44,111 @@ class SsLiveEngagementSnapshot {
   String? userReactionFor(String updateId) => userReactions[updateId];
 
   int replyCountFor(String updateId) => replyCounts[updateId] ?? 0;
+
+  SsLiveEngagementSnapshot seedUpdate(String updateId) {
+    if (reactionCounts.containsKey(updateId) ||
+        replyCounts.containsKey(updateId) ||
+        userReactions.containsKey(updateId)) {
+      return this;
+    }
+    return SsLiveEngagementSnapshot(
+      reactionCounts: Map<String, Map<String, int>>.from(reactionCounts),
+      userReactions: Map<String, String>.from(userReactions),
+      replyCounts: Map<String, int>.from(replyCounts)..putIfAbsent(updateId, () => 0),
+    );
+  }
+
+  SsLiveEngagementSnapshot applyLikeEvent({
+    required String updateId,
+    required String actorUserId,
+    required String? oldReaction,
+    required String? newReaction,
+    String? currentUserId,
+  }) {
+    final nextCounts = <String, Map<String, int>>{
+      for (final e in reactionCounts.entries)
+        e.key: Map<String, int>.from(e.value),
+    };
+    final bucket = Map<String, int>.from(nextCounts[updateId] ?? const {});
+
+    void dec(String? emoji) {
+      if (emoji == null || emoji.isEmpty) return;
+      final n = (bucket[emoji] ?? 0) - 1;
+      if (n <= 0) {
+        bucket.remove(emoji);
+      } else {
+        bucket[emoji] = n;
+      }
+    }
+
+    void inc(String? emoji) {
+      if (emoji == null || emoji.isEmpty) return;
+      bucket[emoji] = (bucket[emoji] ?? 0) + 1;
+    }
+
+    dec(oldReaction);
+    inc(newReaction);
+    if (bucket.isEmpty) {
+      nextCounts.remove(updateId);
+    } else {
+      nextCounts[updateId] = bucket;
+    }
+
+    final nextUser = Map<String, String>.from(userReactions);
+    if (currentUserId != null && actorUserId == currentUserId) {
+      if (newReaction == null || newReaction.isEmpty) {
+        nextUser.remove(updateId);
+      } else {
+        nextUser[updateId] = newReaction;
+      }
+    }
+
+    return SsLiveEngagementSnapshot(
+      reactionCounts: nextCounts,
+      userReactions: nextUser,
+      replyCounts: Map<String, int>.from(replyCounts),
+    );
+  }
+
+  SsLiveEngagementSnapshot applyReplyDelta(String updateId, int delta) {
+    final next = Map<String, int>.from(replyCounts);
+    final value = (next[updateId] ?? 0) + delta;
+    if (value <= 0) {
+      next.remove(updateId);
+    } else {
+      next[updateId] = value;
+    }
+    return SsLiveEngagementSnapshot(
+      reactionCounts: reactionCounts,
+      userReactions: userReactions,
+      replyCounts: next,
+    );
+  }
+
+  /// Sustituye contadores de reacción de un aviso (resync puntual).
+  SsLiveEngagementSnapshot replaceReactionCounts(
+    String updateId,
+    Map<String, int> counts,
+  ) {
+    final nextCounts = <String, Map<String, int>>{
+      for (final e in reactionCounts.entries)
+        e.key: Map<String, int>.from(e.value),
+    };
+    final cleaned = <String, int>{
+      for (final e in counts.entries)
+        if (e.value > 0) e.key: e.value,
+    };
+    if (cleaned.isEmpty) {
+      nextCounts.remove(updateId);
+    } else {
+      nextCounts[updateId] = cleaned;
+    }
+    return SsLiveEngagementSnapshot(
+      reactionCounts: nextCounts,
+      userReactions: Map<String, String>.from(userReactions),
+      replyCounts: Map<String, int>.from(replyCounts),
+    );
+  }
 }
 
 class SsLiveEngagementRepository {
@@ -132,6 +237,12 @@ class SsLiveEngagementRepository {
       userReactions: userReactions,
       replyCounts: replyCounts,
     );
+  }
+
+  /// Contadores de un solo aviso (resync si Realtime DELETE llega sin emoji).
+  Future<Map<String, int>> fetchReactionCountsFor(String updateId) async {
+    final snap = await fetchSnapshot(updateIds: [updateId]);
+    return Map<String, int>.from(snap.countsFor(updateId));
   }
 
   Future<void> setReaction({

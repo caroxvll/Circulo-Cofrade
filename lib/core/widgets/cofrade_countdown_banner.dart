@@ -7,6 +7,7 @@ import '../theme/app_typography.dart';
 import '../utils/image_decode_cache.dart';
 import '../../features/calendar/utils/holy_week_countdown.dart';
 import 'countdown_banner_artboard.dart';
+import 'cofradeo_skeleton.dart';
 
 enum CofradeCountdownBannerStyle { card, compact }
 
@@ -43,52 +44,53 @@ class _ArtworkBanner extends StatelessWidget {
       countdown.countdownDays!,
     );
 
-    // Sin radio ni sombra: el arte se integra con el fondo del calendario.
+    // Stack fuera del Image: el RenderImage recorta overlays del frameBuilder.
     return AspectRatio(
       aspectRatio: CountdownBannerArtboard.designWidth /
           CountdownBannerArtboard.designHeight,
-      child: Image.asset(
-        AppAssets.countdownBanner,
-        fit: BoxFit.fill,
-        gaplessPlayback: true,
-        filterQuality: FilterQuality.medium,
-        cacheWidth: ImageDecodeCache.px(
-          context,
-          MediaQuery.sizeOf(context).width,
-        ),
-        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-          if (frame == null) {
-            return ColoredBox(
-              color: AppColors.surfaceAlt,
-              child: const Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.none,
+            children: [
+              Image.asset(
+                AppAssets.countdownBanner,
+                fit: BoxFit.fill,
+                gaplessPlayback: true,
+                filterQuality: FilterQuality.medium,
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+                cacheWidth: ImageDecodeCache.px(
+                  context,
+                  MediaQuery.sizeOf(context).width,
                 ),
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                  if (frame == null) {
+                    return const ColoredBox(
+                      color: AppColors.surfaceAlt,
+                      child: SizedBox.expand(
+                        child: CofradeoSkeletonBone(
+                          height: double.infinity,
+                          borderRadius: 0,
+                        ),
+                      ),
+                    );
+                  }
+                  return child;
+                },
+                errorBuilder: (_, __, ___) =>
+                    _FallbackCardBanner(countdown: countdown, compact: true),
               ),
-            );
-          }
-
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  child,
-                  _DaysSlot(
-                    slot: CountdownBannerArtboard.daysSlot,
-                    label: daysLabel,
-                    bannerWidth: constraints.maxWidth,
-                    bannerHeight: constraints.maxHeight,
-                  ),
-                ],
-              );
-            },
+              _DaysSlot(
+                slot: CountdownBannerArtboard.daysSlot,
+                label: daysLabel,
+                bannerWidth: constraints.maxWidth,
+                bannerHeight: constraints.maxHeight,
+              ),
+            ],
           );
         },
-        errorBuilder: (_, __, ___) =>
-            _FallbackCardBanner(countdown: countdown, compact: true),
       ),
     );
   }
@@ -109,31 +111,29 @@ class _DaysSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cx =
-        bannerWidth * (slot.center.dx / CountdownBannerArtboard.designWidth);
-    final cy =
-        bannerHeight * (slot.center.dy / CountdownBannerArtboard.designHeight);
+    final left =
+        bannerWidth * (slot.left / CountdownBannerArtboard.designWidth);
+    final top =
+        bannerHeight * (slot.top / CountdownBannerArtboard.designHeight);
     final width =
         bannerWidth * (slot.width / CountdownBannerArtboard.designWidth);
     final height =
         bannerHeight * (slot.height / CountdownBannerArtboard.designHeight);
-    final fontSize = height * 1.05;
 
     return Positioned(
-      left: cx - width / 2,
-      top: cy - height / 2,
+      left: left,
+      top: top,
       width: width,
       height: height,
-      child: Center(
+      child: FittedBox(
+        fit: BoxFit.contain,
+        alignment: Alignment.center,
         child: Text(
           label,
           textAlign: TextAlign.center,
-          textHeightBehavior: const TextHeightBehavior(
-            applyHeightToFirstAscent: false,
-            applyHeightToLastDescent: false,
-          ),
+          softWrap: false,
           style: GoogleFonts.cormorantGaramond(
-            fontSize: fontSize,
+            fontSize: 72,
             fontWeight: FontWeight.w700,
             color: AppColors.burgundy,
             height: 1,

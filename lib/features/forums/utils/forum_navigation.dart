@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../forums_provider.dart';
+import '../topic_replies_provider.dart';
 
 /// Abre un hilo desde notificaciones o enlaces.
 /// Navegación directa (sin pasar por /foros → lista) para que no se sienta lento.
@@ -11,6 +15,27 @@ void openForumTopic(
   String querySuffix = '',
 }) {
   context.go('/foros/$forumId/tema/$topicId$querySuffix');
+}
+
+/// Dispara la carga de tema + primera página de respuestas *antes* de navegar.
+/// Así el skeleton se acorta o desaparece si la red responde a tiempo.
+void prefetchForumTopic(WidgetRef ref, {required String forumId, required String topicId}) {
+  final key = ForumTopicKey(forumId: forumId, topicId: topicId);
+  // ignore: unused_result — solo calentamos caché de Riverpod
+  ref.read(forumTopicProvider(key).future);
+  // ignore: unused_result
+  ref.read(topicRepliesFirstPageProvider(topicId).future);
+}
+
+/// Prefetch + push. Usar desde listas (tarjetas de tema / tablón).
+Future<void> pushForumTopic(
+  BuildContext context,
+  WidgetRef ref, {
+  required String forumId,
+  required String topicId,
+}) {
+  prefetchForumTopic(ref, forumId: forumId, topicId: topicId);
+  return context.push('/foros/$forumId/tema/$topicId');
 }
 
 /// Atrás en detalle de tema: pop si hay pila, si no lista del foro.

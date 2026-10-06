@@ -175,6 +175,30 @@
   min-height: 84px;
 }
 
+.form-hint {
+  margin: -4px 0 10px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: color-mix(in srgb, #2e7d32 12%, #fff);
+  color: #2e7d32;
+}
+
+.live-pill.closed {
+  background: color-mix(in srgb, var(--burgundy) 12%, #fff);
+  color: var(--burgundy-dark);
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

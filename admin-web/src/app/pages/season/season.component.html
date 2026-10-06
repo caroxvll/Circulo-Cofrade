@@ -122,7 +122,9 @@
           <p class="hint">
             Por defecto cada jornada va de las 06:00 al día siguiente a las 03:00
             (hora de Sevilla). Así Ramos sigue abierto a las 3 de la madrugada del
-            lunes. Puedes forzar Abrir / Cerrar cuando quieras.
+            lunes. Sin jornada activa, el hub de Semana Santa no muestra hermandades
+            ni avisos. Pulsa «Recalcular» para incluir Viernes de Dolores y Sábado de
+            Pasión.
           </p>
         </div>
         <div class="live-status" [class.on]="liveOpenNow()">
@@ -182,38 +184,52 @@
         <ul class="day-list">
           @for (day of liturgicalDays(); track day.dayKey) {
             <li class="day-row" [class.open]="statusOf(day).tone === 'open' || statusOf(day).tone === 'forced'">
-              <div class="day-main">
-                <strong>{{ day.label }}</strong>
-                <span class="day-range">{{ formatRange(day.startsAt, day.endsAt) }}</span>
-                <span class="badge" [attr.data-tone]="statusOf(day).tone">
-                  {{ statusOf(day).text }}
-                </span>
-              </div>
-              <div class="day-actions">
-                <button
-                  type="button"
-                  class="btn btn-soft"
-                  [disabled]="daysBusy() || day.forceState === 'open'"
-                  (click)="setForce(day, 'open')"
-                >
-                  Abrir
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-ghost"
-                  [disabled]="daysBusy() || day.forceState === 'closed'"
-                  (click)="setForce(day, 'closed')"
-                >
-                  Cerrar
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-ghost"
-                  [disabled]="daysBusy() || day.forceState === 'auto'"
-                  (click)="setForce(day, 'auto')"
-                >
-                  Auto
-                </button>
+              <div class="day-body">
+                <div class="day-top">
+                  <div class="day-main">
+                    <strong>{{ day.label }}</strong>
+                    <span class="day-range">{{ formatRange(day.startsAt, day.endsAt) }}</span>
+                    <span class="badge" [attr.data-tone]="statusOf(day).tone">
+                      {{ statusOf(day).text }}
+                    </span>
+                  </div>
+                  <div class="day-actions">
+                    <button
+                      type="button"
+                      class="btn btn-soft"
+                      [disabled]="daysBusy() || day.forceState === 'open'"
+                      (click)="setForce(day, 'open')"
+                    >
+                      Abrir
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-ghost"
+                      [disabled]="daysBusy() || day.forceState === 'closed'"
+                      (click)="setForce(day, 'closed')"
+                    >
+                      Cerrar
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-ghost"
+                      [disabled]="daysBusy() || day.forceState === 'auto'"
+                      (click)="setForce(day, 'auto')"
+                    >
+                      Auto
+                    </button>
+                  </div>
+                </div>
+                @if (hermandadesForDay(day.label); as hdades) {
+                  <div class="day-hermandades">
+                    <span class="day-hermandades-label">Hermandades</span>
+                    @if (hdades.length) {
+                      <p class="day-hermandades-list">{{ hdades.join(' · ') }}</p>
+                    } @else {
+                      <p class="day-hermandades-empty">Ninguna asociada en el foro Hermandades</p>
+                    }
+                  </div>
+                }
               </div>
             </li>
           }

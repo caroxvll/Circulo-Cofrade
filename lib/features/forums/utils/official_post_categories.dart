@@ -29,25 +29,24 @@ const hermandadSectionQueryKey = 'seccion';
 
 const _validSectionValues = {'noticia', 'culto', 'acto', 'patrimonio'};
 
-/// Normaliza `?seccion=` de la URL. `null` = Todas las secciones.
-String? parseHermandadSectionQuery(String? raw) {
-  if (raw == null) return null;
+/// Normaliza `?seccion=` de la URL. Por defecto Noticias.
+String parseHermandadSectionQuery(String? raw) {
+  if (raw == null) return 'noticia';
   final normalized = raw.trim().toLowerCase();
   if (normalized.isEmpty || normalized == 'todas' || normalized == 'all') {
-    return null;
+    return 'noticia';
   }
   return switch (normalized) {
     'noticias' || 'noticia' => 'noticia',
     'cultos' || 'culto' => 'culto',
     'actos' || 'acto' => 'acto',
     'patrimonio' => 'patrimonio',
-    _ => _validSectionValues.contains(normalized) ? normalized : null,
+    _ => _validSectionValues.contains(normalized) ? normalized : 'noticia',
   };
 }
 
 /// Valor legible para la URL (`noticias`, `cultos`…).
-String hermandadSectionQueryValue(String? category) {
-  if (category == null) return 'todas';
+String hermandadSectionQueryValue(String category) {
   return switch (category) {
     'culto' => 'cultos',
     'acto' => 'actos',
@@ -59,8 +58,16 @@ String hermandadSectionQueryValue(String? category) {
 bool isHermandadSectionQuery(String? raw) {
   if (raw == null) return false;
   final trimmed = raw.trim().toLowerCase();
-  return trimmed.isEmpty ||
-      trimmed == 'todas' ||
-      trimmed == 'all' ||
-      parseHermandadSectionQuery(trimmed) != null;
+  if (trimmed.isEmpty || trimmed == 'todas' || trimmed == 'all') return true;
+  return switch (trimmed) {
+    'noticias' ||
+    'noticia' ||
+    'cultos' ||
+    'culto' ||
+    'actos' ||
+    'acto' ||
+    'patrimonio' =>
+      true,
+    _ => _validSectionValues.contains(trimmed),
+  };
 }

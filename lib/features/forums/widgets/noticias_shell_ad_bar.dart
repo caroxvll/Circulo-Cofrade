@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../ads/ads_provider.dart';
 import '../../ads/models/sponsored_ad.dart';
 import '../../ads/widgets/sponsored_ad_card.dart';
+import '../../ads/widgets/sponsored_placement_slot.dart';
 
 /// Banner de Noticias anclado encima de la bottom nav (mismo formato que Foros).
-class NoticiasShellAdBar extends ConsumerWidget {
+class NoticiasShellAdBar extends StatelessWidget {
   const NoticiasShellAdBar({super.key});
 
   static double heightForWidth(double width) {
@@ -14,23 +13,10 @@ class NoticiasShellAdBar extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final adAsync = ref.watch(
-      adForPlacementProvider(
-        const AdPlacementQuery(placement: AdPlacement.noticias),
-      ),
-    );
-
-    return adAsync.when(
-      data: (ad) {
-        if (ad == null) return const SizedBox.shrink();
-        return SponsoredAdCard(
-          ad: ad,
-          style: SponsoredAdCardStyle.forumsDocked,
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
+  Widget build(BuildContext context) {
+    return const SponsoredPlacementSlot(
+      placement: AdPlacement.noticias,
+      style: SponsoredAdCardStyle.forumsDocked,
     );
   }
 }

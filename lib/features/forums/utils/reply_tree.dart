@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/forum.dart';
 import '../topic_detail_typography.dart';
+import '../widgets/hermandad_comunicado_card.dart';
 import '../widgets/reply_card.dart';
 
 /// A partir de este número de subrespuestas, el hilo se colapsa por defecto.
@@ -123,6 +124,10 @@ class ReplyThreadList extends StatefulWidget {
     this.topicAuthorId,
     /// Si true, construye un [SliverList] (solo hijos visibles).
     this.sliver = false,
+    /// Canal oficial: cards tipo periódico en vez de reply de foro.
+    this.officialChannelStyle = false,
+    /// Abrir comunicado oficial a pantalla casi completa.
+    this.onOfficialOpen,
   });
 
   final List<ReplyTreeNode> nodes;
@@ -140,6 +145,8 @@ class ReplyThreadList extends StatefulWidget {
   final Map<String, GlobalKey>? replyAnchorKeys;
   final String? topicAuthorId;
   final bool sliver;
+  final bool officialChannelStyle;
+  final void Function(ForumReply reply)? onOfficialOpen;
 
   @override
   State<ReplyThreadList> createState() => _ReplyThreadListState();
@@ -220,8 +227,10 @@ class _ReplyThreadListState extends State<ReplyThreadList> {
           onShareTap: widget.onShareTap,
           manageOptionsFor: widget.manageOptionsFor,
           showReport: widget.showReport,
+          officialChannelStyle: widget.officialChannelStyle,
+          onOfficialOpen: widget.onOfficialOpen,
         ),
-        if (node.children.isNotEmpty)
+        if (node.children.isNotEmpty && !widget.officialChannelStyle)
           _ReplyThreadBranch(
             children: node.children,
             expanded: _expandedThreadIds.contains(_normId(node.reply.id)),
@@ -244,6 +253,9 @@ class _ReplyThreadListState extends State<ReplyThreadList> {
   }
 
   Widget _divider() {
+    if (widget.officialChannelStyle) {
+      return const SizedBox(height: 10);
+    }
     return Divider(
       height: 1,
       thickness: 1,
@@ -331,83 +343,50 @@ class _ReplyThreadBranch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Estilo X: sin riel lateral ni sangría fuerte. El contexto va
+    // en "Respondiendo a @…" dentro de cada reply.
     return Padding(
-      padding: const EdgeInsets.only(left: 20, bottom: 4),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _ThreadBranchRail(),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_isCollapsible && !expanded && _hiddenCount > 0)
-                    _ThreadToggleButton(
-                      label: _hiddenCount == 1
-                          ? 'Mostrar 1 respuesta más'
-                          : 'Mostrar $_hiddenCount respuestas más',
-                      expanded: false,
-                      onPressed: onToggle,
-                    ),
-                  for (final child in _visibleChildren)
-                    _ReplyCardSlot(
-                      node: child,
-                      topicAuthorId: topicAuthorId,
-                      replyAnchorKeys: replyAnchorKeys,
-                      highlightReplyId: highlightReplyId,
-                      onAuthorTap: onAuthorTap,
-                      onReplyTap: onReplyTap,
-                      reactionCountsFor: reactionCountsFor,
-                      userReactionFor: userReactionFor,
-                      onReactionChanged: onReactionChanged,
-                      onReportTap: onReportTap,
-                      onShareTap: onShareTap,
-                      manageOptionsFor: manageOptionsFor,
-                      showReport: showReport,
-                    ),
-                  if (_isCollapsible && expanded)
-                    _ThreadToggleButton(
-                      label: 'Ocultar respuestas',
-                      expanded: true,
-                      onPressed: onToggle,
-                    ),
-                ],
+      padding: const EdgeInsets.only(left: 12, top: 0, bottom: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_isCollapsible && !expanded && _hiddenCount > 0)
+            _ThreadToggleButton(
+              label: _hiddenCount == 1
+                  ? 'Mostrar 1 respuesta'
+                  : 'Mostrar $_hiddenCount respuestas',
+              expanded: false,
+              onPressed: onToggle,
+            ),
+          for (var i = 0; i < _visibleChildren.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: AppColors.border.withValues(alpha: 0.35),
               ),
+            _ReplyCardSlot(
+              node: _visibleChildren[i],
+              topicAuthorId: topicAuthorId,
+              replyAnchorKeys: replyAnchorKeys,
+              highlightReplyId: highlightReplyId,
+              onAuthorTap: onAuthorTap,
+              onReplyTap: onReplyTap,
+              reactionCountsFor: reactionCountsFor,
+              userReactionFor: userReactionFor,
+              onReactionChanged: onReactionChanged,
+              onReportTap: onReportTap,
+              onShareTap: onShareTap,
+              manageOptionsFor: manageOptionsFor,
+              showReport: showReport,
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ThreadBranchRail extends StatelessWidget {
-  const _ThreadBranchRail();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 10,
-      child: Column(
-        children: [
-          const SizedBox(height: 10),
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: AppColors.burgundy.withValues(alpha: 0.5),
-              shape: BoxShape.circle,
+          if (_isCollapsible && expanded)
+            _ThreadToggleButton(
+              label: 'Ocultar respuestas',
+              expanded: true,
+              onPressed: onToggle,
             ),
-          ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: Container(
-              width: 2,
-              color: AppColors.gold.withValues(alpha: 0.34),
-            ),
-          ),
         ],
       ),
     );
@@ -479,6 +458,8 @@ class _ReplyCardSlot extends StatelessWidget {
     this.onShareTap,
     this.manageOptionsFor,
     this.showReport,
+    this.officialChannelStyle = false,
+    this.onOfficialOpen,
   });
 
   final ReplyTreeNode node;
@@ -495,6 +476,8 @@ class _ReplyCardSlot extends StatelessWidget {
   final void Function(ForumReply reply)? onShareTap;
   final ReplyManageOptions? Function(ForumReply reply)? manageOptionsFor;
   final bool Function(ForumReply reply)? showReport;
+  final bool officialChannelStyle;
+  final void Function(ForumReply reply)? onOfficialOpen;
 
   bool get _isTopicAuthor {
     final authorId = topicAuthorId;
@@ -505,37 +488,62 @@ class _ReplyCardSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reply = node.reply;
+    if (officialChannelStyle && reply.isOfficial) {
+      return Padding(
+        padding: EdgeInsets.zero,
+        key: replyAnchorKeys?.putIfAbsent(
+          _normId(reply.id),
+          GlobalKey.new,
+        ),
+        child: HermandadComunicadoCard(
+          key: ValueKey(reply.id),
+          reply: reply,
+          manageOptions: manageOptionsFor?.call(reply),
+          onShareTap: onShareTap != null && !reply.isDeleted
+              ? () => onShareTap!(reply)
+              : null,
+          reactionCounts: reactionCountsFor?.call(reply) ?? const {},
+          userReaction: userReactionFor?.call(reply),
+          onReactionChanged: onReactionChanged != null
+              ? (reaction) => onReactionChanged!(reply, reaction)
+              : null,
+          onOpen: onOfficialOpen != null ? () => onOfficialOpen!(reply) : null,
+        ),
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.zero,
       key: replyAnchorKeys?.putIfAbsent(
-        _normId(node.reply.id),
+        _normId(reply.id),
         GlobalKey.new,
       ),
       child: ReplyCard(
-        key: ValueKey(node.reply.id),
-        reply: node.reply,
+        key: ValueKey(reply.id),
+        reply: reply,
         depth: node.depth,
         parentHandle: node.parentHandle,
         highlighted: highlightReplyId != null &&
-            _normId(highlightReplyId) == _normId(node.reply.id),
+            _normId(highlightReplyId) == _normId(reply.id),
         isTopicAuthor: _isTopicAuthor,
-        reactionCounts: reactionCountsFor?.call(node.reply) ?? const {},
-        userReaction: userReactionFor?.call(node.reply),
+        reactionCounts: reactionCountsFor?.call(reply) ?? const {},
+        userReaction: userReactionFor?.call(reply),
         onReactionChanged: onReactionChanged != null
-            ? (reaction) => onReactionChanged!(node.reply, reaction)
+            ? (reaction) => onReactionChanged!(reply, reaction)
             : null,
         onAuthorTap:
-            onAuthorTap != null ? () => onAuthorTap!(node.reply) : null,
-        onReplyTap: onReplyTap != null ? () => onReplyTap!(node.reply) : null,
-        onShareTap: onShareTap != null && !node.reply.isDeleted
-            ? () => onShareTap!(node.reply)
+            onAuthorTap != null ? () => onAuthorTap!(reply) : null,
+        onReplyTap: onReplyTap != null ? () => onReplyTap!(reply) : null,
+        onShareTap: onShareTap != null && !reply.isDeleted
+            ? () => onShareTap!(reply)
             : null,
         onReportTap: onReportTap != null &&
-                (showReport?.call(node.reply) ?? true) &&
-                !node.reply.isDeleted
-            ? () => onReportTap!(node.reply)
+                (showReport?.call(reply) ?? true) &&
+                !reply.isDeleted
+            ? () => onReportTap!(reply)
             : null,
-        manageOptions: manageOptionsFor?.call(node.reply),
+        manageOptions: manageOptionsFor?.call(reply),
       ),
     );
   }

@@ -74,8 +74,7 @@ Future<bool> confirmPinnedOfficialCategoryChange(
             'Este comunicado está fijado arriba del tablón.\n\n'
             'Pasará de ${officialCategoryLabel(fromCategory)} a '
             '${officialCategoryLabel(toCategory)}. '
-            'En «Todas» seguirá visible; en otras pestañas solo se anclará '
-            'cuando coincida la sección.',
+            'El fijado solo se verá anclado en la pestaña de esa sección.',
           ),
           actions: [
             TextButton(

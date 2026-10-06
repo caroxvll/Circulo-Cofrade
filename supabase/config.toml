@@ -386,6 +386,10 @@ deno_version = 2
 [functions.send-push]
 verify_jwt = false
 
+# Cola de entrega FCM (kick desde pg_cron / pg_net)
+[functions.drain-push]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

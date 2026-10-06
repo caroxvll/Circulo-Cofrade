@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { adminGuard } from './core/auth/admin.guard';
-import { authGuard, guestGuard } from './core/auth/auth.guard';
+import { authGuard, guestGuard, hermandadGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'app/resumen' },
@@ -9,6 +9,44 @@ export const routes: Routes = [
     canActivate: [guestGuard],
     loadComponent: () =>
       import('./pages/login/login.component').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'hermandad',
+    canActivate: [hermandadGuard],
+    loadComponent: () =>
+      import('./layout/hermandad-shell.component').then(
+        (m) => m.HermandadShellComponent,
+      ),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./pages/hermandad-portal/home/hermandad-home.component').then(
+            (m) => m.HermandadHomePageComponent,
+          ),
+      },
+      {
+        path: 'publicar',
+        loadComponent: () =>
+          import(
+            './pages/hermandad-portal/publish/hermandad-publish.component'
+          ).then((m) => m.HermandadPublishPageComponent),
+      },
+      {
+        path: 'publicaciones',
+        loadComponent: () =>
+          import(
+            './pages/hermandad-portal/posts/hermandad-posts.component'
+          ).then((m) => m.HermandadPostsPageComponent),
+      },
+      {
+        path: 'seguidores',
+        loadComponent: () =>
+          import(
+            './pages/hermandad-portal/followers/hermandad-followers.component'
+          ).then((m) => m.HermandadFollowersPageComponent),
+      },
+    ],
   },
   {
     path: 'app',
@@ -86,6 +124,14 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/moderators/moderators.component').then(
             (m) => m.ModeratorsPageComponent,
+          ),
+      },
+      {
+        path: 'reporteros-ss',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./pages/ss-reporters/ss-reporters.component').then(
+            (m) => m.SsReportersPageComponent,
           ),
       },
       {

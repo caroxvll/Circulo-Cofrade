@@ -4,8 +4,8 @@
       <p class="eyebrow">Plataforma · solo admin</p>
       <h1>Notificaciones</h1>
       <p class="lead">
-        Cobertura de push y cola de envío masivo (Cron). Los avisos grandes se
-        reparte solos; aquí los controlas en vivo.
+        Cobertura de push, cola de avisos masivos y cola de entrega a FCM.
+        Los envíos grandes se dosifican solos; aquí los controlas en vivo.
       </p>
     </div>
     <div class="queue-toolbar">
@@ -62,9 +62,10 @@
 
   @if (tab() === 'queue') {
     <section class="dispatch-panel">
+      <h2 class="section-title">1 · Crear avisos (bandeja)</h2>
       <p class="lead compact">
-        El Cron vacía la cola cada minuto. Aquí ves pendientes, fallos y puedes
-        empujar un lote ya (sin esperar).
+        Fan-out: noticias, hilos, hashtags… El Cron crea filas en
+        <code>notifications</code> por lotes.
       </p>
 
       @if (queueLoading() && !dispatchOverview()) {
@@ -130,7 +131,7 @@
           </ul>
         }
 
-        <h2 class="section-title">Últimos trabajos</h2>
+        <h2 class="section-title">Últimos trabajos (creación)</h2>
         @if (dispatchJobs().length === 0) {
           <div class="empty-box soft">Aún no hay trabajos en la cola.</div>
         } @else {
@@ -141,7 +142,7 @@
                   <th>Tipo</th>
                   <th>Título</th>
                   <th>Estado</th>
-                  <th>Hechos</th>
+                  <th>Progreso</th>
                   <th>Actualizado</th>
                 </tr>
               </thead>
@@ -163,7 +164,131 @@
                         <small>· reintento {{ job.retryCount }}</small>
                       }
                     </td>
-                    <td>{{ formatInt(job.processedCount) }}</td>
+                    <td>
+                      <div class="progress-cell">
+                        <strong>{{ dispatchProgressLabel(job) }}</strong>
+                        @if (dispatchProgressPct(job) > 0 || job.status === 'done') {
+                          <div class="progress-track" aria-hidden="true">
+                            <div
+                              class="progress-fill"
+                              [style.width.%]="dispatchProgressPct(job)"
+                            ></div>
+                          </div>
+                        }
+                      </div>
+                    </td>
+                    <td>{{ job.updatedAt | date: 'dd/MM HH:mm:ss' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        }
+      }
+    </section>
+
+    <section class="dispatch-panel push-fcm-panel">
+      <h2 class="section-title">2 · Entrega FCM (tubo a Google)</h2>
+      <p class="lead compact">
+        Cada aviso en bandeja entra aquí y <code>drain-push</code> lo manda a
+        FCM con ritmo controlado, reintentos y limpieza de tokens muertos.
+      </p>
+
+      @if (queueLoading() && !pushDeliveryOverview()) {
+        <div class="state-box">Cargando cola FCM…</div>
+      } @else {
+        @if (pushDeliveryOverview(); as p) {
+        <div class="dispatch-stats">
+          <article class="stat-card">
+            <strong>{{ formatInt(fcmRemaining()) }}</strong>
+            <span>Quedan por enviar</span>
+          </article>
+          <article class="stat-card warn" [class.hot]="p.failed > 0">
+            <strong>{{ formatInt(p.failed) }}</strong>
+            <span>Fallidos (reintentar)</span>
+          </article>
+          <article class="stat-card ok">
+            <strong>{{ formatInt(p.doneLast24h) }}</strong>
+            <span>Enviados (24h)</span>
+          </article>
+          <article class="stat-card">
+            <strong>{{ formatInt(p.skipped) }}</strong>
+            <span>Omitidos (OK, no reintentar)</span>
+          </article>
+        </div>
+
+        @if (fcmRemaining() + p.doneLast24h > 0) {
+          <div class="fcm-progress-block">
+            <div class="fcm-progress-label">
+              <span>Ritmo reciente (enviados 24h vs pendientes)</span>
+              <strong>{{ fcmProgressPct() }}%</strong>
+            </div>
+            <div class="progress-track large" aria-hidden="true">
+              <div class="progress-fill" [style.width.%]="fcmProgressPct()"></div>
+            </div>
+          </div>
+        }
+
+        <p class="lead compact help-errors">
+          <strong>Fallidos:</strong> error técnico (red, FCM…). Se pueden reintentar.
+          <strong>Omitidos:</strong> push apagado, categoría desactivada o sin móvil —
+          es normal, no es un fallo del tubo.
+        </p>
+
+        <div class="queue-actions dispatch-actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="queueBusy()"
+            (click)="kickPushNow()"
+          >
+            {{ queueBusy() ? 'Llamando…' : 'Drenar FCM ahora' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-soft"
+            [disabled]="queueBusy() || p.failed === 0"
+            (click)="retryFailedPush()"
+          >
+            Reintentar pushes fallidos
+          </button>
+        </div>
+
+        <h2 class="section-title">Últimos jobs FCM</h2>
+        @if (pushDeliveryJobs().length === 0) {
+          <div class="empty-box soft">
+            Cola FCM vacía. Se llena al crear notificaciones nuevas.
+          </div>
+        } @else {
+          <div class="dispatch-table-wrap">
+            <table class="dispatch-table">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Título</th>
+                  <th>Estado</th>
+                  <th>Actualizado</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (job of pushDeliveryJobs(); track job.id) {
+                  <tr [class.failed]="job.status === 'failed'">
+                    <td>{{ typeLabel(job.type) }}</td>
+                    <td>
+                      <strong>{{ job.title }}</strong>
+                      @if (job.lastError) {
+                        <em class="err">{{ job.lastError }}</em>
+                      }
+                    </td>
+                    <td>
+                      <span class="status-pill" [attr.data-status]="job.status">
+                        {{ statusLabel(job.status) }}
+                      </span>
+                      @if (job.retryCount > 0) {
+                        <small>· reintento {{ job.retryCount }}</small>
+                      }
+                    </td>
                     <td>{{ job.updatedAt | date: 'dd/MM HH:mm:ss' }}</td>
                   </tr>
                 }

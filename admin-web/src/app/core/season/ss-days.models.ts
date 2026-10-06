@@ -40,6 +40,8 @@ export interface SsDayTemplate {
 }
 
 export const SS_DAY_TEMPLATES: SsDayTemplate[] = [
+  { dayKey: 'viernes-dolores', label: 'Viernes de Dolores', easterOffset: -9, sortOrder: 1 },
+  { dayKey: 'sabado-pasion', label: 'Sábado de Pasión', easterOffset: -8, sortOrder: 5 },
   { dayKey: 'domingo-ramos', label: 'Domingo de Ramos', easterOffset: -7, sortOrder: 10 },
   { dayKey: 'lunes-santo', label: 'Lunes Santo', easterOffset: -6, sortOrder: 20 },
   { dayKey: 'martes-santo', label: 'Martes Santo', easterOffset: -5, sortOrder: 30 },

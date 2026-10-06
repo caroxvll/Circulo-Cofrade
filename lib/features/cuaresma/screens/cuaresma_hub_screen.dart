@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/cofradeo_bottom_nav.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../ads/models/sponsored_ad.dart';
 import '../../ads/widgets/sponsored_ad_card.dart';
 import '../../ads/widgets/sponsored_placement_slot.dart';
@@ -45,9 +46,8 @@ class CuaresmaHubScreen extends ConsumerWidget {
         (supabaseReady ? 'Foro' : forumById(forumId)?.name ?? 'Foro');
 
     return topicAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      skipLoadingOnReload: true,
+      loading: () => const HubScreenSkeleton(),
       error: (_, _) => Scaffold(
         appBar: AppBar(title: const Text('Cuaresma')),
         body: const Center(child: Text('No se pudo cargar el espacio')),

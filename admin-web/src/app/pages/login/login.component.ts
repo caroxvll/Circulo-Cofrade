@@ -33,7 +33,7 @@ export class LoginComponent {
     this.error.set(null);
     try {
       await this.auth.signIn(this.email.trim(), this.password);
-      await this.router.navigateByUrl('/app/resumen');
+      await this.router.navigateByUrl(this.auth.homePath());
     } catch (err) {
       this.error.set(
         err instanceof Error ? err.message : 'No se pudo iniciar sesión',

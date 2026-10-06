@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../../shared/models/forum.dart';
 import '../../../shared/models/profile_activity.dart';
 import '../../auth/auth_provider.dart';
@@ -11,10 +12,9 @@ import '../data/hidden_activity_store.dart';
 import '../profile_design.dart';
 import '../profile_provider.dart';
 import 'profile_activity_card.dart';
-import 'profile_activity_filters.dart';
-import 'profile_screen_header.dart';
+import 'profile_topics_empty_state.dart';
 
-const _pageSize = 15;
+const _pageSize = 2;
 
 class PublicationsTab extends ConsumerStatefulWidget {
   const PublicationsTab({
@@ -32,19 +32,19 @@ class PublicationsTab extends ConsumerStatefulWidget {
 
 class _PublicationsTabState extends ConsumerState<PublicationsTab> {
   ActivityFeedFilter? _filter;
-  int? _visibleLimit;
+  int _pageIndex = 0;
   Set<String>? _hiddenIds;
   final _hiddenStore = HiddenActivityStore();
 
-  ActivityFeedFilter get _activeFilter => _filter ?? ActivityFeedFilter.all;
-  int get _activeVisibleLimit => _visibleLimit ?? _pageSize;
+  ActivityFeedFilter get _activeFilter =>
+      _filter ?? ActivityFeedFilter.topics;
   Set<String> get _activeHiddenIds => _hiddenIds ?? const {};
 
   @override
   void initState() {
     super.initState();
-    _filter = ActivityFeedFilter.all;
-    _visibleLimit = _pageSize;
+    _filter = ActivityFeedFilter.topics;
+    _pageIndex = 0;
     _hiddenIds = {};
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadHiddenIds();
@@ -54,8 +54,7 @@ class _PublicationsTabState extends ConsumerState<PublicationsTab> {
   @override
   void reassemble() {
     super.reassemble();
-    _filter ??= ActivityFeedFilter.all;
-    _visibleLimit ??= _pageSize;
+    _filter ??= ActivityFeedFilter.topics;
     _hiddenIds ??= {};
   }
 
@@ -72,7 +71,10 @@ class _PublicationsTabState extends ConsumerState<PublicationsTab> {
 
   Future<void> _hideActivity(ProfileActivity activity) async {
     final next = {..._activeHiddenIds, activity.id};
-    setState(() => _hiddenIds = next);
+    setState(() {
+      _hiddenIds = next;
+      _pageIndex = 0;
+    });
     await _hiddenStore.save(widget.userId, next);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -84,84 +86,55 @@ class _PublicationsTabState extends ConsumerState<PublicationsTab> {
   }
 
   Future<void> _restoreHidden() async {
-    setState(() => _hiddenIds = {});
-    await _hiddenStore.clear(widget.userId);
-  }
-
-  void _onFilterSelected(ActivityFeedFilter filter) {
     setState(() {
-      _filter = filter;
-      _visibleLimit = _pageSize;
+      _hiddenIds = {};
+      _pageIndex = 0;
     });
+    await _hiddenStore.clear(widget.userId);
   }
 
   @override
   Widget build(BuildContext context) {
     if (!widget.isAuthenticated) {
-      return ListView(
-        padding: const EdgeInsets.fromLTRB(
-          ProfileDesign.screenPadding,
-          ProfileDesign.sectionGap,
-          ProfileDesign.screenPadding,
-          28,
-        ),
-        children: [
-          Text(
-            'Próximamente',
-            style: AppTypography.displaySmall(color: AppColors.textMuted),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      );
+      return const Center(child: Text('Próximamente'));
     }
 
     final supabaseReady = ref.watch(supabaseReadyProvider);
     final activityAsync = ref.watch(userActivityProvider(widget.userId));
     final hiddenIds = _isOwnProfile ? _activeHiddenIds : const <String>{};
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        ref.invalidate(userActivityProvider(widget.userId));
-        await ref.read(userActivityProvider(widget.userId).future);
-      },
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          ProfileDesign.screenPadding,
-          12,
-          ProfileDesign.screenPadding,
-          28,
+    if (!supabaseReady) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(ProfileDesign.screenPadding),
+          child: Text(
+            'Conecta Supabase para ver publicaciones reales.',
+            style: AppTypography.bodyMedium(),
+            textAlign: TextAlign.center,
+          ),
         ),
-        children: [
-          if (!supabaseReady)
-            Text(
-              'Conecta Supabase para ver publicaciones reales.',
-              style: AppTypography.bodyMedium(),
-              textAlign: TextAlign.center,
-            )
-          else
-            activityAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => Text(
-                'No se pudieron cargar las publicaciones.',
-                style: AppTypography.bodyMedium(),
-              ),
-              data: (activities) => _ActivityFeed(
-                activities: activities,
-                filter: _activeFilter,
-                hiddenIds: hiddenIds,
-                visibleLimit: _activeVisibleLimit,
-                isOwnProfile: _isOwnProfile,
-                userId: widget.userId,
-                onFilterSelected: _onFilterSelected,
-                onHide: _hideActivity,
-                onLoadMore: () {
-                  setState(() => _visibleLimit = _activeVisibleLimit + _pageSize);
-                },
-                onRestoreHidden: _restoreHidden,
-              ),
-            ),
-        ],
+      );
+    }
+
+    return activityAsync.when(
+      skipLoadingOnReload: true,
+      loading: () => const PeopleListSkeleton(itemCount: 5),
+      error: (_, _) => Center(
+        child: Text(
+          'No se pudieron cargar las publicaciones.',
+          style: AppTypography.bodyMedium(),
+        ),
+      ),
+      data: (activities) => _ActivityFeed(
+        activities: activities,
+        filter: _activeFilter,
+        hiddenIds: hiddenIds,
+        pageIndex: _pageIndex,
+        pageSize: _pageSize,
+        isOwnProfile: _isOwnProfile,
+        onHide: _hideActivity,
+        onPageChanged: (page) => setState(() => _pageIndex = page),
+        onRestoreHidden: _restoreHidden,
       ),
     );
   }
@@ -172,24 +145,22 @@ class _ActivityFeed extends StatelessWidget {
     required this.activities,
     required this.filter,
     required this.hiddenIds,
-    required this.visibleLimit,
+    required this.pageIndex,
+    required this.pageSize,
     required this.isOwnProfile,
-    required this.userId,
-    required this.onFilterSelected,
     required this.onHide,
-    required this.onLoadMore,
+    required this.onPageChanged,
     required this.onRestoreHidden,
   });
 
   final List<ProfileActivity> activities;
   final ActivityFeedFilter filter;
   final Set<String> hiddenIds;
-  final int visibleLimit;
+  final int pageIndex;
+  final int pageSize;
   final bool isOwnProfile;
-  final String userId;
-  final ValueChanged<ActivityFeedFilter> onFilterSelected;
   final Future<void> Function(ProfileActivity) onHide;
-  final VoidCallback onLoadMore;
+  final ValueChanged<int> onPageChanged;
   final Future<void> Function() onRestoreHidden;
 
   @override
@@ -199,107 +170,170 @@ class _ActivityFeed extends StatelessWidget {
         .length;
 
     final visible = filterActivities(activities, filter, hiddenIds);
-    final page = visible.take(visibleLimit).toList();
-    final hasMore = visible.length > visibleLimit;
+    final pageCount =
+        visible.isEmpty ? 0 : ((visible.length + pageSize - 1) ~/ pageSize);
+    final safePage = pageCount == 0 ? 0 : pageIndex.clamp(0, pageCount - 1);
+    final start = safePage * pageSize;
+    final pageItems = visible.skip(start).take(pageSize).toList();
 
-    if (activities.isEmpty) {
-      return ProfileEmptyState(
-        icon: Icons.grid_view_outlined,
-        title: 'Aún no hay publicaciones',
-        subtitle: 'Cuando publiques en los foros aparecerán aquí '
-            'con su estado.',
-      );
-    }
+    // Altura exacta del viewport: 2 temas + pager, sin scroll vacío.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxH = constraints.maxHeight;
+        if (!maxH.isFinite || maxH <= 0) {
+          return const SizedBox.shrink();
+        }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (pendingTopics > 0) ...[
-          _PendingTopicsBanner(count: pendingTopics),
-          const SizedBox(height: 12),
-        ],
-        Container(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-          decoration: ProfileDesign.activityPanelDecoration(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ProfileActivitySectionHeader(
-                count: visible.length,
-                isOwnProfile: isOwnProfile,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'FILTRAR ACTIVIDAD',
-                style: ProfileDesign.filterSectionLabel(),
-              ),
-              const SizedBox(height: 8),
-              ProfileActivityFilters(
-                filter: filter,
-                onSelected: onFilterSelected,
-              ),
-              if (isOwnProfile && hiddenIds.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: onRestoreHidden,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.burgundy,
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      'Mostrar ${hiddenIds.length} oculto${hiddenIds.length == 1 ? '' : 's'}',
-                      style: ProfileDesign.meta().copyWith(
-                        color: AppColors.burgundy,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+        return SizedBox(
+          height: maxH,
+          width: constraints.maxWidth,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              ProfileDesign.screenPadding,
+              4,
+              ProfileDesign.screenPadding,
+              4,
+            ),
+            child: activities.isEmpty
+                ? ProfileTopicsEmptyState(isOwnProfile: isOwnProfile)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (pendingTopics > 0) ...[
+                        _PendingTopicsBanner(count: pendingTopics),
+                        const SizedBox(height: 6),
+                      ],
+                      if (isOwnProfile && hiddenIds.isNotEmpty) ...[
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: onRestoreHidden,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.burgundy,
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'Mostrar ${hiddenIds.length} oculto'
+                              '${hiddenIds.length == 1 ? '' : 's'}',
+                              style: ProfileDesign.meta().copyWith(
+                                color: AppColors.burgundy,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                      if (visible.isEmpty)
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              filter == ActivityFeedFilter.all &&
+                                      hiddenIds.isNotEmpty
+                                  ? 'Todo oculto. Pulsa «Mostrar ocultos» '
+                                      'para recuperar.'
+                                  : 'Nada en esta categoría.',
+                              style: AppTypography.bodyMedium(),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      else ...[
+                        Expanded(
+                          child: Column(
+                            children: [
+                              for (var i = 0; i < pageItems.length; i++) ...[
+                                if (i > 0) const SizedBox(height: 6),
+                                Expanded(
+                                  child: isOwnProfile
+                                      ? _DismissibleActivityCard(
+                                          activity: pageItems[i],
+                                          onHide: () =>
+                                              onHide(pageItems[i]),
+                                        )
+                                      : ProfileActivityCard(
+                                          activity: pageItems[i],
+                                          dense: true,
+                                          fillHeight: true,
+                                        ),
+                                ),
+                              ],
+                              if (pageItems.length == 1)
+                                const Expanded(child: SizedBox.shrink()),
+                            ],
+                          ),
+                        ),
+                        if (pageCount > 1)
+                          _TopicsPager(
+                            pageIndex: safePage,
+                            pageCount: pageCount,
+                            onPageChanged: onPageChanged,
+                          ),
+                      ],
+                    ],
                   ),
-                ),
-              ],
-            ],
           ),
-        ),
-        const SizedBox(height: 12),
-        if (visible.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: Text(
-                filter == ActivityFeedFilter.all && hiddenIds.isNotEmpty
-                    ? 'Todo oculto. Pulsa «Mostrar ocultos» para recuperar.'
-                    : 'Nada en esta categoría.',
-                style: AppTypography.bodyMedium(),
-                textAlign: TextAlign.center,
-              ),
+        );
+      },
+    );
+  }
+}
+
+class _TopicsPager extends StatelessWidget {
+  const _TopicsPager({
+    required this.pageIndex,
+    required this.pageCount,
+    required this.onPageChanged,
+  });
+
+  final int pageIndex;
+  final int pageCount;
+  final ValueChanged<int> onPageChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final canPrev = pageIndex > 0;
+    final canNext = pageIndex < pageCount - 1;
+
+    return SizedBox(
+      height: 32,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            tooltip: 'Anterior',
+            onPressed: canPrev ? () => onPageChanged(pageIndex - 1) : null,
+            icon: const Icon(Icons.chevron_left_rounded, size: 22),
+            color: AppColors.burgundy,
+            disabledColor: AppColors.textMuted.withValues(alpha: 0.35),
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+          Text(
+            '${pageIndex + 1} / $pageCount',
+            style: AppTypography.labelSmall(
+              color: AppColors.textSecondary,
+            ).copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              letterSpacing: 0.4,
             ),
-          )
-        else ...[
-          for (final activity in page)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: isOwnProfile
-                  ? _DismissibleActivityCard(
-                      activity: activity,
-                      onHide: () => onHide(activity),
-                    )
-                  : ProfileActivityCard(activity: activity),
-            ),
-          if (hasMore)
-            Center(
-              child: TextButton(
-                onPressed: onLoadMore,
-                child: Text(
-                  'Cargar más (${visible.length - visibleLimit} restantes)',
-                  style: AppTypography.bodyMedium(color: AppColors.burgundy),
-                ),
-              ),
-            ),
+          ),
+          IconButton(
+            tooltip: 'Siguiente',
+            onPressed: canNext ? () => onPageChanged(pageIndex + 1) : null,
+            icon: const Icon(Icons.chevron_right_rounded, size: 22),
+            color: AppColors.burgundy,
+            disabledColor: AppColors.textMuted.withValues(alpha: 0.35),
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
         ],
-      ],
+      ),
     );
   }
 }
@@ -316,36 +350,29 @@ class _DismissibleActivityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dismissible(
-      key: ValueKey(activity.id),
+      key: ValueKey('hide-${activity.id}'),
       direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        onHide();
+        return false;
+      },
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 18),
-        margin: const EdgeInsets.only(bottom: 0),
+        padding: const EdgeInsets.only(right: 16),
         decoration: BoxDecoration(
-          color: AppColors.burgundy.withValues(alpha: 0.12),
+          color: AppColors.burgundy.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(ProfileDesign.cardRadius),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Icon(
-              Icons.visibility_off_outlined,
-              size: 18,
-              color: AppColors.burgundy.withValues(alpha: 0.85),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Ocultar',
-              style: AppTypography.labelSmall(
-                color: AppColors.burgundy,
-              ).copyWith(fontWeight: FontWeight.w700),
-            ),
-          ],
+        child: const Icon(
+          Icons.visibility_off_outlined,
+          color: AppColors.burgundy,
         ),
       ),
-      onDismissed: (_) => onHide(),
-      child: ProfileActivityCard(activity: activity),
+      child: ProfileActivityCard(
+        activity: activity,
+        dense: true,
+        fillHeight: true,
+      ),
     );
   }
 }
@@ -359,34 +386,20 @@ class _PendingTopicsBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.goldPale.withValues(alpha: 0.32),
+        color: AppColors.goldPale.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.goldLight),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.gavel_outlined, color: AppColors.burgundy, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$count tema${count == 1 ? '' : 's'} en revisión',
-                  style: AppTypography.titleLarge().copyWith(fontSize: 13),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  TopicModerationCopy.profilePendingHint,
-                  style: AppTypography.bodyMedium().copyWith(fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        ],
+      child: Text(
+        count == 1
+            ? TopicModerationCopy.profilePendingHint
+            : 'Tienes $count temas en revisión por la Junta. '
+                'Aparecen aquí hasta que se publiquen.',
+        style: AppTypography.bodyMedium(
+          color: AppColors.goldDark,
+        ).copyWith(fontSize: 12, fontWeight: FontWeight.w600),
       ),
     );
   }

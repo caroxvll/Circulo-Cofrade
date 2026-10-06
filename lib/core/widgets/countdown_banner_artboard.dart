@@ -6,7 +6,7 @@ abstract final class CountdownBannerArtboard {
   static const designHeight = 276.0;
 
   /// Hueco entre «Faltan» y «días» en la primera línea del arte.
-  static const daysSlot = Rect.fromLTWH(380, 58, 156, 74);
+  static const daysSlot = Rect.fromLTWH(378, 52, 160, 72);
 
   static String labelForDays(int days) => days.clamp(0, 999).toString();
 }

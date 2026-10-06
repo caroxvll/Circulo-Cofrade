@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -18,7 +20,7 @@ final notificationsProvider =
   NotificationsNotifier.new,
 );
 
-/// Suscripción Realtime: mantiene la bandeja al día sin refrescar manualmente.
+/// Suscripción Realtime: parche local + debounce de refetch como red de seguridad.
 final notificationsRealtimeProvider = Provider<void>((ref) {
   final user = ref.watch(currentUserProvider);
   final repo = ref.watch(notificationsRepositoryProvider);
@@ -38,8 +40,10 @@ final notificationsRealtimeProvider = Provider<void>((ref) {
           column: 'user_id',
           value: user.id,
         ),
-        callback: (_) {
-          ref.read(notificationsProvider.notifier).silentRefresh();
+        callback: (payload) {
+          ref
+              .read(notificationsProvider.notifier)
+              .applyRealtimePayload(payload);
         },
       )
       .subscribe();
@@ -50,8 +54,13 @@ final notificationsRealtimeProvider = Provider<void>((ref) {
 });
 
 class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
+  Timer? _silentRefreshDebounce;
+  var _silentRefreshGen = 0;
+
   @override
   Future<List<AppNotification>> build() async {
+    ref.onDispose(() => _silentRefreshDebounce?.cancel());
+
     final user = ref.watch(currentUserProvider);
     final repo = ref.read(notificationsRepositoryProvider);
 
@@ -135,15 +144,95 @@ class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
 
     if (user == null || !repo.isAvailable) return;
 
+    final gen = ++_silentRefreshGen;
     try {
       final previous = state.asData?.value;
       final list = await repo.fetchForUser(user.id);
+      if (gen != _silentRefreshGen) return;
       _syncProfileActivity(user.id, previous: previous, list: list);
       _syncFollowerCountIfNeeded(previous, list);
       _syncCofradeRankIfNeeded(previous, list);
       state = AsyncData(list);
     } catch (_) {
       // Mantener el estado anterior si falla la red.
+    }
+  }
+
+  void scheduleSilentRefresh() {
+    _silentRefreshDebounce?.cancel();
+    _silentRefreshDebounce = Timer(const Duration(milliseconds: 320), () {
+      unawaited(silentRefresh());
+    });
+  }
+
+  /// Parche incremental; si el payload no basta (agrupación reply reactions), refetch.
+  void applyRealtimePayload(PostgresChangePayload payload) {
+    final current = state.asData?.value;
+    if (current == null) {
+      scheduleSilentRefresh();
+      return;
+    }
+    final repo = ref.read(notificationsRepositoryProvider);
+
+    switch (payload.eventType) {
+      case PostgresChangeEvent.insert:
+        final parsed = repo.fromRealtimeRecord(payload.newRecord);
+        if (parsed == null) {
+          scheduleSilentRefresh();
+          return;
+        }
+        // Las reacciones de reply se agrupan en fetch; mejor refetch suave.
+        if (parsed.kind == AppNotificationKind.replyReaction) {
+          scheduleSilentRefresh();
+          return;
+        }
+        if (current.any((n) => n.id == parsed.id)) return;
+        final next = [parsed, ...current];
+        final userId = ref.read(currentUserProvider)?.id;
+        if (userId != null) {
+          _syncProfileActivity(userId, previous: current, list: next);
+          _syncFollowerCountIfNeeded(current, next);
+          _syncCofradeRankIfNeeded(current, next);
+        }
+        state = AsyncData(next);
+        return;
+      case PostgresChangeEvent.update:
+        final id = payload.newRecord['id']?.toString();
+        if (id == null || id.isEmpty) {
+          scheduleSilentRefresh();
+          return;
+        }
+        final readAt = payload.newRecord['read_at'];
+        final isRead = readAt != null;
+        var changed = false;
+        final updated = <AppNotification>[];
+        for (final n in current) {
+          if (n.id == id) {
+            updated.add(n.copyWith(isRead: isRead));
+            changed = true;
+          } else {
+            updated.add(n);
+          }
+        }
+        if (!changed) {
+          scheduleSilentRefresh();
+          return;
+        }
+        state = AsyncData(updated);
+        return;
+      case PostgresChangeEvent.delete:
+        final id = payload.oldRecord['id']?.toString();
+        if (id == null || id.isEmpty) {
+          scheduleSilentRefresh();
+          return;
+        }
+        final next = [for (final n in current) if (n.id != id) n];
+        if (next.length == current.length) return;
+        state = AsyncData(next);
+        return;
+      case PostgresChangeEvent.all:
+        scheduleSilentRefresh();
+        return;
     }
   }
 

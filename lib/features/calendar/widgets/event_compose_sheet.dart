@@ -206,9 +206,9 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     setState(() => _loadingOrganizerShield = true);
 
     try {
-      final logoUrl = await ref
-          .read(calendarRepositoryProvider)
-          .fetchOrganizerLogo(organizer);
+      final repo = ref.read(calendarRepositoryProvider);
+      var logoUrl = await repo.fetchOrganizerLogo(organizer);
+      logoUrl ??= await repo.fetchHermandadIconByOrganizerLabel(organizer);
       if (!mounted) return;
       if (logoUrl == null || logoUrl.isEmpty) {
         setState(() => _loadingOrganizerShield = false);

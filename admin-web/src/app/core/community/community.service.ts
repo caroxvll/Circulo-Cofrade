@@ -34,9 +34,23 @@ export interface ModeratorAssignment {
   assignedAt: string;
 }
 
+export interface SsLiveReporterRow {
+  profileId: string;
+  handle: string;
+  assignedAt: string;
+  note: string;
+}
+
 export interface HermandadTopicOption {
   id: string;
   title: string;
+  processionDay: string | null;
+  hermandadName: string;
+  excerpt: string;
+  body: string;
+  coverImageUrl: string | null;
+  iconImageUrl: string | null;
+  createdAt: string;
 }
 
 export interface HermandadAssignment {
@@ -54,6 +68,81 @@ export interface CreatedHermandadAccount {
   email: string;
   topicId: string | null;
   temporaryPassword: string | null;
+}
+
+export interface HermandadAccountCredentials {
+  profileId: string;
+  handle: string;
+  displayName: string;
+  email: string;
+}
+
+/** Días de estación (mismo orden que la app). */
+export const HERMANDAD_STATION_DAYS = [
+  'Viernes de Dolores',
+  'Sábado de Pasión',
+  'Domingo de Ramos',
+  'Lunes Santo',
+  'Martes Santo',
+  'Miércoles Santo',
+  'Jueves Santo',
+  'Madrugá',
+  'Viernes Santo',
+  'Sábado Santo',
+  'Domingo de Resurrección',
+] as const;
+
+export function parseHermandadTopicTitle(title: string): {
+  processionDay: string | null;
+  hermandadName: string;
+} {
+  const parts = title
+    .split(' · ')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) {
+    return {
+      processionDay: parts[0],
+      hermandadName: parts.slice(1).join(' · '),
+    };
+  }
+  return { processionDay: null, hermandadName: title.trim() };
+}
+
+export function hermandadBoardTitle(day: string, name: string): string {
+  return `${day.trim()} · ${name.trim()}`;
+}
+
+export function hermandadBoardTemplate(name: string, day: string): {
+  excerpt: string;
+  body: string;
+} {
+  const n = name.trim();
+  const d = day.trim();
+  return {
+    excerpt: `Espacio para noticias, horarios, avisos e información oficial de ${n}.`,
+    body:
+      `Este es el espacio de seguimiento de ${n} para el ${d}.\n\n` +
+      `Aquí se podrán centralizar noticias, horarios, avisos de última hora, ` +
+      `comunicados, cambios de itinerario y comentarios de la comunidad.\n\n` +
+      `Cuando exista una cuenta verificada de la hermandad, sus publicaciones ` +
+      `aparecerán identificadas como información oficial.`,
+  };
+}
+
+function slugifyHermandadPart(raw: string): string {
+  return raw
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+}
+
+export function hermandadBoardTopicId(day: string, name: string): string {
+  const id = `${slugifyHermandadPart(day)}-${slugifyHermandadPart(name)}`;
+  return id || `hermandad-${Date.now()}`;
 }
 
 export interface SignupStats {
@@ -245,17 +334,235 @@ export class CommunityService {
     if (error) throw error;
   }
 
+  async fetchSsLiveReporters(): Promise<SsLiveReporterRow[]> {
+    const { data, error } = await getSupabase()
+      .from('ss_live_reporters')
+      .select('profile_id, assigned_at, note, profiles!profile_id(handle)')
+      .order('assigned_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((row) => {
+      const profile = row.profiles as { handle?: string } | null;
+      return {
+        profileId: String(row.profile_id),
+        handle: profile?.handle ?? '—',
+        assignedAt: String(row.assigned_at ?? ''),
+        note: String(row.note ?? ''),
+      };
+    });
+  }
+
+  async assignSsLiveReporter(profileId: string, note?: string): Promise<void> {
+    const userId = (await getSupabase().auth.getUser()).data.user?.id ?? null;
+    const { error } = await getSupabase().from('ss_live_reporters').upsert({
+      profile_id: profileId,
+      assigned_by: userId,
+      note: (note ?? '').slice(0, 200),
+      assigned_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+  }
+
+  async removeSsLiveReporter(profileId: string): Promise<void> {
+    const { error } = await getSupabase()
+      .from('ss_live_reporters')
+      .delete()
+      .eq('profile_id', profileId);
+    if (error) throw error;
+  }
+
   async fetchHermandadBoardTopics(): Promise<HermandadTopicOption[]> {
     const { data, error } = await getSupabase()
       .from('forum_topics')
-      .select('id, title')
+      .select('id, title, excerpt, body, cover_image_url, icon_image_url, created_at')
       .eq('forum_id', 'hermandades')
       .order('title');
     if (error) throw error;
-    return (data ?? []).map((row) => ({
-      id: String(row.id),
-      title: String(row.title ?? row.id),
-    }));
+    return (data ?? []).map((row) => {
+      const title = String(row.title ?? row.id);
+      const parsed = parseHermandadTopicTitle(title);
+      return {
+        id: String(row.id),
+        title,
+        processionDay: parsed.processionDay,
+        hermandadName: parsed.hermandadName,
+        excerpt: String(row.excerpt ?? ''),
+        body: String(row.body ?? ''),
+        coverImageUrl: (row.cover_image_url as string | null) ?? null,
+        iconImageUrl: (row.icon_image_url as string | null) ?? null,
+        createdAt: String(row.created_at ?? ''),
+      };
+    });
+  }
+
+  async createHermandadBoard(input: {
+    processionDay: string;
+    hermandadName: string;
+    coverImageUrl?: string | null;
+    iconImageUrl?: string | null;
+  }): Promise<HermandadTopicOption> {
+    const day = input.processionDay.trim();
+    const name = input.hermandadName.trim();
+    if (!day) throw new Error('Elige el día de estación.');
+    if (name.length < 2) {
+      throw new Error('Indica el nombre de la hermandad (mín. 2 caracteres).');
+    }
+
+    const title = hermandadBoardTitle(day, name);
+    const template = hermandadBoardTemplate(name, day);
+    const id = hermandadBoardTopicId(day, name);
+    const cover = input.coverImageUrl?.trim() || null;
+    const icon = input.iconImageUrl?.trim() || null;
+    const userId = (await getSupabase().auth.getUser()).data.user?.id ?? null;
+
+    const { data, error } = await getSupabase()
+      .from('forum_topics')
+      .insert({
+        id,
+        forum_id: 'hermandades',
+        author_id: userId,
+        author_handle: '@cofradeo',
+        title,
+        excerpt: template.excerpt,
+        body: template.body,
+        status: 'published',
+        is_pinned: false,
+        is_system: false,
+        cover_image_url: cover,
+        icon_image_url: icon,
+      })
+      .select('id, title, excerpt, body, cover_image_url, icon_image_url, created_at')
+      .single();
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error('Ya existe un tablón con ese día y nombre.');
+      }
+      throw error;
+    }
+
+    const row = data as Record<string, unknown>;
+    const parsed = parseHermandadTopicTitle(String(row['title'] ?? title));
+    return {
+      id: String(row['id'] ?? id),
+      title: String(row['title'] ?? title),
+      processionDay: parsed.processionDay,
+      hermandadName: parsed.hermandadName,
+      excerpt: String(row['excerpt'] ?? ''),
+      body: String(row['body'] ?? ''),
+      coverImageUrl: (row['cover_image_url'] as string | null) ?? null,
+      iconImageUrl: (row['icon_image_url'] as string | null) ?? null,
+      createdAt: String(row['created_at'] ?? ''),
+    };
+  }
+
+  async updateHermandadBoard(input: {
+    id: string;
+    processionDay: string;
+    hermandadName: string;
+    coverImageUrl?: string | null;
+    iconImageUrl?: string | null;
+    resetBodyToTemplate?: boolean;
+  }): Promise<void> {
+    const day = input.processionDay.trim();
+    const name = input.hermandadName.trim();
+    if (!day) throw new Error('Elige el día de estación.');
+    if (name.length < 2) {
+      throw new Error('Indica el nombre de la hermandad (mín. 2 caracteres).');
+    }
+
+    const title = hermandadBoardTitle(day, name);
+    const template = hermandadBoardTemplate(name, day);
+    const patch: Record<string, unknown> = {
+      title,
+      excerpt: template.excerpt,
+    };
+    if (input.resetBodyToTemplate) {
+      patch['body'] = template.body;
+    }
+    if (input.coverImageUrl !== undefined) {
+      const v = input.coverImageUrl?.trim() ?? '';
+      patch['cover_image_url'] = v || null;
+    }
+    if (input.iconImageUrl !== undefined) {
+      const v = input.iconImageUrl?.trim() ?? '';
+      patch['icon_image_url'] = v || null;
+    }
+
+    const { error } = await getSupabase()
+      .from('forum_topics')
+      .update(patch)
+      .eq('id', input.id)
+      .eq('forum_id', 'hermandades');
+    if (error) throw error;
+  }
+
+  /** Sube portada o escudo al bucket topic-covers. */
+  async uploadHermandadBoardAsset(
+    topicId: string,
+    kind: 'cover' | 'escudo',
+    file: File,
+  ): Promise<string> {
+    const maxBytes = kind === 'cover' ? 3 * 1024 * 1024 : 1 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      throw new Error(
+        kind === 'cover'
+          ? 'La portada no puede superar 3 MB.'
+          : 'El escudo no puede superar 1 MB.',
+      );
+    }
+    const ok = ['image/png', 'image/jpeg', 'image/webp'].includes(file.type);
+    if (file.type && !ok) {
+      throw new Error('Usa PNG, JPEG o WebP.');
+    }
+    const fromName = (file.name.split('.').pop() || '').toLowerCase();
+    let ext = 'jpg';
+    if (fromName === 'png' || fromName === 'webp' || fromName === 'jpg' || fromName === 'jpeg') {
+      ext = fromName === 'jpeg' ? 'jpg' : fromName;
+    } else if (file.type.includes('png')) {
+      ext = 'png';
+    } else if (file.type.includes('webp')) {
+      ext = 'webp';
+    }
+    const path = `${topicId}/${kind}.${ext}`;
+    const { error } = await getSupabase().storage.from('topic-covers').upload(path, file, {
+      upsert: true,
+      contentType: file.type || 'image/jpeg',
+    });
+    if (error) throw error;
+    const base = getSupabase().storage.from('topic-covers').getPublicUrl(path).data.publicUrl;
+    return `${base}?v=${Date.now()}`;
+  }
+
+  async deleteHermandadBoard(topicId: string): Promise<void> {
+    const { error } = await getSupabase()
+      .from('forum_topics')
+      .delete()
+      .eq('id', topicId)
+      .eq('forum_id', 'hermandades');
+    if (error) throw error;
+  }
+
+  async updateBrotherhoodProfile(input: {
+    profileId: string;
+    displayName?: string;
+    verified?: boolean;
+  }): Promise<void> {
+    const patch: Record<string, unknown> = {};
+    if (input.displayName != null) {
+      const name = input.displayName.trim();
+      if (name.length < 2) {
+        throw new Error('El nombre debe tener al menos 2 caracteres.');
+      }
+      patch['display_name'] = name;
+    }
+    if (input.verified != null) patch['verified'] = input.verified;
+    if (!Object.keys(patch).length) return;
+
+    const { error } = await getSupabase()
+      .from('profiles')
+      .update(patch)
+      .eq('id', input.profileId)
+      .eq('account_type', 'brotherhood');
+    if (error) throw error;
   }
 
   async fetchHermandadAssignments(): Promise<HermandadAssignment[]> {
@@ -330,6 +637,60 @@ export class CommunityService {
       email: String(payload['email'] ?? body['email']),
       topicId: (payload['topicId'] as string | null) ?? null,
       temporaryPassword: (payload['temporaryPassword'] as string | null) ?? null,
+    };
+  }
+
+  async fetchHermandadAccountCredentials(
+    profileId: string,
+  ): Promise<HermandadAccountCredentials> {
+    const { data, error } = await getSupabase().functions.invoke(
+      'manage-hermandad-account',
+      { body: { action: 'get', profileId } },
+    );
+    if (error) throw error;
+    const payload = data as Record<string, unknown>;
+    if (payload?.['error']) {
+      throw new Error(String(payload['error']));
+    }
+    return {
+      profileId: String(payload['profileId'] ?? profileId),
+      handle: String(payload['handle'] ?? ''),
+      displayName: String(payload['displayName'] ?? ''),
+      email: String(payload['email'] ?? ''),
+    };
+  }
+
+  async updateHermandadAccountCredentials(input: {
+    profileId: string;
+    email?: string | null;
+    password?: string | null;
+  }): Promise<HermandadAccountCredentials & {
+    passwordUpdated: boolean;
+    emailUpdated: boolean;
+  }> {
+    const body: Record<string, unknown> = {
+      action: 'update',
+      profileId: input.profileId,
+    };
+    if (input.email != null) body['email'] = input.email.trim();
+    if (input.password?.trim()) body['password'] = input.password.trim();
+
+    const { data, error } = await getSupabase().functions.invoke(
+      'manage-hermandad-account',
+      { body },
+    );
+    if (error) throw error;
+    const payload = data as Record<string, unknown>;
+    if (payload?.['error']) {
+      throw new Error(String(payload['error']));
+    }
+    return {
+      profileId: String(payload['profileId'] ?? input.profileId),
+      handle: String(payload['handle'] ?? ''),
+      displayName: String(payload['displayName'] ?? ''),
+      email: String(payload['email'] ?? ''),
+      passwordUpdated: Boolean(payload['passwordUpdated']),
+      emailUpdated: Boolean(payload['emailUpdated']),
     };
   }
 

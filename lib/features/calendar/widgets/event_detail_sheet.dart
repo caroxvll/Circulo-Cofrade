@@ -158,6 +158,10 @@ class _EventDetailSheet extends ConsumerWidget {
                     _EventDetailCard(
                       event: event,
                       dateLabel: formattedDate,
+                      shieldUrl: resolvedOrganizerShieldUrl(
+                        ref.watch(organizerLogosMapProvider).asData?.value,
+                        event,
+                      ),
                     ),
                     if (event.publisherHandle != null) ...[
                       const SizedBox(height: 10),
@@ -215,10 +219,15 @@ class _EventDetailSheet extends ConsumerWidget {
 }
 
 class _EventDetailCard extends StatelessWidget {
-  const _EventDetailCard({required this.event, required this.dateLabel});
+  const _EventDetailCard({
+    required this.event,
+    required this.dateLabel,
+    this.shieldUrl,
+  });
 
   final CalendarEvent event;
   final String dateLabel;
+  final String? shieldUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +267,7 @@ class _EventDetailCard extends StatelessWidget {
               child: EventTypeIcon(
                 type: event.type,
                 size: 72,
-                customIconUrl: event.customIconUrl,
+                customIconUrl: shieldUrl ?? event.customIconUrl,
               ),
             ),
           ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../topic_detail_typography.dart';
+import '../../../core/theme/app_typography.dart';
 
 /// Rango cofrade visible bajo el @handle (p. ej. «Diputado de Tramo»).
 class CofradeRankLabel extends StatelessWidget {
@@ -22,10 +22,12 @@ class CofradeRankLabel extends StatelessWidget {
       title,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: TopicDetailTypography.meta(
+      style: AppTypography.rankTitle(
         color: AppColors.textMuted,
+      ).copyWith(
+        fontSize: compact ? 10.5 : 11.5,
         fontWeight: FontWeight.w500,
-      ).copyWith(fontSize: compact ? 10 : 11),
+      ),
     );
   }
 }

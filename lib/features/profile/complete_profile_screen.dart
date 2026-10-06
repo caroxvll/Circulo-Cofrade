@@ -10,6 +10,7 @@ import '../auth/auth_provider.dart';
 import 'profile_onboarding.dart';
 import 'data/profile_repository.dart';
 import 'profile_provider.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 
 class CompleteProfileScreen extends ConsumerStatefulWidget {
   const CompleteProfileScreen({super.key, this.redirect});
@@ -245,7 +246,8 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
         backgroundColor: AppColors.background,
         body: SafeArea(
           child: profileAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            skipLoadingOnReload: true,
+            loading: () => const PrefsFormSkeleton(),
             error: (_, __) =>
                 const Center(child: Text('Error al cargar perfil')),
             data: (profile) {

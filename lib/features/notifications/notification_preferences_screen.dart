@@ -8,6 +8,7 @@ import '../auth/auth_provider.dart';
 import '../push/push_provider.dart';
 import 'notification_preferences_provider.dart';
 import 'notifications_design.dart';
+import '../../core/widgets/cofradeo_skeleton.dart';
 
 class NotificationPreferencesScreen extends ConsumerWidget {
   const NotificationPreferencesScreen({super.key});
@@ -63,7 +64,7 @@ class NotificationPreferencesScreen extends ConsumerWidget {
                     )
                   : prefsAsync.when(
                       loading: () =>
-                          const Center(child: CircularProgressIndicator()),
+                          const PrefsFormSkeleton(),
                       error: (_, __) => Center(
                         child: Padding(
                           padding: const EdgeInsets.all(24),

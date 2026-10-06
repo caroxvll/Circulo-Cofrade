@@ -11,10 +11,20 @@ class NotificationCard extends StatelessWidget {
     super.key,
     required this.notification,
     required this.onTap,
+    this.onAcceptFollowRequest,
+    this.onRejectFollowRequest,
+    this.followRequestBusy = false,
   });
 
   final AppNotification notification;
   final VoidCallback onTap;
+  final VoidCallback? onAcceptFollowRequest;
+  final VoidCallback? onRejectFollowRequest;
+  final bool followRequestBusy;
+
+  bool get _isFollowRequest =>
+      notification.kind == AppNotificationKind.followRequest &&
+      notification.requestId != null;
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +33,7 @@ class NotificationCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: _isFollowRequest ? null : onTap,
         borderRadius: BorderRadius.circular(NotificationsDesign.cardRadius),
         child: Ink(
           decoration: NotificationsDesign.cardDecoration(unread: unread),
@@ -84,6 +94,105 @@ class NotificationCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (_isFollowRequest) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: followRequestBusy
+                                    ? null
+                                    : onAcceptFollowRequest,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.burgundy,
+                                  foregroundColor: AppColors.textOnDark,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  minimumSize: const Size(0, 36),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: followRequestBusy
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppColors.textOnDark,
+                                        ),
+                                      )
+                                    : Text(
+                                        'Aceptar',
+                                        style: AppTypography.labelSmall(
+                                          color: AppColors.textOnDark,
+                                        ).copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: followRequestBusy
+                                    ? null
+                                    : onRejectFollowRequest,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.textSecondary,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  minimumSize: const Size(0, 36),
+                                  side: BorderSide(
+                                    color: AppColors.border.withValues(
+                                      alpha: 0.9,
+                                    ),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Rechazar',
+                                  style: AppTypography.labelSmall(
+                                    color: AppColors.textSecondary,
+                                  ).copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (notification.profileId != null) ...[
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton(
+                              onPressed: onTap,
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.burgundy,
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                'Ver perfil',
+                                style: AppTypography.bodyMedium(
+                                  color: AppColors.burgundy,
+                                ).copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ],
                   ),
                 ),
@@ -118,12 +227,13 @@ class _NotificationLeading extends StatelessWidget {
         shape: BoxShape.circle,
         color: notification.badgeBackgroundColor ?? AppColors.burgundy,
         border: Border.all(
-          color: AppColors.gold.withValues(alpha: 0.2),
+          color: AppColors.gold.withValues(alpha: 0.45),
+          width: 1.2,
         ),
       ),
       child: Icon(
         notification.badgeIcon ?? Icons.notifications_outlined,
-        color: AppColors.goldPale,
+        color: AppColors.textOnDark,
         size: 22,
       ),
     );

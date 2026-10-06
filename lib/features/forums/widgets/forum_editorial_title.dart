@@ -33,6 +33,24 @@ class ForumEditorialTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     final resolvedKicker = kicker ?? forumTopicAppBarKicker(forumId);
     final align = center ? TextAlign.center : TextAlign.start;
+    final isHermandadChannel = forumId == 'hermandades';
+    final titleStyle = onDark
+        ? AppTypography.displaySmall(color: AppColors.gold).copyWith(
+            fontSize: titleFontSize ?? 20,
+            fontWeight: FontWeight.w700,
+            height: 1.05,
+            letterSpacing: 0.4,
+          )
+        : isHermandadChannel
+            ? AppTypography.hermandadName(color: AppColors.burgundyDark)
+                .copyWith(
+                fontSize: titleFontSize ?? 18,
+                fontWeight: FontWeight.w700,
+                height: 1.05,
+              )
+            : TopicDetailTypography.editorialAppBarTitle().copyWith(
+                fontSize: titleFontSize,
+              );
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -41,16 +59,7 @@ class ForumEditorialTitle extends StatelessWidget {
       children: [
         Text(
           title,
-          style: onDark
-              ? AppTypography.displaySmall(color: AppColors.gold).copyWith(
-                  fontSize: titleFontSize ?? 20,
-                  fontWeight: FontWeight.w700,
-                  height: 1.05,
-                  letterSpacing: 0.4,
-                )
-              : TopicDetailTypography.editorialAppBarTitle().copyWith(
-                  fontSize: titleFontSize,
-                ),
+          style: titleStyle,
           maxLines: maxTitleLines,
           overflow: TextOverflow.ellipsis,
           textAlign: align,
@@ -66,7 +75,12 @@ class ForumEditorialTitle extends StatelessWidget {
                   letterSpacing: 1.2,
                   height: 1.15,
                 )
-              : TopicDetailTypography.editorialAppBarKicker(),
+              : isHermandadChannel
+                  ? TopicDetailTypography.editorialAppBarKicker().copyWith(
+                      color: AppColors.goldDark,
+                      letterSpacing: 1.2,
+                    )
+                  : TopicDetailTypography.editorialAppBarKicker(),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: align,

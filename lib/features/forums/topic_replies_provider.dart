@@ -152,6 +152,8 @@ List<ForumReply> applyLivePatches(
       byId[entry.key] = incoming;
       continue;
     }
+    // Realtime trae fila completa de BD: imagen/categoría null = limpiar.
+    // Conservamos metadatos de perfil que el payload a menudo no trae.
     byId[entry.key] = previous.copyWith(
       content: incoming.content.isNotEmpty ? incoming.content : null,
       authorHandle:
@@ -159,7 +161,22 @@ List<ForumReply> applyLivePatches(
       deletedAt: incoming.deletedAt ?? previous.deletedAt,
       editedAt: incoming.editedAt ?? previous.editedAt,
       parentReplyId: incoming.parentReplyId ?? previous.parentReplyId,
-      imageUrl: incoming.imageUrl ?? previous.imageUrl,
+      isOfficial: incoming.isOfficial,
+      isFeatured: incoming.isFeatured,
+      officialCategory: incoming.officialCategory,
+      clearOfficialCategory: incoming.officialCategory == null,
+      imageUrl: incoming.imageUrl,
+      clearImageUrl: incoming.imageUrl == null || incoming.imageUrl!.isEmpty,
+      authorAvatarUrl: incoming.authorAvatarUrl ?? previous.authorAvatarUrl,
+      authorVerified: incoming.authorAvatarUrl != null ||
+              (incoming.authorId != null &&
+                  incoming.authorId == previous.authorId)
+          ? incoming.authorVerified
+          : previous.authorVerified,
+      authorTrophyPoints: incoming.authorTrophyPoints > 0
+          ? incoming.authorTrophyPoints
+          : previous.authorTrophyPoints,
+      likeCount: incoming.likeCount,
     );
   }
 
@@ -188,6 +205,11 @@ List<ForumReply> applyLivePatches(
     final next = byId[id];
     if (next != null) ordered.add(next);
   }
+  ordered.sort((a, b) {
+    final aTime = a.createdAt?.millisecondsSinceEpoch ?? 0;
+    final bTime = b.createdAt?.millisecondsSinceEpoch ?? 0;
+    return bTime.compareTo(aTime);
+  });
   return ordered;
 }
 

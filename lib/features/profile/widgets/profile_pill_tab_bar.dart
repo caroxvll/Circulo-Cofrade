@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 
+/// Tabs del perfil: TEMAS · SIGUIENDO · INFORMACIÓN (underline).
 class ProfilePillTabBar extends StatelessWidget {
   const ProfilePillTabBar({super.key, required this.tabs});
 
@@ -11,63 +12,37 @@ class ProfilePillTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: AppColors.gold.withValues(alpha: 0.22),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.textPrimary.withValues(alpha: 0.05),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
-            ),
-          ],
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: TabBar(
+        isScrollable: false,
+        tabAlignment: TabAlignment.fill,
+        dividerColor: AppColors.border.withValues(alpha: 0.7),
+        dividerHeight: 1,
+        indicatorSize: TabBarIndicatorSize.label,
+        indicator: const UnderlineTabIndicator(
+          borderSide: BorderSide(color: AppColors.burgundy, width: 2.5),
+          insets: EdgeInsets.symmetric(horizontal: 2),
         ),
-        child: TabBar(
-          isScrollable: false,
-          tabAlignment: TabAlignment.fill,
-          dividerColor: Colors.transparent,
-          indicatorSize: TabBarIndicatorSize.tab,
-          indicator: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.burgundy,
-                AppColors.burgundyDark.withValues(alpha: 0.92),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.burgundy.withValues(alpha: 0.22),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          labelColor: AppColors.textOnDark,
-          unselectedLabelColor: AppColors.textSecondary,
-          labelStyle: AppTypography.labelSmall().copyWith(
-            fontWeight: FontWeight.w700,
-            fontSize: 11.5,
-          ),
-          unselectedLabelStyle: AppTypography.labelSmall(
-            color: AppColors.textSecondary,
-          ).copyWith(
-            fontWeight: FontWeight.w600,
-            fontSize: 11.5,
-          ),
-          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-          overlayColor: WidgetStateProperty.all(Colors.transparent),
-          splashFactory: NoSplash.splashFactory,
-          tabs: tabs,
+        labelColor: AppColors.burgundy,
+        unselectedLabelColor: AppColors.textMuted,
+        labelStyle: AppTypography.labelSmall().copyWith(
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          letterSpacing: 0.8,
         ),
+        unselectedLabelStyle: AppTypography.labelSmall(
+          color: AppColors.textMuted,
+        ).copyWith(
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+          letterSpacing: 0.6,
+        ),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+        overlayColor: WidgetStateProperty.all(
+          AppColors.burgundy.withValues(alpha: 0.06),
+        ),
+        splashFactory: NoSplash.splashFactory,
+        tabs: tabs,
       ),
     );
   }
@@ -76,31 +51,18 @@ class ProfilePillTabBar extends StatelessWidget {
 class ProfilePillTab extends StatelessWidget {
   const ProfilePillTab({
     super.key,
-    required this.icon,
     required this.label,
+    this.icon,
   });
 
-  final IconData icon;
   final String label;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return Tab(
-      height: 48,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 17),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 10.5, height: 1),
-          ),
-        ],
-      ),
+      height: 34,
+      text: label.toUpperCase(),
     );
   }
 }
@@ -111,8 +73,8 @@ class ProfileTabBarDelegate extends SliverPersistentHeaderDelegate {
   final ProfilePillTabBar tabBar;
   final Color? backgroundColor;
 
-  static const _verticalPadding = 10.0;
-  static const _tabBarHeight = 54.0;
+  static const _verticalPadding = 6.0;
+  static const _tabBarHeight = 42.0;
 
   @override
   double get minExtent => _tabBarHeight + _verticalPadding * 2;

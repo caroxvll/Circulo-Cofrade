@@ -7,6 +7,9 @@ alter table public.forum_topics
 alter table public.forum_topics
   add column if not exists cover_image_url text;
 
+alter table public.forum_topics
+  add column if not exists icon_image_url text;
+
 update public.forum_topics set icon_key = 'filter_vintage_outlined'
 where id = 'circulo-cuaresma';
 

@@ -1,0 +1,327 @@
+<section class="posts-page">
+  <header class="posts-head">
+    <div>
+      <p class="eyebrow">Historial</p>
+      <h1>Mis publicaciones</h1>
+      <p class="lead">Publicadas y programadas como cuenta oficial.</p>
+    </div>
+    <a routerLink="/hermandad/publicar" class="btn-ico primary">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M12 5v14M5 12h14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </svg>
+      <span>Nueva</span>
+      <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M5 12h14M13 6l6 6-6 6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </a>
+  </header>
+
+  @if (store.loading()) {
+    <div class="state-box">Cargando…</div>
+  } @else {
+    <div class="filter-chips" role="group" aria-label="Filtrar por sección del tablón">
+      @for (opt of categoryFilterOptions; track opt.value) {
+        <button
+          type="button"
+          class="chip"
+          [class.active]="categoryFilter() === opt.value"
+          (click)="setCategoryFilter(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      }
+    </div>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>Programadas</h2>
+        @if (filteredScheduled().length > 0) {
+          <span class="count">{{ filteredScheduled().length }}</span>
+        }
+      </div>
+
+      @if (filteredScheduled().length === 0) {
+        <div class="empty-panel soft">
+          <p>
+            @if (categoryFilter() === 'all') {
+              No hay nada programado.
+            } @else {
+              No hay programadas en esta sección.
+            }
+          </p>
+          <a routerLink="/hermandad/publicar" class="link-arrow">
+            Programar una
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 12h14M13 6l6 6-6 6"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </a>
+        </div>
+      } @else {
+        <div class="cards">
+          @for (post of filteredScheduled(); track post.id) {
+            <article class="pub-card scheduled">
+              @if (post.imageUrl) {
+                <img [src]="post.imageUrl" alt="" class="cover" />
+              } @else {
+                <div class="cover empty"></div>
+              }
+              <div class="body">
+                <div class="top">
+                  <span class="tag">{{ categoryLabel(post.category) }}</span>
+                  <span class="badge"
+                    >Sale {{ formatSchedule(post.scheduledAt) }}</span
+                  >
+                </div>
+                <h3>{{ postTitle(post.body) }}</h3>
+                @if (postExcerpt(post.body); as excerpt) {
+                  <p>{{ excerpt }}</p>
+                }
+                <p class="meta">{{ boardTitle(post.topicId) }}</p>
+                <button
+                  type="button"
+                  class="btn-ico soft sm"
+                  [disabled]="cancellingId() === post.id"
+                  (click)="cancelScheduled(post.id)"
+                >
+                  <span>{{
+                    cancellingId() === post.id ? 'Cancelando…' : 'Cancelar'
+                  }}</span>
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>Publicadas</h2>
+        @if (filteredPublished().length > 0) {
+          <div class="block-tools">
+            <span class="count">{{ filteredPublished().length }}</span>
+            @if (pageCount() > 1) {
+              <div class="pager">
+                <button
+                  type="button"
+                  class="pager-btn"
+                  [disabled]="page() <= 0"
+                  (click)="shiftPage(-1)"
+                  aria-label="Anterior"
+                >
+                  ‹
+                </button>
+                <span>{{ page() + 1 }}/{{ pageCount() }}</span>
+                <button
+                  type="button"
+                  class="pager-btn"
+                  [disabled]="page() >= pageCount() - 1"
+                  (click)="shiftPage(1)"
+                  aria-label="Siguiente"
+                >
+                  ›
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      @if (published().length === 0) {
+        <div class="empty-panel">
+          <p class="empty-title">Todavía no hay publicaciones</p>
+          <p>Cuando publiques, aparecerán aquí en formato ficha.</p>
+          <a routerLink="/hermandad/publicar" class="btn-ico soft">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 5v14M5 12h14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+            <span>Publicar</span>
+            <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 12h14M13 6l6 6-6 6"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </a>
+        </div>
+      } @else if (filteredPublished().length === 0) {
+        <div class="empty-panel soft">
+          <p>No hay publicadas en esta sección.</p>
+        </div>
+      } @else {
+        <div class="cards">
+          @for (post of visiblePosts(); track post.id) {
+            <article class="pub-card">
+              @if (post.imageUrl) {
+                <img [src]="post.imageUrl" alt="" class="cover" />
+              } @else {
+                <div class="cover empty"></div>
+              }
+              <div class="body">
+                <div class="top">
+                  <span class="tag">{{ categoryLabel(post.category) }}</span>
+                  <span class="when">{{ timeAgo(post.createdAt) }}</span>
+                </div>
+                <h3>{{ postTitle(post.body) }}</h3>
+                @if (postExcerpt(post.body); as excerpt) {
+                  <p>{{ excerpt }}</p>
+                }
+                <p class="meta">{{ boardTitle(post.topicId) }}</p>
+                <div class="card-actions">
+                  <button
+                    type="button"
+                    class="btn-ico soft sm"
+                    (click)="openPreview(post)"
+                  >
+                    <span>Vista app</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-ico soft sm"
+                    (click)="openEdit(post)"
+                  >
+                    <span>Editar</span>
+                  </button>
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  }
+</section>
+
+@if (previewPost(); as post) {
+  <div class="modal-backdrop" (click)="closePreview()">
+    <div class="modal phone" (click)="$event.stopPropagation()">
+      <header class="modal-head">
+        <strong>Así se ve en la app</strong>
+        <button type="button" class="icon-x" (click)="closePreview()">✕</button>
+      </header>
+      <div class="phone-frame">
+        <article class="app-card">
+          <div class="app-kicker">
+            <span>{{ categoryLabel(post.category).toUpperCase() }}</span>
+            <span>{{ timeAgo(post.createdAt) }}</span>
+          </div>
+          <h3>{{ previewTitle() }}</h3>
+          <p>{{ previewBody() }}</p>
+          <span class="app-more">Leer más →</span>
+          @if (post.imageUrl) {
+            <img [src]="post.imageUrl" alt="" class="app-img" />
+            <p class="app-hint">En la app, al tocar la imagen se abre a pantalla completa.</p>
+          }
+        </article>
+      </div>
+      <footer class="modal-foot">
+        <button type="button" class="btn-ico soft" (click)="openEdit(post); closePreview()">
+          <span>Editar</span>
+        </button>
+        <button type="button" class="btn-ico primary" (click)="closePreview()">
+          <span>Cerrar</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+}
+
+@if (editingPost(); as post) {
+  <div class="modal-backdrop" (click)="closeEdit()">
+    <div class="modal edit" (click)="$event.stopPropagation()">
+      <header class="modal-head">
+        <strong>Editar publicación</strong>
+        <button type="button" class="icon-x" (click)="closeEdit()">✕</button>
+      </header>
+
+      <div class="edit-form">
+        <label>
+          Categoría
+          <select [(ngModel)]="editCategory">
+            @for (c of categories; track c.value) {
+              <option [value]="c.value">{{ c.label }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Título
+          <input [(ngModel)]="editTitle" />
+        </label>
+        <label>
+          Texto
+          <textarea [(ngModel)]="editBody" rows="7"></textarea>
+        </label>
+
+        <div class="image-edit">
+          @if (editImagePreview) {
+            <img [src]="editImagePreview" alt="" />
+            <button type="button" class="btn-ico soft sm" (click)="removeEditImage()">
+              <span>Quitar imagen</span>
+            </button>
+          } @else {
+            <label class="file-btn">
+              Cambiar imagen
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                (change)="onEditImagePicked($event)"
+              />
+            </label>
+          }
+        </div>
+
+        @if (dialogError()) {
+          <div class="error-box">{{ dialogError() }}</div>
+        }
+      </div>
+
+      <footer class="modal-foot">
+        <button type="button" class="btn-ico soft" (click)="deletePublished(post)">
+          <span>Eliminar</span>
+        </button>
+        <div class="grow"></div>
+        <button type="button" class="btn-ico soft" (click)="closeEdit()">
+          <span>Cancelar</span>
+        </button>
+        <button
+          type="button"
+          class="btn-ico primary"
+          [disabled]="saving()"
+          (click)="saveEdit()"
+        >
+          <span>{{ saving() ? 'Guardando…' : 'Guardar' }}</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+}

@@ -4,7 +4,7 @@ final _mockSsLiveUpdates = <SsLiveUpdate>[
   SsLiveUpdate(
     id: 'mock-ss-1c',
     userId: 'mock-user-1c',
-    authorHandle: '@triana_paso',
+    authorHandle: '@esperanza_triana',
     kind: SsLiveUpdateKind.posicion,
     hermandadLabel: 'La Esperanza de Triana',
     message: 'Ya en Pureza. Ambiente de barrio.',
@@ -12,6 +12,7 @@ final _mockSsLiveUpdates = <SsLiveUpdate>[
     latitude: 37.3835,
     longitude: -6.0024,
     createdAt: DateTime.now().subtract(const Duration(minutes: 22)),
+    isOfficial: true,
   ),
   SsLiveUpdate(
     id: 'mock-ss-1b',
@@ -166,11 +167,14 @@ SsLiveUpdate addMockSsLiveUpdate({
   required String message,
   String? hermandadLabel,
   String? placeLabel,
+  String? imageUrl,
   double? latitude,
   double? longitude,
+  bool isOfficial = false,
 }) {
   final hermandad = hermandadLabel?.trim();
   final place = placeLabel?.trim();
+  final image = imageUrl?.trim();
   final update = SsLiveUpdate(
     id: 'mock-ss-${_mockSsLiveUpdates.length + 1}',
     userId: userId,
@@ -179,9 +183,11 @@ SsLiveUpdate addMockSsLiveUpdate({
     message: message.trim(),
     hermandadLabel: hermandad == null || hermandad.isEmpty ? null : hermandad,
     placeLabel: place == null || place.isEmpty ? null : place,
+    imageUrl: image == null || image.isEmpty ? null : image,
     latitude: latitude,
     longitude: longitude,
     createdAt: DateTime.now(),
+    isOfficial: isOfficial,
   );
   _mockSsLiveUpdates.insert(0, update);
   return update;

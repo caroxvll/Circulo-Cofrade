@@ -10,6 +10,7 @@ Future<void> showHermandadBoardStatsSheet(
   required int viewCount,
   required int comunicadoCount,
   required Map<String, int> reactionBreakdown,
+  int followerCount = 0,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -40,19 +41,24 @@ Future<void> showHermandadBoardStatsSheet(
               ),
               const SizedBox(height: 16),
               Text(
-                'Resumen del tablón',
+                'Resumen del canal',
                 style: AppTypography.titleLarge(color: AppColors.burgundy),
               ),
               const SizedBox(height: 16),
               _SummaryRow(
-                icon: Icons.visibility_outlined,
-                label: 'Visitas al tablón',
-                value: '$viewCount',
+                icon: Icons.people_outline_rounded,
+                label: 'Seguidores',
+                value: '$followerCount',
               ),
               _SummaryRow(
                 icon: Icons.campaign_outlined,
                 label: 'Comunicados publicados',
                 value: '$comunicadoCount',
+              ),
+              _SummaryRow(
+                icon: Icons.visibility_outlined,
+                label: 'Visitas al tablón',
+                value: '$viewCount',
               ),
               _SummaryRow(
                 icon: Icons.add_reaction_outlined,

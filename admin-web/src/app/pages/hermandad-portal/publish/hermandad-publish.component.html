@@ -1,0 +1,175 @@
+<section class="publish-page">
+  @if (store.boards().length === 0) {
+    <div class="empty-box">
+      No tienes tablón asignado. Contacta con la Junta.
+    </div>
+  } @else {
+    <div class="composer">
+      <header class="composer-head">
+        <div>
+          <p class="eyebrow">Canal oficial</p>
+          <h1>Nueva publicación</h1>
+        </div>
+        <p class="board-pill">
+          {{
+            store.boards().length > 1
+              ? 'Elige tablón ↓'
+              : store.boards()[0].hermandadName || store.boards()[0].title
+          }}
+        </p>
+      </header>
+
+      @if (store.boards().length > 1) {
+        <label class="field">
+          Tablón
+          <select [(ngModel)]="topicId">
+            @for (board of store.boards(); track board.topicId) {
+              <option [value]="board.topicId">{{ board.title }}</option>
+            }
+          </select>
+        </label>
+      }
+
+      <div class="row-block">
+        <span class="row-label">Tipo</span>
+        <div class="chips" role="listbox" aria-label="Tipo de publicación">
+          @for (kind of kinds; track kind.id) {
+            <button
+              type="button"
+              class="chip"
+              role="option"
+              [attr.aria-selected]="kindId === kind.id"
+              [class.on]="kindId === kind.id"
+              (click)="onKindChange(kind.id)"
+            >
+              {{ kind.label }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="meta-row">
+        <div class="where-box">
+          <span class="row-label">Dónde se verá</span>
+          <p class="where-summary">
+            Siempre en el <strong>tablón</strong> de tu hermandad en la app.
+            @if (!activeKind.calendarType) {
+              Este tipo no va al calendario.
+            }
+          </p>
+          @if (activeKind.calendarType) {
+            <label class="switch-line">
+              <input type="checkbox" [(ngModel)]="destCalendar" />
+              <span
+                >También en el <strong>calendario</strong> de Círculo Cofrade (fecha y
+                lugar del acto)</span
+              >
+            </label>
+          }
+        </div>
+
+        <div class="meta-group">
+          <span class="row-label">Cuándo sale en el tablón</span>
+          <div class="seg">
+            <button
+              type="button"
+              [class.on]="timing === 'now'"
+              (click)="timing = 'now'"
+            >
+              Ahora
+            </button>
+            <button
+              type="button"
+              [class.on]="timing === 'later'"
+              (click)="timing = 'later'"
+            >
+              Programar
+            </button>
+          </div>
+          @if (timing === 'later') {
+            <input
+              type="datetime-local"
+              class="when-input"
+              [(ngModel)]="scheduleAtLocal"
+              aria-label="Fecha de publicación"
+            />
+          }
+        </div>
+      </div>
+
+      @if (destCalendar && activeKind.needsDate) {
+        <div class="event-row">
+          <label class="field grow">
+            Fecha del acto
+            <input type="datetime-local" [(ngModel)]="startsAtLocal" />
+          </label>
+          <label class="field grow">
+            Lugar
+            <input
+              [(ngModel)]="location"
+              placeholder="Templo, casa de hermandad…"
+            />
+          </label>
+        </div>
+      }
+
+      <label class="field">
+        Título
+        <input
+          [(ngModel)]="title"
+          placeholder="Ej. Culto de regla · Iguala de costaleros"
+        />
+      </label>
+
+      <label class="field body-field">
+        Texto
+        <textarea
+          [(ngModel)]="body"
+          placeholder="Detalles, horario, avisos…"
+        ></textarea>
+      </label>
+
+      @if (error()) {
+        <div class="error-box compact">{{ error() }}</div>
+      }
+
+      <footer class="composer-foot">
+        <div class="image-slot">
+          @if (imagePreview) {
+            <img [src]="imagePreview" alt="" class="thumb" />
+            <button type="button" class="linkish" (click)="clearImage()">
+              Quitar
+            </button>
+          } @else {
+            <label class="file-btn">
+              + Imagen
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                (change)="onImagePicked($event)"
+              />
+            </label>
+            <span class="muted">opcional · 5 MB</span>
+          }
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-primary publish-btn"
+          [disabled]="saving() || body.trim().length < 3"
+          (click)="submit()"
+        >
+          {{
+            saving()
+              ? timing === 'later'
+                ? 'Programando…'
+                : 'Publicando…'
+              : timing === 'later'
+                ? 'Programar'
+                : 'Publicar'
+          }}
+        </button>
+      </footer>
+    </div>
+  }
+</section>

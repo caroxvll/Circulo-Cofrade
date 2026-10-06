@@ -69,6 +69,7 @@ export interface DispatchJobRow {
   title: string;
   status: string;
   processedCount: number;
+  audienceEstimate: number | null;
   retryCount: number;
   errorMessage: string | null;
   createdAt: string;
@@ -82,6 +83,28 @@ export interface DispatchOverview {
   failedCount: number;
   doneLast24h: number;
   processedLast24h: number;
+}
+
+export interface PushDeliveryOverview {
+  pending: number;
+  processing: number;
+  done: number;
+  failed: number;
+  skipped: number;
+  doneLast24h: number;
+  failedLast24h: number;
+  oldestPendingAt: string | null;
+}
+
+export interface PushDeliveryJobRow {
+  id: string;
+  type: string;
+  title: string;
+  status: string;
+  retryCount: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Prefs que mostramos como chips en la tabla (orden visual). */
@@ -201,10 +224,16 @@ export class NotificationsAdminService {
   }
 
   async listDispatchJobs(limit = 40): Promise<DispatchJobRow[]> {
+    const { error: fillError } = await getSupabase().rpc(
+      'staff_fill_dispatch_audience_estimates',
+    );
+    // Si el SQL de progreso aún no está, seguimos sin estimación.
+    void fillError;
+
     const { data, error } = await getSupabase()
       .from('notification_dispatch_jobs')
       .select(
-        'id, kind, source_id, title, status, processed_count, retry_count, error_message, created_at, updated_at',
+        'id, kind, source_id, title, status, processed_count, audience_estimate, retry_count, error_message, created_at, updated_at',
       )
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -216,6 +245,10 @@ export class NotificationsAdminService {
       title: String(row['title'] ?? ''),
       status: String(row['status'] ?? ''),
       processedCount: Number(row['processed_count'] ?? 0),
+      audienceEstimate:
+        row['audience_estimate'] == null
+          ? null
+          : Number(row['audience_estimate']),
       retryCount: Number(row['retry_count'] ?? 0),
       errorMessage: (row['error_message'] as string | null) ?? null,
       createdAt: String(row['created_at'] ?? ''),
@@ -236,6 +269,58 @@ export class NotificationsAdminService {
   async retryFailedDispatchJobs(): Promise<number> {
     const { data, error } = await getSupabase().rpc(
       'staff_retry_failed_notification_jobs',
+    );
+    if (error) throw error;
+    return Number(data ?? 0);
+  }
+
+  async fetchPushDeliveryOverview(): Promise<PushDeliveryOverview> {
+    const { data, error } = await getSupabase().rpc(
+      'staff_push_delivery_overview',
+    );
+    if (error) throw error;
+    const raw = (data ?? {}) as Record<string, unknown>;
+    return {
+      pending: Number(raw['pending'] ?? 0),
+      processing: Number(raw['processing'] ?? 0),
+      done: Number(raw['done'] ?? 0),
+      failed: Number(raw['failed'] ?? 0),
+      skipped: Number(raw['skipped'] ?? 0),
+      doneLast24h: Number(raw['doneLast24h'] ?? 0),
+      failedLast24h: Number(raw['failedLast24h'] ?? 0),
+      oldestPendingAt: (raw['oldestPendingAt'] as string | null) ?? null,
+    };
+  }
+
+  async listPushDeliveryJobs(limit = 40): Promise<PushDeliveryJobRow[]> {
+    const { data, error } = await getSupabase()
+      .from('push_delivery_jobs')
+      .select(
+        'id, type, title, status, retry_count, last_error, created_at, updated_at',
+      )
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []).map((row) => ({
+      id: String(row['id'] ?? ''),
+      type: String(row['type'] ?? ''),
+      title: String(row['title'] ?? ''),
+      status: String(row['status'] ?? ''),
+      retryCount: Number(row['retry_count'] ?? 0),
+      lastError: (row['last_error'] as string | null) ?? null,
+      createdAt: String(row['created_at'] ?? ''),
+      updatedAt: String(row['updated_at'] ?? ''),
+    }));
+  }
+
+  async kickPushDelivery(): Promise<void> {
+    const { error } = await getSupabase().rpc('staff_kick_push_delivery');
+    if (error) throw error;
+  }
+
+  async retryFailedPushJobs(): Promise<number> {
+    const { data, error } = await getSupabase().rpc(
+      'staff_retry_failed_push_jobs',
     );
     if (error) throw error;
     return Number(data ?? 0);
@@ -275,6 +360,8 @@ export class NotificationsAdminService {
         return 'Hecho';
       case 'failed':
         return 'Fallido';
+      case 'skipped':
+        return 'Omitido';
       default:
         return status;
     }

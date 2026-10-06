@@ -220,10 +220,11 @@ Future<bool> needsProfileOnboarding(Ref ref) async {
   final user = ref.read(currentUserProvider);
   if (user == null) return false;
 
+  // Metadata local primero: no bloquear redirects esperando el perfil remoto.
+  if (isProfileOnboardingDone(user)) return false;
+
   final profile = ref.read(currentUserProfileProvider).asData?.value ??
       await ref.read(currentUserProfileProvider.future);
-
-  if (isProfileOnboardingDone(user)) return false;
 
   if (isProfileCompleteForOnboarding(user: user, profile: profile)) {
     await syncProfileOnboardingCompletedIfNeeded(ref);
@@ -240,10 +241,10 @@ Future<bool> needsProfileOnboardingWidget(WidgetRef ref) async {
   final user = ref.read(currentUserProvider);
   if (user == null) return false;
 
+  if (isProfileOnboardingDone(user)) return false;
+
   final profile = ref.read(currentUserProfileProvider).asData?.value ??
       await ref.read(currentUserProfileProvider.future);
-
-  if (isProfileOnboardingDone(user)) return false;
 
   if (isProfileCompleteForOnboarding(user: user, profile: profile)) {
     await syncProfileOnboardingCompletedIfNeededWidget(ref);

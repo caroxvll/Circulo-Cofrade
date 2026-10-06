@@ -60,6 +60,25 @@ enum EventType {
 
 enum CalendarEventStatus { published, pendingReview, rejected }
 
+/// Control manual del live (ensayo / procesión / etc.).
+enum EventLiveForceState {
+  auto,
+  open,
+  closed;
+
+  static EventLiveForceState fromDb(String? raw) => switch (raw) {
+    'open' => EventLiveForceState.open,
+    'closed' => EventLiveForceState.closed,
+    _ => EventLiveForceState.auto,
+  };
+
+  String get dbValue => switch (this) {
+    EventLiveForceState.auto => 'auto',
+    EventLiveForceState.open => 'open',
+    EventLiveForceState.closed => 'closed',
+  };
+}
+
 extension CalendarEventStatusX on CalendarEventStatus {
   static CalendarEventStatus fromDb(String? raw) => switch (raw) {
     'pending_review' => CalendarEventStatus.pendingReview,
@@ -104,6 +123,8 @@ class CalendarEvent {
 
     this.coverImageUrl,
     this.status = CalendarEventStatus.published,
+    this.endsAt,
+    this.liveForceState = EventLiveForceState.auto,
   });
 
   final String? id;
@@ -135,6 +156,12 @@ class CalendarEvent {
 
   final CalendarEventStatus status;
 
+  /// Fin estimado del live (si null, duración por tipo en la app).
+  final DateTime? endsAt;
+
+  /// auto / open / closed — cierre manual (lluvia, etc.).
+  final EventLiveForceState liveForceState;
+
   bool get isPublished => status == CalendarEventStatus.published;
   bool get isPendingReview => status == CalendarEventStatus.pendingReview;
 
@@ -161,6 +188,9 @@ class CalendarEvent {
     String? customIconUrl,
     String? coverImageUrl,
     CalendarEventStatus? status,
+    DateTime? endsAt,
+    bool clearEndsAt = false,
+    EventLiveForceState? liveForceState,
   }) {
     return CalendarEvent(
       id: id ?? this.id,
@@ -177,6 +207,8 @@ class CalendarEvent {
       customIconUrl: customIconUrl ?? this.customIconUrl,
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
       status: status ?? this.status,
+      endsAt: clearEndsAt ? null : (endsAt ?? this.endsAt),
+      liveForceState: liveForceState ?? this.liveForceState,
     );
   }
 }

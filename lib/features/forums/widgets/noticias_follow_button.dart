@@ -21,15 +21,10 @@ class NoticiasFollowButton extends ConsumerWidget {
     final followingAsync = ref.watch(isFollowingForumProvider(noticiasForumId));
 
     return followingAsync.when(
-      loading: () => const SizedBox(
-        height: 36,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
+      skipLoadingOnReload: true,
+      loading: () => _NoticiasFollowChip(
+        isFollowing: false,
+        onTap: () => _toggle(context, ref, false),
       ),
       error: (_, _) => const SizedBox.shrink(),
       data: (isFollowing) => _NoticiasFollowChip(

@@ -41,13 +41,9 @@ abstract final class SearchDesign {
         ],
       );
 
-  static TextStyle sectionTitle() => AppTypography.titleLarge(
+  static TextStyle sectionTitle() => AppTypography.sectionTitle(
         color: AppColors.burgundy,
-      ).copyWith(
-        fontSize: sectionTitleSize,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.15,
-      );
+      ).copyWith(fontSize: sectionTitleSize);
 
   static TextStyle sectionMeta() => AppTypography.labelSmall(
         color: AppColors.textMuted,

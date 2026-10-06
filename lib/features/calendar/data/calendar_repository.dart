@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../shared/models/calendar_event.dart';
+import '../../forums/utils/hermandad_board_display.dart';
 import '../models/organizer_logo.dart';
 import '../utils/calendar_event_utils.dart';
 import 'mock_calendar_events.dart';
@@ -145,6 +146,7 @@ class CalendarRepository {
     required String subtitle,
     required EventType type,
     required DateTime startsAt,
+    DateTime? endsAt,
     String? dayLabel,
     String? location,
     String? organizerLabel,
@@ -161,6 +163,7 @@ class CalendarRepository {
           'subtitle': subtitle,
           'event_type': type.dbValue,
           'starts_at': startsAt.toUtc().toIso8601String(),
+          if (endsAt != null) 'ends_at': endsAt.toUtc().toIso8601String(),
           'day_label': dayLabel,
           'location': location ?? '',
           'organizer_label': organizerLabel ?? '',
@@ -180,6 +183,8 @@ class CalendarRepository {
     required String subtitle,
     required EventType type,
     required DateTime startsAt,
+    DateTime? endsAt,
+    bool clearEndsAt = false,
     String? dayLabel,
     String? location,
     String? organizerLabel,
@@ -188,25 +193,57 @@ class CalendarRepository {
   }) async {
     if (_client == null) throw CalendarRemoteUnavailableException();
 
+    final payload = <String, dynamic>{
+      'title': title,
+      'subtitle': subtitle,
+      'event_type': type.dbValue,
+      'starts_at': startsAt.toUtc().toIso8601String(),
+      'day_label': dayLabel,
+      'location': location ?? '',
+      'organizer_label': organizerLabel ?? '',
+      'custom_icon_url': customIconUrl ?? '',
+      'cover_image_url': coverImageUrl ?? '',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    if (clearEndsAt) {
+      payload['ends_at'] = null;
+    } else if (endsAt != null) {
+      payload['ends_at'] = endsAt.toUtc().toIso8601String();
+    }
+
     final row = await _client!
         .from('calendar_events')
-        .update({
-          'title': title,
-          'subtitle': subtitle,
-          'event_type': type.dbValue,
-          'starts_at': startsAt.toUtc().toIso8601String(),
-          'day_label': dayLabel,
-          'location': location ?? '',
-          'organizer_label': organizerLabel ?? '',
-          'custom_icon_url': customIconUrl ?? '',
-          'cover_image_url': coverImageUrl ?? '',
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        })
+        .update(payload)
         .eq('id', eventId)
         .select('*, profiles!created_by(handle, display_name)')
         .single();
 
     return _fromRow(row);
+  }
+
+  Future<void> setEventLiveForceState({
+    required String eventId,
+    required EventLiveForceState state,
+  }) async {
+    if (_client == null) throw CalendarRemoteUnavailableException();
+    try {
+      await _client!.rpc(
+        'admin_set_event_live_force_state',
+        params: {
+          'p_event_id': eventId,
+          'p_force_state': state.dbValue,
+        },
+      );
+    } catch (_) {
+      // Fallback si aún no está el RPC: update directo (RLS staff).
+      await _client!
+          .from('calendar_events')
+          .update({
+            'live_force_state': state.dbValue,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', eventId);
+    }
   }
 
   Future<void> deleteEvent(String eventId) async {
@@ -380,6 +417,55 @@ class CalendarRepository {
         .maybeSingle();
     if (row == null) return null;
     return _nonEmptyUrl(row['logo_url'] as String?);
+  }
+
+  /// Escudo del tablón oficial si el organizador coincide con una hermandad.
+  Future<String?> fetchHermandadIconByOrganizerLabel(
+    String organizerLabel,
+  ) async {
+    final label = organizerLabel.trim();
+    if (label.length < 3 || _client == null) return null;
+    final key = normalizeOrganizerKey(label);
+    if (key.length < 2) return null;
+
+    final logos = await fetchHermandadOrganizerLogos();
+    return logos[key]?.logoUrl;
+  }
+
+  /// Escudos de tablones oficiales indexados por organizador normalizado.
+  Future<Map<String, OrganizerLogo>> fetchHermandadOrganizerLogos() async {
+    if (_client == null) return const {};
+
+    try {
+      final rows = await _client!
+          .from('forum_topics')
+          .select('title, icon_image_url')
+          .eq('forum_id', 'hermandades')
+          .not('icon_image_url', 'eq', '')
+          .limit(400);
+
+      final result = <String, OrganizerLogo>{};
+      for (final row in rows as List<dynamic>) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final icon = _nonEmptyUrl(map['icon_image_url'] as String?);
+        if (icon == null) continue;
+        final title = (map['title'] as String?)?.trim() ?? '';
+        if (title.isEmpty) continue;
+        final parsed = parseHermandadTopicTitle(title);
+        final name = parsed.hermandadName.trim();
+        if (name.length < 3) continue;
+        final key = normalizeOrganizerKey(name);
+        if (key.length < 2 || result.containsKey(key)) continue;
+        result[key] = OrganizerLogo(
+          organizerKey: key,
+          displayLabel: name,
+          logoUrl: icon,
+        );
+      }
+      return result;
+    } catch (_) {
+      return const {};
+    }
   }
 
   Future<void> saveOrganizerLogo({
@@ -663,6 +749,12 @@ class CalendarRepository {
       customIconUrl: row['custom_icon_url'] as String?,
       coverImageUrl: _nonEmptyUrl(row['cover_image_url'] as String?),
       status: CalendarEventStatusX.fromDb(row['status'] as String?),
+      endsAt: row['ends_at'] != null
+          ? DateTime.parse(row['ends_at'] as String).toLocal()
+          : null,
+      liveForceState: EventLiveForceState.fromDb(
+        row['live_force_state'] as String?,
+      ),
     );
   }
 
