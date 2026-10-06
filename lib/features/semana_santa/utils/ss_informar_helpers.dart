@@ -19,7 +19,8 @@ class SsDayHermandadOption {
   final String? processionDay;
 }
 
-/// Hermandades del foro que salen en la jornada activa (o todas si no hay día).
+/// Hermandades del foro que salen en la jornada activa.
+/// Sin jornada activa → lista vacía (el hub SS no muestra hermandades).
 final ssDayHermandadesProvider =
     Provider.autoDispose<AsyncValue<List<SsDayHermandadOption>>>((ref) {
   final gate = ref.watch(ssLiveGateProvider);
@@ -30,18 +31,16 @@ final ssDayHermandadesProvider =
     error: AsyncValue.error,
     data: (topics) {
       final dayLabel = gate.asData?.value.activeDay?.label.trim();
+      if (dayLabel == null || dayLabel.isEmpty) {
+        return const AsyncValue.data([]);
+      }
       final options = <SsDayHermandadOption>[];
       for (final topic in topics) {
         if (topic.isSystem) continue;
         final parsed = parseHermandadTopicTitle(topic.title);
         final name = parsed.hermandadName.trim();
         if (name.isEmpty) continue;
-        if (dayLabel != null &&
-            dayLabel.isNotEmpty &&
-            parsed.processionDay != null &&
-            parsed.processionDay != dayLabel) {
-          continue;
-        }
+        if (parsed.processionDay != dayLabel) continue;
         options.add(
           SsDayHermandadOption(
             name: name,

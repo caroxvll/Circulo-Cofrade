@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,12 +10,13 @@ import '../../auth/auth_provider.dart';
 import '../../cuaresma/widgets/cuaresma_hub_design.dart';
 import '../../forums/topic_detail_typography.dart';
 import '../../forums/utils/hermandad_local_assets.dart';
+import '../../forums/widgets/forum_post_image_viewer.dart';
 import '../models/ss_live_update.dart';
 import '../semana_santa_provider.dart';
 import '../utils/ss_informar_helpers.dart';
 import 'ss_live_design.dart';
 
-/// Timeline en directo del hub: página fija sin scroll (paginación).
+/// Timeline en directo del hub (scroll continuo, estilo feed).
 class SemanaSantaRadarSection extends ConsumerStatefulWidget {
   const SemanaSantaRadarSection({
     super.key,
@@ -39,12 +38,6 @@ class SemanaSantaRadarSection extends ConsumerStatefulWidget {
 
 class _SemanaSantaRadarSectionState
     extends ConsumerState<SemanaSantaRadarSection> {
-  static const _tileEstimate = 136.0;
-  static const _tileGap = 8.0;
-  static const _pagerHeight = 36.0;
-
-  var _page = 0;
-
   void _openInformar(BuildContext context) {
     context.push(
       '/foros/${widget.forumId}/tema/${widget.topicId}/informar',
@@ -57,17 +50,65 @@ class _SemanaSantaRadarSectionState
     final feedAsync = ref.watch(ssLiveFeedProvider);
     final canInform = ref.watch(ssCanInformProvider).asData?.value ?? false;
     final gate = ref.watch(ssLiveGateProvider).asData?.value;
-    final dayLabel = gate?.activeDay?.label;
-    final sectionSubtitle = dayLabel != null
+    final rawDayLabel = gate?.activeDay?.label;
+    final dayLabel = rawDayLabel?.trim();
+    final hasActiveDay = dayLabel != null && dayLabel.isNotEmpty;
+    final sectionSubtitle = hasActiveDay
         ? 'Jornada: $dayLabel · últimas 12 h'
-        : 'Últimas 12 h · seguimiento de hermandades';
+        : 'Sin jornada activa · el directo está en pausa';
 
-    ref.listen(ssLiveFeedFilterProvider, (_, _) {
-      if (_page != 0) setState(() => _page = 0);
-    });
-    ref.listen(ssHermandadFilterProvider, (_, _) {
-      if (_page != 0) setState(() => _page = 0);
-    });
+    if (!hasActiveDay) {
+      final dormant = Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.schedule_outlined,
+                size: 32,
+                color: AppColors.burgundy.withValues(alpha: 0.4),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'No hay jornada abierta',
+                textAlign: TextAlign.center,
+                style: TopicDetailTypography.body().copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Cuando Temporada active Dolores, Pasión o un día santo, aquí saldrán los avisos de las hermandades.',
+                textAlign: TextAlign.center,
+                style: TopicDetailTypography.meta(
+                  color: AppColors.textSecondary,
+                ).copyWith(fontSize: 12.5, height: 1.35),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (!widget.fillHeight) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(sectionSubtitle, style: TopicDetailTypography.sectionSubtitle()),
+            const SizedBox(height: 12),
+            dormant,
+          ],
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(sectionSubtitle, style: TopicDetailTypography.sectionSubtitle()),
+          const SizedBox(height: 8),
+          Expanded(child: dormant),
+        ],
+      );
+    }
 
     final header = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -115,246 +156,216 @@ class _SemanaSantaRadarSectionState
       ],
     );
 
-    final feed = feedAsync.when(
-      skipLoadingOnReload: true,
-      data: (updates) {
-        if (updates.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.campaign_outlined,
-                    size: 28,
-                    color: AppColors.burgundy.withValues(alpha: 0.45),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    kindFilter == null
-                        ? (canInform
-                            ? 'Todavía no hay avisos. Sé el primero.'
-                            : 'Todavía no hay avisos en directo.')
-                        : 'Ningún aviso con este filtro.',
-                    textAlign: TextAlign.center,
-                    style: TopicDetailTypography.meta(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  if (kindFilter == null && !canInform) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'Los publican hermandades y reporteros de confianza.\nTú puedes reaccionar y comentar.',
-                      textAlign: TextAlign.center,
-                      style: TopicDetailTypography.meta(
-                        color: AppColors.textMuted,
-                      ).copyWith(fontSize: 12, height: 1.35),
-                    ),
-                  ],
-                  if (canInform)
-                    TextButton(
-                      onPressed: () => _openInformar(context),
-                      child: const Text('+ Informar'),
-                    ),
-                ],
+    Widget emptyFeed() {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.campaign_outlined,
+              size: 28,
+              color: AppColors.burgundy.withValues(alpha: 0.45),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              kindFilter == null
+                  ? (canInform
+                      ? 'Todavía no hay avisos. Sé el primero.'
+                      : 'Todavía no hay avisos en directo.')
+                  : 'Ningún aviso con este filtro.',
+              textAlign: TextAlign.center,
+              style: TopicDetailTypography.meta(
+                color: AppColors.textSecondary,
               ),
             ),
-          );
-        }
-
-        final ordered = [
-          ...updates.where((u) => u.isOfficial),
-          ...updates.where((u) => !u.isOfficial),
-        ];
-
-        if (!widget.fillHeight) {
-          final preview = ordered.take(3).toList();
-          return Column(
-            children: [
-              for (final u in preview) ...[
-                SsLiveHubCompactTile(update: u),
-                const SizedBox(height: _tileGap),
-              ],
+            if (kindFilter == null && !canInform) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Los publican hermandades y reporteros de confianza.\nTú puedes reaccionar y comentar.',
+                textAlign: TextAlign.center,
+                style: TopicDetailTypography.meta(
+                  color: AppColors.textMuted,
+                ).copyWith(fontSize: 12, height: 1.35),
+              ),
             ],
-          );
-        }
-
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final usable = math.max(
-              0.0,
-              constraints.maxHeight - _pagerHeight,
-            );
-            final pageSize = math.max(
-              1,
-              (usable / (_tileEstimate + _tileGap)).floor(),
-            );
-            final pageCount = math.max(1, (ordered.length / pageSize).ceil());
-            final page = _page.clamp(0, pageCount - 1);
-            if (page != _page) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() => _page = page);
-              });
-            }
-            final start = page * pageSize;
-            final pageItems = ordered.skip(start).take(pageSize).toList();
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      for (var i = 0; i < pageItems.length; i++) ...[
-                        if (i > 0) const SizedBox(height: _tileGap),
-                        SsLiveHubCompactTile(update: pageItems[i]),
-                      ],
-                      const Spacer(),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  height: _pagerHeight,
-                  child: _FeedPager(
-                    page: page,
-                    pageCount: pageCount,
-                    total: ordered.length,
-                    onPrev: page > 0
-                        ? () => setState(() => _page = page - 1)
-                        : null,
-                    onNext: page < pageCount - 1
-                        ? () => setState(() => _page = page + 1)
-                        : null,
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: HubSectionListSkeleton(itemCount: 3),
-      ),
-      error: (_, _) => Text(
-        'No se pudieron cargar los avisos.',
-        style: TopicDetailTypography.meta(color: AppColors.textSecondary),
-      ),
-    );
-
-    if (!widget.fillHeight) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          header,
-          const SizedBox(height: 8),
-          feed,
-        ],
+            if (canInform)
+              TextButton(
+                onPressed: () => _openInformar(context),
+                child: const Text('+ Informar'),
+              ),
+          ],
+        ),
       );
     }
 
-    final body = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        header,
-        const SizedBox(height: 8),
-        Expanded(child: feed),
-      ],
-    );
+    if (!widget.fillHeight) {
+      return feedAsync.when(
+        skipLoadingOnReload: true,
+        loading: () => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            header,
+            const SizedBox(height: 8),
+            const HubSectionListSkeleton(itemCount: 3),
+          ],
+        ),
+        error: (_, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            header,
+            const SizedBox(height: 8),
+            Text(
+              'No se pudieron cargar los avisos.',
+              style: TopicDetailTypography.meta(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        data: (updates) {
+          if (updates.isEmpty) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                header,
+                emptyFeed(),
+              ],
+            );
+          }
+          final preview = updates.take(3).toList();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              header,
+              const SizedBox(height: 4),
+              for (final u in preview) SsLiveHubCompactTile(update: u),
+            ],
+          );
+        },
+      );
+    }
 
     final refresh = widget.onRefresh;
-    if (refresh == null) return body;
 
-    // No usar SliverFillRemaining + LayoutBuilder: Flutter pide altura
-    // intrínseca y LayoutBuilder no puede darla → pantalla en blanco.
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return RefreshIndicator(
-          color: AppColors.burgundy,
-          onRefresh: refresh,
-          child: SingleChildScrollView(
+    Widget pinnedHeaderSliver() {
+      return SliverPersistentHeader(
+        pinned: true,
+        delegate: _SsFeedStickyHeaderDelegate(child: header),
+      );
+    }
+
+    return RefreshIndicator(
+      color: AppColors.burgundy,
+      onRefresh: refresh ?? () async {},
+      child: feedAsync.when(
+        skipLoadingOnReload: true,
+        loading: () => CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            pinnedHeaderSliver(),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: HubSectionListSkeleton(itemCount: 4),
+              ),
+            ),
+          ],
+        ),
+        error: (_, _) => CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            pinnedHeaderSliver(),
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Text(
+                  'No se pudieron cargar los avisos.',
+                  style: TopicDetailTypography.meta(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        data: (updates) {
+          if (updates.isEmpty) {
+            return CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                pinnedHeaderSliver(),
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: emptyFeed()),
+                ),
+              ],
+            );
+          }
+
+          return CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
-            child: SizedBox(
-              height: constraints.maxHeight,
-              child: body,
-            ),
-          ),
-        );
-      },
+            slivers: [
+              pinnedHeaderSliver(),
+              SliverList.separated(
+                itemCount: updates.length,
+                separatorBuilder: (_, _) => Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: AppColors.border.withValues(alpha: 0.55),
+                ),
+                itemBuilder: (context, index) =>
+                    SsLiveHubCompactTile(update: updates[index]),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            ],
+          );
+        },
+      ),
     );
   }
 }
 
-class _FeedPager extends StatelessWidget {
-  const _FeedPager({
-    required this.page,
-    required this.pageCount,
-    required this.total,
-    required this.onPrev,
-    required this.onNext,
-  });
+class _SsFeedStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _SsFeedStickyHeaderDelegate({required this.child});
 
-  final int page;
-  final int pageCount;
-  final int total;
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
+  final Widget child;
+
+  /// Badge + subtítulo + chips (+ márgenes).
+  static const double _height = 98;
 
   @override
-  Widget build(BuildContext context) {
-    if (pageCount <= 1) {
-      return Center(
-        child: Text(
-          total == 1 ? '1 aviso' : '$total avisos',
-          style: TopicDetailTypography.meta(
-            color: AppColors.textMuted,
-            fontWeight: FontWeight.w600,
-          ).copyWith(fontSize: 11),
-        ),
-      );
-    }
+  double get minExtent => _height;
 
-    return Row(
-      children: [
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          onPressed: onPrev,
-          icon: Icon(
-            Icons.chevron_left_rounded,
-            color: onPrev == null
-                ? AppColors.textMuted.withValues(alpha: 0.35)
-                : AppColors.burgundy,
-          ),
-        ),
-        Expanded(
-          child: Text(
-            '${page + 1} / $pageCount · $total avisos',
-            textAlign: TextAlign.center,
-            style: TopicDetailTypography.meta(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w700,
-            ).copyWith(fontSize: 11.5),
-          ),
-        ),
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          onPressed: onNext,
-          icon: Icon(
-            Icons.chevron_right_rounded,
-            color: onNext == null
-                ? AppColors.textMuted.withValues(alpha: 0.35)
-                : AppColors.burgundy,
-          ),
-        ),
-      ],
+  @override
+  double get maxExtent => _height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Material(
+      color: AppColors.background,
+      elevation: overlapsContent || shrinkOffset > 0.5 ? 1.5 : 0,
+      shadowColor: AppColors.burgundyDark.withValues(alpha: 0.12),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: child,
+      ),
     );
+  }
+
+  @override
+  bool shouldRebuild(covariant _SsFeedStickyHeaderDelegate oldDelegate) {
+    return child != oldDelegate.child;
   }
 }
 
@@ -365,12 +376,6 @@ class SsLiveHubCompactTile extends ConsumerWidget {
   });
 
   final SsLiveUpdate update;
-
-  String _clock(DateTime dt) {
-    final h = dt.hour.toString().padLeft(2, '0');
-    final m = dt.minute.toString().padLeft(2, '0');
-    return '$h:$m';
-  }
 
   SsDayHermandadOption? _matchHermandad(List<SsDayHermandadOption> options) {
     final needle = update.hermandadLabel?.trim().toLowerCase() ?? '';
@@ -440,283 +445,236 @@ class SsLiveHubCompactTile extends ConsumerWidget {
 
     return Material(
       color: official
-          ? AppColors.burgundy.withValues(alpha: 0.04)
-          : AppColors.surface,
-      elevation: official ? 2.2 : 1.2,
-      shadowColor: AppColors.burgundyDark.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          InkWell(
-            onTap: () => showSsLiveUpdateDetailSheet(context, update: update),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-            child: Ink(
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(14),
-                ),
-                border: Border(
-                  top: BorderSide(
+          ? AppColors.burgundy.withValues(alpha: 0.035)
+          : Colors.transparent,
+      child: InkWell(
+        onTap: () => showSsLiveUpdateDetailSheet(context, update: update),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withValues(alpha: 0.08),
+                  border: Border.all(
                     color: official
-                        ? AppColors.burgundy.withValues(alpha: 0.45)
-                        : AppColors.border.withValues(alpha: 0.75),
-                    width: official ? 1.4 : 1,
-                  ),
-                  left: BorderSide(
-                    color: official
-                        ? AppColors.burgundy.withValues(alpha: 0.45)
-                        : AppColors.border.withValues(alpha: 0.75),
-                    width: official ? 1.4 : 1,
-                  ),
-                  right: BorderSide(
-                    color: official
-                        ? AppColors.burgundy.withValues(alpha: 0.45)
-                        : AppColors.border.withValues(alpha: 0.75),
-                    width: official ? 1.4 : 1,
+                        ? AppColors.burgundy.withValues(alpha: 0.5)
+                        : AppColors.gold.withValues(alpha: 0.4),
                   ),
                 ),
-              ),
-              padding: const EdgeInsets.fromLTRB(12, 11, 12, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 38,
-                    child: Text(
-                      _clock(update.createdAt),
-                      style: TopicDetailTypography.meta(
-                        color: AppColors.textMuted,
-                        fontWeight: FontWeight.w700,
-                      ).copyWith(fontSize: 11),
-                    ),
-                  ),
-                  Container(
-                    width: 3,
-                    height: 42,
-                    margin: const EdgeInsets.only(right: 10, top: 2),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: color.withValues(alpha: 0.08),
-                      border: Border.all(
-                        color: official
-                            ? AppColors.burgundy.withValues(alpha: 0.55)
-                            : AppColors.gold.withValues(alpha: 0.42),
-                      ),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: remote != null && remote.isNotEmpty
-                        ? CofradeoNetworkImage(
-                            url: remote,
-                            fit: BoxFit.contain,
-                            width: 40,
-                            height: 40,
-                            cacheSize: 80,
-                            errorWidget: Icon(
-                              Icons.church_outlined,
-                              size: 18,
-                              color: color,
-                            ),
-                          )
-                        : localAvatar != null
-                            ? Image.asset(localAvatar, fit: BoxFit.cover)
-                            : Icon(
-                                Icons.church_outlined,
-                                size: 18,
-                                color: color,
-                              ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TopicDetailTypography.body().copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 13.5,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: badgeColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    badgeIcon,
-                                    size: 11,
-                                    color: badgeColor,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    badgeLabel,
-                                    style: TopicDetailTypography.meta(
-                                      color: badgeColor,
-                                      fontWeight: FontWeight.w800,
-                                    ).copyWith(fontSize: 10),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                clipBehavior: Clip.antiAlias,
+                child: remote != null && remote.isNotEmpty
+                    ? CofradeoNetworkImage(
+                        url: remote,
+                        fit: BoxFit.contain,
+                        width: 42,
+                        height: 42,
+                        cacheSize: 84,
+                        errorWidget: Icon(
+                          Icons.church_outlined,
+                          size: 18,
+                          color: color,
                         ),
-                        const SizedBox(height: 2),
+                      )
+                    : localAvatar != null
+                        ? Image.asset(localAvatar, fit: BoxFit.cover)
+                        : Icon(
+                            Icons.church_outlined,
+                            size: 18,
+                            color: color,
+                          ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TopicDetailTypography.body().copyWith(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              height: 1.15,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(badgeIcon, size: 13, color: badgeColor),
+                        const SizedBox(width: 3),
                         Text(
-                          author,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          badgeLabel,
                           style: TopicDetailTypography.meta(
-                            color: AppColors.textMuted,
-                            fontWeight: FontWeight.w600,
+                            color: badgeColor,
+                            fontWeight: FontWeight.w800,
                           ).copyWith(fontSize: 11),
                         ),
-                        const SizedBox(height: 4),
                         Text(
-                          update.message,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          ' · ${formatTimeAgo(update.createdAt)}',
                           style: TopicDetailTypography.meta(
-                            color: AppColors.textSecondary,
-                          ).copyWith(fontSize: 12.5, height: 1.3),
+                            color: AppColors.textMuted,
+                          ).copyWith(fontSize: 11),
                         ),
-                        if (place != null && place.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.place_outlined,
-                                size: 12,
-                                color: AppColors.textMuted,
-                              ),
-                              const SizedBox(width: 3),
-                              Expanded(
-                                child: Text(
-                                  place,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TopicDetailTypography.meta(
-                                    color: AppColors.textMuted,
-                                  ).copyWith(fontSize: 11),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(14),
-              ),
-              border: Border(
-                left: BorderSide(
-                  color: official
-                      ? AppColors.burgundy.withValues(alpha: 0.45)
-                      : AppColors.border.withValues(alpha: 0.75),
-                  width: official ? 1.4 : 1,
-                ),
-                right: BorderSide(
-                  color: official
-                      ? AppColors.burgundy.withValues(alpha: 0.45)
-                      : AppColors.border.withValues(alpha: 0.75),
-                  width: official ? 1.4 : 1,
-                ),
-                bottom: BorderSide(
-                  color: official
-                      ? AppColors.burgundy.withValues(alpha: 0.45)
-                      : AppColors.border.withValues(alpha: 0.75),
-                  width: official ? 1.4 : 1,
-                ),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 6, 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SsLiveReactionsBar(
-                      reactionCounts: counts,
-                      userReaction: userReaction,
-                      enabled: canEngage,
-                      onReactionChanged:
-                          canEngage ? (r) => _setReaction(ref, r) : null,
-                    ),
-                  ),
-                  Material(
-                    color: replyCount > 0
-                        ? AppColors.burgundy.withValues(alpha: 0.08)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    child: InkWell(
-                      onTap: () => showSsLiveUpdateDetailSheet(
-                        context,
-                        update: update,
-                        openReplies: true,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.chat_bubble_outline,
-                              size: 15,
-                              color: replyCount > 0
-                                  ? AppColors.burgundy
-                                  : AppColors.textSecondary,
+                    const SizedBox(height: 2),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: author,
+                            style: TopicDetailTypography.meta(
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w600,
+                            ).copyWith(fontSize: 11.5),
+                          ),
+                          TextSpan(
+                            text: ' · ',
+                            style: TopicDetailTypography.meta(
+                              color: AppColors.textMuted,
+                            ).copyWith(fontSize: 11.5),
+                          ),
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: Icon(
+                              ssKindIcon(update.kind),
+                              size: 12,
+                              color: color,
                             ),
-                            if (replyCount > 0) ...[
-                              const SizedBox(width: 4),
-                              Text(
-                                '$replyCount',
-                                style: TopicDetailTypography.meta(
-                                  color: AppColors.burgundy,
-                                  fontWeight: FontWeight.w700,
-                                ).copyWith(fontSize: 11),
-                              ),
-                            ],
-                          ],
-                        ),
+                          ),
+                          TextSpan(
+                            text: ' ${update.kind.label}',
+                            style: TopicDetailTypography.meta(
+                              color: color,
+                              fontWeight: FontWeight.w700,
+                            ).copyWith(fontSize: 11.5),
+                          ),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      update.message,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: TopicDetailTypography.body().copyWith(
+                        fontSize: 14.5,
+                        height: 1.35,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
-                ],
+                    if (update.hasImage) ...[
+                      const SizedBox(height: 10),
+                      GestureDetector(
+                        onTap: () => showForumPostImageViewer(
+                          context,
+                          imageUrl: update.imageUrl!,
+                          shareText: update.message,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: AspectRatio(
+                            aspectRatio: 16 / 10,
+                            child: CofradeoNetworkImage(
+                              url: update.imageUrl!,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              cacheSize: 720,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (place != null && place.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.place_outlined,
+                            size: 13,
+                            color: AppColors.textMuted,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              place,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TopicDetailTypography.meta(
+                                color: AppColors.textMuted,
+                              ).copyWith(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SsLiveReactionsBar(
+                            reactionCounts: counts,
+                            userReaction: userReaction,
+                            enabled: canEngage,
+                            onReactionChanged:
+                                canEngage ? (r) => _setReaction(ref, r) : null,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => showSsLiveUpdateDetailSheet(
+                            context,
+                            update: update,
+                            openReplies: true,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 4,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline,
+                                  size: 15,
+                                  color: replyCount > 0
+                                      ? AppColors.burgundy
+                                      : AppColors.textMuted,
+                                ),
+                                if (replyCount > 0) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$replyCount',
+                                    style: TopicDetailTypography.meta(
+                                      color: AppColors.burgundy,
+                                      fontWeight: FontWeight.w700,
+                                    ).copyWith(fontSize: 11),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1038,6 +996,26 @@ class _SsLiveUpdateDetailSheetState
                       height: 1.45,
                     ),
                   ),
+                  if (update.hasImage) ...[
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () => showForumPostImageViewer(
+                        context,
+                        imageUrl: update.imageUrl!,
+                        shareText: update.message,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: CofradeoNetworkImage(
+                          url: update.imageUrl!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: 220,
+                          cacheSize: 960,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   Row(
                     children: [

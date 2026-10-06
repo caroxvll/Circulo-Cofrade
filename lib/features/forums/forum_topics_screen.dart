@@ -6,7 +6,6 @@ import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/image_decode_cache.dart';
-import '../../core/widgets/cofradeo_bottom_nav.dart';
 import '../../core/widgets/cofradeo_skeleton.dart';
 import '../../shared/models/forum.dart';
 import '../calendar/calendar_provider.dart';
@@ -315,7 +314,9 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
             ),
           ],
         ),
-        bottomPadding: cofradeoBottomScrollPadding(context, extra: 16),
+        // Misma corrección que Círculo / otros foros: el shell ya reserva la
+        // bottom nav (extendBody: false), no sumar otra vez su altura.
+        bottomPadding: 16,
       );
     }
 

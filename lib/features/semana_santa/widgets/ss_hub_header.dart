@@ -9,18 +9,14 @@ class SemanaSantaHubSummaryCard extends StatelessWidget {
   const SemanaSantaHubSummaryCard({
     super.key,
     required this.liveUpdateCount,
-    required this.topicsCount,
     required this.onPublish,
-    required this.onNewTopic,
     this.liveOpen = true,
     this.canInform = false,
     this.jornadaLabel,
   });
 
   final int liveUpdateCount;
-  final int topicsCount;
   final VoidCallback onPublish;
-  final VoidCallback onNewTopic;
   final bool liveOpen;
   final bool canInform;
   final String? jornadaLabel;
@@ -30,8 +26,6 @@ class SemanaSantaHubSummaryCard extends StatelessWidget {
     final avisosLabel = liveUpdateCount == 1
         ? '1 aviso en directo'
         : '$liveUpdateCount avisos en directo';
-    final temasLabel =
-        topicsCount == 1 ? '1 tema abierto' : '$topicsCount temas abiertos';
 
     return Material(
       color: AppColors.surface,
@@ -78,11 +72,13 @@ class SemanaSantaHubSummaryCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       liveOpen
-                          ? '$avisosLabel · $temasLabel'
+                          ? (canInform
+                              ? avisosLabel
+                              : '$avisosLabel · reacciona y comenta')
                           : (jornadaLabel != null
                               ? 'Cerrado · $jornadaLabel'
                               : 'El en directo está cerrado'),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TopicDetailTypography.meta(
                         color: AppColors.textSecondary,
@@ -91,18 +87,8 @@ class SemanaSantaHubSummaryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              if (!liveOpen)
-                TextButton(
-                  onPressed: onNewTopic,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.burgundy,
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  child: const Text('+ Tema'),
-                )
-              else if (canInform)
+              if (liveOpen && canInform) ...[
+                const SizedBox(width: 8),
                 FilledButton(
                   onPressed: onPublish,
                   style: FilledButton.styleFrom(
@@ -127,17 +113,8 @@ class SemanaSantaHubSummaryCard extends StatelessWidget {
                       fontSize: 13,
                     ),
                   ),
-                )
-              else
-                TextButton(
-                  onPressed: onNewTopic,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.burgundy,
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  child: const Text('+ Tema'),
                 ),
+              ],
             ],
           ),
         ),

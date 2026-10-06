@@ -1,11 +1,20 @@
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_bootstrap.dart';
+import '../../../core/utils/image_upload_compress.dart';
 import '../models/ss_live_update.dart';
 import 'mock_ss_live_updates.dart';
 
 class SsLiveUpdateRateLimitedException implements Exception {
-  const SsLiveUpdateRateLimitedException();
+  const SsLiveUpdateRateLimitedException({this.waitSeconds = 45});
+
+  final int waitSeconds;
+}
+
+class SsLiveUpdateImageTooLargeException implements Exception {
+  const SsLiveUpdateImageTooLargeException();
 }
 
 class SsLiveUpdatesRepository {
@@ -15,6 +24,8 @@ class SsLiveUpdatesRepository {
 
   static const _minSecondsBetweenPosts = 45;
   static const _feedWindow = Duration(hours: 12);
+  static const _imagesBucket = 'ss-live-images';
+  static const maxImageBytes = 3 * 1024 * 1024;
 
   Future<List<SsLiveUpdate>> fetchFeed({
     SsLiveUpdateKind? kind,
@@ -82,6 +93,7 @@ class SsLiveUpdatesRepository {
         : (previous?.authorHandle.replaceFirst(RegExp(r'^@'), '') ?? 'cofrade');
     final handle = handleRaw.startsWith('@') ? handleRaw : '@$handleRaw';
 
+    final image = (row['image_url'] as String?)?.trim();
     return SsLiveUpdate(
       id: id,
       userId: userId,
@@ -92,10 +104,46 @@ class SsLiveUpdatesRepository {
       createdAt: DateTime.parse(createdRaw).toLocal(),
       hermandadLabel: hermandad.isEmpty ? null : hermandad,
       placeLabel: place.isEmpty ? null : place,
+      imageUrl: (image == null || image.isEmpty)
+          ? previous?.imageUrl
+          : image,
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
       isOfficial: row['is_official'] as bool? ?? previous?.isOfficial ?? false,
     );
+  }
+
+  Future<String> uploadLiveImage({
+    required String userId,
+    required Uint8List bytes,
+  }) async {
+    final client = _client;
+    if (client == null) {
+      return 'https://example.com/mock-ss-live.jpg';
+    }
+
+    CompressedImage compressed;
+    try {
+      compressed = await compressImageForUploadAsync(
+        bytes,
+        maxBytes: maxImageBytes,
+        maxSide: 1600,
+      );
+    } on ImageTooLargeAfterCompressException {
+      throw const SsLiveUpdateImageTooLargeException();
+    }
+
+    final path = '$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    await client.storage.from(_imagesBucket).uploadBinary(
+          path,
+          compressed.bytes,
+          fileOptions: const FileOptions(
+            upsert: true,
+            contentType: 'image/jpeg',
+          ),
+        );
+    final publicUrl = client.storage.from(_imagesBucket).getPublicUrl(path);
+    return '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
   }
 
   Future<SsLiveUpdate> postUpdate({
@@ -105,6 +153,7 @@ class SsLiveUpdatesRepository {
     String? authorHandle,
     String? hermandadLabel,
     String? placeLabel,
+    String? imageUrl,
     double? latitude,
     double? longitude,
     bool isOfficial = false,
@@ -117,9 +166,13 @@ class SsLiveUpdatesRepository {
     final client = _client;
     if (client == null) {
       final lastAt = mockSsLastPostAt(userId);
-      if (lastAt != null &&
-          DateTime.now().difference(lastAt).inSeconds < _minSecondsBetweenPosts) {
-        throw const SsLiveUpdateRateLimitedException();
+      if (lastAt != null) {
+        final elapsed = DateTime.now().difference(lastAt).inSeconds;
+        if (elapsed < _minSecondsBetweenPosts) {
+          throw SsLiveUpdateRateLimitedException(
+            waitSeconds: _minSecondsBetweenPosts - elapsed,
+          );
+        }
       }
       return addMockSsLiveUpdate(
         userId: userId,
@@ -128,6 +181,7 @@ class SsLiveUpdatesRepository {
         message: trimmed,
         hermandadLabel: hermandadLabel,
         placeLabel: placeLabel,
+        imageUrl: imageUrl,
         latitude: latitude,
         longitude: longitude,
         isOfficial: isOfficial,
@@ -143,13 +197,17 @@ class SsLiveUpdatesRepository {
 
     if (lastRows.isNotEmpty) {
       final lastAt = DateTime.parse(lastRows.first['created_at'] as String);
-      if (DateTime.now().toUtc().difference(lastAt.toUtc()).inSeconds <
-          _minSecondsBetweenPosts) {
-        throw const SsLiveUpdateRateLimitedException();
+      final elapsed =
+          DateTime.now().toUtc().difference(lastAt.toUtc()).inSeconds;
+      if (elapsed < _minSecondsBetweenPosts) {
+        throw SsLiveUpdateRateLimitedException(
+          waitSeconds: _minSecondsBetweenPosts - elapsed,
+        );
       }
     }
 
     final handleForDb = _normalizeHandle(authorHandle)?.replaceFirst('@', '');
+    final image = imageUrl?.trim();
     final row = await client
         .from('ss_live_updates')
         .insert({
@@ -160,6 +218,7 @@ class SsLiveUpdatesRepository {
           'place_label': placeLabel?.trim() ?? '',
           if (handleForDb != null && handleForDb.isNotEmpty)
             'author_handle': handleForDb,
+          if (image != null && image.isNotEmpty) 'image_url': image,
           if (latitude != null) 'latitude': latitude,
           if (longitude != null) 'longitude': longitude,
         })
@@ -179,6 +238,7 @@ class SsLiveUpdatesRepository {
     final avatar = (profile?['avatar_url'] as String?)?.trim();
     final hermandad = (row['hermandad_label'] as String?)?.trim() ?? '';
     final place = (row['place_label'] as String?)?.trim() ?? '';
+    final image = (row['image_url'] as String?)?.trim();
 
     return SsLiveUpdate(
       id: row['id'] as String,
@@ -190,6 +250,7 @@ class SsLiveUpdatesRepository {
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
       hermandadLabel: hermandad.isEmpty ? null : hermandad,
       placeLabel: place.isEmpty ? null : place,
+      imageUrl: (image == null || image.isEmpty) ? null : image,
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
       isOfficial: row['is_official'] as bool? ?? false,

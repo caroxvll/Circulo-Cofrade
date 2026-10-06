@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/time_ago.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
+import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../auth/auth_provider.dart';
 import '../../forums/topic_detail_typography.dart';
 import '../../forums/utils/reply_reactions.dart';
+import '../../forums/widgets/forum_post_image_viewer.dart';
 import '../models/ss_live_update.dart';
 import '../semana_santa_provider.dart';
 
@@ -295,6 +297,29 @@ class _SsLiveUpdateTileState extends ConsumerState<SsLiveUpdateTile> {
               fontSize: 13.5,
             ),
           ),
+          if (update.hasImage) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => showForumPostImageViewer(
+                context,
+                imageUrl: update.imageUrl!,
+                shareText: update.message,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: CofradeoNetworkImage(
+                    url: update.imageUrl!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    cacheSize: 640,
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (place != null && place.isNotEmpty) ...[
             const SizedBox(height: 6),
             Row(

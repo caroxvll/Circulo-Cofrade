@@ -167,12 +167,14 @@ SsLiveUpdate addMockSsLiveUpdate({
   required String message,
   String? hermandadLabel,
   String? placeLabel,
+  String? imageUrl,
   double? latitude,
   double? longitude,
   bool isOfficial = false,
 }) {
   final hermandad = hermandadLabel?.trim();
   final place = placeLabel?.trim();
+  final image = imageUrl?.trim();
   final update = SsLiveUpdate(
     id: 'mock-ss-${_mockSsLiveUpdates.length + 1}',
     userId: userId,
@@ -181,6 +183,7 @@ SsLiveUpdate addMockSsLiveUpdate({
     message: message.trim(),
     hermandadLabel: hermandad == null || hermandad.isEmpty ? null : hermandad,
     placeLabel: place == null || place.isEmpty ? null : place,
+    imageUrl: image == null || image.isEmpty ? null : image,
     latitude: latitude,
     longitude: longitude,
     createdAt: DateTime.now(),

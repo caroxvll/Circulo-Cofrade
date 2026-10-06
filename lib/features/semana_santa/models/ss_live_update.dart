@@ -35,6 +35,7 @@ class SsLiveUpdate {
     this.authorAvatarUrl,
     this.hermandadLabel,
     this.placeLabel,
+    this.imageUrl,
     this.latitude,
     this.longitude,
     this.isOfficial = false,
@@ -49,11 +50,17 @@ class SsLiveUpdate {
   final DateTime createdAt;
   final String? hermandadLabel;
   final String? placeLabel;
+  final String? imageUrl;
   final double? latitude;
   final double? longitude;
   final bool isOfficial;
 
   bool get hasCoordinates => latitude != null && longitude != null;
+
+  bool get hasImage {
+    final url = imageUrl?.trim();
+    return url != null && url.isNotEmpty;
+  }
 
   bool get hasMapTarget =>
       hasCoordinates || (placeLabel != null && placeLabel!.trim().isNotEmpty);

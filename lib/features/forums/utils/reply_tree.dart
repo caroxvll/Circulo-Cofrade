@@ -343,83 +343,50 @@ class _ReplyThreadBranch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Estilo X: sin riel lateral ni sangría fuerte. El contexto va
+    // en "Respondiendo a @…" dentro de cada reply.
     return Padding(
-      padding: const EdgeInsets.only(left: 20, bottom: 4),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _ThreadBranchRail(),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_isCollapsible && !expanded && _hiddenCount > 0)
-                    _ThreadToggleButton(
-                      label: _hiddenCount == 1
-                          ? 'Mostrar 1 respuesta más'
-                          : 'Mostrar $_hiddenCount respuestas más',
-                      expanded: false,
-                      onPressed: onToggle,
-                    ),
-                  for (final child in _visibleChildren)
-                    _ReplyCardSlot(
-                      node: child,
-                      topicAuthorId: topicAuthorId,
-                      replyAnchorKeys: replyAnchorKeys,
-                      highlightReplyId: highlightReplyId,
-                      onAuthorTap: onAuthorTap,
-                      onReplyTap: onReplyTap,
-                      reactionCountsFor: reactionCountsFor,
-                      userReactionFor: userReactionFor,
-                      onReactionChanged: onReactionChanged,
-                      onReportTap: onReportTap,
-                      onShareTap: onShareTap,
-                      manageOptionsFor: manageOptionsFor,
-                      showReport: showReport,
-                    ),
-                  if (_isCollapsible && expanded)
-                    _ThreadToggleButton(
-                      label: 'Ocultar respuestas',
-                      expanded: true,
-                      onPressed: onToggle,
-                    ),
-                ],
+      padding: const EdgeInsets.only(left: 12, top: 0, bottom: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_isCollapsible && !expanded && _hiddenCount > 0)
+            _ThreadToggleButton(
+              label: _hiddenCount == 1
+                  ? 'Mostrar 1 respuesta'
+                  : 'Mostrar $_hiddenCount respuestas',
+              expanded: false,
+              onPressed: onToggle,
+            ),
+          for (var i = 0; i < _visibleChildren.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: AppColors.border.withValues(alpha: 0.35),
               ),
+            _ReplyCardSlot(
+              node: _visibleChildren[i],
+              topicAuthorId: topicAuthorId,
+              replyAnchorKeys: replyAnchorKeys,
+              highlightReplyId: highlightReplyId,
+              onAuthorTap: onAuthorTap,
+              onReplyTap: onReplyTap,
+              reactionCountsFor: reactionCountsFor,
+              userReactionFor: userReactionFor,
+              onReactionChanged: onReactionChanged,
+              onReportTap: onReportTap,
+              onShareTap: onShareTap,
+              manageOptionsFor: manageOptionsFor,
+              showReport: showReport,
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ThreadBranchRail extends StatelessWidget {
-  const _ThreadBranchRail();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 10,
-      child: Column(
-        children: [
-          const SizedBox(height: 10),
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: AppColors.burgundy.withValues(alpha: 0.5),
-              shape: BoxShape.circle,
+          if (_isCollapsible && expanded)
+            _ThreadToggleButton(
+              label: 'Ocultar respuestas',
+              expanded: true,
+              onPressed: onToggle,
             ),
-          ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: Container(
-              width: 2,
-              color: AppColors.gold.withValues(alpha: 0.34),
-            ),
-          ),
         ],
       ),
     );

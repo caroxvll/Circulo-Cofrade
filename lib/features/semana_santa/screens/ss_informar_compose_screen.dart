@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -7,7 +9,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../forums/topic_detail_typography.dart';
+import '../../forums/widgets/hermandad_post_image_picker.dart';
 import '../../profile/profile_provider.dart';
+import '../data/ss_live_updates_repository.dart';
 import '../models/ss_live_update.dart';
 import '../semana_santa_provider.dart';
 import '../utils/ss_informar_helpers.dart';
@@ -38,6 +42,7 @@ class _SsInformarComposeScreenState
   SsDayHermandadOption? _selected;
   double? _latitude;
   double? _longitude;
+  Uint8List? _imageBytes;
   var _isLocating = false;
   var _isPosting = false;
 
@@ -159,13 +164,22 @@ class _SsInformarComposeScreenState
 
     setState(() => _isPosting = true);
     try {
-      final created = await ref.read(ssLiveUpdatesRepositoryProvider).postUpdate(
+      final repo = ref.read(ssLiveUpdatesRepositoryProvider);
+      String? imageUrl;
+      if (_imageBytes != null) {
+        imageUrl = await repo.uploadLiveImage(
+          userId: profile.id,
+          bytes: _imageBytes!,
+        );
+      }
+      final created = await repo.postUpdate(
             userId: profile.id,
             kind: widget.kind,
             message: message,
             authorHandle: profile.handle,
             hermandadLabel: hermandad,
             placeLabel: _placeController.text.trim(),
+            imageUrl: imageUrl,
             latitude: _latitude,
             longitude: _longitude,
             isOfficial: profile.isOfficialHermandad,
@@ -184,12 +198,22 @@ class _SsInformarComposeScreenState
       );
       // Vuelve al hub de Semana Santa (no a la pantalla antigua de compose).
       context.go('/foros/${widget.forumId}/tema/${widget.topicId}');
-    } on SsLiveUpdateRateLimitedException {
+    } on SsLiveUpdateRateLimitedException catch (err) {
+      if (!mounted) return;
+      final secs = err.waitSeconds.clamp(1, 45);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            secs == 1
+                ? 'Espera 1 segundo antes de publicar otro aviso'
+                : 'Espera $secs segundos antes de publicar otro aviso',
+          ),
+        ),
+      );
+    } on SsLiveUpdateImageTooLargeException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Espera un momento antes de publicar otro aviso'),
-        ),
+        const SnackBar(content: Text('La imagen es demasiado grande')),
       );
     } catch (_) {
       if (!mounted) return;
@@ -561,6 +585,17 @@ class _SsInformarComposeScreenState
                                 vertical: 12,
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 12),
+                          HermandadPostImagePicker(
+                            enabled: !_isPosting,
+                            sectionTitle: 'FOTO',
+                            sectionSubtitle:
+                                'Opcional · se verá compacta en el chat',
+                            maxBytes: SsLiveUpdatesRepository.maxImageBytes,
+                            onChanged: ({bytes, mimeType, existingUrl}) {
+                              setState(() => _imageBytes = bytes);
+                            },
                           ),
                           const SizedBox(height: 8),
                           Row(

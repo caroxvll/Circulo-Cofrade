@@ -23,17 +23,23 @@ class SemanaSantaHubHermandadesStrip extends ConsumerWidget {
     final updates = ref.watch(ssLiveRawFeedProvider).asData?.value ?? const [];
     final selected = ref.watch(ssHermandadFilterProvider);
     final gate = ref.watch(ssLiveGateProvider).asData?.value;
-    final dayTitle = gate?.activeDay?.label.trim().isNotEmpty == true
-        ? gate!.activeDay!.label
-        : 'Hoy en la calle';
+    final activeLabel = gate?.activeDay?.label.trim();
+    final hasActiveDay = activeLabel != null && activeLabel.isNotEmpty;
+    final dayTitle = hasActiveDay ? activeLabel : 'Sin jornada activa';
 
     return dayAsync.when(
       loading: () => const SizedBox(height: 72),
       error: (_, _) => const SizedBox.shrink(),
       data: (options) {
+        if (!hasActiveDay) {
+          return const _EmptyDayCta(
+            message:
+                'Sin jornada activa. Cuando abras Dolores, Pasión o Ramos en Temporada, aquí saldrán las hermandades del día.',
+          );
+        }
         if (options.isEmpty) {
           return _EmptyDayCta(
-            dayTitle: dayTitle,
+            message: '$dayTitle · aún no hay hermandades listadas',
             onExplore: () => context.push('/foros/hermandades'),
           );
         }
@@ -255,13 +261,17 @@ class _DayCrestChip extends StatelessWidget {
 }
 
 class _EmptyDayCta extends StatelessWidget {
-  const _EmptyDayCta({required this.dayTitle, required this.onExplore});
+  const _EmptyDayCta({
+    required this.message,
+    this.onExplore,
+  });
 
-  final String dayTitle;
-  final VoidCallback onExplore;
+  final String message;
+  final VoidCallback? onExplore;
 
   @override
   Widget build(BuildContext context) {
+    final tappable = onExplore != null;
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(12),
@@ -284,17 +294,18 @@ class _EmptyDayCta extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '$dayTitle · aún no hay hermandades listadas',
+                  message,
                   style: TopicDetailTypography.meta(
                     color: AppColors.textSecondary,
                   ).copyWith(fontSize: 12),
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.textMuted,
-                size: 20,
-              ),
+              if (tappable)
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textMuted,
+                  size: 20,
+                ),
             ],
           ),
         ),

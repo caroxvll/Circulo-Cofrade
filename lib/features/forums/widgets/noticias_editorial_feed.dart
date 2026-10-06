@@ -163,9 +163,8 @@ List<Widget> buildNoticiasEditorialSlivers({
   }
 
   slivers.add(
-    SliverPadding(
-      padding: EdgeInsets.only(bottom: bottomPadding),
-      sliver: const SliverToBoxAdapter(child: SizedBox.shrink()),
+    SliverToBoxAdapter(
+      child: SizedBox(height: bottomPadding),
     ),
   );
 

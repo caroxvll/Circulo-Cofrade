@@ -1,6 +1,10 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
+  CommunityService,
+  HermandadTopicOption,
+} from '../../core/community/community.service';
+import {
   DEFAULT_VISIBLE_DAYS,
   MAX_VISIBLE_DAYS,
   LiturgicalCountdownSettings,
@@ -30,6 +34,7 @@ import {
 })
 export class SeasonPageComponent implements OnInit {
   private readonly seasonApi = inject(SeasonService);
+  private readonly communityApi = inject(CommunityService);
 
   readonly year = signal(new Date().getFullYear());
   readonly loading = signal(true);
@@ -40,6 +45,7 @@ export class SeasonPageComponent implements OnInit {
   readonly daysMsg = signal<string | null>(null);
 
   readonly liturgicalDays = signal<SsLiturgicalDay[]>([]);
+  readonly hermandadBoards = signal<HermandadTopicOption[]>([]);
   liveEnabled = true;
 
   isEnabled = true;
@@ -67,6 +73,14 @@ export class SeasonPageComponent implements OnInit {
     if (this.liturgicalDays().length === 0) return true;
     return this.activeDay() != null;
   });
+
+  hermandadesForDay(dayLabel: string): string[] {
+    return this.hermandadBoards()
+      .filter((b) => b.processionDay === dayLabel)
+      .map((b) => b.hermandadName)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'es'));
+  }
 
   ngOnInit(): void {
     void this.reload();
@@ -221,7 +235,7 @@ export class SeasonPageComponent implements OnInit {
       );
       this.liturgicalDays.set(days);
       this.daysMsg.set(
-        `Jornadas ${this.year()} regeneradas (horarios Madrid). Se conservan Abrir/Cerrar forzados.`,
+        `Jornadas ${this.year()} regeneradas (incl. Dolores y Pasión). Se conservan Abrir/Cerrar forzados.`,
       );
     } catch (err) {
       const msg =
@@ -292,12 +306,14 @@ export class SeasonPageComponent implements OnInit {
 
   private async reloadDaysAndLive(): Promise<void> {
     try {
-      const [live, days] = await Promise.all([
+      const [live, days, boards] = await Promise.all([
         this.seasonApi.fetchLiveSettings(),
         this.seasonApi.fetchLiturgicalDays(this.year()),
+        this.communityApi.fetchHermandadBoardTopics().catch(() => []),
       ]);
       this.liveEnabled = live.isEnabled;
       this.liturgicalDays.set(days);
+      this.hermandadBoards.set(boards);
     } catch (err) {
       this.liturgicalDays.set([]);
       this.daysMsg.set(

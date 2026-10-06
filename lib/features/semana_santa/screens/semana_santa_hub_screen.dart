@@ -148,16 +148,10 @@ class SemanaSantaHubScreen extends ConsumerWidget {
               children: [
                 SemanaSantaHubSummaryCard(
                   liveUpdateCount: stats.total,
-                  topicsCount: topicsCount,
                   liveOpen: liveOpen,
                   canInform: canInform,
                   jornadaLabel: gate?.activeDay?.label,
                   onPublish: openInformar,
-                  onNewTopic: () => openSemanaSantaTopicCompose(
-                    context,
-                    ref,
-                    forumId: forumId,
-                  ),
                 ),
                 const SizedBox(height: 10),
                 const SemanaSantaHubHermandadesStrip(),
@@ -218,18 +212,6 @@ class SemanaSantaHubScreen extends ConsumerWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        openSemanaSantaTopicCompose(
-                          context,
-                          ref,
-                          forumId: forumId,
-                        );
-                      },
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Nuevo'),
                     ),
                     IconButton(
                       onPressed: () => Navigator.of(ctx).pop(),
