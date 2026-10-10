@@ -30,6 +30,7 @@ class HermandadFeedItem {
 /// Feed cronológico de publicaciones oficiales de las hermandades seguidas.
 final followedHermandadFeedProvider =
     FutureProvider.autoDispose<List<HermandadFeedItem>>((ref) async {
+  ref.keepAlive();
   final boards = await ref.watch(followedHermandadBoardsProvider.future);
   if (boards.isEmpty) return [];
 

@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/image_decode_cache.dart';
+import '../../core/widgets/cofradeo_asset_image.dart';
 import '../../core/widgets/cofradeo_error_panel.dart';
 import '../../core/widgets/cofradeo_network_image.dart';
 import '../../core/widgets/cofradeo_skeleton.dart';
 import '../../shared/models/forum.dart';
 import '../semana_santa/widgets/ss_forums_live_chip.dart';
 import 'forums_provider.dart';
+import 'utils/forum_navigation.dart';
 import 'utils/forum_pillar_image_cache.dart';
 import 'utils/hermandad_local_assets.dart';
 import 'utils/topic_list_order.dart';
@@ -34,7 +35,11 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
   void initState() {
     super.initState();
     // Calentar escudos/fondos locales antes de abrir Hermandades.
-    HermandadLocalAssets.ensureLoaded();
+    if (!HermandadLocalAssets.isReady) {
+      HermandadLocalAssets.ensureLoaded().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   @override
@@ -102,8 +107,10 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
                                 if (noticias != null)
                                   NoticiasPremiumBanner(
                                     forum: noticias,
-                                    onTap: () => context.push(
-                                      '/foros/${noticias.id}',
+                                    onTap: () => pushForumTopicsList(
+                                      context,
+                                      ref,
+                                      forumId: noticias.id,
                                     ),
                                   ),
                                 Expanded(
@@ -206,7 +213,7 @@ class _CenteredForumsBlock extends StatelessWidget {
   }
 }
 
-class _ForumsCardsList extends StatelessWidget {
+class _ForumsCardsList extends ConsumerWidget {
   const _ForumsCardsList({
     required this.pillars,
     required this.cardHeight,
@@ -216,7 +223,7 @@ class _ForumsCardsList extends StatelessWidget {
   final double cardHeight;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (pillars.isEmpty) return const SizedBox.shrink();
 
     return Padding(
@@ -231,7 +238,11 @@ class _ForumsCardsList extends StatelessWidget {
               child: ForumCategoryCard(
                 forum: pillars[i],
                 height: cardHeight,
-                onTap: () => context.push('/foros/${pillars[i].id}'),
+                onTap: () => pushForumTopicsList(
+                  context,
+                  ref,
+                  forumId: pillars[i].id,
+                ),
               ),
             ),
           ],
@@ -277,13 +288,13 @@ class _ForumsHero extends ConsumerWidget {
     final heroUrl = ref.watch(forumsListHeroImageProvider).asData?.value;
     final screenW = MediaQuery.sizeOf(context).width;
     final heroCache = ImageDecodeCache.px(context, screenW);
-    final heroAsset = Image.asset(
-      AppAssets.heroProcesion,
+    final heroAsset = CofradeoAssetImage(
+      assetPath: AppAssets.heroProcesion,
       fit: BoxFit.cover,
       alignment: const Alignment(0, -0.45),
       filterQuality: FilterQuality.medium,
       cacheWidth: heroCache,
-      gaplessPlayback: true,
+      fadeDuration: const Duration(milliseconds: 320),
     );
 
     return ClipRect(

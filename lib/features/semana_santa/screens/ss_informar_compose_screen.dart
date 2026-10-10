@@ -7,8 +7,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../forums/topic_detail_typography.dart';
+import '../../forums/utils/hermandad_local_assets.dart';
 import '../../forums/widgets/hermandad_post_image_picker.dart';
 import '../../profile/profile_provider.dart';
 import '../data/ss_live_updates_repository.dart';
@@ -691,6 +694,17 @@ class _HermandadAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url = option.iconImageUrl?.trim();
+    final hasRemote = url != null && url.isNotEmpty;
+    final localAvatar = HermandadLocalAssets.avatar(
+      processionDay: option.processionDay,
+      hermandadName: option.name,
+    );
+    final fallback = Icon(
+      Icons.church_outlined,
+      size: size * 0.5,
+      color: AppColors.burgundy,
+    );
+
     return Container(
       width: size,
       height: size,
@@ -700,24 +714,32 @@ class _HermandadAvatar extends StatelessWidget {
         border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: url != null && url.isNotEmpty
+      child: hasRemote
           ? CofradeoNetworkImage(
               url: url,
               fit: BoxFit.contain,
               width: size,
               height: size,
               cacheSize: size * 2,
-              errorWidget: Icon(
-                Icons.church_outlined,
-                size: size * 0.5,
-                color: AppColors.burgundy,
+              placeholder: CofradeoSkeletonBone(
+                width: size,
+                height: size,
+                borderRadius: size / 2,
               ),
+              errorWidget: fallback,
             )
-          : Icon(
-              Icons.church_outlined,
-              size: size * 0.5,
-              color: AppColors.burgundy,
-            ),
+          : localAvatar != null
+              ? CofradeoAssetImage(
+                  assetPath: localAvatar,
+                  fit: BoxFit.contain,
+                )
+              : !HermandadLocalAssets.isReady
+                  ? CofradeoSkeletonBone(
+                      width: size,
+                      height: size,
+                      borderRadius: size / 2,
+                    )
+                  : fallback,
     );
   }
 }

@@ -5,6 +5,7 @@ import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../calendar_design_tokens.dart';
 import 'calendar_event_image.dart';
@@ -256,8 +257,8 @@ class _HeroPatternBackground extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(
-          AppAssets.loginBackground,
+        CofradeoAssetImage(
+          assetPath: AppAssets.loginBackground,
           fit: BoxFit.cover,
           alignment: Alignment.center,
           filterQuality: FilterQuality.medium,
@@ -265,7 +266,6 @@ class _HeroPatternBackground extends StatelessWidget {
             context,
             MediaQuery.sizeOf(context).width,
           ),
-          gaplessPlayback: true,
         ),
         DecoratedBox(
           decoration: BoxDecoration(

@@ -184,28 +184,39 @@ class AdsRepository {
     return client.storage.from(_adAssetsBucket).getPublicUrl(path);
   }
 
-  Future<void> registerImpression({
+  /// `true` si se insertó impresión nueva; `false` si dedupe 24 h / sin cliente.
+  /// Lanza si falla la red (el caller puede reintentar).
+  Future<bool> registerImpression({
     required String adId,
     required String viewerId,
   }) async {
     final client = _client;
-    if (client == null) return;
-    await client.rpc(
+    if (client == null) return false;
+    final result = await client.rpc(
       'register_ad_impression',
       params: {'p_ad_id': adId, 'p_viewer_id': viewerId},
     );
+    return result == true;
   }
 
-  Future<void> registerClick({
+  /// `true` si se insertó clic nuevo; `false` si dedupe (15 min) / sin cliente.
+  Future<bool> registerClick({
     required String adId,
     required String viewerId,
   }) async {
     final client = _client;
-    if (client == null) return;
-    await client.rpc(
-      'register_ad_click',
-      params: {'p_ad_id': adId, 'p_viewer_id': viewerId},
-    );
+    if (client == null) return false;
+    try {
+      final result = await client.rpc(
+        'register_ad_click',
+        params: {'p_ad_id': adId, 'p_viewer_id': viewerId},
+      );
+      // Compat: RPC antigua devolvía void (null) tras insertar.
+      if (result == null) return true;
+      return result == true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Informe de impresiones / clics por anuncio.

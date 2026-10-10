@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../forums/topic_detail_typography.dart';
 import '../../forums/utils/hermandad_board_display.dart';
 import '../../forums/utils/hermandad_local_assets.dart';
@@ -28,7 +30,7 @@ class SemanaSantaHubHermandadesStrip extends ConsumerWidget {
     final dayTitle = hasActiveDay ? activeLabel : 'Sin jornada activa';
 
     return dayAsync.when(
-      loading: () => const SizedBox(height: 72),
+      loading: () => const _HermandadesStripSkeleton(),
       error: (_, _) => const SizedBox.shrink(),
       data: (options) {
         if (!hasActiveDay) {
@@ -200,6 +202,11 @@ class _DayCrestChip extends StatelessWidget {
                           width: 48,
                           height: 48,
                           cacheSize: 96,
+                          placeholder: const CofradeoSkeletonBone(
+                            width: 48,
+                            height: 48,
+                            borderRadius: 24,
+                          ),
                           errorWidget: Icon(
                             Icons.church_outlined,
                             size: 22,
@@ -207,12 +214,21 @@ class _DayCrestChip extends StatelessWidget {
                           ),
                         )
                       : localAvatar != null
-                          ? Image.asset(localAvatar, fit: BoxFit.cover)
-                          : Icon(
-                              Icons.church_outlined,
-                              size: 22,
-                              color: accent,
-                            ),
+                          ? CofradeoAssetImage(
+                              assetPath: localAvatar,
+                              fit: BoxFit.contain,
+                            )
+                          : !HermandadLocalAssets.isReady
+                              ? const CofradeoSkeletonBone(
+                                  width: 48,
+                                  height: 48,
+                                  borderRadius: 24,
+                                )
+                              : Icon(
+                                  Icons.church_outlined,
+                                  size: 22,
+                                  color: accent,
+                                ),
                 ),
                 Positioned(
                   right: -1,
@@ -256,6 +272,48 @@ class _DayCrestChip extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _HermandadesStripSkeleton extends StatelessWidget {
+  const _HermandadesStripSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const CofradeoSkeletonBone(width: 140, height: 14, borderRadius: 6),
+        const SizedBox(height: 6),
+        const CofradeoSkeletonBone(width: 200, height: 11, borderRadius: 5),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 78,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 5,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (_, _) => const SizedBox(
+              width: 72,
+              child: Column(
+                children: [
+                  CofradeoSkeletonBone(
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                  ),
+                  SizedBox(height: 6),
+                  CofradeoSkeletonBone(width: 56, height: 10, borderRadius: 4),
+                  SizedBox(height: 4),
+                  CofradeoSkeletonBone(width: 44, height: 9, borderRadius: 4),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

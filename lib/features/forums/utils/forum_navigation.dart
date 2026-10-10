@@ -27,6 +27,12 @@ void prefetchForumTopic(WidgetRef ref, {required String forumId, required String
   ref.read(topicRepliesFirstPageProvider(topicId).future);
 }
 
+/// Calienta la lista de temas del foro *antes* del push (1ª visita menos fría).
+void prefetchForumTopicsList(WidgetRef ref, {required String forumId}) {
+  // ignore: unused_result
+  ref.read(forumTopicsProvider(forumId).future);
+}
+
 /// Prefetch + push. Usar desde listas (tarjetas de tema / tablón).
 Future<void> pushForumTopic(
   BuildContext context,
@@ -36,6 +42,16 @@ Future<void> pushForumTopic(
 }) {
   prefetchForumTopic(ref, forumId: forumId, topicId: topicId);
   return context.push('/foros/$forumId/tema/$topicId');
+}
+
+/// Prefetch lista + push al pilar (Noticias, Hermandades, etc.).
+Future<void> pushForumTopicsList(
+  BuildContext context,
+  WidgetRef ref, {
+  required String forumId,
+}) {
+  prefetchForumTopicsList(ref, forumId: forumId);
+  return context.push('/foros/$forumId');
 }
 
 /// Atrás en detalle de tema: pop si hay pila, si no lista del foro.

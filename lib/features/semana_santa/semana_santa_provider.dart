@@ -108,6 +108,8 @@ class SsLiveFeedNotifier extends AsyncNotifier<List<SsLiveUpdate>> {
 
   @override
   Future<List<SsLiveUpdate>> build() {
+    // keepAlive: reentrar al hub no refetcha en frío en la misma sesión.
+    ref.keepAlive();
     return ref.watch(ssLiveUpdatesRepositoryProvider).fetchFeed();
   }
 
@@ -224,6 +226,7 @@ class SsLiveEngagementNotifier
 
   @override
   Future<SsLiveEngagementSnapshot> build() async {
+    ref.keepAlive();
     final repo = ref.watch(ssLiveEngagementRepositoryProvider);
     final userId = ref.watch(currentUserProvider)?.id;
     // Espera la primera carga del feed sin re-suscribirse a cada parche.

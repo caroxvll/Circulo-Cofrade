@@ -17,6 +17,7 @@ class NoticiasShellAdBar extends StatelessWidget {
     return const SponsoredPlacementSlot(
       placement: AdPlacement.noticias,
       style: SponsoredAdCardStyle.forumsDocked,
+      refreshOnMount: true,
     );
   }
 }

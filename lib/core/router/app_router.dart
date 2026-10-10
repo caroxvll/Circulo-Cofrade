@@ -146,7 +146,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/splash',
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => cofradeoTabPage(
+        pageBuilder: (context, state) => cofradeoAuthPage(
           state: state,
           child: const AuthSplashScreen(),
         ),
@@ -154,7 +154,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/bienvenida',
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => cofradeoFadePage(
+        pageBuilder: (context, state) => cofradeoAuthPage(
           state: state,
           child: const WelcomeScreen(),
         ),
@@ -162,7 +162,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => cofradeoFadePage(
+        pageBuilder: (context, state) => cofradeoAuthPage(
           state: state,
           child: LoginScreen(redirect: state.uri.queryParameters['redirect']),
         ),
@@ -170,7 +170,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/registro',
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => cofradeoFadePage(
+        pageBuilder: (context, state) => cofradeoAuthPage(
           state: state,
           child: RegisterScreen(redirect: state.uri.queryParameters['redirect']),
         ),

@@ -6,6 +6,7 @@ import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/verified_account_badge.dart';
@@ -339,11 +340,12 @@ class _ProfileCoverImage extends StatelessWidget {
       );
     }
 
-    return Image.asset(
-      AppAssets.profileHeaderCover,
+    return CofradeoAssetImage(
+      assetPath: AppAssets.profileHeaderCover,
       fit: BoxFit.cover,
       alignment: const Alignment(0, -0.15),
       cacheWidth: ImageDecodeCache.px(context, screenWidth),
+      fadeDuration: const Duration(milliseconds: 320),
     );
   }
 }

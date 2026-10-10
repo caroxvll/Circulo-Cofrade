@@ -98,5 +98,6 @@ final ssLiveGateRepositoryProvider = Provider<SsLiveGateRepository>((ref) {
 });
 
 final ssLiveGateProvider = FutureProvider.autoDispose<SsLiveGateState>((ref) {
+  ref.keepAlive();
   return ref.watch(ssLiveGateRepositoryProvider).fetchGate();
 });

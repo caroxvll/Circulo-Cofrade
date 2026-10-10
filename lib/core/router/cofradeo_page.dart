@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 /// Empuje de pantallas con sensación nativa.
@@ -41,6 +42,39 @@ Page<void> cofradeoFadePage({
         secondaryRouteAnimation: secondaryAnimation,
         linearTransition: false,
         child: child,
+      );
+    },
+  );
+}
+
+/// Auth (splash / bienvenida / login / registro): fade + leve subida.
+/// Evita el slide Cupertino arrastrando el mismo fondo entre pantallas.
+Page<void> cofradeoAuthPage({
+  required GoRouterState state,
+  required Widget child,
+}) {
+  final isWeb = kIsWeb;
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    name: state.name,
+    child: child,
+    transitionDuration: Duration(milliseconds: isWeb ? 160 : 340),
+    reverseTransitionDuration: Duration(milliseconds: isWeb ? 120 : 280),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.028),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
       );
     },
   );

@@ -9,10 +9,14 @@ import '../calendar/liturgical_countdown_provider.dart';
 import '../calendar/widgets/calendar_shell_ad_bar.dart';
 import '../auth/auth_provider.dart';
 import '../forums/forums_provider.dart';
+import '../forums/mis_hermandades_provider.dart';
+import '../forums/utils/noticias_forum.dart';
 import '../forums/widgets/forums_shell_ad_bar.dart';
+import '../forums/widgets/noticias_shell_ad_bar.dart';
 import '../notifications/notifications_provider.dart';
 import '../permissions/permissions_provider.dart';
 import '../quiz/quiz_provider.dart';
+import '../semana_santa/semana_santa_provider.dart';
 
 class CofradeoShell extends ConsumerWidget {
   const CofradeoShell({
@@ -34,9 +38,16 @@ class CofradeoShell extends ConsumerWidget {
         () => ref.read(notificationsProvider.notifier).silentRefresh(),
       );
     }
-    // Prefetch quiz flag al ir a Foros: el FAB no “aparece tarde”.
+    // Prefetch al ir a Foros: FAB, gate SS, hermandades y feed ya calientes.
     if (index == 1) {
-      Future.microtask(() => ref.read(quizLiveVisibleProvider.future));
+      Future.microtask(() {
+        ref.read(quizLiveVisibleProvider.future);
+        ref.read(ssLiveGateProvider.future);
+        ref.read(forumTopicsProvider('hermandades').future);
+        ref.read(followedHermandadBoardsProvider.future);
+        ref.read(followedHermandadFeedProvider.future);
+        ref.read(ssLiveRawFeedProvider.future);
+      });
     }
     navigationShell.goBranch(
       index,
@@ -59,6 +70,8 @@ class CofradeoShell extends ConsumerWidget {
     final path = GoRouterState.of(context).uri.path;
     final showForumsAd =
         navigationShell.currentIndex == 1 && path == '/foros';
+    final showNoticiasAd = navigationShell.currentIndex == 1 &&
+        path == '/foros/$noticiasForumId';
     final showCalendarAd =
         navigationShell.currentIndex == 0 && path == '/calendario';
 
@@ -71,6 +84,7 @@ class CofradeoShell extends ConsumerWidget {
         children: [
           if (showCalendarAd) const CalendarShellAdBar(),
           if (showForumsAd) const ForumsShellAdBar(),
+          if (showNoticiasAd) const NoticiasShellAdBar(),
           CofradeoBottomNav(
             currentIndex: navigationShell.currentIndex,
             onTap: (index) => _onTap(context, index, ref),

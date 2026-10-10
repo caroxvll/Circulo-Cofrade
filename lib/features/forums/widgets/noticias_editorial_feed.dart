@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/forum.dart';
 import '../data/mock_forums.dart';
@@ -702,12 +703,11 @@ class _NoticiasEditorialCover extends StatelessWidget {
 
     if (cover == null) return placeholder();
     if (topicCoverIsAsset(cover)) {
-      return Image.asset(
-        cover,
+      return CofradeoAssetImage(
+        assetPath: cover,
         fit: BoxFit.cover,
         filterQuality: FilterQuality.low,
         cacheWidth: ImageDecodeCache.px(context, 220),
-        gaplessPlayback: true,
         errorBuilder: (_, _, _) => placeholder(),
       );
     }
@@ -715,6 +715,9 @@ class _NoticiasEditorialCover extends StatelessWidget {
       url: cover,
       fit: BoxFit.cover,
       cacheSize: 220,
+      placeholder: ColoredBox(
+        color: AppColors.burgundy.withValues(alpha: 0.55),
+      ),
       errorWidget: placeholder(),
     );
   }

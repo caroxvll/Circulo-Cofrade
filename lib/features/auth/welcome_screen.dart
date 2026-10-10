@@ -7,8 +7,21 @@ import '../../core/theme/app_typography.dart';
 import '../../core/utils/image_decode_cache.dart';
 
 /// Puerta de entrada: login o registro (solo usuarios sin sesión).
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Calienta fondo/logo para que login/registro no “parpadeen” al entrar.
+    precacheImage(const AssetImage(AppAssets.loginBackground), context);
+    precacheImage(const AssetImage(AppAssets.logoLogin), context);
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/event_type_icon.dart';
 import '../../../core/utils/image_decode_cache.dart';
@@ -43,8 +44,8 @@ class CalendarEventImage extends StatelessWidget {
 
     Widget child;
     if (hasCover && isAsset) {
-      child = Image.asset(
-        cover,
+      child = CofradeoAssetImage(
+        assetPath: cover,
         fit: fit,
         alignment: alignment,
         filterQuality: FilterQuality.medium,
@@ -52,7 +53,6 @@ class CalendarEventImage extends StatelessWidget {
           context,
           MediaQuery.sizeOf(context).width.clamp(320.0, 1080.0),
         ),
-        gaplessPlayback: true,
         errorBuilder: (_, __, ___) => _fallback(),
       );
     } else if (hasCover) {

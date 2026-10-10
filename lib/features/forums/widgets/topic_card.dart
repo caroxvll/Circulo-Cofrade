@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/verified_account_badge.dart';
@@ -18,6 +19,7 @@ import '../data/mock_forums.dart';
 import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
 import '../utils/topic_list_order.dart';
+import 'hermandad_crest_hero.dart';
 import 'related_forum_chip.dart';
 import 'topic_status_badge.dart';
 
@@ -301,6 +303,7 @@ class _PremiumTopicCard extends StatelessWidget {
                                 topic: topic,
                                 size: pinned ? 52 : 44,
                                 circular: !pinned,
+                                heroTopicId: topic.id,
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -754,11 +757,15 @@ class _NoticiasCoverImage extends StatelessWidget {
       ),
     );
 
+    Widget softPlaceholder() => ColoredBox(
+      color: AppColors.burgundy.withValues(alpha: 0.55),
+    );
+
     Widget buildImage({required double? imageHeight}) {
       if (cover == null) return placeholder();
       if (topicCoverIsAsset(cover)) {
-        return Image.asset(
-          cover,
+        return CofradeoAssetImage(
+          assetPath: cover,
           fit: BoxFit.cover,
           width: width,
           height: imageHeight,
@@ -768,7 +775,6 @@ class _NoticiasCoverImage extends StatelessWidget {
             context,
             imageHeight ?? resolvedHeight,
           ),
-          gaplessPlayback: true,
           errorBuilder: (_, _, _) => placeholder(),
         );
       }
@@ -778,6 +784,7 @@ class _NoticiasCoverImage extends StatelessWidget {
         width: width,
         height: imageHeight,
         cacheSize: width,
+        placeholder: softPlaceholder(),
         errorWidget: placeholder(),
       );
     }
@@ -818,13 +825,12 @@ class _HermandadCardWash extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            assetPath,
+          CofradeoAssetImage(
+            assetPath: assetPath,
             fit: BoxFit.cover,
             alignment: const Alignment(-0.4, 0),
             filterQuality: FilterQuality.low,
             cacheWidth: cacheW,
-            gaplessPlayback: true,
           ),
           const DecoratedBox(
             decoration: BoxDecoration(
@@ -1180,11 +1186,15 @@ class PinnedTopicMark extends StatelessWidget {
     required this.topic,
     this.size = 44,
     this.circular = false,
+    this.heroTopicId,
   });
 
   final ForumTopic topic;
   final double size;
   final bool circular;
+
+  /// Si no es null, envuelve el escudo en [HermandadCrestHero] (vuelo al header).
+  final String? heroTopicId;
 
   @override
   Widget build(BuildContext context) {
@@ -1205,7 +1215,7 @@ class PinnedTopicMark extends StatelessWidget {
     final isLocalAsset = (!hasRemoteEscudo && localEscudo != null) ||
         (cover != null && topicCoverIsAsset(cover));
 
-    return Container(
+    final mark = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -1222,13 +1232,14 @@ class PinnedTopicMark extends StatelessWidget {
       child: cover == null
           ? Icon(icon, color: AppColors.gold, size: size * 0.5)
           : isLocalAsset
-          ? Image.asset(
-              cover,
+          ? CofradeoAssetImage(
+              assetPath: cover,
               fit: isEscudo ? BoxFit.contain : BoxFit.cover,
               filterQuality: FilterQuality.low,
               cacheWidth: ImageDecodeCache.px(context, size),
               cacheHeight: ImageDecodeCache.px(context, size),
-              gaplessPlayback: true,
+              // Sin fade en vuelo Hero: el decode ya está en caché.
+              fadeDuration: Duration.zero,
               errorBuilder: (_, _, _) =>
                   Icon(icon, color: AppColors.gold, size: size * 0.5),
             )
@@ -1238,9 +1249,15 @@ class PinnedTopicMark extends StatelessWidget {
               width: size,
               height: size,
               cacheSize: size,
+              fadeInDuration: Duration.zero,
+              fadeOutDuration: Duration.zero,
               errorWidget: Icon(icon, color: AppColors.gold, size: size * 0.5),
             ),
     );
+
+    final heroId = heroTopicId?.trim();
+    if (heroId == null || heroId.isEmpty) return mark;
+    return HermandadCrestHero(topicId: heroId, child: mark);
   }
 }
 

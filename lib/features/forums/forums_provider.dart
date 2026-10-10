@@ -180,6 +180,8 @@ class ForumTopicsNotifier extends AsyncNotifier<List<ForumTopic>> {
 
 final forumTopicProvider = FutureProvider.autoDispose
     .family<ForumTopic?, ForumTopicKey>((ref, key) async {
+      // Mantener en sesión: atrás → delante no vuelve a skeleton + red.
+      ref.keepAlive();
       return ref
           .watch(forumsRepositoryProvider)
           .fetchTopic(key.forumId, key.topicId);

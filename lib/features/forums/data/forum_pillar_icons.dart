@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../shared/models/forum.dart';
 import 'forum_icons.dart';
 
@@ -79,15 +80,14 @@ class ForumPillarIconImage extends StatelessWidget {
       borderRadius: isCircle
           ? BorderRadius.circular(size / 2)
           : borderRadius ?? BorderRadius.zero,
-      child: Image.asset(
-        source,
+      child: CofradeoAssetImage(
+        assetPath: source,
         width: size,
         height: size,
         fit: BoxFit.cover,
         filterQuality: FilterQuality.low,
         cacheWidth: ImageDecodeCache.px(context, size),
         cacheHeight: ImageDecodeCache.px(context, size),
-        gaplessPlayback: true,
         errorBuilder: (_, _, _) => _materialFallback(
           fallbackIcon: fallbackIcon,
           isCircle: isCircle,

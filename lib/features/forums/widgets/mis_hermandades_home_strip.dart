@@ -4,12 +4,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/followed_topic.dart';
 import '../mis_hermandades_provider.dart';
 import '../utils/forum_navigation.dart';
 import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
+import 'hermandad_crest_hero.dart';
 
 /// Bloque compacto en la home de Foros → «Tus Hermandades».
 class MisHermandadesHomeStrip extends ConsumerWidget {
@@ -243,33 +245,42 @@ class _HermandadChip extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: accent.withValues(alpha: 0.12),
-                  border: Border.all(
-                    color: accent.withValues(alpha: 0.45),
+              HermandadCrestHero(
+                topicId: board.topicId,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: accent.withValues(alpha: 0.12),
+                    border: Border.all(
+                      color: accent.withValues(alpha: 0.45),
+                    ),
                   ),
+                  clipBehavior: Clip.antiAlias,
+                  child: hasRemote
+                      ? CofradeoNetworkImage(
+                          url: remote,
+                          fit: BoxFit.contain,
+                          width: 36,
+                          height: 36,
+                          cacheSize: 72,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          errorWidget: Icon(
+                            Icons.church_outlined,
+                            size: 18,
+                            color: accent,
+                          ),
+                        )
+                      : localAvatar != null
+                      ? CofradeoAssetImage(
+                          assetPath: localAvatar,
+                          fit: BoxFit.contain,
+                          fadeDuration: Duration.zero,
+                        )
+                      : Icon(Icons.church_outlined, size: 18, color: accent),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: hasRemote
-                    ? CofradeoNetworkImage(
-                        url: remote,
-                        fit: BoxFit.contain,
-                        width: 36,
-                        height: 36,
-                        cacheSize: 72,
-                        errorWidget: Icon(
-                          Icons.church_outlined,
-                          size: 18,
-                          color: accent,
-                        ),
-                      )
-                    : localAvatar != null
-                    ? Image.asset(localAvatar, fit: BoxFit.cover)
-                    : Icon(Icons.church_outlined, size: 18, color: accent),
               ),
               const SizedBox(width: 8),
               Expanded(
