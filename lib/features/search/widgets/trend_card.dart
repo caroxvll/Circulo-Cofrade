@@ -26,9 +26,18 @@ class TrendCard extends StatelessWidget {
     return Container(
       decoration: SearchDesign.cardDecoration(
         highlighted: isFollowing,
+      ).copyWith(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.textPrimary.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
         child: Row(
           children: [
             Expanded(
@@ -36,34 +45,37 @@ class TrendCard extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: onHashtagTap,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 2,
-                      vertical: 2,
+                      vertical: 1,
                     ),
                     child: Row(
                       children: [
                         CofradeoAvatar(
                           icon: trend.avatarIcon,
-                          size: 46,
+                          size: 34,
                           backgroundColor: AppColors.burgundyDark,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 trend.hashtag,
-                                style: AppTypography.titleLarge(
+                                style: AppTypography.bodyMedium(
                                   color: AppColors.burgundy,
                                 ).copyWith(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.2,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: 2),
                               Text(
                                 '${formatCount(trend.postCount)} publicaciones',
                                 style: SearchDesign.sectionMeta(),
@@ -109,7 +121,7 @@ class _FollowButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: isFollowing
@@ -120,7 +132,7 @@ class _FollowButton extends StatelessWidget {
             isFollowing ? 'Siguiendo' : 'Seguir',
             style: AppTypography.labelSmall(
               color: isFollowing ? AppColors.goldDark : AppColors.textOnDark,
-            ).copyWith(fontWeight: FontWeight.w700, fontSize: 12),
+            ).copyWith(fontWeight: FontWeight.w700, fontSize: 11),
           ),
         ),
       ),

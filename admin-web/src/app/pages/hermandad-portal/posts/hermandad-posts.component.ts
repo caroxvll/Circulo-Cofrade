@@ -9,6 +9,7 @@ import {
 } from '../../../core/hermandad/hermandad-portal.service';
 import { HermandadPortalStore } from '../../../core/hermandad/hermandad-portal.store';
 import { formatTimeAgo } from '../../../core/utils/date';
+import { ConfirmDialogService } from '../../../shared/confirm-dialog/confirm-dialog.service';
 
 @Component({
   selector: 'app-hermandad-posts-page',
@@ -20,19 +21,24 @@ import { formatTimeAgo } from '../../../core/utils/date';
 export class HermandadPostsPageComponent implements OnInit {
   readonly store = inject(HermandadPortalStore);
   private readonly api = inject(HermandadPortalService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly timeAgo = formatTimeAgo;
   readonly categories = OFFICIAL_CATEGORIES;
   readonly categoryLabel = (v: string) => this.api.categoryLabel(v);
   readonly page = signal(0);
-  readonly pageSize = 6;
+  readonly deletedPage = signal(0);
+  readonly pageSize = 20;
   readonly categoryFilter = signal<'all' | OfficialCategory>('all');
+  readonly searchQuery = signal('');
 
   readonly categoryFilterOptions = [
     { value: 'all' as const, label: 'Todas' },
     ...OFFICIAL_CATEGORIES.map((c) => ({ value: c.value, label: c.label })),
   ];
   readonly cancellingId = signal<string | null>(null);
+  readonly restoringId = signal<string | null>(null);
+  readonly purgingId = signal<string | null>(null);
   readonly saving = signal(false);
   readonly dialogError = signal<string | null>(null);
 
@@ -52,20 +58,58 @@ export class HermandadPostsPageComponent implements OnInit {
 
   readonly filteredPublished = computed(() => {
     const f = this.categoryFilter();
-    const all = this.published();
-    if (f === 'all') return all;
-    return all.filter((p) => p.category === f);
+    const q = this.searchQuery().trim().toLowerCase();
+    let list = this.published();
+    if (f !== 'all') list = list.filter((p) => p.category === f);
+    if (q) {
+      list = list.filter((p) => {
+        const title = this.postTitle(p.body).toLowerCase();
+        const excerpt = this.postExcerpt(p.body).toLowerCase();
+        const board = this.boardTitle(p.topicId).toLowerCase();
+        return title.includes(q) || excerpt.includes(q) || board.includes(q);
+      });
+    }
+    return list;
   });
 
   readonly filteredScheduled = computed(() => {
     const f = this.categoryFilter();
-    const all = this.store.scheduledPosts();
-    if (f === 'all') return all;
-    return all.filter((p) => p.category === f);
+    const q = this.searchQuery().trim().toLowerCase();
+    let list = this.store.scheduledPosts();
+    if (f !== 'all') list = list.filter((p) => p.category === f);
+    if (q) {
+      list = list.filter((p) => {
+        const title = this.postTitle(p.body).toLowerCase();
+        const excerpt = this.postExcerpt(p.body).toLowerCase();
+        const board = this.boardTitle(p.topicId).toLowerCase();
+        return title.includes(q) || excerpt.includes(q) || board.includes(q);
+      });
+    }
+    return list;
+  });
+
+  readonly filteredDeleted = computed(() => {
+    const f = this.categoryFilter();
+    const q = this.searchQuery().trim().toLowerCase();
+    let list = this.store.deletedPosts();
+    if (f !== 'all') list = list.filter((p) => p.category === f);
+    if (q) {
+      list = list.filter((p) => {
+        const title = this.postTitle(p.body).toLowerCase();
+        const excerpt = this.postExcerpt(p.body).toLowerCase();
+        const board = this.boardTitle(p.topicId).toLowerCase();
+        return title.includes(q) || excerpt.includes(q) || board.includes(q);
+      });
+    }
+    return list;
   });
 
   readonly pageCount = computed(() =>
     Math.max(1, Math.ceil(this.filteredPublished().length / this.pageSize)),
+  );
+
+  readonly deletedPageCount = computed(() =>
+    Math.max(1, Math.ceil(this.filteredDeleted().length / this.pageSize)),
   );
 
   readonly visiblePosts = computed(() => {
@@ -75,8 +119,34 @@ export class HermandadPostsPageComponent implements OnInit {
     return list.slice(start, start + this.pageSize);
   });
 
+  readonly visibleDeleted = computed(() => {
+    const list = this.filteredDeleted();
+    const p = Math.min(this.deletedPage(), this.deletedPageCount() - 1);
+    const start = p * this.pageSize;
+    return list.slice(start, start + this.pageSize);
+  });
+
+  readonly rangeLabel = computed(() => {
+    const total = this.filteredPublished().length;
+    if (total === 0) return '0';
+    const p = Math.min(this.page(), this.pageCount() - 1);
+    const start = p * this.pageSize + 1;
+    const end = Math.min(total, start + this.pageSize - 1);
+    return `${start}–${end} de ${total}`;
+  });
+
+  readonly deletedRangeLabel = computed(() => {
+    const total = this.filteredDeleted().length;
+    if (total === 0) return '0';
+    const p = Math.min(this.deletedPage(), this.deletedPageCount() - 1);
+    const start = p * this.pageSize + 1;
+    const end = Math.min(total, start + this.pageSize - 1);
+    return `${start}–${end} de ${total}`;
+  });
+
   ngOnInit(): void {
-    if (!this.store.boards().length && !this.store.loading()) {
+    // Siempre refrescar: si no, posts publicados por cron/otra pestaña quedan invisibles.
+    if (!this.store.loading()) {
       void this.store.reload();
     }
   }
@@ -92,9 +162,40 @@ export class HermandadPostsPageComponent implements OnInit {
     this.page.set(Math.max(0, Math.min(this.pageCount() - 1, next)));
   }
 
+  shiftDeletedPage(delta: number): void {
+    const next = this.deletedPage() + delta;
+    this.deletedPage.set(
+      Math.max(0, Math.min(this.deletedPageCount() - 1, next)),
+    );
+  }
+
   setCategoryFilter(value: 'all' | OfficialCategory): void {
     this.categoryFilter.set(value);
     this.page.set(0);
+    this.deletedPage.set(0);
+  }
+
+  onSearchInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.searchQuery.set(value);
+    this.page.set(0);
+    this.deletedPage.set(0);
+  }
+
+  clearSearch(): void {
+    this.searchQuery.set('');
+    this.page.set(0);
+    this.deletedPage.set(0);
+  }
+
+  formatPublishedAt(iso: string): string {
+    return new Date(iso).toLocaleString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   }
 
   formatSchedule(iso: string): string {
@@ -200,13 +301,24 @@ export class HermandadPostsPageComponent implements OnInit {
   }
 
   async deletePublished(post: HermandadOfficialPost): Promise<void> {
-    if (!confirm('¿Eliminar esta publicación del tablón?\nSi tenía evento en el calendario, también se quitará.')) return;
+    const ok = await this.confirmDialog.confirm({
+      title: 'Eliminar publicación',
+      message:
+        'Se quitará del tablón y pasará a Eliminadas.\nSi tenía evento en el calendario, también se quitará.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       await this.store.deletePublishedPost(post.id);
       if (this.previewPost()?.id === post.id) this.closePreview();
       if (this.editingPost()?.id === post.id) this.closeEdit();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'No se pudo eliminar');
+      await this.confirmDialog.alert({
+        title: 'No se pudo eliminar',
+        message: err instanceof Error ? err.message : 'Inténtalo de nuevo.',
+      });
     }
   }
 
@@ -216,6 +328,61 @@ export class HermandadPostsPageComponent implements OnInit {
       await this.store.cancelScheduled(id);
     } finally {
       this.cancellingId.set(null);
+    }
+  }
+
+  async restoreDeleted(id: string): Promise<void> {
+    const ok = await this.confirmDialog.confirm({
+      title: 'Restaurar publicación',
+      message:
+        'Volverá a verse en el tablón y en la app.\nEl evento de calendario (si lo tenía) no se recrea solo.',
+      confirmLabel: 'Restaurar',
+      cancelLabel: 'Cancelar',
+      tone: 'primary',
+    });
+    if (!ok) return;
+    this.restoringId.set(id);
+    try {
+      await this.store.restorePublishedPost(id);
+    } catch (err) {
+      await this.confirmDialog.alert({
+        title: 'No se pudo restaurar',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Comprueba que ejecutaste restore_forum_reply.sql en Supabase.',
+      });
+    } finally {
+      this.restoringId.set(null);
+    }
+  }
+
+  async purgeDeleted(id: string): Promise<void> {
+    const ok = await this.confirmDialog.confirm({
+      title: 'Borrar definitivamente',
+      message:
+        'Se eliminará para siempre del historial.\nEsta acción no se puede deshacer.',
+      confirmLabel: 'Borrar para siempre',
+      cancelLabel: 'Cancelar',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    this.purgingId.set(id);
+    try {
+      await this.store.hardDeletePublishedPost(id);
+      if (this.deletedPage() >= this.deletedPageCount()) {
+        this.deletedPage.set(Math.max(0, this.deletedPageCount() - 1));
+      }
+    } catch (err) {
+      await this.confirmDialog.alert({
+        title: 'No se pudo borrar',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Comprueba que ejecutaste hard_delete_forum_reply.sql en Supabase.',
+      });
+    } finally {
+      this.purgingId.set(null);
     }
   }
 

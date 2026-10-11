@@ -21,6 +21,7 @@ import {
   UserNotifDiag,
 } from '../../core/notifications/notifications-admin.service';
 import { HandleHit } from '../../core/community/community.service';
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import { HandleSearchComponent } from '../../shared/handle-search.component';
 
 type NotifTab = 'coverage' | 'queue';
@@ -34,9 +35,11 @@ type NotifTab = 'coverage' | 'queue';
 })
 export class NotificationsPageComponent implements OnInit, OnDestroy {
   private readonly api = inject(NotificationsAdminService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
   private queueTimer: ReturnType<typeof setInterval> | null = null;
 
   readonly pageSize = 50;
+  readonly queuePageSize = 25;
   readonly tab = signal<NotifTab>('coverage');
   readonly days = signal(30);
   readonly overview = signal<NotificationsOverview | null>(null);
@@ -54,8 +57,12 @@ export class NotificationsPageComponent implements OnInit, OnDestroy {
   readonly queueInfo = signal<string | null>(null);
   readonly dispatchOverview = signal<DispatchOverview | null>(null);
   readonly dispatchJobs = signal<DispatchJobRow[]>([]);
+  readonly dispatchJobsTotal = signal(0);
+  readonly dispatchJobsPage = signal(0);
   readonly pushDeliveryOverview = signal<PushDeliveryOverview | null>(null);
   readonly pushDeliveryJobs = signal<PushDeliveryJobRow[]>([]);
+  readonly pushDeliveryJobsTotal = signal(0);
+  readonly pushDeliveryJobsPage = signal(0);
   readonly liveQueue = signal(true);
 
   selected: HandleHit | null = null;
@@ -72,6 +79,38 @@ export class NotificationsPageComponent implements OnInit, OnDestroy {
   readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.pushUsersTotal() / this.pageSize)),
   );
+
+  readonly dispatchJobsPageCount = computed(() =>
+    Math.max(1, Math.ceil(this.dispatchJobsTotal() / this.queuePageSize)),
+  );
+
+  readonly pushJobsPageCount = computed(() =>
+    Math.max(
+      1,
+      Math.ceil(this.pushDeliveryJobsTotal() / this.queuePageSize),
+    ),
+  );
+
+  readonly dispatchJobsRange = computed(() => {
+    const total = this.dispatchJobsTotal();
+    if (total === 0) return '0';
+    const p = Math.min(this.dispatchJobsPage(), this.dispatchJobsPageCount() - 1);
+    const start = p * this.queuePageSize + 1;
+    const end = Math.min(total, start + this.queuePageSize - 1);
+    return `${start}–${end} de ${total}`;
+  });
+
+  readonly pushJobsRange = computed(() => {
+    const total = this.pushDeliveryJobsTotal();
+    if (total === 0) return '0';
+    const p = Math.min(
+      this.pushDeliveryJobsPage(),
+      this.pushJobsPageCount() - 1,
+    );
+    const start = p * this.queuePageSize + 1;
+    const end = Math.min(total, start + this.queuePageSize - 1);
+    return `${start}–${end} de ${total}`;
+  });
 
   readonly pageLabel = computed(() => {
     const total = this.pushUsersTotal();
@@ -146,11 +185,14 @@ export class NotificationsPageComponent implements OnInit, OnDestroy {
     if (!silent) this.queueLoading.set(true);
     if (!silent) this.error.set(null);
     try {
+      const dispatchOffset =
+        this.dispatchJobsPage() * this.queuePageSize;
+      const pushOffset = this.pushDeliveryJobsPage() * this.queuePageSize;
       const results = await Promise.allSettled([
         this.api.fetchDispatchOverview(),
-        this.api.listDispatchJobs(50),
+        this.api.listDispatchJobs(this.queuePageSize, dispatchOffset),
         this.api.fetchPushDeliveryOverview(),
-        this.api.listPushDeliveryJobs(40),
+        this.api.listPushDeliveryJobs(this.queuePageSize, pushOffset),
       ]);
 
       const [overviewR, jobsR, pushOverviewR, pushJobsR] = results;
@@ -159,13 +201,29 @@ export class NotificationsPageComponent implements OnInit, OnDestroy {
         this.dispatchOverview.set(overviewR.value);
       }
       if (jobsR.status === 'fulfilled') {
-        this.dispatchJobs.set(jobsR.value);
+        this.dispatchJobs.set(jobsR.value.rows);
+        this.dispatchJobsTotal.set(jobsR.value.total);
+        const maxPage = Math.max(
+          0,
+          Math.ceil(jobsR.value.total / this.queuePageSize) - 1,
+        );
+        if (this.dispatchJobsPage() > maxPage) {
+          this.dispatchJobsPage.set(maxPage);
+        }
       }
       if (pushOverviewR.status === 'fulfilled') {
         this.pushDeliveryOverview.set(pushOverviewR.value);
       }
       if (pushJobsR.status === 'fulfilled') {
-        this.pushDeliveryJobs.set(pushJobsR.value);
+        this.pushDeliveryJobs.set(pushJobsR.value.rows);
+        this.pushDeliveryJobsTotal.set(pushJobsR.value.total);
+        const maxPage = Math.max(
+          0,
+          Math.ceil(pushJobsR.value.total / this.queuePageSize) - 1,
+        );
+        if (this.pushDeliveryJobsPage() > maxPage) {
+          this.pushDeliveryJobsPage.set(maxPage);
+        }
       }
 
       const failed = results
@@ -292,6 +350,55 @@ export class NotificationsPageComponent implements OnInit, OnDestroy {
         err instanceof Error
           ? `${err.message} ¿Reejecutaste notification_dispatch_admin.sql?`
           : 'No se pudo recargar el esquema',
+      );
+    } finally {
+      this.queueBusy.set(false);
+    }
+  }
+
+  shiftDispatchJobsPage(delta: number): void {
+    const next = this.dispatchJobsPage() + delta;
+    this.dispatchJobsPage.set(
+      Math.max(0, Math.min(this.dispatchJobsPageCount() - 1, next)),
+    );
+    void this.reloadQueue(true);
+  }
+
+  shiftPushJobsPage(delta: number): void {
+    const next = this.pushDeliveryJobsPage() + delta;
+    this.pushDeliveryJobsPage.set(
+      Math.max(0, Math.min(this.pushJobsPageCount() - 1, next)),
+    );
+    void this.reloadQueue(true);
+  }
+
+  async purgeQueueHistory(): Promise<void> {
+    const ok = await this.confirmDialog.confirm({
+      title: 'Limpiar historial de colas',
+      message:
+        'Se borrarán de la base de datos los trabajos terminados (hechos, fallidos u omitidos) de más de 7 días.\nNo se tocan los pendientes ni los que se están procesando.',
+      confirmLabel: 'Limpiar',
+      cancelLabel: 'Cancelar',
+      tone: 'danger',
+    });
+    if (!ok) return;
+
+    this.queueBusy.set(true);
+    this.queueInfo.set(null);
+    this.error.set(null);
+    try {
+      const result = await this.api.purgeQueueHistory(7);
+      this.dispatchJobsPage.set(0);
+      this.pushDeliveryJobsPage.set(0);
+      this.queueInfo.set(
+        `Historial limpiado: ${result.dispatchDeleted} creación + ${result.pushDeleted} FCM (más de ${result.days} días).`,
+      );
+      await this.reloadQueue(true);
+    } catch (err) {
+      this.error.set(
+        err instanceof Error
+          ? `${err.message} ¿Ejecutaste staff_purge_notification_queues.sql?`
+          : 'No se pudo limpiar el historial',
       );
     } finally {
       this.queueBusy.set(false);

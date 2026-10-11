@@ -327,6 +327,12 @@ class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
     }
   }
 
+  /// Marca leído y luego elimina (p. ej. al deslizar en la bandeja).
+  Future<void> dismissAfterRead(String id) async {
+    await markRead(id);
+    await dismiss(id);
+  }
+
   Future<void> dismiss(String id) async {
     final user = ref.read(currentUserProvider);
     final repo = ref.read(notificationsRepositoryProvider);

@@ -303,17 +303,9 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
             ref.invalidate(forumTopicsProvider(forumId));
           }
         },
-        sponsoredSlot: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ForumTopicsSponsoredEventSlot(forumId: forumId),
-            _ForumTopicsListBanner(
-              placement: _listBannerPlacement(forumId),
-              forumId: forumId,
-              dense: true,
-            ),
-          ],
-        ),
+        // Sin banner a mitad de portada: Noticias ya lleva el dock inferior
+        // (AdPlacement.noticias / NoticiasShellAdBar).
+        sponsoredSlot: null,
         // Misma corrección que Círculo / otros foros: el shell ya reserva la
         // bottom nav (extendBody: false), no sumar otra vez su altura.
         bottomPadding: 16,

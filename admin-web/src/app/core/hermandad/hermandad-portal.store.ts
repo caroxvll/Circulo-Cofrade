@@ -27,6 +27,7 @@ export class HermandadPortalStore {
 
   readonly boards = signal<HermandadBoard[]>([]);
   readonly posts = signal<HermandadOfficialPost[]>([]);
+  readonly deletedPosts = signal<HermandadOfficialPost[]>([]);
   readonly scheduledPosts = signal<HermandadScheduledPost[]>([]);
   readonly upcomingEvents = signal<HermandadUpcomingEvent[]>([]);
   readonly followerCount = signal(0);
@@ -46,6 +47,7 @@ export class HermandadPortalStore {
     if (!profile) {
       this.boards.set([]);
       this.posts.set([]);
+      this.deletedPosts.set([]);
       this.scheduledPosts.set([]);
       this.upcomingEvents.set([]);
       this.followerCount.set(0);
@@ -65,8 +67,9 @@ export class HermandadPortalStore {
       const topicIds = boards.map((b) => b.topicId);
       const primaryId = topicIds[0] ?? null;
 
-      const [posts, scheduled, events, followers] = await Promise.all([
+      const [posts, deleted, scheduled, events, followers] = await Promise.all([
         this.api.fetchOfficialPosts(profile.id, topicIds),
+        this.api.fetchDeletedOfficialPosts(profile.id, topicIds).catch(() => []),
         this.api.fetchScheduledPosts(profile.id, topicIds).catch(() => []),
         this.api.fetchUpcomingOwnEvents(profile.id, 30),
         primaryId
@@ -74,6 +77,7 @@ export class HermandadPortalStore {
           : Promise.resolve(0),
       ]);
       this.posts.set(posts);
+      this.deletedPosts.set(deleted);
       this.scheduledPosts.set(scheduled);
       this.upcomingEvents.set(events);
       this.followerCount.set(followers);
@@ -121,6 +125,11 @@ export class HermandadPortalStore {
       }
       if (!input.startsAtLocal) {
         throw new Error('Indica fecha y hora para el calendario.');
+      }
+      if (!input.location?.trim()) {
+        throw new Error(
+          'Indica el lugar del acto para publicarlo en el calendario.',
+        );
       }
     }
 
@@ -195,6 +204,12 @@ export class HermandadPortalStore {
           } catch (rollbackErr) {
             console.warn('Rollback del post tras fallo de calendario', rollbackErr);
           }
+          const msg = err instanceof Error ? err.message : String(err ?? '');
+          if (/location|not-null|23502/i.test(msg)) {
+            throw new Error(
+              'Falta el lugar del acto. Indícalo para publicar en el calendario. La publicación se ha revertido.',
+            );
+          }
           throw err instanceof Error
             ? err
             : new Error(
@@ -252,6 +267,16 @@ export class HermandadPortalStore {
   async deletePublishedPost(replyId: string): Promise<void> {
     await this.api.softDeleteOfficialPost(replyId);
     await this.reload();
+  }
+
+  async restorePublishedPost(replyId: string): Promise<void> {
+    await this.api.restoreOfficialPost(replyId);
+    await this.reload();
+  }
+
+  async hardDeletePublishedPost(replyId: string): Promise<void> {
+    await this.api.hardDeleteOfficialPost(replyId);
+    this.deletedPosts.update((list) => list.filter((p) => p.id !== replyId));
   }
 
   async deleteUpcomingEvent(eventId: string): Promise<void> {

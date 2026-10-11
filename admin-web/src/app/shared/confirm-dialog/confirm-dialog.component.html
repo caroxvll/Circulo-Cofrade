@@ -1,0 +1,54 @@
+@if (dialog.state(); as s) {
+  <div
+    class="cd-backdrop"
+    (click)="dialog.settle(false)"
+    role="presentation"
+  >
+    <div
+      class="cd-modal"
+      role="alertdialog"
+      aria-modal="true"
+      [attr.aria-labelledby]="'cd-title'"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="cd-head">
+        <strong id="cd-title">{{ s.title }}</strong>
+        <button
+          type="button"
+          class="cd-x"
+          aria-label="Cerrar"
+          (click)="dialog.settle(false)"
+        >
+          ✕
+        </button>
+      </header>
+
+      <div class="cd-body">
+        @for (line of messageLines(s.message); track $index) {
+          <p>{{ line }}</p>
+        }
+      </div>
+
+      <footer class="cd-foot">
+        @if (!s.alertOnly) {
+          <button
+            type="button"
+            class="cd-btn soft"
+            (click)="dialog.settle(false)"
+          >
+            {{ s.cancelLabel }}
+          </button>
+        }
+        <button
+          type="button"
+          class="cd-btn"
+          [class.danger]="s.tone === 'danger'"
+          [class.primary]="s.tone === 'primary' || s.tone === 'default'"
+          (click)="dialog.settle(true)"
+        >
+          {{ s.confirmLabel }}
+        </button>
+      </footer>
+    </div>
+  </div>
+}

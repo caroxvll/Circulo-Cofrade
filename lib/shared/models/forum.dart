@@ -233,7 +233,9 @@ class ForumTopic {
   bool get isPending => status == TopicStatus.pending;
   bool get isRejected => status == TopicStatus.rejected;
   bool get isCloseRequested => closeStatus == TopicCloseStatus.closeRequested;
-  bool get acceptsReplies => isPublished && !isClosed;
+  /// Noticias es solo lectura editorial: sin comentarios.
+  bool get acceptsReplies =>
+      isPublished && !isClosed && forumId != 'noticias';
 
   int get sortTimestamp => createdAt?.millisecondsSinceEpoch ?? 0;
 

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_upload_compress.dart';
+import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../auth/auth_provider.dart';
 import '../../auth/email_verification_gate.dart';
 import '../../permissions/permissions_provider.dart';
@@ -90,6 +91,17 @@ Future<void> showReplyComposeSheet(
     return;
   }
 
+  if (forumId == 'noticias') {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Las noticias no admiten comentarios.'),
+        ),
+      );
+    }
+    return;
+  }
+
   if (forumId == 'hermandades') {
     final profile = ref.read(currentUserProfileProvider).asData?.value;
     final hermandadTopics = await ref.read(hermandadTopicIdsProvider.future);
@@ -117,9 +129,9 @@ Future<void> showReplyComposeSheet(
     isScrollControlled: true,
     isDismissible: true,
     enableDrag: true,
-    backgroundColor: AppColors.background,
+    backgroundColor: AppColors.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (sheetContext) {
       return _ReplyComposeSheet(
@@ -326,6 +338,33 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
     );
   }
 
+  Widget _socialSubmitButton({required bool enabled}) {
+    return FilledButton(
+      onPressed: (_submitting || !enabled) ? null : _submit,
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.burgundy,
+        disabledBackgroundColor: AppColors.burgundy.withValues(alpha: 0.35),
+        foregroundColor: AppColors.textOnDark,
+        disabledForegroundColor: AppColors.textOnDark.withValues(alpha: 0.85),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        minimumSize: const Size(0, 34),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: const StadiumBorder(),
+        textStyle: AppTypography.buttonLabel().copyWith(fontSize: 12.5),
+      ),
+      child: _submitting
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.textOnDark,
+              ),
+            )
+          : const Text('Responder'),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isHermandadBoard = widget.forumId == 'hermandades';
@@ -335,24 +374,46 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
         isHermandadBoard &&
         canPostOfficial &&
         _publishMode == HermandadPublishMode.scheduled;
-    final title = isHermandadBoard && canPostOfficial
-        ? null
-        : 'Escribe una respuesta';
+    final socialReply = !useRichEditor;
+    final profile = ref.watch(currentUserProfileProvider).asData?.value;
 
     return ForumComposeSheetLayout(
+      padding: socialReply
+          ? const EdgeInsets.fromLTRB(14, 0, 12, 0)
+          : const EdgeInsets.fromLTRB(20, 0, 12, 0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (title != null)
-            ForumComposeSheetTitleBar(
-              closeEnabled: !_submitting,
-              title: Text(title, style: TopicDetailTypography.title()),
-            )
+          if (useRichEditor)
+            HermandadOfficialComposeHeader(closeEnabled: !_submitting)
           else
-            HermandadOfficialComposeHeader(closeEnabled: !_submitting),
-          const SizedBox(height: 10),
-          if (isHermandadBoard && canPostOfficial) ...[
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _controller,
+              builder: (context, value, _) {
+                final canSubmit = value.text.trim().isNotEmpty;
+                return Row(
+                  children: [
+                    ForumComposeSheetCloseButton(enabled: !_submitting),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        widget.parentReplyId != null
+                            ? 'Responder'
+                            : 'Nueva respuesta',
+                        style: TopicDetailTypography.meta(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ).copyWith(fontSize: 13),
+                      ),
+                    ),
+                    _socialSubmitButton(enabled: canSubmit),
+                  ],
+                );
+              },
+            ),
+          SizedBox(height: socialReply ? 6 : 10),
+          if (useRichEditor) ...[
             OfficialPostCategoriesPicker(
               category: _officialCategory,
               onCategoryChanged: (value) {
@@ -384,17 +445,45 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
             ),
             const SizedBox(height: 10),
           ],
-          ForumComposeField(
-            controller: _controller,
-            maxLines: isHermandadBoard ? 8 : 6,
-            minLines: useRichEditor ? 6 : 4,
-            toolbar: useRichEditor
-                ? ForumComposeToolbar.editorial
-                : ForumComposeToolbar.standard,
-            hintText: useRichEditor
-                ? 'Redacta la noticia o comunicado oficial…'
-                : 'Comparte tu opinión con claridad…',
-          ),
+          if (socialReply)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (profile != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: CofradeoAvatar(
+                      imageUrl: profile.avatarUrl,
+                      icon: profile.avatarIcon,
+                      size: 34,
+                      backgroundColor: AppColors.backgroundElevated,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: ForumComposeField(
+                    controller: _controller,
+                    maxLines: 4,
+                    minLines: 3,
+                    dense: true,
+                    showHintCaption: false,
+                    toolbar: ForumComposeToolbar.standard,
+                    hintText: widget.parentReplyId != null
+                        ? 'Escribe tu respuesta…'
+                        : '¿Qué opinas?',
+                  ),
+                ),
+              ],
+            )
+          else
+            ForumComposeField(
+              controller: _controller,
+              maxLines: 8,
+              minLines: 6,
+              toolbar: ForumComposeToolbar.editorial,
+              hintText: 'Redacta la noticia o comunicado oficial…',
+            ),
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -402,8 +491,8 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
               style: AppTypography.bodyMedium(color: AppColors.accentRed),
             ),
           ],
-          const SizedBox(height: 12),
-          if (isHermandadBoard && canPostOfficial) ...[
+          if (useRichEditor) ...[
+            const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _submitting ? null : _showPreview,
               icon: const Icon(Icons.visibility_outlined, size: 18),
@@ -415,22 +504,22 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
               ),
             ),
             const SizedBox(height: 8),
-          ],
-          FilledButton(
-            onPressed: _submitting ? null : _submit,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.burgundy,
-              foregroundColor: AppColors.textOnDark,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+            FilledButton(
+              onPressed: _submitting ? null : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.burgundy,
+                foregroundColor: AppColors.textOnDark,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: _submitting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(_submitButtonLabel(isHermandadBoard, canPostOfficial)),
             ),
-            child: _submitting
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(_submitButtonLabel(isHermandadBoard, canPostOfficial)),
-          ),
+          ],
         ],
       ),
     );

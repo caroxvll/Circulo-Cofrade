@@ -34,6 +34,14 @@ export interface UserNotifDiag {
     createdAt: string;
     read: boolean;
   }[];
+  followedHermandades?: {
+    topicId: string;
+    title: string;
+    notifyCategories: string[] | null;
+    notifyAllSections: boolean;
+    notifyNone: boolean;
+    followedAt: string;
+  }[];
 }
 
 export type PushUserFilter =
@@ -223,37 +231,46 @@ export class NotificationsAdminService {
     };
   }
 
-  async listDispatchJobs(limit = 40): Promise<DispatchJobRow[]> {
+  async listDispatchJobs(
+    limit = 25,
+    offset = 0,
+  ): Promise<{ rows: DispatchJobRow[]; total: number }> {
     const { error: fillError } = await getSupabase().rpc(
       'staff_fill_dispatch_audience_estimates',
     );
     // Si el SQL de progreso aún no está, seguimos sin estimación.
     void fillError;
 
-    const { data, error } = await getSupabase()
+    const from = Math.max(0, offset);
+    const to = from + Math.max(1, limit) - 1;
+    const { data, error, count } = await getSupabase()
       .from('notification_dispatch_jobs')
       .select(
         'id, kind, source_id, title, status, processed_count, audience_estimate, retry_count, error_message, created_at, updated_at',
+        { count: 'exact' },
       )
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .range(from, to);
     if (error) throw error;
-    return (data ?? []).map((row) => ({
-      id: String(row['id'] ?? ''),
-      kind: String(row['kind'] ?? ''),
-      sourceId: String(row['source_id'] ?? ''),
-      title: String(row['title'] ?? ''),
-      status: String(row['status'] ?? ''),
-      processedCount: Number(row['processed_count'] ?? 0),
-      audienceEstimate:
-        row['audience_estimate'] == null
-          ? null
-          : Number(row['audience_estimate']),
-      retryCount: Number(row['retry_count'] ?? 0),
-      errorMessage: (row['error_message'] as string | null) ?? null,
-      createdAt: String(row['created_at'] ?? ''),
-      updatedAt: String(row['updated_at'] ?? ''),
-    }));
+    return {
+      total: count ?? 0,
+      rows: (data ?? []).map((row) => ({
+        id: String(row['id'] ?? ''),
+        kind: String(row['kind'] ?? ''),
+        sourceId: String(row['source_id'] ?? ''),
+        title: String(row['title'] ?? ''),
+        status: String(row['status'] ?? ''),
+        processedCount: Number(row['processed_count'] ?? 0),
+        audienceEstimate:
+          row['audience_estimate'] == null
+            ? null
+            : Number(row['audience_estimate']),
+        retryCount: Number(row['retry_count'] ?? 0),
+        errorMessage: (row['error_message'] as string | null) ?? null,
+        createdAt: String(row['created_at'] ?? ''),
+        updatedAt: String(row['updated_at'] ?? ''),
+      })),
+    };
   }
 
   async processDispatchNow(): Promise<{ processedTotal: number }> {
@@ -292,25 +309,52 @@ export class NotificationsAdminService {
     };
   }
 
-  async listPushDeliveryJobs(limit = 40): Promise<PushDeliveryJobRow[]> {
-    const { data, error } = await getSupabase()
+  async listPushDeliveryJobs(
+    limit = 25,
+    offset = 0,
+  ): Promise<{ rows: PushDeliveryJobRow[]; total: number }> {
+    const from = Math.max(0, offset);
+    const to = from + Math.max(1, limit) - 1;
+    const { data, error, count } = await getSupabase()
       .from('push_delivery_jobs')
       .select(
         'id, type, title, status, retry_count, last_error, created_at, updated_at',
+        { count: 'exact' },
       )
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .range(from, to);
     if (error) throw error;
-    return (data ?? []).map((row) => ({
-      id: String(row['id'] ?? ''),
-      type: String(row['type'] ?? ''),
-      title: String(row['title'] ?? ''),
-      status: String(row['status'] ?? ''),
-      retryCount: Number(row['retry_count'] ?? 0),
-      lastError: (row['last_error'] as string | null) ?? null,
-      createdAt: String(row['created_at'] ?? ''),
-      updatedAt: String(row['updated_at'] ?? ''),
-    }));
+    return {
+      total: count ?? 0,
+      rows: (data ?? []).map((row) => ({
+        id: String(row['id'] ?? ''),
+        type: String(row['type'] ?? ''),
+        title: String(row['title'] ?? ''),
+        status: String(row['status'] ?? ''),
+        retryCount: Number(row['retry_count'] ?? 0),
+        lastError: (row['last_error'] as string | null) ?? null,
+        createdAt: String(row['created_at'] ?? ''),
+        updatedAt: String(row['updated_at'] ?? ''),
+      })),
+    };
+  }
+
+  async purgeQueueHistory(days = 7): Promise<{
+    dispatchDeleted: number;
+    pushDeleted: number;
+    days: number;
+  }> {
+    const { data, error } = await getSupabase().rpc(
+      'staff_purge_notification_queues',
+      { p_days: days },
+    );
+    if (error) throw error;
+    const raw = (data ?? {}) as Record<string, unknown>;
+    return {
+      days: Number(raw['days'] ?? days),
+      dispatchDeleted: Number(raw['dispatchDeleted'] ?? 0),
+      pushDeleted: Number(raw['pushDeleted'] ?? 0),
+    };
   }
 
   async kickPushDelivery(): Promise<void> {

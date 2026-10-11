@@ -33,6 +33,7 @@ class TopicCard extends StatelessWidget {
     this.pinned = false,
     this.variant = TopicCardVariant.standard,
     this.forumId,
+    this.compact = false,
   });
 
   final ForumTopic topic;
@@ -40,6 +41,8 @@ class TopicCard extends StatelessWidget {
   final bool pinned;
   final TopicCardVariant variant;
   final String? forumId;
+  /// Listado denso (p. ej. resultados de Buscar).
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +66,7 @@ class TopicCard extends StatelessWidget {
       topic: topic,
       onTap: onTap,
       pinned: pinned,
+      compact: compact,
     );
   }
 }
@@ -72,26 +76,48 @@ class _StandardTopicCard extends StatelessWidget {
     required this.topic,
     required this.onTap,
     required this.pinned,
+    this.compact = false,
   });
 
   final ForumTopic topic;
   final VoidCallback onTap;
   final bool pinned;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final displayTitle = _displayTitle(topic.title);
+    final radius = compact ? 12.0 : 14.0;
+    final pad = compact ? 10.0 : 16.0;
+    final avatarSize = compact ? 32.0 : 44.0;
+    final titleSize = compact ? 14.0 : 17.0;
+    final gapAfterHeader = compact ? 4.0 : 8.0;
+    final gapAfterTitle = compact ? 4.0 : 6.0;
+    final gapBeforeMeta = compact ? 6.0 : 10.0;
+    final excerptStyle = compact
+        ? AppTypography.labelSmall(color: AppColors.textSecondary).copyWith(
+            fontSize: 11.5,
+            height: 1.35,
+            fontWeight: FontWeight.w400,
+          )
+        : AppTypography.bodyMedium();
+    final handleStyle = compact
+        ? AppTypography.labelSmall(color: AppColors.textSecondary).copyWith(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          )
+        : AppTypography.bodyMedium();
 
     return Material(
       color: pinned ? AppColors.backgroundElevated : AppColors.surface,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(radius),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(radius),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(pad),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(radius),
             border: Border.all(
               color: pinned ? AppColors.goldDark : AppColors.border,
               width: pinned ? 1.5 : 1,
@@ -105,10 +131,10 @@ class _StandardTopicCard extends StatelessWidget {
                   : CofradeoAvatar(
                       imageUrl: topic.authorAvatarUrl,
                       icon: topic.avatarIcon,
-                      size: 44,
+                      size: avatarSize,
                       backgroundColor: AppColors.backgroundElevated,
                     ),
-              const SizedBox(width: 12),
+              SizedBox(width: compact ? 10 : 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,7 +147,7 @@ class _StandardTopicCard extends StatelessWidget {
                               if (pinned) ...[
                                 Icon(
                                   Icons.push_pin,
-                                  size: 14,
+                                  size: compact ? 12 : 14,
                                   color: AppColors.goldDark,
                                 ),
                                 const SizedBox(width: 4),
@@ -135,13 +161,13 @@ class _StandardTopicCard extends StatelessWidget {
                                 Flexible(
                                   child: Text(
                                     topic.authorHandle,
-                                    style: AppTypography.bodyMedium(),
+                                    style: handleStyle,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 if (topic.authorVerified) ...[
                                   const SizedBox(width: 4),
-                                  const VerifiedAccountIcon(size: 15),
+                                  VerifiedAccountIcon(size: compact ? 12 : 15),
                                 ],
                               ],
                             ],
@@ -152,54 +178,63 @@ class _StandardTopicCard extends StatelessWidget {
                             topic.timeAgo,
                             style: AppTypography.labelSmall(
                               color: AppColors.accentRed,
-                            ),
+                            ).copyWith(fontSize: compact ? 10 : null),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: gapAfterHeader),
                     Text(
                       displayTitle,
                       style: AppTypography.displaySmall(
                         color: AppColors.textPrimary,
-                      ).copyWith(fontSize: 17),
+                      ).copyWith(
+                        fontSize: titleSize,
+                        height: compact ? 1.2 : null,
+                      ),
+                      maxLines: compact ? 2 : null,
+                      overflow: compact ? TextOverflow.ellipsis : null,
                     ),
                     if (topic.relatedForumId != null) ...[
-                      const SizedBox(height: 8),
+                      SizedBox(height: compact ? 5 : 8),
                       RelatedForumChip(
                         relatedForumId: topic.relatedForumId!,
                         compact: true,
                       ),
                     ],
-                    const SizedBox(height: 6),
+                    SizedBox(height: gapAfterTitle),
                     Text(
                       topic.excerpt,
-                      style: AppTypography.bodyMedium(),
-                      maxLines: 2,
+                      style: excerptStyle,
+                      maxLines: compact ? 2 : 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 10),
+                    SizedBox(height: gapBeforeMeta),
                     Row(
                       children: [
                         Icon(
                           Icons.chat_bubble_outline,
-                          size: 14,
+                          size: compact ? 12 : 14,
                           color: AppColors.textMuted,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           '${topic.commentCount}',
-                          style: AppTypography.labelSmall(),
+                          style: AppTypography.labelSmall().copyWith(
+                            fontSize: compact ? 10 : null,
+                          ),
                         ),
-                        const SizedBox(width: 14),
+                        SizedBox(width: compact ? 10 : 14),
                         Icon(
                           Icons.visibility_outlined,
-                          size: 14,
+                          size: compact ? 12 : 14,
                           color: AppColors.textMuted,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           '${formatCount(topic.viewCount)} vistas',
-                          style: AppTypography.labelSmall(),
+                          style: AppTypography.labelSmall().copyWith(
+                            fontSize: compact ? 10 : null,
+                          ),
                         ),
                         const Spacer(),
                         TopicStatusBadge(topic: topic),
@@ -209,8 +244,11 @@ class _StandardTopicCard extends StatelessWidget {
                 ),
               ),
               if (_topicListCoverUrl(topic) != null) ...[
-                const SizedBox(width: 10),
-                _TopicListCoverThumb(url: _topicListCoverUrl(topic)!),
+                SizedBox(width: compact ? 8 : 10),
+                _TopicListCoverThumb(
+                  url: _topicListCoverUrl(topic)!,
+                  compact: compact,
+                ),
               ],
             ],
           ),
@@ -1268,21 +1306,27 @@ String? _topicListCoverUrl(ForumTopic topic) {
 }
 
 class _TopicListCoverThumb extends StatelessWidget {
-  const _TopicListCoverThumb({required this.url});
+  const _TopicListCoverThumb({
+    required this.url,
+    this.compact = false,
+  });
 
   final String url;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final w = compact ? 44.0 : 52.0;
+    final h = compact ? 56.0 : 68.0;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(compact ? 7 : 8),
       child: SizedBox(
-        width: 52,
-        height: 68,
+        width: w,
+        height: h,
         child: CofradeoNetworkImage(
           url: url,
           fit: BoxFit.cover,
-          cacheSize: 160,
+          cacheSize: compact ? 120 : 160,
           errorWidget: ColoredBox(
             color: AppColors.backgroundElevated,
             child: Icon(

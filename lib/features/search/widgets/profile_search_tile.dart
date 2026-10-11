@@ -23,19 +23,28 @@ class ProfileSearchTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(SearchDesign.cardRadius),
+        borderRadius: BorderRadius.circular(12),
         child: Ink(
-          decoration: SearchDesign.cardDecoration(),
+          decoration: SearchDesign.cardDecoration().copyWith(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.textPrimary.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
             child: Row(
               children: [
                 CofradeoAvatar(
                   imageUrl: profile.avatarUrl,
-                  size: 48,
+                  size: 36,
                   backgroundColor: AppColors.backgroundElevated,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,18 +54,19 @@ class ProfileSearchTile extends StatelessWidget {
                           Flexible(
                             child: Text(
                               profile.displayName,
-                              style: AppTypography.titleLarge(
+                              style: AppTypography.bodyMedium(
                                 color: AppColors.textPrimary,
                               ).copyWith(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                height: 1.2,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (profile.isVerified) ...[
                             const SizedBox(width: 4),
-                            const VerifiedAccountIcon(size: 14),
+                            const VerifiedAccountIcon(size: 12),
                           ],
                         ],
                       ),
@@ -65,17 +75,20 @@ class ProfileSearchTile extends StatelessWidget {
                         profile.handle,
                         style: AppTypography.labelSmall(
                           color: AppColors.burgundy,
-                        ).copyWith(fontWeight: FontWeight.w600),
+                        ).copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
                       ),
                       if (profile.bio.isNotEmpty) ...[
-                        const SizedBox(height: 5),
+                        const SizedBox(height: 3),
                         Text(
                           profile.bio,
                           style: SearchDesign.sectionMeta().copyWith(
                             color: AppColors.textSecondary,
-                            height: 1.35,
+                            height: 1.3,
                           ),
-                          maxLines: 2,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -84,7 +97,8 @@ class ProfileSearchTile extends StatelessWidget {
                 ),
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: AppColors.textMuted.withValues(alpha: 0.75),
+                  size: 20,
+                  color: AppColors.textMuted.withValues(alpha: 0.7),
                 ),
               ],
             ),

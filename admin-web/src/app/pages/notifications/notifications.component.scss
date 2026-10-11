@@ -399,6 +399,30 @@ th {
   font-size: 0.92rem;
 }
 
+.warn-text {
+  color: #9b2c2c;
+}
+
+.hermandad-follows li {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.hermandad-follows li:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.pill.sm {
+  justify-self: start;
+  margin-top: 4px;
+  font-size: 0.72rem;
+}
+
 .diag-cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -538,6 +562,57 @@ th {
 .section-title {
   margin: 8px 0 10px;
   font-size: 1.05rem;
+}
+
+.section-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 8px 0 10px;
+}
+
+.section-row .section-title {
+  margin: 0;
+}
+
+.block-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.block-tools .range {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+
+.queue-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+
+.queue-pager-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.queue-pager-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .kind-list {

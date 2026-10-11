@@ -205,6 +205,25 @@ begin
         order by created_at desc
         limit 20
       ) n
+    ), '[]'::jsonb),
+    'followedHermandades', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'topicId', t.id,
+          'title', t.title,
+          'notifyCategories', f.notify_official_categories,
+          'notifyAllSections', f.notify_official_categories is null,
+          'notifyNone', coalesce(cardinality(f.notify_official_categories), 0) = 0
+            and f.notify_official_categories is not null,
+          'followedAt', f.created_at
+        )
+        order by f.created_at desc
+      )
+      from public.follows f
+      join public.forum_topics t on t.id = f.target_id
+      where f.follower_id = v_profile.id
+        and f.target_type = 'topic'
+        and t.forum_id = 'hermandades'
     ), '[]'::jsonb)
   )
   into v_result;

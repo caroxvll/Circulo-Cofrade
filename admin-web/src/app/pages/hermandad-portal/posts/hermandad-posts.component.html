@@ -1,9 +1,9 @@
 <section class="posts-page">
   <header class="posts-head">
     <div>
-      <p class="eyebrow">Historial</p>
+      <p class="eyebrow">Canal oficial</p>
       <h1>Mis publicaciones</h1>
-      <p class="lead">Publicadas y programadas como cuenta oficial.</p>
+      <p class="lead">Publicadas, programadas y eliminadas del canal oficial.</p>
     </div>
     <a routerLink="/hermandad/publicar" class="btn-ico primary">
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -16,50 +16,63 @@
         />
       </svg>
       <span>Nueva</span>
-      <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M5 12h14M13 6l6 6-6 6"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
     </a>
   </header>
 
   @if (store.loading()) {
     <div class="state-box">Cargando…</div>
   } @else {
-    <div class="filter-chips" role="group" aria-label="Filtrar por sección del tablón">
-      @for (opt of categoryFilterOptions; track opt.value) {
-        <button
-          type="button"
-          class="chip"
-          [class.active]="categoryFilter() === opt.value"
-          (click)="setCategoryFilter(opt.value)"
-        >
-          {{ opt.label }}
-        </button>
-      }
+    <div class="toolbar">
+      <label class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm10-1-4.35-4.35"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+        <input
+          type="search"
+          placeholder="Buscar por título, texto o tablón…"
+          [value]="searchQuery()"
+          (input)="onSearchInput($event)"
+        />
+        @if (searchQuery()) {
+          <button type="button" class="clear-search" (click)="clearSearch()">
+            Limpiar
+          </button>
+        }
+      </label>
+
+      <div class="filter-chips" role="group" aria-label="Filtrar por sección">
+        @for (opt of categoryFilterOptions; track opt.value) {
+          <button
+            type="button"
+            class="chip"
+            [class.active]="categoryFilter() === opt.value"
+            (click)="setCategoryFilter(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        }
+      </div>
     </div>
 
     <section class="block">
       <div class="block-head">
         <h2>Programadas</h2>
-        @if (filteredScheduled().length > 0) {
-          <span class="count">{{ filteredScheduled().length }}</span>
-        }
+        <span class="count">{{ filteredScheduled().length }}</span>
       </div>
 
       @if (filteredScheduled().length === 0) {
         <div class="empty-panel soft">
           <p>
-            @if (categoryFilter() === 'all') {
+            @if (categoryFilter() === 'all' && !searchQuery()) {
               No hay nada programado.
             } @else {
-              No hay programadas en esta sección.
+              Ninguna programada coincide con el filtro.
             }
           </p>
           <a routerLink="/hermandad/publicar" class="link-arrow">
@@ -77,39 +90,59 @@
           </a>
         </div>
       } @else {
-        <div class="cards">
-          @for (post of filteredScheduled(); track post.id) {
-            <article class="pub-card scheduled">
-              @if (post.imageUrl) {
-                <img [src]="post.imageUrl" alt="" class="cover" />
-              } @else {
-                <div class="cover empty"></div>
+        <div class="table-wrap">
+          <table class="posts-table">
+            <thead>
+              <tr>
+                <th class="col-thumb"></th>
+                <th>Publicación</th>
+                <th class="col-cat">Sección</th>
+                <th class="col-board">Tablón</th>
+                <th class="col-date">Sale</th>
+                <th class="col-actions"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (post of filteredScheduled(); track post.id) {
+                <tr class="scheduled-row">
+                  <td class="col-thumb">
+                    @if (post.imageUrl) {
+                      <img [src]="post.imageUrl" alt="" class="thumb" />
+                    } @else {
+                      <div class="thumb empty"></div>
+                    }
+                  </td>
+                  <td>
+                    <div class="title-cell">
+                      <strong>{{ postTitle(post.body) }}</strong>
+                      @if (postExcerpt(post.body); as excerpt) {
+                        <span>{{ excerpt }}</span>
+                      }
+                    </div>
+                  </td>
+                  <td class="col-cat">
+                    <span class="tag">{{ categoryLabel(post.category) }}</span>
+                  </td>
+                  <td class="col-board">{{ boardTitle(post.topicId) }}</td>
+                  <td class="col-date">
+                    <span class="badge">{{ formatSchedule(post.scheduledAt) }}</span>
+                  </td>
+                  <td class="col-actions">
+                    <button
+                      type="button"
+                      class="btn-ico soft sm"
+                      [disabled]="cancellingId() === post.id"
+                      (click)="cancelScheduled(post.id)"
+                    >
+                      <span>{{
+                        cancellingId() === post.id ? 'Cancelando…' : 'Cancelar'
+                      }}</span>
+                    </button>
+                  </td>
+                </tr>
               }
-              <div class="body">
-                <div class="top">
-                  <span class="tag">{{ categoryLabel(post.category) }}</span>
-                  <span class="badge"
-                    >Sale {{ formatSchedule(post.scheduledAt) }}</span
-                  >
-                </div>
-                <h3>{{ postTitle(post.body) }}</h3>
-                @if (postExcerpt(post.body); as excerpt) {
-                  <p>{{ excerpt }}</p>
-                }
-                <p class="meta">{{ boardTitle(post.topicId) }}</p>
-                <button
-                  type="button"
-                  class="btn-ico soft sm"
-                  [disabled]="cancellingId() === post.id"
-                  (click)="cancelScheduled(post.id)"
-                >
-                  <span>{{
-                    cancellingId() === post.id ? 'Cancelando…' : 'Cancelar'
-                  }}</span>
-                </button>
-              </div>
-            </article>
-          }
+            </tbody>
+          </table>
         </div>
       }
     </section>
@@ -117,40 +150,38 @@
     <section class="block">
       <div class="block-head">
         <h2>Publicadas</h2>
-        @if (filteredPublished().length > 0) {
-          <div class="block-tools">
-            <span class="count">{{ filteredPublished().length }}</span>
-            @if (pageCount() > 1) {
-              <div class="pager">
-                <button
-                  type="button"
-                  class="pager-btn"
-                  [disabled]="page() <= 0"
-                  (click)="shiftPage(-1)"
-                  aria-label="Anterior"
-                >
-                  ‹
-                </button>
-                <span>{{ page() + 1 }}/{{ pageCount() }}</span>
-                <button
-                  type="button"
-                  class="pager-btn"
-                  [disabled]="page() >= pageCount() - 1"
-                  (click)="shiftPage(1)"
-                  aria-label="Siguiente"
-                >
-                  ›
-                </button>
-              </div>
-            }
-          </div>
-        }
+        <div class="block-tools">
+          <span class="range">{{ rangeLabel() }}</span>
+          @if (pageCount() > 1) {
+            <div class="pager">
+              <button
+                type="button"
+                class="pager-btn"
+                [disabled]="page() <= 0"
+                (click)="shiftPage(-1)"
+                aria-label="Anterior"
+              >
+                ‹
+              </button>
+              <span>{{ page() + 1 }}/{{ pageCount() }}</span>
+              <button
+                type="button"
+                class="pager-btn"
+                [disabled]="page() >= pageCount() - 1"
+                (click)="shiftPage(1)"
+                aria-label="Siguiente"
+              >
+                ›
+              </button>
+            </div>
+          }
+        </div>
       </div>
 
       @if (published().length === 0) {
         <div class="empty-panel">
           <p class="empty-title">Todavía no hay publicaciones</p>
-          <p>Cuando publiques, aparecerán aquí en formato ficha.</p>
+          <p>Cuando publiques, aparecerán aquí en formato listado.</p>
           <a routerLink="/hermandad/publicar" class="btn-ico soft">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -162,60 +193,201 @@
               />
             </svg>
             <span>Publicar</span>
-            <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M5 12h14M13 6l6 6-6 6"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
           </a>
         </div>
       } @else if (filteredPublished().length === 0) {
         <div class="empty-panel soft">
-          <p>No hay publicadas en esta sección.</p>
+          <p>Ninguna publicada coincide con el filtro.</p>
         </div>
       } @else {
-        <div class="cards">
-          @for (post of visiblePosts(); track post.id) {
-            <article class="pub-card">
-              @if (post.imageUrl) {
-                <img [src]="post.imageUrl" alt="" class="cover" />
-              } @else {
-                <div class="cover empty"></div>
+        <div class="table-wrap">
+          <table class="posts-table">
+            <thead>
+              <tr>
+                <th class="col-thumb"></th>
+                <th>Publicación</th>
+                <th class="col-cat">Sección</th>
+                <th class="col-board">Tablón</th>
+                <th class="col-date">Fecha</th>
+                <th class="col-actions">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (post of visiblePosts(); track post.id) {
+                <tr>
+                  <td class="col-thumb">
+                    @if (post.imageUrl) {
+                      <img [src]="post.imageUrl" alt="" class="thumb" />
+                    } @else {
+                      <div class="thumb empty"></div>
+                    }
+                  </td>
+                  <td>
+                    <div class="title-cell">
+                      <strong>{{ postTitle(post.body) }}</strong>
+                      @if (postExcerpt(post.body); as excerpt) {
+                        <span>{{ excerpt }}</span>
+                      }
+                    </div>
+                  </td>
+                  <td class="col-cat">
+                    <span class="tag">{{ categoryLabel(post.category) }}</span>
+                  </td>
+                  <td class="col-board">{{ boardTitle(post.topicId) }}</td>
+                  <td class="col-date">
+                    <time [attr.datetime]="post.createdAt">
+                      {{ formatPublishedAt(post.createdAt) }}
+                    </time>
+                    <small>{{ timeAgo(post.createdAt) }}</small>
+                  </td>
+                  <td class="col-actions">
+                    <div class="row-actions">
+                      <button
+                        type="button"
+                        class="btn-ico soft sm"
+                        (click)="openPreview(post)"
+                      >
+                        <span>Vista</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn-ico soft sm"
+                        (click)="openEdit(post)"
+                      >
+                        <span>Editar</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               }
-              <div class="body">
-                <div class="top">
-                  <span class="tag">{{ categoryLabel(post.category) }}</span>
-                  <span class="when">{{ timeAgo(post.createdAt) }}</span>
-                </div>
-                <h3>{{ postTitle(post.body) }}</h3>
-                @if (postExcerpt(post.body); as excerpt) {
-                  <p>{{ excerpt }}</p>
-                }
-                <p class="meta">{{ boardTitle(post.topicId) }}</p>
-                <div class="card-actions">
-                  <button
-                    type="button"
-                    class="btn-ico soft sm"
-                    (click)="openPreview(post)"
-                  >
-                    <span>Vista app</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="btn-ico soft sm"
-                    (click)="openEdit(post)"
-                  >
-                    <span>Editar</span>
-                  </button>
-                </div>
-              </div>
-            </article>
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    <section class="block deleted-block">
+      <div class="block-head">
+        <h2>Eliminadas</h2>
+        <div class="block-tools">
+          <span class="range">{{ deletedRangeLabel() }}</span>
+          @if (deletedPageCount() > 1) {
+            <div class="pager">
+              <button
+                type="button"
+                class="pager-btn"
+                [disabled]="deletedPage() <= 0"
+                (click)="shiftDeletedPage(-1)"
+                aria-label="Anterior"
+              >
+                ‹
+              </button>
+              <span>{{ deletedPage() + 1 }}/{{ deletedPageCount() }}</span>
+              <button
+                type="button"
+                class="pager-btn"
+                [disabled]="deletedPage() >= deletedPageCount() - 1"
+                (click)="shiftDeletedPage(1)"
+                aria-label="Siguiente"
+              >
+                ›
+              </button>
+            </div>
           }
+        </div>
+      </div>
+      <p class="block-hint">
+        Historial de comunicados quitados del tablón. Puedes restaurarlos o
+        borrarlos definitivamente.
+      </p>
+
+      @if (store.deletedPosts().length === 0) {
+        <div class="empty-panel soft">
+          <p>No hay eliminadas.</p>
+        </div>
+      } @else if (filteredDeleted().length === 0) {
+        <div class="empty-panel soft">
+          <p>Ninguna eliminada coincide con el filtro.</p>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="posts-table deleted-table">
+            <thead>
+              <tr>
+                <th class="col-thumb"></th>
+                <th>Publicación</th>
+                <th class="col-cat">Sección</th>
+                <th class="col-board">Tablón</th>
+                <th class="col-date">Eliminada</th>
+                <th class="col-actions">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (post of visibleDeleted(); track post.id) {
+                <tr class="deleted-row">
+                  <td class="col-thumb">
+                    @if (post.imageUrl) {
+                      <img [src]="post.imageUrl" alt="" class="thumb" />
+                    } @else {
+                      <div class="thumb empty"></div>
+                    }
+                  </td>
+                  <td>
+                    <div class="title-cell">
+                      <strong>{{ postTitle(post.body) }}</strong>
+                      @if (postExcerpt(post.body); as excerpt) {
+                        <span>{{ excerpt }}</span>
+                      }
+                    </div>
+                  </td>
+                  <td class="col-cat">
+                    <span class="tag">{{ categoryLabel(post.category) }}</span>
+                  </td>
+                  <td class="col-board">{{ boardTitle(post.topicId) }}</td>
+                  <td class="col-date">
+                    @if (post.deletedAt) {
+                      <time [attr.datetime]="post.deletedAt">
+                        {{ formatPublishedAt(post.deletedAt) }}
+                      </time>
+                      <small>Publicada {{ timeAgo(post.createdAt) }}</small>
+                    }
+                  </td>
+                  <td class="col-actions">
+                    <div class="row-actions">
+                      <button
+                        type="button"
+                        class="btn-ico soft sm"
+                        [disabled]="
+                          restoringId() === post.id || purgingId() === post.id
+                        "
+                        (click)="restoreDeleted(post.id)"
+                      >
+                        <span>{{
+                          restoringId() === post.id
+                            ? 'Restaurando…'
+                            : 'Restaurar'
+                        }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn-ico danger sm"
+                        [disabled]="
+                          restoringId() === post.id || purgingId() === post.id
+                        "
+                        (click)="purgeDeleted(post.id)"
+                      >
+                        <span>{{
+                          purgingId() === post.id
+                            ? 'Borrando…'
+                            : 'Borrar'
+                        }}</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
         </div>
       }
     </section>

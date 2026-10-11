@@ -1697,7 +1697,7 @@ String _placementWhereHint(AdPlacement placement) {
     AdPlacement.forumsEvent =>
       'Tarjeta de evento tras los temas fijados, dentro del foro elegido.',
     AdPlacement.forumsMiddle =>
-      'Banner «Publicidad» en el listado de temas del foro.',
+      'Banner «Publicidad» en el listado de temas (Círculo, Pentagrama, Martillo…; no Noticias).',
     AdPlacement.featuredTopic =>
       'Banner dentro de Cuaresma, Semana Santa o Glorias (tema destacado).',
     AdPlacement.hermandades =>

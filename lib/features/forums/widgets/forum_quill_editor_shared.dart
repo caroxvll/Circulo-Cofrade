@@ -9,8 +9,16 @@ enum ForumComposeToolbar { standard, editorial }
 QuillEditorConfig forumQuillEditorConfig({
   required String? hintText,
   bool expands = false,
+  bool dense = false,
 }) {
-  final baseStyle = TopicDetailTypography.body();
+  final baseStyle = TopicDetailTypography.body().copyWith(
+    fontSize: dense ? 13.0 : TopicDetailTypography.bodySize,
+    height: dense ? 1.4 : 1.5,
+    fontWeight: FontWeight.w400,
+  );
+  final paraV = dense
+      ? const VerticalSpacing(2, 4)
+      : const VerticalSpacing(6, 12);
 
   return QuillEditorConfig(
     placeholder: hintText ?? 'Escribe tu mensaje…',
@@ -22,7 +30,7 @@ QuillEditorConfig forumQuillEditorConfig({
       paragraph: DefaultTextBlockStyle(
         baseStyle,
         const HorizontalSpacing(0, 0),
-        const VerticalSpacing(6, 12),
+        paraV,
         const VerticalSpacing(0, 0),
         null,
       ),
@@ -84,11 +92,16 @@ QuillEditorConfig forumQuillEditorConfig({
         decoration: TextDecoration.underline,
         decorationColor: AppColors.burgundy,
       ),
+      bold: baseStyle.copyWith(fontWeight: FontWeight.w700),
+      italic: baseStyle.copyWith(fontStyle: FontStyle.italic),
     ),
   );
 }
 
-QuillSimpleToolbarConfig forumQuillToolbarConfig(ForumComposeToolbar toolbar) {
+QuillSimpleToolbarConfig forumQuillToolbarConfig(
+  ForumComposeToolbar toolbar, {
+  bool compact = false,
+}) {
   final editorial = toolbar == ForumComposeToolbar.editorial;
 
   return QuillSimpleToolbarConfig(
@@ -103,9 +116,10 @@ QuillSimpleToolbarConfig forumQuillToolbarConfig(ForumComposeToolbar toolbar) {
     showHeaderStyle: false,
     showIndent: false,
     showInlineCode: false,
+    showCodeBlock: editorial,
     showJustifyAlignment: false,
     showLeftAlignment: false,
-    showLink: true,
+    showLink: editorial,
     showListBullets: editorial,
     showListNumbers: editorial,
     showListCheck: false,
@@ -120,18 +134,33 @@ QuillSimpleToolbarConfig forumQuillToolbarConfig(ForumComposeToolbar toolbar) {
     showUnderLineButton: false,
     showUndo: true,
     multiRowsDisplay: editorial,
+    toolbarIconAlignment: WrapAlignment.start,
+    toolbarSectionSpacing: compact ? 0 : 4,
     buttonOptions: QuillSimpleToolbarButtonOptions(
       base: QuillToolbarBaseButtonOptions(
+        iconSize: compact ? 16 : 18,
         iconTheme: QuillIconTheme(
           iconButtonSelectedData: IconButtonData(
             style: IconButton.styleFrom(
               foregroundColor: AppColors.burgundy,
-              backgroundColor: AppColors.burgundy.withValues(alpha: 0.12),
+              backgroundColor: AppColors.burgundy.withValues(alpha: 0.1),
+              minimumSize: Size(compact ? 32 : 40, compact ? 32 : 40),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: compact
+                  ? VisualDensity.compact
+                  : VisualDensity.standard,
             ),
           ),
           iconButtonUnselectedData: IconButtonData(
             style: IconButton.styleFrom(
-              foregroundColor: AppColors.burgundy,
+              foregroundColor: compact
+                  ? AppColors.textSecondary
+                  : AppColors.burgundy,
+              minimumSize: Size(compact ? 32 : 40, compact ? 32 : 40),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: compact
+                  ? VisualDensity.compact
+                  : VisualDensity.standard,
             ),
           ),
         ),
@@ -143,16 +172,26 @@ QuillSimpleToolbarConfig forumQuillToolbarConfig(ForumComposeToolbar toolbar) {
 Widget forumQuillToolbar({
   required QuillController controller,
   ForumComposeToolbar toolbar = ForumComposeToolbar.standard,
+  bool compact = false,
 }) {
+  final bar = QuillSimpleToolbar(
+    controller: controller,
+    config: forumQuillToolbarConfig(toolbar, compact: compact),
+  );
+
+  if (compact) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: bar,
+    );
+  }
+
   return Container(
     decoration: BoxDecoration(
       color: AppColors.surfaceAlt,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: AppColors.gold.withValues(alpha: 0.18)),
     ),
-    child: QuillSimpleToolbar(
-      controller: controller,
-      config: forumQuillToolbarConfig(toolbar),
-    ),
+    child: bar,
   );
 }

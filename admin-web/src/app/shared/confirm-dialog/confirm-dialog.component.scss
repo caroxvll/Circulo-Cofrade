@@ -1,0 +1,111 @@
+.cd-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(20, 14, 12, 0.48);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.cd-modal {
+  width: min(440px, 100%);
+  background: var(--surface);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.cd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cd-head strong {
+  font-family: var(--font-serif);
+  font-size: 1.08rem;
+  color: var(--text);
+}
+
+.cd-x {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.cd-x:hover {
+  background: var(--border);
+}
+
+.cd-body {
+  padding: 16px 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.cd-body p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
+.cd-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.cd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.cd-btn.soft {
+  background: color-mix(in srgb, var(--burgundy) 10%, #fff);
+  color: var(--burgundy);
+  border-color: color-mix(in srgb, var(--burgundy) 22%, var(--border));
+}
+
+.cd-btn.soft:hover {
+  background: color-mix(in srgb, var(--burgundy) 16%, #fff);
+}
+
+.cd-btn.primary {
+  background: var(--gold);
+  color: var(--burgundy-dark);
+}
+
+.cd-btn.primary:hover {
+  filter: brightness(0.97);
+}
+
+.cd-btn.danger {
+  background: var(--burgundy);
+  color: #fff;
+}
+
+.cd-btn.danger:hover {
+  background: var(--burgundy-dark);
+}

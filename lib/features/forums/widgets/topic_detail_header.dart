@@ -70,10 +70,7 @@ class TopicDetailHeader extends StatelessWidget {
         topic: topic,
         forumId: forumId,
         topicId: topicId,
-        displayCommentCount: displayCommentCount,
         displayViewCount: displayViewCount,
-        displayTotalReactions: displayTotalReactions,
-        reactionBreakdown: reactionBreakdown,
       );
     }
 
@@ -212,10 +209,7 @@ class _TopicEditorialBody extends StatelessWidget {
     if (coverUrl == null) {
       return ForumPostContent(
         text: normalizeStoredText(body),
-        style: TopicDetailTypography.body().copyWith(
-          fontSize: TopicDetailTypography.bodySize + 0.5,
-          height: 1.55,
-        ),
+        style: TopicDetailTypography.body(),
         subtleLinks: true,
         premium: isHermandadBoard,
       );
@@ -299,12 +293,12 @@ class _EditorialCaptionColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     return ForumPostContent(
       text: text,
-      style: TopicDetailTypography.body().copyWith(
-        fontSize: compact ? 12.5 : 13.0,
-        height: 1.62,
-        color: AppColors.textSecondary,
-        letterSpacing: 0.12,
-        fontWeight: FontWeight.w400,
+      style: TopicDetailTypography.body(
+        color: AppColors.textPrimary,
+      ).copyWith(
+        fontSize: compact
+            ? TopicDetailTypography.bodySize - 0.5
+            : TopicDetailTypography.bodySize,
       ),
       subtleLinks: true,
       premium: true,
@@ -369,37 +363,23 @@ class TopicDetailRepliesHeader extends StatelessWidget {
             ? (commentCount > 0
                 ? 'Noticias, cultos, actos y patrimonio · más recientes primero'
                 : 'Noticias, cultos, actos y patrimonio')
-            : (commentCount > 0 ? 'Más recientes primero' : null));
+            : null);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 3,
-              height: 16,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2),
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppColors.gold.withValues(alpha: 0.85),
-                    AppColors.goldDark,
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title.toUpperCase(),
-              style: TopicDetailTypography.sectionTitle(),
-            ),
-          ],
+        Text(
+          title,
+          style: AppTypography.displaySmall(
+            color: AppColors.textPrimary,
+          ).copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            height: 1.15,
+          ),
         ),
         if (subtitle != null) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             subtitle,
             style: TopicDetailTypography.sectionSubtitle(),

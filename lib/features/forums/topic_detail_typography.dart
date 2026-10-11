@@ -8,7 +8,8 @@ import 'forum_topics_typography.dart';
 abstract final class TopicDetailTypography {
   static const titleSize = 16.0;
   static const heroTitleSize = 18.0;
-  static const bodySize = 13.0;
+  /// Cuerpo del tema y de las respuestas (misma escala).
+  static const bodySize = 15.0;
   static const metaSize = 11.0;
 
   static TextStyle title({Color? color}) => AppTypography.titleLarge(
@@ -30,8 +31,9 @@ abstract final class TopicDetailTypography {
         color: color ?? AppColors.textPrimary,
       ).copyWith(
         fontSize: bodySize,
-        height: 1.5,
+        height: 1.45,
         fontWeight: FontWeight.w400,
+        letterSpacing: 0.05,
       );
 
   static TextStyle meta({Color? color, FontWeight? fontWeight}) =>

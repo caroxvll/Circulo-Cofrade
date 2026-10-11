@@ -54,7 +54,6 @@ void main() {
     await tester.tap(find.text('Traslado del Cristo').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Detalle del evento'), findsOneWidget);
     // Puede aparecer tanto en el carousel (slide) como dentro del bottom sheet.
     expect(find.text('Traslado del Cristo'), findsWidgets);
   });

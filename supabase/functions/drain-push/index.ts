@@ -343,6 +343,7 @@ async function processJob(
     type: record.type,
     title: record.title,
     body,
+    notificationId: job.notification_id,
   };
 
   const notifPayload = record.payload ?? {};
@@ -357,6 +358,12 @@ async function processJob(
   }
   if (typeof notifPayload.officialCategory === "string") {
     data.officialCategory = notifPayload.officialCategory;
+  }
+  if (typeof notifPayload.eventId === "string") {
+    data.eventId = notifPayload.eventId;
+  }
+  if (typeof notifPayload.startsAt === "string") {
+    data.startsAt = notifPayload.startsAt;
   }
 
   let sent = 0;

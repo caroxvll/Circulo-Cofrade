@@ -174,7 +174,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             label: 'Perfiles',
             count: results.profiles.length,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           for (var i = 0; i < results.profiles.length; i++) ...[
             if (i > 0) const SizedBox(height: SearchDesign.cardGap),
             ProfileSearchTile(
@@ -192,7 +192,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             label: 'Eventos',
             count: results.events.length,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           for (var i = 0; i < results.events.length; i++) ...[
             if (i > 0) const SizedBox(height: SearchDesign.cardGap),
             EventCard(
@@ -219,11 +219,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             label: 'Temas',
             count: results.topics.length,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           for (var i = 0; i < results.topics.length; i++) ...[
             if (i > 0) const SizedBox(height: SearchDesign.cardGap),
             TopicCard(
               topic: results.topics[i],
+              compact: true,
               onTap: () => context.push(
                 '/foros/${results.topics[i].forumId}/tema/${results.topics[i].id}',
               ),

@@ -518,8 +518,10 @@ class _TopicFollowChip extends StatelessWidget {
   final VoidCallback onTap;
   final bool compact;
 
-  String get _followLabel =>
-      isHermandadBoard ? 'Seguir hermandad' : 'Seguir hilo';
+  String get _followLabel {
+    if (isHermandadBoard) return 'Seguir hermandad';
+    return compact ? 'Seguir' : 'Seguir hilo';
+  }
 
   @override
   Widget build(BuildContext context) {

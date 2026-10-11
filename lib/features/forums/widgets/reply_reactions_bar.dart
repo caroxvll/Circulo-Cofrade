@@ -39,6 +39,8 @@ class ReplyReactionsBar extends StatefulWidget {
     this.enabled = true,
     this.compact = false,
     this.alignEnd = false,
+    this.socialStyle = false,
+    this.hideEmptyPicker = false,
   });
 
   final String replyId;
@@ -48,6 +50,10 @@ class ReplyReactionsBar extends StatefulWidget {
   final bool enabled;
   final bool compact;
   final bool alignEnd;
+  /// Estilo Twitter/IG: pills más ligeras, menos borde.
+  final bool socialStyle;
+  /// Si no hay actividad, no muestra el botón «reaccionar» (el like va aparte).
+  final bool hideEmptyPicker;
 
   @override
   State<ReplyReactionsBar> createState() => _ReplyReactionsBarState();
@@ -196,6 +202,7 @@ class _ReplyReactionsBarState extends State<ReplyReactionsBar> {
                 showCount: false,
                 enabled: enabled,
                 compact: pillCompact,
+                socialStyle: widget.socialStyle,
                 onReact: () => _onReact(reaction.emoji),
               ),
             _reaccionarButton(compact: true),
@@ -205,6 +212,9 @@ class _ReplyReactionsBarState extends State<ReplyReactionsBar> {
     }
 
     if (!_hasActivity) {
+      if (widget.hideEmptyPicker && !_pickerOpen) {
+        return const SizedBox.shrink();
+      }
       return _wrapBar(_reaccionarButton(compact: pillCompact));
     }
 
@@ -226,6 +236,7 @@ class _ReplyReactionsBarState extends State<ReplyReactionsBar> {
               showCount: true,
               enabled: enabled,
               compact: pillCompact,
+              socialStyle: widget.socialStyle,
               onReact: () => _onReact(entry.key),
               onShowUsers: () => _showReactionUsers(entry.key),
             ),
@@ -246,6 +257,7 @@ class _ReactionPill extends StatelessWidget {
     required this.enabled,
     required this.onReact,
     this.compact = false,
+    this.socialStyle = false,
     this.onShowUsers,
   });
 
@@ -256,6 +268,7 @@ class _ReactionPill extends StatelessWidget {
   final bool showCount;
   final bool enabled;
   final bool compact;
+  final bool socialStyle;
   final VoidCallback onReact;
   final VoidCallback? onShowUsers;
 
@@ -288,15 +301,23 @@ class _ReactionPill extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             color: selected
-                ? AppColors.goldPale.withValues(alpha: 0.75)
+                ? (socialStyle
+                    ? AppColors.burgundy.withValues(alpha: 0.08)
+                    : AppColors.goldPale.withValues(alpha: 0.75))
                 : _hasCount
-                    ? AppColors.backgroundElevated
+                    ? (socialStyle
+                        ? Colors.transparent
+                        : AppColors.backgroundElevated)
                     : Colors.transparent,
             border: Border.all(
               color: selected
-                  ? AppColors.gold.withValues(alpha: 0.6)
+                  ? (socialStyle
+                      ? AppColors.burgundy.withValues(alpha: 0.22)
+                      : AppColors.gold.withValues(alpha: 0.6))
                   : _hasCount
-                      ? AppColors.border.withValues(alpha: 0.9)
+                      ? (socialStyle
+                          ? Colors.transparent
+                          : AppColors.border.withValues(alpha: 0.9))
                       : AppColors.border.withValues(alpha: 0.35),
             ),
           ),
@@ -336,11 +357,13 @@ class _ReactionPill extends StatelessWidget {
                         '$count',
                         style: TopicDetailTypography.meta(
                           color: selected
-                              ? AppColors.goldDark
+                              ? (socialStyle
+                                  ? AppColors.burgundy
+                                  : AppColors.goldDark)
                               : AppColors.textMuted,
                           fontWeight:
                               selected ? FontWeight.w700 : FontWeight.w600,
-                        ).copyWith(fontSize: compact ? 10 : null),
+                        ).copyWith(fontSize: compact ? 11 : null),
                       ),
                     ),
                   ),

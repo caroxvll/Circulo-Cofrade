@@ -120,6 +120,7 @@ class ForumsRepository {
         .from('forum_replies')
         .select('*, $_profileAuthorSelect')
         .eq('topic_id', topicId)
+        .isFilter('deleted_at', null)
         .order('created_at', ascending: false)
         .range(offset, offset + limit - 1);
 

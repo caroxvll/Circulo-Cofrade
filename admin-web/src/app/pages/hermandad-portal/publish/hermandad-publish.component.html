@@ -104,9 +104,11 @@
             <input type="datetime-local" [(ngModel)]="startsAtLocal" />
           </label>
           <label class="field grow">
-            Lugar
+            Lugar *
             <input
               [(ngModel)]="location"
+              name="location"
+              required
               placeholder="Templo, casa de hermandad…"
             />
           </label>

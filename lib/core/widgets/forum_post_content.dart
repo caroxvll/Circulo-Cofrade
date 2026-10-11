@@ -12,12 +12,14 @@ class ForumPostContent extends StatelessWidget {
     this.style,
     this.subtleLinks = false,
     this.premium = false,
+    this.textAlign,
   });
 
   final String text;
   final TextStyle? style;
   final bool subtleLinks;
   final bool premium;
+  final TextAlign? textAlign;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +35,7 @@ class ForumPostContent extends StatelessWidget {
         text: blocks.first.lines.first,
         style: baseStyle,
         subtleLinks: subtleLinks,
+        textAlign: textAlign,
       );
     }
 
@@ -49,6 +52,7 @@ class ForumPostContent extends StatelessWidget {
             baseStyle: baseStyle,
             subtleLinks: subtleLinks,
             premium: premium,
+            textAlign: textAlign,
           ),
         ],
       ],
@@ -62,12 +66,14 @@ class _ForumMarkdownBlockView extends StatelessWidget {
     required this.baseStyle,
     required this.subtleLinks,
     required this.premium,
+    this.textAlign,
   });
 
   final ForumMarkdownBlock block;
   final TextStyle baseStyle;
   final bool subtleLinks;
   final bool premium;
+  final TextAlign? textAlign;
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +82,7 @@ class _ForumMarkdownBlockView extends StatelessWidget {
           text: block.lines.first,
           style: baseStyle,
           subtleLinks: subtleLinks,
+          textAlign: textAlign,
         ),
       ForumMarkdownBlockKind.bulletList => _BulletList(
           items: block.lines,

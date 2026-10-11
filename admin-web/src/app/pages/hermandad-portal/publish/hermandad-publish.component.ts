@@ -119,6 +119,19 @@ export class HermandadPublishPageComponent implements OnInit {
       }
     }
 
+    if (this.destCalendar && this.activeKind.needsDate) {
+      if (!this.startsAtLocal) {
+        this.error.set('Indica la fecha y hora del acto.');
+        return;
+      }
+      if (!this.location.trim()) {
+        this.error.set(
+          'Indica el lugar del acto para publicarlo en el calendario.',
+        );
+        return;
+      }
+    }
+
     const destinations: PublishDestinations = {
       board: this.destBoard,
       calendar: this.destCalendar,

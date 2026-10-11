@@ -1071,8 +1071,10 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
             isForumBannedProvider((userId: userId, forumId: widget.forumId)),
           );
     final isForumBanned = forumBanAsync?.asData?.value ?? false;
+    final isNoticias = isNoticiasForum(widget.forumId);
     final canReply =
         topic.acceptsReplies &&
+        !isNoticias &&
         !isSuspended &&
         !isForumBanned &&
         (!isHermandadBoard || canPublishOfficial);
@@ -1299,14 +1301,14 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                         ),
                       ),
                     ),
-                  if (!isHermandadBoard)
+                  if (!isHermandadBoard && !isNoticias)
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
                       sliver: SliverToBoxAdapter(
                         child: TopicDetailRepliesHeader(
                           isHermandadBoard: false,
                           commentCount: displayCommentCount,
-                          isNoticias: isNoticiasForum(widget.forumId),
+                          isNoticias: false,
                         ),
                       ),
                     ),
@@ -1342,7 +1344,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                         ),
                       ),
                     ),
-                  ...buildRepliesSlivers(),
+                  if (!isNoticias) ...buildRepliesSlivers(),
                 ],
               ),
             ),
@@ -1513,7 +1515,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
   List<ForumReply> _officialReplies(List<ForumReply> replies) {
     return [
       for (final reply in replies)
-        if (reply.isOfficial) reply,
+        if (reply.isOfficial && !reply.isDeleted) reply,
     ];
   }
 
@@ -1535,7 +1537,9 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
   }
 
   List<ForumReply> _visibleRepliesForBoard(List<ForumReply> replies) {
-    if (widget.forumId != 'hermandades') return replies;
+    if (widget.forumId != 'hermandades') {
+      return [for (final r in replies) if (!r.isDeleted) r];
+    }
 
     final official = _officialReplies(replies);
     final filter = _hermandadCategoryFilter;
@@ -1697,14 +1701,14 @@ class _ReplyInputBar extends ConsumerWidget {
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
             child: Row(
               children: [
                 if (profile != null) ...[
                   CofradeoAvatar(
                     imageUrl: profile.avatarUrl,
                     icon: profile.avatarIcon,
-                    size: 32,
+                    size: 30,
                     backgroundColor: AppColors.backgroundElevated,
                   ),
                   const SizedBox(width: 10),
@@ -1715,38 +1719,20 @@ class _ReplyInputBar extends ConsumerWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
-                        vertical: 10,
+                        vertical: 11,
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.backgroundElevated,
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(22),
                         border: Border.all(
-                          color: AppColors.gold.withValues(alpha: 0.2),
+                          color: AppColors.border.withValues(alpha: 0.85),
                         ),
                       ),
                       child: Text(
                         hint,
                         style: TopicDetailTypography.meta(
                           color: AppColors.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Material(
-                  color: AppColors.burgundy,
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    onTap: onTap,
-                    customBorder: const CircleBorder(),
-                    child: const SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Icon(
-                        Icons.send_rounded,
-                        size: 18,
-                        color: AppColors.textOnDark,
+                        ).copyWith(fontSize: 12.5),
                       ),
                     ),
                   ),

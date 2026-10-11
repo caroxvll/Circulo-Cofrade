@@ -285,6 +285,18 @@ export class HermandadPortalService {
     }));
   }
 
+  private mapOfficialPost(row: Record<string, unknown>): HermandadOfficialPost {
+    return {
+      id: String(row['id']),
+      topicId: String(row['topic_id']),
+      body: String(row['content'] ?? ''),
+      category: (row['official_category'] as OfficialCategory) || 'noticia',
+      imageUrl: (row['image_url'] as string | null) ?? null,
+      createdAt: String(row['created_at'] ?? ''),
+      deletedAt: (row['deleted_at'] as string | null) ?? null,
+    };
+  }
+
   async fetchOfficialPosts(
     profileId: string,
     topicIds: string[],
@@ -298,19 +310,49 @@ export class HermandadPortalService {
       .eq('author_id', profileId)
       .eq('is_official', true)
       .in('topic_id', topicIds)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
-      .limit(80);
+      .limit(500);
     if (error) throw error;
+    return (data ?? []).map((row) =>
+      this.mapOfficialPost(row as Record<string, unknown>),
+    );
+  }
 
-    return (data ?? []).map((row) => ({
-      id: String(row.id),
-      topicId: String(row.topic_id),
-      body: String(row.content ?? ''),
-      category: (row.official_category as OfficialCategory) || 'noticia',
-      imageUrl: (row.image_url as string | null) ?? null,
-      createdAt: String(row.created_at ?? ''),
-      deletedAt: (row.deleted_at as string | null) ?? null,
-    }));
+  async fetchDeletedOfficialPosts(
+    profileId: string,
+    topicIds: string[],
+  ): Promise<HermandadOfficialPost[]> {
+    if (!topicIds.length) return [];
+    const { data, error } = await getSupabase()
+      .from('forum_replies')
+      .select(
+        'id, topic_id, content, official_category, image_url, created_at, deleted_at',
+      )
+      .eq('author_id', profileId)
+      .eq('is_official', true)
+      .in('topic_id', topicIds)
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    return (data ?? []).map((row) =>
+      this.mapOfficialPost(row as Record<string, unknown>),
+    );
+  }
+
+  async restoreOfficialPost(replyId: string): Promise<void> {
+    const { error } = await getSupabase().rpc('restore_forum_reply', {
+      p_reply_id: replyId,
+    });
+    if (error) throw error;
+  }
+
+  async hardDeleteOfficialPost(replyId: string): Promise<void> {
+    const { error } = await getSupabase().rpc('hard_delete_forum_reply', {
+      p_reply_id: replyId,
+    });
+    if (error) throw error;
   }
 
   async uploadPostImage(topicId: string, file: File): Promise<string> {

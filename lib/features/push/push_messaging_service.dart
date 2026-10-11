@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -175,6 +177,12 @@ class PushMessagingService {
   }
 
   void _onMessageOpened(RemoteMessage message) {
+    final notificationId = message.data['notificationId']?.toString();
+    if (notificationId != null && notificationId.isNotEmpty) {
+      unawaited(
+        _ref.read(notificationsProvider.notifier).markRead(notificationId),
+      );
+    }
     _navigateFromData(message.data);
   }
 

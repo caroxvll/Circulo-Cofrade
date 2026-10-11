@@ -13,7 +13,6 @@ import '../topic_detail_typography.dart';
 import '../utils/official_post_categories.dart';
 import '../utils/reply_reactions.dart';
 import '../utils/cofrade_gamification.dart';
-import 'cofrade_rank_label.dart';
 import 'topic_author_badge.dart';
 import 'reply_reaction_stats_sheet.dart';
 import 'reply_reactions_bar.dart';
@@ -92,11 +91,27 @@ class ReplyCard extends StatelessWidget {
     final deleted = reply.isDeleted;
     final hasImage =
         reply.imageUrl != null && reply.imageUrl!.trim().isNotEmpty && !deleted;
-    const avatarSize = 36.0;
+    final avatarSize = _isSubReply ? 34.0 : 44.0;
+    final showOverflow = !deleted &&
+        ((manageOptions?.hasMenu ?? false) ||
+            onShareTap != null ||
+            onReportTap != null);
+    final showOfficialMeta =
+        !deleted && (reply.isOfficial || reply.isFeatured);
+    final rank = !deleted && reply.authorId != null
+        ? cofradeRankTitleForPoints(reply.authorTrophyPoints)
+        : null;
+    final handle = reply.authorHandle.startsWith('@')
+        ? reply.authorHandle
+        : '@${reply.authorHandle}';
+    // Si ya mostramos «Respondiendo a @x», no repetir @x al inicio del texto.
+    final bodyText = deleted
+        ? reply.displayContent
+        : _bodyWithoutLeadingParentMention(reply.content, parentHandle);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        highlighted && !_isSubReply ? 8 : 0,
+        highlighted && !_isSubReply ? 6 : 0,
         0,
         0,
         0,
@@ -106,297 +121,180 @@ class ReplyCard extends StatelessWidget {
           border: highlighted && !_isSubReply
               ? Border(
                   left: BorderSide(
-                    color: AppColors.burgundy.withValues(alpha: 0.45),
+                    color: AppColors.burgundy.withValues(alpha: 0.4),
                     width: 2,
                   ),
                 )
               : null,
           color: deleted
-              ? AppColors.backgroundElevated.withValues(alpha: 0.45)
+              ? AppColors.backgroundElevated.withValues(alpha: 0.35)
               : (reply.isOfficial && !deleted
-                  ? AppColors.burgundy.withValues(alpha: 0.03)
+                  ? AppColors.burgundy.withValues(alpha: 0.02)
                   : null),
           borderRadius: deleted ? BorderRadius.circular(8) : null,
         ),
         child: Padding(
           padding: EdgeInsets.fromLTRB(
-            highlighted && !_isSubReply ? 10 : 0,
-            deleted ? 10 : (_isSubReply ? 10 : 12),
-            deleted ? 8 : 0,
-            deleted ? 10 : (_isSubReply ? 10 : 12),
+            highlighted && !_isSubReply ? 8 : 0,
+            _isSubReply ? 6 : 8,
+            deleted ? 4 : 0,
+            _isSubReply ? 4 : 6,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: deleted ? null : onAuthorTap,
-                    child: CofradeoAvatar(
-                      imageUrl: reply.authorAvatarUrl,
-                      icon: reply.avatarIcon,
-                      size: avatarSize,
-                      backgroundColor: AppColors.backgroundElevated,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
+              GestureDetector(
+                onTap: deleted ? null : onAuthorTap,
+                child: CofradeoAvatar(
+                  imageUrl: reply.authorAvatarUrl,
+                  icon: reply.avatarIcon,
+                  size: avatarSize,
+                  backgroundColor: AppColors.backgroundElevated,
+                ),
+              ),
+              SizedBox(width: _isSubReply ? 10 : 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (parentHandle != null && !deleted) ...[
-                          Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: 'Respondiendo a ',
-                                  style: TopicDetailTypography.meta(
-                                    color: AppColors.textMuted,
-                                  ).copyWith(fontSize: 12),
-                                ),
-                                TextSpan(
-                                  text: parentHandle,
-                                  style: TopicDetailTypography.meta(
-                                    color: AppColors.burgundy,
-                                    fontWeight: FontWeight.w700,
-                                  ).copyWith(fontSize: 12),
-                                ),
-                              ],
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: deleted ? null : onAuthorTap,
+                            behavior: HitTestBehavior.opaque,
+                            child: _AuthorHeader(
+                              handle: handle,
+                              verified: reply.authorVerified && !deleted,
+                              isTopicAuthor: isTopicAuthor && !deleted,
+                              timeAgo: reply.timeAgo,
+                              isEdited: reply.isEdited,
+                              rank: rank,
+                              replyingTo: !deleted ? parentHandle : null,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                        ],
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: deleted ? null : onAuthorTap,
-                                behavior: HitTestBehavior.opaque,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            reply.authorHandle,
-                                            overflow: TextOverflow.ellipsis,
-                                            style:
-                                                TopicDetailTypography.body()
-                                                    .copyWith(
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 14,
-                                              height: 1.15,
-                                              color: AppColors.textPrimary,
-                                            ),
-                                          ),
-                                        ),
-                                        if (reply.authorVerified &&
-                                            !deleted) ...[
-                                          const SizedBox(width: 4),
-                                          const VerifiedAccountIcon(
-                                            size: 14,
-                                          ),
-                                        ],
-                                        if (isTopicAuthor && !deleted) ...[
-                                          const SizedBox(width: 6),
-                                          const TopicAuthorBadge(),
-                                        ],
-                                        Text(
-                                          ' · ${reply.timeAgo}',
-                                          style: TopicDetailTypography.meta(
-                                            color: AppColors.textMuted,
-                                          ).copyWith(fontSize: 11.5),
-                                        ),
-                                        if (reply.isEdited)
-                                          Text(
-                                            ' · editado',
-                                            style: TopicDetailTypography.meta(
-                                              color: AppColors.textMuted,
-                                            ).copyWith(fontSize: 11.5),
-                                          ),
-                                      ],
-                                    ),
-                                    if (!deleted &&
-                                        (reply.authorId != null ||
-                                            reply.isOfficial ||
-                                            reply.isFeatured)) ...[
-                                      const SizedBox(height: 2),
-                                      Wrap(
-                                        crossAxisAlignment:
-                                            WrapCrossAlignment.center,
-                                        spacing: 6,
-                                        runSpacing: 2,
-                                        children: [
-                                          if (reply.authorId != null)
-                                            CofradeRankLabel(
-                                              title: cofradeRankTitleForPoints(
-                                                reply.authorTrophyPoints,
-                                              ),
-                                              compact: true,
-                                            ),
-                                          if (reply.isOfficial)
-                                            _OfficialInlineChip(
-                                              category: reply.officialCategory,
-                                            ),
-                                          if (reply.isFeatured)
-                                            Text(
-                                              reply.isOfficial
-                                                  ? 'Fijada'
-                                                  : 'Destacada',
-                                              style:
-                                                  TopicDetailTypography.meta(
-                                                color: AppColors.burgundy,
-                                                fontWeight: FontWeight.w700,
-                                              ).copyWith(fontSize: 11),
-                                            ),
-                                          if (reply.isOfficial &&
-                                              totalReactionCount(
-                                                      reactionCounts) >
-                                                  0)
-                                            GestureDetector(
-                                              onTap: () =>
-                                                  showReplyReactionStatsSheet(
-                                                context,
-                                                replyId: reply.id,
-                                                reactionCounts: reactionCounts,
-                                              ),
-                                              child: Text(
-                                                '${totalReactionCount(reactionCounts)} reacc.',
-                                                style:
-                                                    TopicDetailTypography.meta(
-                                                  color: AppColors.goldDark,
-                                                  fontWeight: FontWeight.w600,
-                                                ).copyWith(fontSize: 11),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                            if (manageOptions?.hasMenu ?? false)
-                              _ManageMenu(options: manageOptions!),
-                            if (onShareTap != null &&
-                                !deleted &&
-                                !_isSubReply)
-                              IconButton(
-                                onPressed: onShareTap,
-                                icon: const Icon(
-                                  Icons.share_outlined,
-                                  size: 17,
-                                ),
-                                color: AppColors.textMuted,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 30,
-                                  minHeight: 30,
-                                ),
-                                tooltip: 'Compartir',
-                              ),
-                            if (onReportTap != null &&
-                                !deleted &&
-                                !_isSubReply)
-                              IconButton(
-                                onPressed: onReportTap,
-                                icon: const Icon(
-                                  Icons.flag_outlined,
-                                  size: 17,
-                                ),
-                                color: AppColors.textMuted,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 30,
-                                  minHeight: 30,
-                                ),
-                                tooltip: 'Reportar',
-                              ),
-                          ],
                         ),
-                        const SizedBox(height: 6),
-                        if (deleted)
-                          Text(
-                            reply.displayContent,
-                            style: AppTypography.bodyMedium(
-                              color: AppColors.textMuted,
-                            ).copyWith(
-                              fontStyle: FontStyle.italic,
-                              fontSize: 14,
-                            ),
-                          )
-                        else
-                          ForumPostContent(
-                            text: reply.content,
-                            style: TopicDetailTypography.body().copyWith(
-                              fontSize: 15,
-                              height: 1.4,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            subtleLinks: true,
-                            premium: reply.isOfficial,
+                        if (showOverflow)
+                          _ReplyOverflowMenu(
+                            manageOptions: manageOptions,
+                            onShareTap: onShareTap,
+                            onReportTap: !_isSubReply ? onReportTap : null,
+                            showShare: !_isSubReply && onShareTap != null,
                           ),
-                        if (reply.isEdited && reply.editedAt != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'Editado ${formatTimeAgo(reply.editedAt!)}',
-                            style: AppTypography.labelSmall(
-                              color: AppColors.textMuted,
-                            ),
-                          ),
-                        ],
-                        if (hasImage) ...[
-                          const SizedBox(height: 10),
-                          ForumPostImage(
-                            imageUrl: reply.imageUrl!,
-                            shareText: _imageShareText(reply),
-                          ),
-                        ],
-                        if (!deleted) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              if (onReplyTap != null)
-                                TextButton(
-                                  onPressed: onReplyTap,
-                                  style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                                  child: Text(
-                                    'Responder',
-                                    style: TopicDetailTypography.meta(
-                                      color: AppColors.burgundy,
-                                      fontWeight: FontWeight.w700,
-                                    ).copyWith(fontSize: 12.5),
-                                  ),
-                                ),
-                              const Spacer(),
-                              ReplyReactionsBar(
-                                replyId: reply.id,
-                                reactionCounts: reactionCounts,
-                                userReaction: userReaction,
-                                onReactionChanged: onReactionChanged,
-                                enabled: onReactionChanged != null,
-                                compact: true,
-                                alignEnd: true,
-                              ),
-                            ],
-                          ),
-                        ],
                       ],
                     ),
-                  ),
-                ],
+                    if (showOfficialMeta) ...[
+                      const SizedBox(height: 2),
+                      _OfficialMetaRow(
+                        reply: reply,
+                        reactionCounts: reactionCounts,
+                      ),
+                    ],
+                    const SizedBox(height: 3),
+                    if (deleted)
+                      Text(
+                        bodyText,
+                        style: TopicDetailTypography.body(
+                          color: AppColors.textMuted,
+                        ).copyWith(
+                          fontStyle: FontStyle.italic,
+                          fontSize: 14.5,
+                          height: 1.32,
+                        ),
+                      )
+                    else
+                      ForumPostContent(
+                        text: bodyText,
+                        style: TopicDetailTypography.body().copyWith(
+                          fontSize: 14.5,
+                          height: 1.32,
+                        ),
+                        subtleLinks: true,
+                        premium: reply.isOfficial,
+                      ),
+                    if (reply.isEdited && reply.editedAt != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Editado ${formatTimeAgo(reply.editedAt!)}',
+                        style: AppTypography.labelSmall(
+                          color: AppColors.textMuted,
+                        ).copyWith(fontSize: 10.5),
+                      ),
+                    ],
+                    if (hasImage) ...[
+                      const SizedBox(height: 6),
+                      ForumPostImage(
+                        imageUrl: reply.imageUrl!,
+                        shareText: _imageShareText(reply),
+                        borderRadius:
+                            const BorderRadius.all(Radius.circular(10)),
+                        maxPreviewHeight: 220,
+                        showExpandHint: false,
+                        fit: BoxFit.cover,
+                      ),
+                    ],
+                    if (!deleted) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          if (onReplyTap != null)
+                            GestureDetector(
+                              onTap: onReplyTap,
+                              behavior: HitTestBehavior.opaque,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 2,
+                                ),
+                                child: Text(
+                                  'Responder',
+                                  style: TopicDetailTypography.meta(
+                                    color: AppColors.textMuted,
+                                    fontWeight: FontWeight.w600,
+                                  ).copyWith(fontSize: 12.5),
+                                ),
+                              ),
+                            ),
+                          const Spacer(),
+                          ReplyReactionsBar(
+                            replyId: reply.id,
+                            reactionCounts: _nonHeartCounts(reactionCounts),
+                            userReaction: _isHeartReaction(userReaction)
+                                ? null
+                                : userReaction,
+                            onReactionChanged: onReactionChanged == null
+                                ? null
+                                : (reaction) async {
+                                    await onReactionChanged!(reaction);
+                                  },
+                            enabled: onReactionChanged != null,
+                            compact: true,
+                            alignEnd: true,
+                            socialStyle: true,
+                            hideEmptyPicker: true,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
+              if (!deleted && onReactionChanged != null) ...[
+                const SizedBox(width: 6),
+                _InstagramLikeButton(
+                  liked: _isHeartReaction(userReaction),
+                  count: _heartCount(reactionCounts),
+                  onTap: () async {
+                    final next = _isHeartReaction(userReaction) ? null : '❤️';
+                    await onReactionChanged!(next);
+                  },
+                  onLongPress: () => _showQuickReactionPicker(
+                    context,
+                    current: userReaction,
+                    onPick: onReactionChanged!,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -405,26 +303,256 @@ class ReplyCard extends StatelessWidget {
   }
 }
 
-class _OfficialInlineChip extends StatelessWidget {
-  const _OfficialInlineChip({this.category});
+bool _isHeartReaction(String? value) {
+  if (value == null || value.isEmpty) return false;
+  final display = replyReactionDisplay(value);
+  return display == '❤️' || value == 'heart';
+}
 
-  final String? category;
+/// Quita el @padre del inicio del cuerpo si ya hay etiqueta «Respondiendo a».
+String _bodyWithoutLeadingParentMention(String content, String? parentHandle) {
+  if (parentHandle == null || parentHandle.trim().isEmpty) return content;
+  final bare = parentHandle.trim().replaceFirst(RegExp(r'^@'), '');
+  if (bare.isEmpty) return content;
+
+  final pattern = RegExp(
+    '^\\s*@${RegExp.escape(bare)}\\b[,:]?\\s*',
+    caseSensitive: false,
+  );
+  final stripped = content.replaceFirst(pattern, '');
+  // Si el mensaje era solo la mención, no dejar la tarjeta vacía.
+  if (stripped.trim().isEmpty) return content;
+  return stripped;
+}
+
+int _heartCount(Map<String, int> counts) {
+  final normalized = normalizeReactionCounts(counts);
+  return normalized['❤️'] ?? 0;
+}
+
+Map<String, int> _nonHeartCounts(Map<String, int> counts) {
+  final normalized = Map<String, int>.from(normalizeReactionCounts(counts));
+  normalized.remove('❤️');
+  return normalized;
+}
+
+Future<void> _showQuickReactionPicker(
+  BuildContext context, {
+  required String? current,
+  required Future<void> Function(String? reaction) onPick,
+}) async {
+  final selected = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: AppColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Reaccionar',
+                style: AppTypography.bodyMedium().copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  for (final reaction in quickReplyReactions)
+                    InkWell(
+                      onTap: () => Navigator.pop(ctx, reaction.emoji),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: reactionsEqual(current, reaction.emoji)
+                              ? AppColors.burgundy.withValues(alpha: 0.1)
+                              : AppColors.backgroundElevated,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          reaction.emoji,
+                          style: const TextStyle(fontSize: 22),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+  if (selected == null) return;
+  final next = reactionsEqual(current, selected) ? null : selected;
+  await onPick(next);
+}
+
+/// Cabecera IG: «Respondiendo a» + @handle; tiempo/rango en 2.ª línea (sin cortar).
+class _AuthorHeader extends StatelessWidget {
+  const _AuthorHeader({
+    required this.handle,
+    required this.verified,
+    required this.isTopicAuthor,
+    required this.timeAgo,
+    required this.isEdited,
+    this.rank,
+    this.replyingTo,
+  });
+
+  final String handle;
+  final bool verified;
+  final bool isTopicAuthor;
+  final String timeAgo;
+  final bool isEdited;
+  final String? rank;
+  final String? replyingTo;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppColors.burgundy.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        'Oficial · ${_categoryLabel(category)}',
-        style: TopicDetailTypography.meta(
-          color: AppColors.burgundy,
-          fontWeight: FontWeight.w800,
-        ).copyWith(fontSize: 10.5),
-      ),
+    final metaStyle = TopicDetailTypography.meta(
+      color: AppColors.textMuted,
+    ).copyWith(fontSize: 12.5, fontWeight: FontWeight.w400, height: 1.2);
+    final parent = replyingTo?.trim();
+    final parentHandle = parent == null || parent.isEmpty
+        ? null
+        : (parent.startsWith('@') ? parent : '@$parent');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (parentHandle != null) ...[
+          Text.rich(
+            TextSpan(
+              style: metaStyle.copyWith(fontSize: 11.5),
+              children: [
+                const TextSpan(text: 'Respondiendo a '),
+                TextSpan(
+                  text: parentHandle,
+                  style: const TextStyle(
+                    color: AppColors.burgundy,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+        ],
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                handle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.bodyMedium().copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14.5,
+                  height: 1.15,
+                  letterSpacing: -0.1,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (verified) ...[
+              const SizedBox(width: 4),
+              const VerifiedAccountIcon(size: 13),
+            ],
+            if (isTopicAuthor) ...[
+              const SizedBox(width: 5),
+              const TopicAuthorBadge(),
+            ],
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          [
+            timeAgo,
+            if (isEdited) 'editado',
+            if (rank != null && rank!.trim().isNotEmpty) rank!.trim(),
+          ].join(' · '),
+          style: AppTypography.rankTitle(
+            color: AppColors.textSecondary,
+          ).copyWith(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            height: 1.25,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OfficialMetaRow extends StatelessWidget {
+  const _OfficialMetaRow({
+    required this.reply,
+    required this.reactionCounts,
+  });
+
+  final ForumReply reply;
+  final Map<String, int> reactionCounts;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 0,
+      children: [
+        if (reply.isOfficial)
+          Text(
+            'Oficial · ${_categoryLabel(reply.officialCategory)}',
+            style: TopicDetailTypography.meta(
+              color: AppColors.burgundy,
+              fontWeight: FontWeight.w700,
+            ).copyWith(fontSize: 10.5),
+          ),
+        if (reply.isFeatured)
+          Text(
+            reply.isOfficial ? 'Fijada' : 'Destacada',
+            style: TopicDetailTypography.meta(
+              color: AppColors.burgundy,
+              fontWeight: FontWeight.w600,
+            ).copyWith(fontSize: 10.5),
+          ),
+        if (reply.isOfficial && totalReactionCount(reactionCounts) > 0)
+          GestureDetector(
+            onTap: () => showReplyReactionStatsSheet(
+              context,
+              replyId: reply.id,
+              reactionCounts: reactionCounts,
+            ),
+            child: Text(
+              '${totalReactionCount(reactionCounts)} reacc.',
+              style: TopicDetailTypography.meta(
+                color: AppColors.goldDark,
+                fontWeight: FontWeight.w600,
+              ).copyWith(fontSize: 10.5),
+            ),
+          ),
+      ],
     );
   }
 
@@ -438,53 +566,124 @@ class _OfficialInlineChip extends StatelessWidget {
   }
 }
 
-class _ManageMenu extends StatelessWidget {
-  const _ManageMenu({required this.options});
+/// Corazón a la derecha, estilo Instagram.
+class _InstagramLikeButton extends StatelessWidget {
+  const _InstagramLikeButton({
+    required this.liked,
+    required this.count,
+    required this.onTap,
+    this.onLongPress,
+  });
 
-  final ReplyManageOptions options;
+  final bool liked;
+  final int count;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 28,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+              size: 16,
+              color: liked ? AppColors.accentRed : AppColors.textMuted,
+            ),
+            if (count > 0) ...[
+              const SizedBox(height: 1),
+              Text(
+                '$count',
+                style: TopicDetailTypography.meta(
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w600,
+                ).copyWith(fontSize: 11, height: 1),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReplyOverflowMenu extends StatelessWidget {
+  const _ReplyOverflowMenu({
+    this.manageOptions,
+    this.onShareTap,
+    this.onReportTap,
+    this.showShare = false,
+  });
+
+  final ReplyManageOptions? manageOptions;
+  final VoidCallback? onShareTap;
+  final VoidCallback? onReportTap;
+  final bool showShare;
 
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textMuted),
+      icon: Icon(
+        Icons.more_horiz_rounded,
+        size: 18,
+        color: AppColors.textMuted.withValues(alpha: 0.75),
+      ),
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      tooltip: 'Más opciones',
       onSelected: (value) {
         switch (value) {
           case 'edit':
-            options.onEdit?.call();
+            manageOptions?.onEdit?.call();
           case 'delete':
-            options.onDelete?.call();
+            manageOptions?.onDelete?.call();
           case 'feature':
-            options.onToggleFeature?.call();
+            manageOptions?.onToggleFeature?.call();
           case 'ban':
-            options.onBanFromForum?.call();
+            manageOptions?.onBanFromForum?.call();
+          case 'share':
+            onShareTap?.call();
+          case 'report':
+            onReportTap?.call();
         }
       },
-      itemBuilder: (context) => [
-        if (options.canEdit)
-          const PopupMenuItem(value: 'edit', child: Text('Editar')),
-        if (options.canFeature)
-          PopupMenuItem(
-            value: 'feature',
-            child: Text(
-              options.isFeatured
-                  ? (options.pinOfficialStyle
-                      ? 'Quitar fijado'
-                      : 'Quitar destacado')
-                  : (options.pinOfficialStyle
-                      ? 'Fijar arriba del tablón'
-                      : 'Destacar respuesta'),
+      itemBuilder: (context) {
+        final options = manageOptions;
+        return [
+          if (options?.canEdit ?? false)
+            const PopupMenuItem(value: 'edit', child: Text('Editar')),
+          if (options?.canFeature ?? false)
+            PopupMenuItem(
+              value: 'feature',
+              child: Text(
+                options!.isFeatured
+                    ? (options.pinOfficialStyle
+                        ? 'Quitar fijado'
+                        : 'Quitar destacado')
+                    : (options.pinOfficialStyle
+                        ? 'Fijar arriba del tablón'
+                        : 'Destacar respuesta'),
+              ),
             ),
-          ),
-        if (options.canBanFromForum)
-          const PopupMenuItem(
-            value: 'ban',
-            child: Text('Expulsar del foro'),
-          ),
-        if (options.canDelete)
-          const PopupMenuItem(value: 'delete', child: Text('Eliminar')),
-      ],
+          if (showShare && onShareTap != null)
+            const PopupMenuItem(value: 'share', child: Text('Compartir')),
+          if (options?.canBanFromForum ?? false)
+            const PopupMenuItem(
+              value: 'ban',
+              child: Text('Expulsar del foro'),
+            ),
+          if (onReportTap != null)
+            const PopupMenuItem(value: 'report', child: Text('Reportar')),
+          if (options?.canDelete ?? false)
+            const PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+        ];
+      },
     );
   }
 }
