@@ -6,6 +6,7 @@ import {
   CreatedHermandadAccount,
   HERMANDAD_STATION_DAYS,
   HandleHit,
+  HermandadAccessRequest,
   HermandadAssignment,
   HermandadTopicOption,
   hermandadBoardTopicId,
@@ -28,6 +29,7 @@ export class HermandadesPageComponent implements OnInit {
   readonly assignments = signal<HermandadAssignment[]>([]);
   readonly topics = signal<HermandadTopicOption[]>([]);
   readonly brotherhoods = signal<AdminUserRow[]>([]);
+  readonly accessRequests = signal<HermandadAccessRequest[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly creating = signal(false);
@@ -118,19 +120,85 @@ export class HermandadesPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [assignments, topics, brotherhoods] = await Promise.all([
-        this.community.fetchHermandadAssignments(),
-        this.community.fetchHermandadBoardTopics(),
-        this.community.fetchBrotherhoodAccounts(80),
-      ]);
+      const [assignments, topics, brotherhoods, accessRequests] =
+        await Promise.all([
+          this.community.fetchHermandadAssignments(),
+          this.community.fetchHermandadBoardTopics(),
+          this.community.fetchBrotherhoodAccounts(80),
+          this.community.fetchHermandadAccessRequests('pending', 40),
+        ]);
       this.assignments.set(assignments);
       this.topics.set(topics);
       this.brotherhoods.set(brotherhoods);
+      this.accessRequests.set(accessRequests);
       if (!this.linkTopicId && topics.length) this.linkTopicId = topics[0].id;
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo cargar');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  prefillFromRequest(req: HermandadAccessRequest): void {
+    this.displayName = req.hermandadName;
+    this.email = req.contactEmail;
+    const slug = req.hermandadName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 24);
+    this.handle = slug || this.handle;
+    this.autoPassword = true;
+    this.password = '';
+    document
+      .getElementById('create-hermandad-account')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async rejectAccessRequest(
+    req: HermandadAccessRequest,
+    asSpam = false,
+  ): Promise<void> {
+    const label = asSpam ? 'marcar como spam' : 'rechazar';
+    if (!confirm(`¿${label} la solicitud de «${req.hermandadName}»?`)) return;
+    this.busyKey.set(`req:${req.id}`);
+    this.error.set(null);
+    try {
+      await this.community.reviewHermandadAccessRequest({
+        requestId: req.id,
+        status: asSpam ? 'spam' : 'rejected',
+      });
+      this.accessRequests.update((list) => list.filter((r) => r.id !== req.id));
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo actualizar la solicitud',
+      );
+    } finally {
+      this.busyKey.set(null);
+    }
+  }
+
+  async markRequestApproved(
+    req: HermandadAccessRequest,
+    profileId?: string | null,
+  ): Promise<void> {
+    this.busyKey.set(`req:${req.id}`);
+    this.error.set(null);
+    try {
+      await this.community.reviewHermandadAccessRequest({
+        requestId: req.id,
+        status: 'approved',
+        createdProfileId: profileId ?? null,
+      });
+      this.accessRequests.update((list) => list.filter((r) => r.id !== req.id));
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo marcar como aprobada',
+      );
+    } finally {
+      this.busyKey.set(null);
     }
   }
 
@@ -271,6 +339,10 @@ export class HermandadesPageComponent implements OnInit {
     this.creating.set(true);
     this.error.set(null);
     this.created.set(null);
+    const emailNorm = this.email.trim().toLowerCase();
+    const matchingRequest = this.accessRequests().find(
+      (r) => r.contactEmail.toLowerCase() === emailNorm,
+    );
     try {
       const result = await this.community.createHermandadAccount({
         email: this.email,
@@ -280,6 +352,17 @@ export class HermandadesPageComponent implements OnInit {
         topicId: this.createTopicId || null,
       });
       this.created.set(result);
+      if (matchingRequest) {
+        try {
+          await this.community.reviewHermandadAccessRequest({
+            requestId: matchingRequest.id,
+            status: 'approved',
+            createdProfileId: result.profileId || null,
+          });
+        } catch {
+          /* la cuenta ya está creada; la solicitud se puede marcar a mano */
+        }
+      }
       this.displayName = '';
       this.handle = '';
       this.email = '';

@@ -46,6 +46,20 @@ export const routes: Routes = [
             './pages/hermandad-portal/followers/hermandad-followers.component'
           ).then((m) => m.HermandadFollowersPageComponent),
       },
+      {
+        path: 'calendario',
+        loadComponent: () =>
+          import(
+            './pages/hermandad-portal/calendar/hermandad-calendar.component'
+          ).then((m) => m.HermandadCalendarPageComponent),
+      },
+      {
+        path: 'ajustes',
+        loadComponent: () =>
+          import(
+            './pages/hermandad-portal/settings/hermandad-settings.component'
+          ).then((m) => m.HermandadSettingsPageComponent),
+      },
     ],
   },
   {

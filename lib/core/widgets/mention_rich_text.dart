@@ -86,7 +86,7 @@ class _MentionRichTextState extends ConsumerState<MentionRichText> {
 
   void _openHashtagSearch(String hashtag) {
     final tag = hashtag.startsWith('#') ? hashtag : '#$hashtag';
-    context.go('/buscar?q=${Uri.encodeComponent(tag)}');
+    context.push('/buscar?q=${Uri.encodeComponent(tag)}');
   }
 
   Future<void> _openUrl(String raw) async {

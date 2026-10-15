@@ -275,14 +275,55 @@ export class HermandadPortalService {
       .order('starts_at', { ascending: true })
       .limit(limit);
     if (error) throw error;
-    return (data ?? []).map((row) => ({
-      id: String(row.id),
-      title: String(row.title ?? ''),
-      startsAt: String(row.starts_at ?? ''),
-      location: (row.location as string | null) ?? null,
-      coverImageUrl: (row.cover_image_url as string | null) ?? null,
-      eventType: String(row.event_type ?? 'evento'),
-    }));
+    return (data ?? []).map((row) => this.mapCalendarEvent(row));
+  }
+
+  /** Eventos propios en un rango (vista calendario mensual). */
+  async fetchOwnEventsInRange(
+    profileId: string,
+    fromIso: string,
+    toIso: string,
+  ): Promise<
+    Array<{
+      id: string;
+      title: string;
+      startsAt: string;
+      location: string | null;
+      coverImageUrl: string | null;
+      eventType: string;
+    }>
+  > {
+    const { data, error } = await getSupabase()
+      .from('calendar_events')
+      .select(
+        'id, title, starts_at, location, cover_image_url, event_type, status',
+      )
+      .eq('created_by', profileId)
+      .eq('status', 'published')
+      .gte('starts_at', fromIso)
+      .lt('starts_at', toIso)
+      .order('starts_at', { ascending: true })
+      .limit(200);
+    if (error) throw error;
+    return (data ?? []).map((row) => this.mapCalendarEvent(row));
+  }
+
+  private mapCalendarEvent(row: Record<string, unknown>): {
+    id: string;
+    title: string;
+    startsAt: string;
+    location: string | null;
+    coverImageUrl: string | null;
+    eventType: string;
+  } {
+    return {
+      id: String(row['id']),
+      title: String(row['title'] ?? ''),
+      startsAt: String(row['starts_at'] ?? ''),
+      location: (row['location'] as string | null) ?? null,
+      coverImageUrl: (row['cover_image_url'] as string | null) ?? null,
+      eventType: String(row['event_type'] ?? 'evento'),
+    };
   }
 
   private mapOfficialPost(row: Record<string, unknown>): HermandadOfficialPost {
@@ -312,7 +353,7 @@ export class HermandadPortalService {
       .in('topic_id', topicIds)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
-      .limit(500);
+      .limit(120);
     if (error) throw error;
     return (data ?? []).map((row) =>
       this.mapOfficialPost(row as Record<string, unknown>),
@@ -334,7 +375,7 @@ export class HermandadPortalService {
       .in('topic_id', topicIds)
       .not('deleted_at', 'is', null)
       .order('deleted_at', { ascending: false })
-      .limit(500);
+      .limit(80);
     if (error) throw error;
     return (data ?? []).map((row) =>
       this.mapOfficialPost(row as Record<string, unknown>),
@@ -530,6 +571,32 @@ export class HermandadPortalService {
     const { error } = await getSupabase()
       .from('calendar_events')
       .delete()
+      .eq('id', eventId);
+    if (error) throw error;
+  }
+
+  async updateOwnCalendarEvent(
+    eventId: string,
+    input: {
+      title: string;
+      startsAtIso: string;
+      location?: string | null;
+      eventType: string;
+    },
+  ): Promise<void> {
+    const title = input.title.trim();
+    if (title.length < 2) {
+      throw new Error('El título debe tener al menos 2 caracteres.');
+    }
+    const { error } = await getSupabase()
+      .from('calendar_events')
+      .update({
+        title,
+        starts_at: input.startsAtIso,
+        location: input.location?.trim() || null,
+        event_type: input.eventType,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', eventId);
     if (error) throw error;
   }

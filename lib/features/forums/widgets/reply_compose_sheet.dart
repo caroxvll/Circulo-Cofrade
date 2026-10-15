@@ -16,6 +16,7 @@ import '../data/forums_repository.dart';
 import '../forums_provider.dart';
 import '../hermandad_scheduled_posts_provider.dart';
 import '../hermandad_scheduled_posts_screen.dart';
+import '../utils/forum_navigation.dart';
 import '../utils/official_post_categories.dart';
 import '../topic_detail_typography.dart';
 import 'forum_compose_field.dart';
@@ -39,7 +40,7 @@ Future<void> showReplyComposeSheet(
 }) async {
   final isAuth = ref.read(isAuthenticatedProvider);
   if (!isAuth) {
-    final redirect = '/foros/$forumId/tema/$topicId';
+    final redirect = forumTopicLocation(forumId, topicId);
     if (context.mounted) {
       await context.push('/login?redirect=${Uri.encodeComponent(redirect)}');
     }

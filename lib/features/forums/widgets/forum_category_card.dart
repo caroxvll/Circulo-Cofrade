@@ -1,14 +1,14 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/models/forum.dart';
 import '../data/forum_pillar_covers.dart';
-import '../data/mock_forums.dart';
 import '../utils/forum_activity_badge.dart';
-import 'forum_last_activity_link.dart';
+import '../utils/forum_navigation.dart';
 import 'forum_pillar_icon_mark.dart';
 
 class ForumCategoryCard extends StatelessWidget {
@@ -143,7 +143,9 @@ class _ForumCardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final metrics = _CardContentMetrics.forHeight(height, featured: featured);
-    final descriptionLines = height >= 118 ? 2 : 1;
+    final hasHotTopic = !locked &&
+        (forum.lastTopicTitle?.trim().isNotEmpty ?? false) &&
+        (forum.lastTopicId?.trim().isNotEmpty ?? false);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -194,38 +196,45 @@ class _ForumCardContent extends StatelessWidget {
               fontSize: metrics.bodySize,
               height: metrics.bodyLineHeight,
             ),
-            maxLines: descriptionLines,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const Spacer(),
+          SizedBox(height: metrics.metaGap + 2),
           if (locked && forum.lockedLabel != null)
-            Text(
-              forum.lockedLabel!,
-              style: AppTypography.labelSmall(
-                color: AppColors.burgundy,
-              ).copyWith(
-                fontSize: metrics.metaSize,
-                fontWeight: FontWeight.w600,
-                height: 1.12,
+            Expanded(
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  forum.lockedLabel!,
+                  style: AppTypography.labelSmall(
+                    color: AppColors.burgundy,
+                  ).copyWith(
+                    fontSize: metrics.metaSize,
+                    fontWeight: FontWeight.w600,
+                    height: 1.12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             )
-          else ...[
-            _ForumCardStatsRow(
-              forum: forum,
-              metaSize: metrics.metaSize,
-              iconSize: metrics.iconSize,
-              topicsLabel: featured ? 'noticias' : 'temas',
+          else if (hasHotTopic)
+            Expanded(
+              child: _ForumHotTopicStrip(
+                forum: forum,
+                metaSize: metrics.metaSize,
+                fillHeight: true,
+              ),
+            )
+          else
+            Expanded(
+              child: _ForumIdleActivityPanel(
+                forum: forum,
+                metaSize: metrics.metaSize,
+                iconSize: metrics.iconSize,
+                topicsLabel: featured ? 'noticias' : 'temas',
+              ),
             ),
-            SizedBox(height: metrics.metaGap),
-            ForumLastActivityLink(
-              forum: forum,
-              compact: true,
-              accentColor: AppColors.burgundy,
-              fontSize: metrics.metaSize,
-            ),
-          ],
         ],
       ),
     );
@@ -306,6 +315,189 @@ class _CardContentMetrics {
       iconSize: 10.5,
       gap: 3,
       metaGap: 2,
+    );
+  }
+}
+
+/// Hilo con actividad más reciente; [fillHeight] ocupa el hueco de la card.
+class _ForumHotTopicStrip extends StatelessWidget {
+  const _ForumHotTopicStrip({
+    required this.forum,
+    required this.metaSize,
+    this.fillHeight = false,
+  });
+
+  final ForumCategory forum;
+  final double metaSize;
+  final bool fillHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = forum.lastTopicTitle!.trim();
+    final topicId = forum.lastTopicId!.trim();
+    final ago = forum.lastMessageAgo == 'sin actividad'
+        ? null
+        : forum.lastMessageAgo;
+
+    return Material(
+      color: AppColors.gold.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: () => context.push(forumTopicLocation(forum.id, topicId)),
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            9,
+            fillHeight ? 8 : 6,
+            9,
+            fillHeight ? 8 : 6,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.local_fire_department_rounded,
+                    size: metaSize + 2.5,
+                    color: AppColors.burgundy,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'AHORA',
+                    style: AppTypography.labelSmall(
+                      color: AppColors.burgundy,
+                    ).copyWith(
+                      fontSize: metaSize,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                      height: 1,
+                    ),
+                  ),
+                  if (ago != null) ...[
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        ago,
+                        style: AppTypography.labelSmall(
+                          color: AppColors.textMuted,
+                        ).copyWith(fontSize: metaSize - 0.5, height: 1),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              SizedBox(height: fillHeight ? 5 : 3),
+              Text(
+                title,
+                style: AppTypography.bodyMedium(
+                  color: AppColors.textPrimary,
+                ).copyWith(
+                  fontSize: metaSize + (fillHeight ? 2 : 1.5),
+                  fontWeight: FontWeight.w700,
+                  height: 1.18,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (fillHeight) ...[
+                const SizedBox(height: 4),
+                Expanded(
+                  child: Text(
+                    (forum.lastTopicExcerpt?.trim().isNotEmpty ?? false)
+                        ? forum.lastTopicExcerpt!.trim()
+                        : 'Toca para abrir el hilo y unirte al debate.',
+                    style: AppTypography.bodyMedium(
+                      color: AppColors.textSecondary,
+                    ).copyWith(
+                      fontSize: metaSize + 0.5,
+                      fontWeight: FontWeight.w400,
+                      height: 1.25,
+                    ),
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Abrir hilo ›',
+                    style: AppTypography.labelSmall(
+                      color: AppColors.burgundy,
+                    ).copyWith(
+                      fontSize: metaSize,
+                      fontWeight: FontWeight.w700,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Panel cuando aún no hay hilo caliente: rellena el hueco con stats.
+class _ForumIdleActivityPanel extends StatelessWidget {
+  const _ForumIdleActivityPanel({
+    required this.forum,
+    required this.metaSize,
+    required this.iconSize,
+    required this.topicsLabel,
+  });
+
+  final ForumCategory forum;
+  final double metaSize;
+  final double iconSize;
+  final String topicsLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.backgroundElevated.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sin actividad reciente',
+              style: AppTypography.labelSmall(
+                color: AppColors.burgundy,
+              ).copyWith(
+                fontSize: metaSize + 0.5,
+                fontWeight: FontWeight.w700,
+                height: 1.1,
+              ),
+            ),
+            const Spacer(),
+            _ForumCardStatsRow(
+              forum: forum,
+              metaSize: metaSize,
+              iconSize: iconSize,
+              topicsLabel: topicsLabel,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Sé el primero en abrir un tema',
+              style: AppTypography.labelSmall(
+                color: AppColors.textMuted,
+              ).copyWith(fontSize: metaSize, height: 1.15),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -572,5 +764,5 @@ String _shortCount(int value) {
     final short = value / 1000;
     return '${short.toStringAsFixed(short >= 10 ? 0 : 1)}k';
   }
-  return formatCount(value);
+  return '$value';
 }

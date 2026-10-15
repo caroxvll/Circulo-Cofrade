@@ -4,6 +4,21 @@ import 'package:go_router/go_router.dart';
 
 import '../forums_provider.dart';
 import '../topic_replies_provider.dart';
+import 'noticias_forum.dart';
+
+/// Ruta de la lista de un foro (Noticias es tab propio).
+String forumListLocation(String forumId) =>
+    isNoticiasForum(forumId) ? '/noticias' : '/foros/$forumId';
+
+/// Ruta de un hilo (Noticias vive bajo `/noticias/tema/...`).
+String forumTopicLocation(
+  String forumId,
+  String topicId, {
+  String querySuffix = '',
+}) =>
+    isNoticiasForum(forumId)
+        ? '/noticias/tema/$topicId$querySuffix'
+        : '/foros/$forumId/tema/$topicId$querySuffix';
 
 /// Abre un hilo desde notificaciones o enlaces.
 /// Navegación directa (sin pasar por /foros → lista) para que no se sienta lento.
@@ -14,7 +29,7 @@ void openForumTopic(
   required String topicId,
   String querySuffix = '',
 }) {
-  context.go('/foros/$forumId/tema/$topicId$querySuffix');
+  context.go(forumTopicLocation(forumId, topicId, querySuffix: querySuffix));
 }
 
 /// Dispara la carga de tema + primera página de respuestas *antes* de navegar.
@@ -41,7 +56,7 @@ Future<void> pushForumTopic(
   required String topicId,
 }) {
   prefetchForumTopic(ref, forumId: forumId, topicId: topicId);
-  return context.push('/foros/$forumId/tema/$topicId');
+  return context.push(forumTopicLocation(forumId, topicId));
 }
 
 /// Prefetch lista + push al pilar (Noticias, Hermandades, etc.).
@@ -51,6 +66,10 @@ Future<void> pushForumTopicsList(
   required String forumId,
 }) {
   prefetchForumTopicsList(ref, forumId: forumId);
+  if (isNoticiasForum(forumId)) {
+    context.go('/noticias');
+    return Future.value();
+  }
   return context.push('/foros/$forumId');
 }
 
@@ -59,14 +78,16 @@ void popForumTopic(BuildContext context, {required String forumId}) {
   if (context.canPop()) {
     context.pop();
   } else {
-    context.go('/foros/$forumId');
+    context.go(forumListLocation(forumId));
   }
 }
 
 /// Atrás en lista de temas de un foro: pop si hay pila, si no pilares.
-void popForumTopicsList(BuildContext context) {
+void popForumTopicsList(BuildContext context, {String? forumId}) {
   if (context.canPop()) {
     context.pop();
+  } else if (forumId != null && isNoticiasForum(forumId)) {
+    context.go('/noticias');
   } else {
     context.go('/foros');
   }

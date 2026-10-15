@@ -12,8 +12,10 @@ import '../ads/widgets/sponsored_placement_slot.dart';
 import '../calendar/calendar_provider.dart';
 import '../calendar/models/calendar_focus_request.dart';
 import '../calendar/widgets/event_card.dart';
+import '../forums/utils/forum_navigation.dart';
 import '../forums/widgets/forums_beige_background.dart';
 import '../forums/widgets/topic_card.dart';
+import '../shell/cofradeo_shell.dart';
 import 'data/follows_repository.dart';
 import 'data/mock_search.dart';
 import 'follows_provider.dart';
@@ -136,6 +138,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   bool get _isSearching => _query.trim().isNotEmpty;
 
+  void _leaveSearch() {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    final shell = StatefulNavigationShell.maybeOf(context);
+    if (shell != null) {
+      shell.goBranch(ShellMainTabMemory.lastIndex);
+      return;
+    }
+    context.go('/calendario');
+  }
+
   Widget _buildTrendCard(SearchTrend trend) {
     return TrendCard(
       trend: trend,
@@ -226,7 +241,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               topic: results.topics[i],
               compact: true,
               onTap: () => context.push(
-                '/foros/${results.topics[i].forumId}/tema/${results.topics[i].id}',
+                forumTopicLocation(
+                  results.topics[i].forumId,
+                  results.topics[i].id,
+                ),
               ),
             ),
           ],
@@ -245,14 +263,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final trendsAsync = ref.watch(searchTrendsProvider);
     final recentQueries = _recentQueries(supabaseReady);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        image: forumsBeigeDecorationImage(context),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: CustomScrollView(
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          image: forumsBeigeDecorationImage(context),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: CustomScrollView(
           slivers: [
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(
@@ -268,6 +288,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
+                        IconButton(
+                          onPressed: _leaveSearch,
+                          icon: const Icon(Icons.chevron_left),
+                          color: AppColors.burgundy,
+                          iconSize: 28,
+                          tooltip: 'Volver',
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(44, 44),
+                          ),
+                        ),
                         Expanded(
                           child: Text(
                             'BUSCAR',
@@ -467,6 +497,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
             ],
           ],
+        ),
         ),
       ),
     );

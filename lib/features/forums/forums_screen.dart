@@ -18,10 +18,10 @@ import 'utils/hermandad_local_assets.dart';
 import 'utils/topic_list_order.dart';
 import 'widgets/forum_category_card.dart';
 import 'widgets/forums_beige_background.dart';
-import 'widgets/noticias_premium_banner.dart';
 import 'forums_hero_tokens.dart';
 import '../quiz/quiz_provider.dart';
 import '../quiz/widgets/quiz_forums_card.dart';
+import '../../core/widgets/search_quick_access_button.dart';
 
 class ForumsScreen extends ConsumerStatefulWidget {
   const ForumsScreen({super.key});
@@ -81,9 +81,7 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
               );
             }
 
-            final split = splitNoticiasFromForums(visible);
-            final noticias = split.noticias;
-            final forums = split.forums;
+            final forums = splitNoticiasFromForums(visible).forums;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -101,25 +99,7 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
                           ),
                           child: SizedBox(
                             height: constraints.maxHeight,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (noticias != null)
-                                  NoticiasPremiumBanner(
-                                    forum: noticias,
-                                    onTap: () => pushForumTopicsList(
-                                      context,
-                                      ref,
-                                      forumId: noticias.id,
-                                    ),
-                                  ),
-                                Expanded(
-                                  child: _CenteredForumsBlock(
-                                    pillars: forums,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            child: _FilledForumsBlock(pillars: forums),
                           ),
                         );
                       },
@@ -130,7 +110,6 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
             );
           },
         ),
-        const SemanaSantaForumsLiveChip(),
         if (ref.watch(quizLiveVisibleProvider).asData?.value == true)
           const QuizForumsFab(),
       ],
@@ -150,10 +129,19 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
   }
 }
 
-class _CenteredForumsBlock extends StatelessWidget {
-  const _CenteredForumsBlock({required this.pillars});
+/// Lista de foros anclada arriba y estirada para ocupar el alto útil.
+class _FilledForumsBlock extends StatelessWidget {
+  const _FilledForumsBlock({required this.pillars});
 
   final List<ForumCategory> pillars;
+
+  static const _sectionHeaderHeight = 26.0;
+  static const _afterHeaderGap = 4.0;
+  static const _topInset = 2.0;
+  /// Margen mínimo bajo la última card (antes del banner).
+  static const _bottomInset = 2.0;
+  static const _minCard = 112.0;
+  static const _sidePad = 14.0;
 
   @override
   Widget build(BuildContext context) {
@@ -161,92 +149,71 @@ class _CenteredForumsBlock extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        const sectionHeaderHeight = 30.0;
-        const afterHeaderGap = 8.0;
-        const safety = 12.0;
         final gaps = (pillars.length - 1) * ForumCategoryCard.cardGap;
         final availableForCards = (constraints.maxHeight -
-                sectionHeaderHeight -
-                afterHeaderGap -
-                safety)
+                _topInset -
+                _sectionHeaderHeight -
+                _afterHeaderGap -
+                _bottomInset)
             .clamp(0.0, constraints.maxHeight);
 
-        final idealCard = ForumCategoryCard.cardHeight;
-        final idealBlock = pillars.length * idealCard + gaps;
+        // Sin tope alto: las cards rellenan hasta el banner.
+        final raw = pillars.isEmpty
+            ? _minCard
+            : (availableForCards - gaps) / pillars.length;
+        final cardHeight = raw.floorToDouble().clamp(_minCard, availableForCards);
 
-        final double cardHeight;
-        final double sidePad;
-        if (idealBlock <= availableForCards) {
-          cardHeight = idealCard;
-          sidePad = (availableForCards - idealBlock) / 2;
-        } else {
-          // Encaja sí o sí (Samsung / 360x740): floor evita desbordes por decimales.
-          final raw = (availableForCards - gaps) / pillars.length;
-          cardHeight = raw.floorToDouble().clamp(1.0, idealCard);
-          sidePad = 0;
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (sidePad > 0) SizedBox(height: sidePad),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 0),
-              child: SizedBox(
-                height: sectionHeaderHeight,
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(
+            _sidePad,
+            _topInset,
+            _sidePad,
+            _bottomInset,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(
+                height: _sectionHeaderHeight,
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: _FeaturedSectionHeader(),
                 ),
               ),
-            ),
-            const SizedBox(height: afterHeaderGap),
-            _ForumsCardsList(
-              pillars: pillars,
-              cardHeight: cardHeight,
-            ),
-            if (sidePad > 0) SizedBox(height: sidePad),
-          ],
+              const SizedBox(height: _afterHeaderGap),
+              for (var i = 0; i < pillars.length; i++) ...[
+                if (i > 0) const SizedBox(height: ForumCategoryCard.cardGap),
+                SizedBox(
+                  height: cardHeight,
+                  child: _ForumCard(
+                    forum: pillars[i],
+                    height: cardHeight,
+                  ),
+                ),
+              ],
+            ],
+          ),
         );
       },
     );
   }
 }
 
-class _ForumsCardsList extends ConsumerWidget {
-  const _ForumsCardsList({
-    required this.pillars,
-    required this.cardHeight,
-  });
+class _ForumCard extends ConsumerWidget {
+  const _ForumCard({required this.forum, required this.height});
 
-  final List<ForumCategory> pillars;
-  final double cardHeight;
+  final ForumCategory forum;
+  final double height;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (pillars.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var i = 0; i < pillars.length; i++) ...[
-            if (i > 0) const SizedBox(height: ForumCategoryCard.cardGap),
-            SizedBox(
-              height: cardHeight,
-              child: ForumCategoryCard(
-                forum: pillars[i],
-                height: cardHeight,
-                onTap: () => pushForumTopicsList(
-                  context,
-                  ref,
-                  forumId: pillars[i].id,
-                ),
-              ),
-            ),
-          ],
-        ],
+    return ForumCategoryCard(
+      forum: forum,
+      height: height,
+      onTap: () => pushForumTopicsList(
+        context,
+        ref,
+        forumId: forum.id,
       ),
     );
   }
@@ -264,9 +231,9 @@ class _FeaturedSectionHeader extends StatelessWidget {
           'Foros destacados',
           style: AppTypography.displaySmall(
             color: AppColors.textPrimary,
-          ).copyWith(fontSize: 18, letterSpacing: 0.08),
+          ).copyWith(fontSize: 17, letterSpacing: 0.08),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         Container(
           width: 44,
           height: 1.5,
@@ -326,14 +293,61 @@ class _ForumsHero extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'FOROS',
-                  style: ForumsHeroTokens.heroTitleStyle(),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'FOROS',
+                            style: ForumsHeroTokens.heroTitleStyle().copyWith(
+                              fontSize: 28,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 7),
+                          Container(
+                            width: 28,
+                            height: 1.5,
+                            color: AppColors.gold.withValues(alpha: 0.75),
+                          ),
+                          const SizedBox(height: 7),
+                          Text(
+                            'COMUNIDAD COFRADE',
+                            style: AppTypography.labelSmall(
+                              color: AppColors.goldPale.withValues(alpha: 0.92),
+                            ).copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                              letterSpacing: 1.6,
+                              height: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SemanaSantaForumsLiveChip(inline: true),
+                          SizedBox(width: 4),
+                          SearchQuickAccessButton(iconColor: AppColors.gold),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: ForumsHeroTokens.afterTitleGap),
+                const SizedBox(height: 8),
                 Text(
-                  'Participa en la mayor\ncomunidad cofrade',
-                  style: ForumsHeroTokens.heroSubtitleStyle(),
+                  'Participa en la mayor comunidad cofrade',
+                  style: ForumsHeroTokens.heroSubtitleStyle().copyWith(
+                    fontSize: 14,
+                    height: 1.25,
+                  ),
                 ),
               ],
             ),

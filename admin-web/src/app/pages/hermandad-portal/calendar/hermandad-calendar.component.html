@@ -1,0 +1,226 @@
+<section class="cal-page">
+  <header class="cal-head">
+    <div>
+      <p class="eyebrow">Agenda oficial</p>
+      <h1>Calendario</h1>
+      <p class="lead">
+        Pulsa un día o un evento para verlo, editarlo o quitarlo del calendario.
+      </p>
+    </div>
+    <a routerLink="/hermandad/publicar" class="btn-ico primary">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M12 5v14M5 12h14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </svg>
+      Nuevo evento
+    </a>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  <div class="cal-layout">
+    <div class="cal-panel">
+      <div class="cal-toolbar">
+        <div class="cal-nav">
+          <button type="button" class="nav-btn" (click)="shiftMonth(-1)" aria-label="Mes anterior">
+            ‹
+          </button>
+          <h2>{{ monthLabel() }}</h2>
+          <button type="button" class="nav-btn" (click)="shiftMonth(1)" aria-label="Mes siguiente">
+            ›
+          </button>
+        </div>
+        <div class="cal-meta">
+          <button type="button" class="ghost-btn" (click)="goToday()">Hoy</button>
+          <span class="count" aria-live="polite">
+            {{ monthEventCount() }}
+            {{ monthEventCount() === 1 ? 'evento' : 'eventos' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="weekdays" aria-hidden="true">
+        @for (w of weekdays; track w) {
+          <span>{{ w }}</span>
+        }
+      </div>
+
+      <div class="grid" role="grid" [attr.aria-label]="'Calendario ' + monthLabel()">
+        @for (day of days(); track day.key) {
+          <div
+            class="cell"
+            role="gridcell"
+            [class.out]="!day.inMonth"
+            [class.today]="day.isToday"
+            [class.selected]="day.key === selectedKey()"
+            [class.has-events]="day.events.length > 0"
+          >
+            <button type="button" class="cell-day" (click)="selectDay(day)">
+              <span class="num">{{ day.day }}</span>
+            </button>
+            @if (day.events.length > 0) {
+              <div class="cell-events">
+                @for (ev of day.events.slice(0, 2); track ev.id) {
+                  <button
+                    type="button"
+                    class="chip"
+                    [class.active]="activeEvent()?.id === ev.id"
+                    [title]="ev.title"
+                    (click)="openEvent(ev, $event)"
+                  >
+                    {{ formatTime(ev.startsAt) }} {{ ev.title }}
+                  </button>
+                }
+                @if (day.events.length > 2) {
+                  <button type="button" class="more" (click)="selectDay(day)">
+                    +{{ day.events.length - 2 }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      @if (loading()) {
+        <p class="loading-hint">Actualizando…</p>
+      }
+    </div>
+
+    <aside class="day-panel">
+      @if (activeEvent(); as ev) {
+        <button type="button" class="back-btn" (click)="closeDetail()">
+          ← Volver al día
+        </button>
+        <p class="day-eyebrow">Ficha del evento</p>
+        <h3>{{ editTitle() || ev.title }}</h3>
+
+        @if (ev.coverImageUrl) {
+          <img [src]="ev.coverImageUrl" alt="" class="detail-cover" />
+        }
+
+        <div class="detail-form">
+          <label class="field">
+            Título
+            <input
+              type="text"
+              [ngModel]="editTitle()"
+              (ngModelChange)="editTitle.set($event)"
+              maxlength="120"
+            />
+          </label>
+          <label class="field">
+            Tipo
+            <select
+              [ngModel]="editType()"
+              (ngModelChange)="editType.set($event)"
+            >
+              @for (t of eventTypes; track t.value) {
+                <option [ngValue]="t.value">{{ t.label }}</option>
+              }
+            </select>
+          </label>
+          <div class="field-row">
+            <label class="field">
+              Fecha
+              <input
+                type="date"
+                [ngModel]="editDate()"
+                (ngModelChange)="editDate.set($event)"
+              />
+            </label>
+            <label class="field">
+              Hora
+              <input
+                type="time"
+                [ngModel]="editTime()"
+                (ngModelChange)="editTime.set($event)"
+              />
+            </label>
+          </div>
+          <label class="field">
+            Lugar
+            <input
+              type="text"
+              [ngModel]="editLocation()"
+              (ngModelChange)="editLocation.set($event)"
+              maxlength="120"
+              placeholder="Opcional"
+            />
+          </label>
+        </div>
+
+        @if (saveError()) {
+          <p class="persist-msg warn">{{ saveError() }}</p>
+        }
+
+        <div class="detail-actions">
+          <button
+            type="button"
+            class="save-btn"
+            [disabled]="!detailDirty() || saving()"
+            (click)="saveEvent()"
+          >
+            {{ saving() ? 'Guardando…' : 'Guardar cambios' }}
+          </button>
+          <button type="button" class="danger-btn" (click)="deleteEvent(ev)">
+            Quitar del calendario
+          </button>
+        </div>
+        <p class="detail-meta">{{ formatFullDate(ev.startsAt) }}</p>
+      } @else {
+        <p class="day-eyebrow">Día seleccionado</p>
+        <h3>{{ selectedLabel() }}</h3>
+
+        @if (selectedEvents().length === 0) {
+          <div class="empty-day">
+            <p>No hay eventos este día.</p>
+            <a routerLink="/hermandad/publicar" class="link-arrow">
+              Publicar con fecha
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M5 12h14M13 6l6 6-6 6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </a>
+          </div>
+        } @else {
+          <ul class="day-list">
+            @for (item of selectedEvents(); track item.id) {
+              <li>
+                <button type="button" class="day-item" (click)="openEvent(item)">
+                  @if (item.coverImageUrl) {
+                    <img [src]="item.coverImageUrl" alt="" class="thumb" />
+                  } @else {
+                    <div class="thumb empty"></div>
+                  }
+                  <div class="body">
+                    <span class="type">{{ eventTypeLabel(item.eventType) }}</span>
+                    <strong>{{ item.title }}</strong>
+                    <p>
+                      {{ formatTime(item.startsAt)
+                      }}{{ item.location ? ' · ' + item.location : '' }}
+                    </p>
+                  </div>
+                  <span class="open-hint" aria-hidden="true">›</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      }
+    </aside>
+  </div>
+</section>

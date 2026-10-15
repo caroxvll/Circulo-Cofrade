@@ -61,7 +61,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     if (notification.kind == AppNotificationKind.ssLiveOfficial) {
       final route = notification.route ??
           (notification.forumId != null && notification.topicId != null
-              ? '/foros/${notification.forumId}/tema/${notification.topicId}'
+              ? forumTopicLocation(
+                  notification.forumId!,
+                  notification.topicId!,
+                )
               : null);
       if (!mounted) return;
       if (route != null) {

@@ -330,6 +330,7 @@ class ForumsRepository {
       lastMessageAgo: _formatLastActivity(lastActivity, enabled),
       lastTopicId: row['last_topic_id'] as String?,
       lastTopicTitle: row['last_topic_title'] as String?,
+      lastTopicExcerpt: row['last_topic_excerpt'] as String?,
       isEnabled: enabled,
       isActive: row['is_active'] as bool? ?? false,
       lockedLabel: row['locked_label'] as String?,

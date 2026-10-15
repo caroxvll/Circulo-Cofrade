@@ -64,8 +64,8 @@ class CofradeoBottomNav extends StatelessWidget {
 
   static const _items = [
     _NavItem(Icons.calendar_month_outlined, Icons.calendar_month, 'Calendario'),
+    _NavItem(Icons.newspaper_outlined, Icons.newspaper, 'Noticias'),
     _NavItem(Icons.chat_bubble_outline, Icons.chat_bubble, 'Foros'),
-    _NavItem(Icons.search, Icons.search, 'Buscar'),
     _NavItem(
       Icons.notifications_outlined,
       Icons.notifications,

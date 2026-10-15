@@ -31,7 +31,10 @@ export class HermandadPortalStore {
   readonly scheduledPosts = signal<HermandadScheduledPost[]>([]);
   readonly upcomingEvents = signal<HermandadUpcomingEvent[]>([]);
   readonly followerCount = signal(0);
+  /** Primera carga (sin caché): la UI puede mostrar “Cargando…”. */
   readonly loading = signal(false);
+  /** Revalidación en segundo plano (no vacía la pantalla). */
+  readonly refreshing = signal(false);
   readonly error = signal<string | null>(null);
   readonly selectedTopicId = signal<string | null>(null);
 
@@ -42,7 +45,70 @@ export class HermandadPortalStore {
     () => this.selectedTopicId() ?? this.primaryBoard()?.topicId ?? null,
   );
 
-  async reload(): Promise<void> {
+  private lastLoadedAt = 0;
+  private inflight: Promise<void> | null = null;
+  /** Ventana en la que no se vuelve a pedir nada. */
+  private static readonly FRESH_MS = 20_000;
+  /** A partir de aquí, al navegar / recuperar foco se revalida en silencio. */
+  private static readonly STALE_MS = 45_000;
+
+  private hasCachedData(): boolean {
+    return this.boards().length > 0 || this.lastLoadedAt > 0;
+  }
+
+  private isFresh(): boolean {
+    return Date.now() - this.lastLoadedAt < HermandadPortalStore.FRESH_MS;
+  }
+
+  private isStale(): boolean {
+    return Date.now() - this.lastLoadedAt >= HermandadPortalStore.STALE_MS;
+  }
+
+  /**
+   * Stale-while-revalidate:
+   * - Sin datos → espera la carga.
+   * - Con datos → responde al instante y, si toca, refresca en background.
+   * - `force: true` → espera el fetch sin vaciar la UI si ya había caché.
+   */
+  ensureLoaded(opts?: { force?: boolean }): Promise<void> {
+    const hasData = this.hasCachedData();
+
+    if (opts?.force) {
+      return this.startFetch({ silent: hasData });
+    }
+
+    if (this.inflight) {
+      return hasData ? Promise.resolve() : this.inflight;
+    }
+
+    if (!hasData) {
+      return this.startFetch({ silent: false });
+    }
+
+    if (this.isFresh()) {
+      return Promise.resolve();
+    }
+
+    void this.startFetch({ silent: true });
+    return Promise.resolve();
+  }
+
+  /** Soft refresh al recuperar el foco de la pestaña. */
+  revalidateIfStale(): void {
+    if (!this.hasCachedData() || this.inflight || !this.isStale()) return;
+    void this.startFetch({ silent: true });
+  }
+
+  private startFetch(opts: { silent: boolean }): Promise<void> {
+    if (this.inflight) return this.inflight;
+    this.inflight = this.reload({ silent: opts.silent }).finally(() => {
+      this.inflight = null;
+    });
+    return this.inflight;
+  }
+
+  async reload(opts?: { silent?: boolean }): Promise<void> {
+    const silent = opts?.silent === true && this.hasCachedData();
     const profile = this.auth.profile();
     if (!profile) {
       this.boards.set([]);
@@ -51,10 +117,14 @@ export class HermandadPortalStore {
       this.scheduledPosts.set([]);
       this.upcomingEvents.set([]);
       this.followerCount.set(0);
+      this.lastLoadedAt = 0;
       return;
     }
-    this.loading.set(true);
+
+    if (silent) this.refreshing.set(true);
+    else this.loading.set(true);
     this.error.set(null);
+
     try {
       const boards = await this.api.fetchAssignedBoards(profile.id);
       this.boards.set(boards);
@@ -81,12 +151,18 @@ export class HermandadPortalStore {
       this.scheduledPosts.set(scheduled);
       this.upcomingEvents.set(events);
       this.followerCount.set(followers);
+      this.lastLoadedAt = Date.now();
     } catch (err) {
-      this.error.set(
-        err instanceof Error ? err.message : 'No se pudo cargar tu área',
-      );
+      if (!silent) {
+        this.error.set(
+          err instanceof Error ? err.message : 'No se pudo cargar tu área',
+        );
+      } else {
+        console.warn('[hermandad] soft refresh failed', err);
+      }
     } finally {
       this.loading.set(false);
+      this.refreshing.set(false);
     }
   }
 
@@ -202,7 +278,10 @@ export class HermandadPortalStore {
           try {
             await this.api.softDeleteOfficialPost(createdReplyId);
           } catch (rollbackErr) {
-            console.warn('Rollback del post tras fallo de calendario', rollbackErr);
+            console.warn(
+              'Rollback del post tras fallo de calendario',
+              rollbackErr,
+            );
           }
           const msg = err instanceof Error ? err.message : String(err ?? '');
           if (/location|not-null|23502/i.test(msg)) {
@@ -219,13 +298,13 @@ export class HermandadPortalStore {
       }
     }
 
-    await this.reload();
+    await this.reload({ silent: true });
     return scheduleAt ? 'scheduled' : 'published';
   }
 
   async cancelScheduled(id: string): Promise<void> {
     await this.api.cancelScheduledPost(id);
-    await this.reload();
+    await this.reload({ silent: true });
   }
 
   async updatePublishedPost(input: {
@@ -261,17 +340,17 @@ export class HermandadPortalStore {
       imageUrl: imageUrl ?? null,
       clearImage,
     });
-    await this.reload();
+    await this.reload({ silent: true });
   }
 
   async deletePublishedPost(replyId: string): Promise<void> {
     await this.api.softDeleteOfficialPost(replyId);
-    await this.reload();
+    await this.reload({ silent: true });
   }
 
   async restorePublishedPost(replyId: string): Promise<void> {
     await this.api.restoreOfficialPost(replyId);
-    await this.reload();
+    await this.reload({ silent: true });
   }
 
   async hardDeletePublishedPost(replyId: string): Promise<void> {
@@ -282,5 +361,31 @@ export class HermandadPortalStore {
   async deleteUpcomingEvent(eventId: string): Promise<void> {
     await this.api.deleteOwnCalendarEvent(eventId);
     this.upcomingEvents.update((list) => list.filter((e) => e.id !== eventId));
+  }
+
+  async updateUpcomingEvent(
+    eventId: string,
+    input: {
+      title: string;
+      startsAtIso: string;
+      location?: string | null;
+      eventType: string;
+    },
+  ): Promise<HermandadUpcomingEvent> {
+    await this.api.updateOwnCalendarEvent(eventId, input);
+    const next: HermandadUpcomingEvent = {
+      id: eventId,
+      title: input.title.trim(),
+      startsAt: input.startsAtIso,
+      location: input.location?.trim() || null,
+      coverImageUrl:
+        this.upcomingEvents().find((e) => e.id === eventId)?.coverImageUrl ??
+        null,
+      eventType: input.eventType,
+    };
+    this.upcomingEvents.update((list) =>
+      list.map((e) => (e.id === eventId ? { ...e, ...next } : e)),
+    );
+    return next;
   }
 }

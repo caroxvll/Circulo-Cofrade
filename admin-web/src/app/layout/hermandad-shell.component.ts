@@ -1,7 +1,15 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import {
+  Component,
+  HostListener,
+  OnInit,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { HermandadPortalStore } from '../core/hermandad/hermandad-portal.store';
+import { HermandadThemeService } from '../core/hermandad/hermandad-theme.service';
 import { HERMANDAD_NAV } from '../core/nav/hermandad-modules';
 
 @Component({
@@ -14,15 +22,38 @@ import { HERMANDAD_NAV } from '../core/nav/hermandad-modules';
 export class HermandadShellComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly store = inject(HermandadPortalStore);
+  private readonly theme = inject(HermandadThemeService);
   private readonly router = inject(Router);
 
   readonly menuOpen = signal(false);
   readonly profile = this.auth.profile;
   readonly boards = this.store.boards;
+  readonly refreshing = this.store.refreshing;
   readonly nav = HERMANDAD_NAV;
+  readonly accent = this.theme.accent;
+  readonly accentDark = this.theme.accentDark;
+
+  constructor() {
+    effect(() => {
+      const p = this.profile();
+      this.theme.loadForProfile(p?.id, p?.panelAccent);
+    });
+  }
 
   ngOnInit(): void {
-    void this.store.reload();
+    void this.store.ensureLoaded();
+  }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if (document.visibilityState === 'visible') {
+      this.store.revalidateIfStale();
+    }
+  }
+
+  @HostListener('window:focus')
+  onWindowFocus(): void {
+    this.store.revalidateIfStale();
   }
 
   closeMenu(): void {
@@ -39,8 +70,10 @@ export class HermandadShellComponent implements OnInit {
   }
 
   boardTitle(): string {
-    return this.store.primaryBoard()?.hermandadName
-      ?? this.profile()?.displayName
-      ?? 'Tu hermandad';
+    return (
+      this.store.primaryBoard()?.hermandadName ??
+      this.profile()?.displayName ??
+      'Tu hermandad'
+    );
   }
 }

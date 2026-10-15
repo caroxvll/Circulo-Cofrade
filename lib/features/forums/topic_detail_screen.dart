@@ -139,7 +139,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     final state = GoRouterState.of(context);
     final params = Map<String, String>.from(state.uri.queryParameters);
     params[hermandadSectionQueryKey] = hermandadSectionQueryValue(category);
-    final path = '/foros/${widget.forumId}/tema/${widget.topicId}';
+    final path = forumTopicLocation(widget.forumId, widget.topicId);
     final nextUri = Uri(
       path: path,
       queryParameters: params.isEmpty ? null : params,
@@ -273,7 +273,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     final user = ref.read(currentUserProvider);
     if (user == null) {
       await context.push(
-        '/login?redirect=${Uri.encodeComponent('/foros/${widget.forumId}/tema/${widget.topicId}')}',
+        '/login?redirect=${Uri.encodeComponent(forumTopicLocation(widget.forumId, widget.topicId))}',
       );
       return;
     }
@@ -295,7 +295,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     final user = ref.read(currentUserProvider);
     if (user == null) {
       await context.push(
-        '/login?redirect=${Uri.encodeComponent('/foros/${widget.forumId}/tema/${widget.topicId}')}',
+        '/login?redirect=${Uri.encodeComponent(forumTopicLocation(widget.forumId, widget.topicId))}',
       );
       return;
     }
@@ -702,7 +702,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
       final user = ref.read(currentUserProvider);
       if (user == null) {
         await context.push(
-          '/login?redirect=${Uri.encodeComponent('/foros/${widget.forumId}/tema/${widget.topicId}')}',
+          '/login?redirect=${Uri.encodeComponent(forumTopicLocation(widget.forumId, widget.topicId))}',
         );
         throw const ReplyReactionCancelled();
       }

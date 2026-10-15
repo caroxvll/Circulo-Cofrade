@@ -11,7 +11,10 @@ import '../data/topic_icon_assets.dart';
 import '../forum_topics_typography.dart';
 import 'related_forum_chip.dart';
 
-/// Slivers del feed editorial de Noticias.
+const _gutter = 12.0;
+const _previewGridCount = 4;
+
+/// Slivers del feed editorial de Noticias (denso, a ancho útil).
 List<Widget> buildNoticiasEditorialSlivers({
   required List<ForumTopic> topics,
   required bool showAllLatest,
@@ -42,19 +45,19 @@ List<Widget> buildNoticiasEditorialSlivers({
     slivers.add(
       SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          padding: const EdgeInsets.fromLTRB(_gutter, 0, _gutter, 4),
           child: Text(
             'Destacada',
             style: AppTypography.newsHeadline(
               color: AppColors.burgundyDark,
-            ).copyWith(fontSize: 18, fontWeight: FontWeight.w600),
+            ).copyWith(fontSize: 17, fontWeight: FontWeight.w600),
           ),
         ),
       ),
     );
     slivers.add(
       SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+        padding: const EdgeInsets.fromLTRB(_gutter, 0, _gutter, 0),
         sliver: SliverToBoxAdapter(
           child: NoticiasFeaturedEditorialCard(
             topic: featured,
@@ -68,7 +71,7 @@ List<Widget> buildNoticiasEditorialSlivers({
   if (sponsoredSlot != null) {
     slivers.add(
       SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.fromLTRB(_gutter, 10, _gutter, 0),
         sliver: SliverToBoxAdapter(child: sponsoredSlot),
       ),
     );
@@ -78,7 +81,7 @@ List<Widget> buildNoticiasEditorialSlivers({
     slivers.add(
       const SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(24, 32, 24, 8),
+          padding: EdgeInsets.fromLTRB(24, 28, 24, 8),
           child: Text(
             'Aún no hay noticias.',
             textAlign: TextAlign.center,
@@ -88,10 +91,15 @@ List<Widget> buildNoticiasEditorialSlivers({
       ),
     );
   } else if (rest.isNotEmpty) {
+    final canExpand = rest.length > _previewGridCount;
+    final gridItems = showAllLatest || !canExpand
+        ? rest
+        : rest.take(_previewGridCount).toList();
+
     slivers.add(
       SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+          padding: const EdgeInsets.fromLTRB(_gutter, 10, _gutter, 6),
           child: Row(
             children: [
               Expanded(
@@ -99,36 +107,40 @@ List<Widget> buildNoticiasEditorialSlivers({
                   'Últimas noticias',
                   style: AppTypography.newsHeadline(
                     color: AppColors.burgundyDark,
-                  ).copyWith(fontSize: 20, fontWeight: FontWeight.w600),
+                  ).copyWith(fontSize: 17, fontWeight: FontWeight.w600),
                 ),
               ),
-              InkWell(
-                onTap: onToggleShowAll,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                  child: Text(
-                    showAllLatest ? 'Ver menos ›' : 'Ver todas ›',
-                    style: ForumTopicsTypography.card(
-                      color: AppColors.burgundy,
-                      fontWeight: FontWeight.w700,
-                    ).copyWith(fontSize: 12),
+              if (canExpand)
+                InkWell(
+                  onTap: onToggleShowAll,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 4,
+                    ),
+                    child: Text(
+                      showAllLatest ? 'Ver menos ›' : 'Ver todas ›',
+                      style: ForumTopicsTypography.card(
+                        color: AppColors.burgundy,
+                        fontWeight: FontWeight.w700,
+                      ).copyWith(fontSize: 12),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
       ),
     );
 
-    if (showAllLatest) {
+    if (showAllLatest && rest.length > _previewGridCount) {
       slivers.add(
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: _gutter),
           sliver: SliverList.separated(
             itemCount: rest.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final topic = rest[index];
               return NoticiasListEditorialCard(
@@ -141,21 +153,24 @@ List<Widget> buildNoticiasEditorialSlivers({
       );
     } else {
       slivers.add(
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: 248,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-              itemCount: rest.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final topic = rest[index];
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: _gutter),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.74,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final topic = gridItems[index];
                 return NoticiasRailCard(
                   topic: topic,
                   onTap: () => onOpenTopic(topic),
                 );
               },
+              childCount: gridItems.length,
             ),
           ),
         ),
@@ -199,207 +214,177 @@ class NoticiasFeaturedEditorialCard extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             color: AppColors.surface,
             border: Border.all(
-              color: AppColors.goldDark.withValues(alpha: 0.32),
+              color: AppColors.goldDark.withValues(alpha: 0.28),
             ),
             boxShadow: [
               BoxShadow(
                 color: AppColors.burgundyDark.withValues(alpha: 0.1),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-              BoxShadow(
-                color: AppColors.gold.withValues(alpha: 0.12),
-                blurRadius: 8,
-                offset: const Offset(0, 1),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: SizedBox(
-              height: 148,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    width: 132,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        _NoticiasEditorialCover(topic: topic),
-                        // Fundido hacia el texto (más editorial).
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          bottom: 0,
-                          width: 28,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [
-                                  AppColors.surface.withValues(alpha: 0),
-                                  AppColors.surface.withValues(alpha: 0.55),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          child: Container(
-                            padding: const EdgeInsets.fromLTRB(7, 3, 8, 3),
-                            decoration: BoxDecoration(
-                              color: AppColors.gold.withValues(alpha: 0.95),
-                              borderRadius: BorderRadius.circular(999),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.18),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.star_rounded,
-                                  size: 11,
-                                  color: AppColors.burgundyDark,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'DESTACADA',
-                                  style: ForumTopicsTypography.card(
-                                    color: AppColors.burgundyDark,
-                                    fontWeight: FontWeight.w800,
-                                  ).copyWith(
-                                    fontSize: 9,
-                                    letterSpacing: 0.4,
-                                    height: 1,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: 3,
-                    color: AppColors.burgundy.withValues(alpha: 0.85),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              _GoldCategoryTag(
-                                label: noticiasCategoryShort(topic),
-                                compact: true,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  topic.timeAgo,
-                                  style: ForumTopicsTypography.card(
-                                    color: AppColors.textMuted,
-                                    fontWeight: FontWeight.w500,
-                                  ).copyWith(fontSize: 10),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.right,
-                                ),
-                              ),
+            borderRadius: BorderRadius.circular(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 168,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _NoticiasEditorialCover(topic: topic, wide: true),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Color(0x33000000),
+                              Color(0x00000000),
+                              Color(0x99000000),
                             ],
+                            stops: [0, 0.45, 1],
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            topic.title,
-                            style: AppTypography.newsHeadline(
-                              color: AppColors.textPrimary,
-                            ).copyWith(
-                              fontSize: 16.5,
-                              height: 1.18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            maxLines: excerpt.isEmpty ? 3 : 2,
-                            overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(8, 4, 9, 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold.withValues(alpha: 0.95),
+                            borderRadius: BorderRadius.circular(999),
                           ),
-                          if (excerpt.isNotEmpty) ...[
-                            const SizedBox(height: 5),
-                            Text(
-                              excerpt,
-                              style: ForumTopicsTypography.card(
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w400,
-                              ).copyWith(fontSize: 11.5, height: 1.3),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                          const Spacer(),
-                          Row(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: AppColors.gold.withValues(alpha: 0.92),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    10,
-                                    5,
-                                    10,
-                                    5,
-                                  ),
-                                  child: Text(
-                                    'Leer noticia ›',
-                                    style: ForumTopicsTypography.card(
-                                      color: AppColors.burgundyDark,
-                                      fontWeight: FontWeight.w800,
-                                    ).copyWith(fontSize: 10.5, height: 1),
-                                  ),
-                                ),
-                              ),
-                              const Spacer(),
                               Icon(
-                                Icons.visibility_outlined,
+                                Icons.star_rounded,
                                 size: 12,
-                                color: AppColors.textMuted,
+                                color: AppColors.burgundyDark,
                               ),
                               const SizedBox(width: 3),
                               Text(
-                                formatCount(topic.viewCount),
+                                'DESTACADA',
                                 style: ForumTopicsTypography.card(
-                                  color: AppColors.textMuted,
-                                  fontWeight: FontWeight.w500,
-                                ).copyWith(fontSize: 10),
+                                  color: AppColors.burgundyDark,
+                                  fontWeight: FontWeight.w800,
+                                ).copyWith(
+                                  fontSize: 9.5,
+                                  letterSpacing: 0.4,
+                                  height: 1,
+                                ),
                               ),
                             ],
                           ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 12,
+                        right: 12,
+                        bottom: 12,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _GoldCategoryTag(
+                              label: noticiasCategoryShort(topic),
+                              compact: true,
+                              onDark: true,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              topic.title,
+                              style: AppTypography.newsHeadline(
+                                color: Colors.white,
+                              ).copyWith(
+                                fontSize: 18,
+                                height: 1.15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (excerpt.isNotEmpty) ...[
+                        Text(
+                          excerpt,
+                          style: ForumTopicsTypography.card(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w400,
+                          ).copyWith(fontSize: 12.5, height: 1.35),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      Row(
+                        children: [
+                          Text(
+                            topic.timeAgo,
+                            style: ForumTopicsTypography.card(
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ).copyWith(fontSize: 11),
+                          ),
+                          const SizedBox(width: 10),
+                          Icon(
+                            Icons.visibility_outlined,
+                            size: 13,
+                            color: AppColors.textMuted,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            formatCount(topic.viewCount),
+                            style: ForumTopicsTypography.card(
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ).copyWith(fontSize: 11),
+                          ),
+                          const Spacer(),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppColors.gold.withValues(alpha: 0.92),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(11, 6, 11, 6),
+                              child: Text(
+                                'Leer noticia ›',
+                                style: ForumTopicsTypography.card(
+                                  color: AppColors.burgundyDark,
+                                  fontWeight: FontWeight.w800,
+                                ).copyWith(fontSize: 11, height: 1),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -420,108 +405,85 @@ class NoticiasRailCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 196,
-      child: Material(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        elevation: 1.5,
-        shadowColor: AppColors.burgundyDark.withValues(alpha: 0.1),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Ink(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: AppColors.gold.withValues(alpha: 0.2),
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 1.2,
+      shadowColor: AppColors.burgundyDark.withValues(alpha: 0.1),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
+                child: SizedBox(
+                  height: 108,
+                  child: _NoticiasEditorialCover(topic: topic),
+                ),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(14),
-                  ),
-                  child: SizedBox(
-                    height: 104,
-                    child: _NoticiasEditorialCover(topic: topic),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _GoldCategoryTag(
+                        label: noticiasCategoryShort(topic),
+                        compact: true,
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        topic.title,
+                        style: AppTypography.newsHeadline(
+                          color: AppColors.textPrimary,
+                        ).copyWith(fontSize: 13.5, height: 1.15),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.visibility_outlined,
+                            size: 12,
+                            color: AppColors.textMuted,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            formatCount(topic.viewCount),
+                            style: ForumTopicsTypography.card(
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ).copyWith(fontSize: 10),
+                          ),
+                          const Spacer(),
+                          Text(
+                            topic.timeAgo,
+                            style: ForumTopicsTypography.card(
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ).copyWith(fontSize: 9.5),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _GoldCategoryTag(
-                          label: noticiasCategoryShort(topic),
-                          compact: true,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          topic.title,
-                          style: AppTypography.newsHeadline(
-                            color: AppColors.textPrimary,
-                          ).copyWith(fontSize: 14, height: 1.15),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          topic.excerpt,
-                          style: ForumTopicsTypography.card(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w400,
-                          ).copyWith(fontSize: 11, height: 1.3),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const Spacer(),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.visibility_outlined,
-                              size: 12,
-                              color: AppColors.textMuted,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              formatCount(topic.viewCount),
-                              style: ForumTopicsTypography.card(
-                                color: AppColors.textMuted,
-                                fontWeight: FontWeight.w500,
-                              ).copyWith(fontSize: 10),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.chat_bubble_outline,
-                              size: 12,
-                              color: AppColors.textMuted,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${topic.commentCount}',
-                              style: ForumTopicsTypography.card(
-                                color: AppColors.textMuted,
-                                fontWeight: FontWeight.w500,
-                              ).copyWith(fontSize: 10),
-                            ),
-                            const Spacer(),
-                            Icon(
-                              Icons.bookmark_border_rounded,
-                              size: 16,
-                              color: AppColors.textMuted.withValues(alpha: 0.8),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -543,31 +505,31 @@ class NoticiasListEditorialCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: AppColors.surface,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       elevation: 1,
       shadowColor: AppColors.burgundyDark.withValues(alpha: 0.08),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.gold.withValues(alpha: 0.2)),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(9),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(9),
                   child: SizedBox(
-                    width: 92,
-                    height: 72,
+                    width: 96,
+                    height: 76,
                     child: _NoticiasEditorialCover(topic: topic),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 11),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -597,8 +559,8 @@ class NoticiasListEditorialCard extends StatelessWidget {
                         style: ForumTopicsTypography.card(
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w400,
-                        ).copyWith(fontSize: 11, height: 1.3),
-                        maxLines: 1,
+                        ).copyWith(fontSize: 11.5, height: 1.3),
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
@@ -625,20 +587,6 @@ class NoticiasListEditorialCard extends StatelessWidget {
                               fontWeight: FontWeight.w500,
                             ).copyWith(fontSize: 10),
                           ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.chat_bubble_outline,
-                            size: 12,
-                            color: AppColors.textMuted,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            '${topic.commentCount}',
-                            style: ForumTopicsTypography.card(
-                              color: AppColors.textMuted,
-                              fontWeight: FontWeight.w500,
-                            ).copyWith(fontSize: 10),
-                          ),
                         ],
                       ),
                     ],
@@ -654,27 +602,39 @@ class NoticiasListEditorialCard extends StatelessWidget {
 }
 
 class _GoldCategoryTag extends StatelessWidget {
-  const _GoldCategoryTag({required this.label, this.compact = false});
+  const _GoldCategoryTag({
+    required this.label,
+    this.compact = false,
+    this.onDark = false,
+  });
 
   final String label;
   final bool compact;
+  final bool onDark;
 
   @override
   Widget build(BuildContext context) {
+    final fg = onDark ? AppColors.goldPale : AppColors.goldDark;
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 7 : 8,
         vertical: compact ? 2 : 3,
       ),
       decoration: BoxDecoration(
-        color: AppColors.gold.withValues(alpha: 0.18),
+        color: onDark
+            ? Colors.black.withValues(alpha: 0.35)
+            : AppColors.gold.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.goldDark.withValues(alpha: 0.28)),
+        border: Border.all(
+          color: onDark
+              ? AppColors.gold.withValues(alpha: 0.45)
+              : AppColors.goldDark.withValues(alpha: 0.28),
+        ),
       ),
       child: Text(
         label.toUpperCase(),
         style: ForumTopicsTypography.card(
-          color: AppColors.goldDark,
+          color: fg,
           fontWeight: FontWeight.w700,
         ).copyWith(fontSize: compact ? 9 : 10, letterSpacing: 0.3, height: 1.1),
         maxLines: 1,
@@ -685,19 +645,24 @@ class _GoldCategoryTag extends StatelessWidget {
 }
 
 class _NoticiasEditorialCover extends StatelessWidget {
-  const _NoticiasEditorialCover({required this.topic});
+  const _NoticiasEditorialCover({
+    required this.topic,
+    this.wide = false,
+  });
 
   final ForumTopic topic;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
     final cover = topicCoverImageSource(topic);
     final icon = topicDisplayIcon(topic);
+    final cache = wide ? 720.0 : 320.0;
 
     Widget placeholder() => ColoredBox(
           color: AppColors.burgundy.withValues(alpha: 0.92),
           child: Center(
-            child: Icon(icon, color: AppColors.gold, size: 28),
+            child: Icon(icon, color: AppColors.gold, size: wide ? 36 : 28),
           ),
         );
 
@@ -706,15 +671,15 @@ class _NoticiasEditorialCover extends StatelessWidget {
       return CofradeoAssetImage(
         assetPath: cover,
         fit: BoxFit.cover,
-        filterQuality: FilterQuality.low,
-        cacheWidth: ImageDecodeCache.px(context, 220),
+        filterQuality: FilterQuality.medium,
+        cacheWidth: ImageDecodeCache.px(context, cache),
         errorBuilder: (_, _, _) => placeholder(),
       );
     }
     return CofradeoNetworkImage(
       url: cover,
       fit: BoxFit.cover,
-      cacheSize: 220,
+      cacheSize: cache,
       placeholder: ColoredBox(
         color: AppColors.burgundy.withValues(alpha: 0.55),
       ),

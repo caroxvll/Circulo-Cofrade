@@ -31,6 +31,7 @@ class ForumCategory {
     required this.lastMessageAgo,
     this.lastTopicId,
     this.lastTopicTitle,
+    this.lastTopicExcerpt,
     this.isEnabled = true,
     this.isActive = false,
     this.lockedLabel,
@@ -60,6 +61,9 @@ class ForumCategory {
   /// Hilo con actividad más reciente en este foro.
   final String? lastTopicId;
   final String? lastTopicTitle;
+
+  /// Extracto / descripción del hilo más reciente.
+  final String? lastTopicExcerpt;
 
   /// Si false, el pilar está oculto en FOROS (solo visible en Junta).
   final bool isEnabled;

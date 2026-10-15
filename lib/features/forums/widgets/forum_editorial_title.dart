@@ -5,6 +5,7 @@ import '../../../core/theme/app_typography.dart';
 import '../forum_topics_typography.dart';
 import '../topic_detail_typography.dart';
 import '../utils/forum_app_bar_kicker.dart';
+import '../utils/noticias_forum.dart';
 
 /// Título + kicker editorial (estilo Noticias) para AppBars y heroes de foro.
 class ForumEditorialTitle extends StatelessWidget {
@@ -34,12 +35,13 @@ class ForumEditorialTitle extends StatelessWidget {
     final resolvedKicker = kicker ?? forumTopicAppBarKicker(forumId);
     final align = center ? TextAlign.center : TextAlign.start;
     final isHermandadChannel = forumId == 'hermandades';
+    final isNoticias = isNoticiasForum(forumId);
     final titleStyle = onDark
         ? AppTypography.displaySmall(color: AppColors.gold).copyWith(
             fontSize: titleFontSize ?? 20,
             fontWeight: FontWeight.w700,
             height: 1.05,
-            letterSpacing: 0.4,
+            letterSpacing: isNoticias ? 0.8 : 0.4,
           )
         : isHermandadChannel
             ? AppTypography.hermandadName(color: AppColors.burgundyDark)
@@ -64,16 +66,26 @@ class ForumEditorialTitle extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           textAlign: align,
         ),
+        if (isNoticias && onDark) ...[
+          const SizedBox(height: 7),
+          Container(
+            width: 28,
+            height: 1.5,
+            color: AppColors.gold.withValues(alpha: 0.75),
+          ),
+          const SizedBox(height: 7),
+        ] else
+          SizedBox(height: isNoticias ? 6 : 2),
         Text(
           resolvedKicker,
           style: onDark
               ? ForumTopicsTypography.onDark(
-                  color: AppColors.goldPale,
+                  color: AppColors.goldPale.withValues(alpha: 0.92),
                   fontWeight: FontWeight.w600,
                 ).copyWith(
-                  fontSize: 9,
-                  letterSpacing: 1.2,
-                  height: 1.15,
+                  fontSize: isNoticias ? 10 : 9,
+                  letterSpacing: isNoticias ? 1.6 : 1.2,
+                  height: 1.2,
                 )
               : isHermandadChannel
                   ? TopicDetailTypography.editorialAppBarKicker().copyWith(

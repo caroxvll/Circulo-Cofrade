@@ -9,6 +9,7 @@ import '../../core/config/firebase_config.dart';
 import '../../core/firebase/firebase_bootstrap.dart';
 import '../../core/router/app_router.dart';
 import '../../core/utils/forum_topic_query.dart';
+import '../../features/forums/utils/forum_navigation.dart';
 import '../../features/forums/utils/official_post_categories.dart';
 import '../../firebase_background.dart';
 import '../auth/auth_provider.dart';
@@ -229,7 +230,7 @@ class PushMessagingService {
       section: forumId == 'hermandades' ? section : null,
       replyId: replyId is String ? replyId : null,
     );
-    return '/foros/$forumId/tema/$topicId$query';
+    return forumTopicLocation(forumId, topicId, querySuffix: query);
   }
 
   void _navigateToRoute(String route) {

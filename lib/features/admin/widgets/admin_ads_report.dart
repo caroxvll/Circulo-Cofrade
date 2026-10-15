@@ -41,7 +41,7 @@ String placementCommercialName(AdPlacement placement) {
 String placementWhereHint(AdPlacement placement) {
   return switch (placement) {
     AdPlacement.forumsTop =>
-      'Sale en la lista principal de foros (encima de la barra inferior).',
+      'Sale en la lista principal de Foros (encima de la barra inferior; sin Noticias).',
     AdPlacement.forumsEvent =>
       'Tarjeta de evento tras los temas fijados, dentro del foro elegido.',
     AdPlacement.forumsMiddle =>

@@ -15,6 +15,7 @@ import '../data/forums_repository.dart';
 import '../data/mock_forums.dart';
 import '../forums_provider.dart';
 import '../topic_detail_typography.dart';
+import '../utils/forum_navigation.dart';
 import '../utils/noticias_forum.dart';
 import '../utils/topic_list_order.dart';
 import '../utils/topic_permissions.dart';
@@ -32,7 +33,7 @@ Future<void> showTopicComposeSheet(
 }) async {
   final isAuth = ref.read(isAuthenticatedProvider);
   if (!isAuth) {
-    final redirect = '/foros/$forumId';
+    final redirect = forumListLocation(forumId);
     if (context.mounted) {
       await context.push('/login?redirect=${Uri.encodeComponent(redirect)}');
     }
@@ -186,7 +187,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
                   ),
           ),
         );
-        context.push('/foros/${widget.forumId}/tema/${topic.id}');
+        context.push(forumTopicLocation(widget.forumId, topic.id));
       }
     } on ForumsRemoteUnavailableException {
       setState(() => _error = 'Supabase no disponible.');

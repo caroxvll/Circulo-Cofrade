@@ -70,6 +70,27 @@ export interface CreatedHermandadAccount {
   temporaryPassword: string | null;
 }
 
+export type HermandadAccessRequestStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'spam';
+
+export interface HermandadAccessRequest {
+  id: string;
+  hermandadName: string;
+  city: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  message: string;
+  status: HermandadAccessRequestStatus;
+  reviewNotes: string;
+  createdProfileId: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
 export interface HermandadAccountCredentials {
   profileId: string;
   handle: string;
@@ -705,6 +726,87 @@ export class CommunityService {
       .limit(limit);
     if (error) throw error;
     return (data ?? []).map((row) => this.mapUser(row));
+  }
+
+  async submitHermandadAccessRequest(input: {
+    hermandadName: string;
+    city: string;
+    contactName: string;
+    contactEmail: string;
+    contactPhone?: string;
+    message?: string;
+    clientFingerprint: string;
+    honeypot?: string;
+  }): Promise<void> {
+    const { error } = await getSupabase().rpc('submit_hermandad_access_request', {
+      p_hermandad_name: input.hermandadName.trim(),
+      p_city: input.city.trim(),
+      p_contact_name: input.contactName.trim(),
+      p_contact_email: input.contactEmail.trim().toLowerCase(),
+      p_contact_phone: (input.contactPhone ?? '').trim(),
+      p_message: (input.message ?? '').trim(),
+      p_client_fingerprint: input.clientFingerprint.slice(0, 128),
+      p_honeypot: input.honeypot ?? '',
+    });
+    if (error) throw error;
+  }
+
+  async fetchHermandadAccessRequests(
+    status: HermandadAccessRequestStatus | 'all' = 'pending',
+    limit = 50,
+  ): Promise<HermandadAccessRequest[]> {
+    let query = getSupabase()
+      .from('hermandad_access_requests')
+      .select(
+        'id, hermandad_name, city, contact_name, contact_email, contact_phone, message, status, review_notes, created_profile_id, created_at, reviewed_at',
+      )
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (status !== 'all') {
+      query = query.eq('status', status);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map((row) => this.mapAccessRequest(row));
+  }
+
+  async reviewHermandadAccessRequest(input: {
+    requestId: string;
+    status: Exclude<HermandadAccessRequestStatus, 'pending'>;
+    notes?: string;
+    createdProfileId?: string | null;
+  }): Promise<void> {
+    const { error } = await getSupabase().rpc('review_hermandad_access_request', {
+      p_request_id: input.requestId,
+      p_status: input.status,
+      p_notes: (input.notes ?? '').trim(),
+      p_created_profile_id: input.createdProfileId ?? null,
+    });
+    if (error) throw error;
+  }
+
+  private mapAccessRequest(row: Record<string, unknown>): HermandadAccessRequest {
+    const status = String(row['status'] ?? 'pending');
+    return {
+      id: String(row['id'] ?? ''),
+      hermandadName: String(row['hermandad_name'] ?? ''),
+      city: String(row['city'] ?? ''),
+      contactName: String(row['contact_name'] ?? ''),
+      contactEmail: String(row['contact_email'] ?? ''),
+      contactPhone: String(row['contact_phone'] ?? ''),
+      message: String(row['message'] ?? ''),
+      status:
+        status === 'approved' ||
+        status === 'rejected' ||
+        status === 'spam' ||
+        status === 'pending'
+          ? status
+          : 'pending',
+      reviewNotes: String(row['review_notes'] ?? ''),
+      createdProfileId: (row['created_profile_id'] as string | null) ?? null,
+      createdAt: String(row['created_at'] ?? ''),
+      reviewedAt: (row['reviewed_at'] as string | null) ?? null,
+    };
   }
 
   private mapUser(row: Record<string, unknown>): AdminUserRow {

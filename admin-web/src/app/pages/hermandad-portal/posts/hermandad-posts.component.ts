@@ -145,10 +145,7 @@ export class HermandadPostsPageComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    // Siempre refrescar: si no, posts publicados por cron/otra pestaña quedan invisibles.
-    if (!this.store.loading()) {
-      void this.store.reload();
-    }
+    void this.store.ensureLoaded();
   }
 
   boardTitle(topicId: string): string {

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/models/forum.dart';
 import '../data/mock_forums.dart';
+import '../utils/forum_navigation.dart';
 
 /// Último hilo activo del foro; enlaza al tema si hay datos.
 class ForumLastActivityLink extends StatelessWidget {
@@ -46,7 +47,8 @@ class ForumLastActivityLink extends StatelessWidget {
       return Align(
         alignment: Alignment.centerLeft,
         child: TextButton(
-          onPressed: () => context.push('/foros/${forum.id}/tema/$topicId'),
+          onPressed: () =>
+              context.push(forumTopicLocation(forum.id, topicId)),
           style: TextButton.styleFrom(
             padding: EdgeInsets.zero,
             minimumSize: Size.zero,

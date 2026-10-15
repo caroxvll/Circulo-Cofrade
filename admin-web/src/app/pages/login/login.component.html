@@ -2,79 +2,448 @@
   <div class="login-atmosphere" aria-hidden="true">
     <div class="glow glow-a"></div>
     <div class="glow glow-b"></div>
+    <div class="glow glow-c"></div>
     <div class="grain"></div>
     <div class="vignette"></div>
   </div>
 
-  <main class="login-stage">
+  <main
+    class="login-stage"
+    [class.stage-request]="view() === 'request'"
+    [class.stage-forgot]="view() === 'forgot'"
+  >
     <section class="brand-panel">
-      <img class="brand-mark" src="/logo-mark.png" alt="" width="72" height="72" />
-      <p class="brand-eyebrow">Acceso Cofradeo</p>
+      <div class="brand-mark-wrap">
+        <img
+          class="brand-mark"
+          src="/logo-mark.png"
+          alt="Círculo Cofrade"
+          width="72"
+          height="72"
+        />
+      </div>
+      <p class="brand-eyebrow">Portal hermandades</p>
       <h1 class="brand-name">Círculo Cofrade</h1>
-      <p class="brand-line">Junta y hermandades</p>
+      <div class="brand-ornament" aria-hidden="true">
+        <span></span>
+        <i></i>
+        <span></span>
+      </div>
+      <p class="brand-line">El espacio oficial de tu hermandad</p>
       <p class="brand-copy">
-        Entra con tu cuenta de Junta o con la cuenta oficial de tu hermandad.
+        Comunica, gestiona y mantén informada a tu comunidad desde un único
+        lugar, en un entorno privado y verificado.
       </p>
-      <ul class="brand-points">
-        <li>Junta: moderación y ciudad</li>
-        <li>Hermandad: tu canal oficial</li>
-        <li>Misma cuenta que en la app</li>
+      <ul class="brand-features">
+        <li>
+          <span class="feat-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M8 7h8M8 12h8M8 17h5"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              />
+              <rect
+                x="4.5"
+                y="3.5"
+                width="15"
+                height="17"
+                rx="2.5"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+            </svg>
+          </span>
+          <span>
+            <strong>Tablón oficial</strong>
+            <em>Publicaciones, avisos y vida de hermandad.</em>
+          </span>
+        </li>
+        <li>
+          <span class="feat-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="9" cy="9" r="3" stroke="currentColor" stroke-width="1.6" />
+              <circle cx="16.5" cy="10" r="2.4" stroke="currentColor" stroke-width="1.6" />
+              <path
+                d="M4.5 18.5c.8-2.4 2.8-3.7 4.5-3.7s3.7 1.3 4.5 3.7"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              />
+              <path
+                d="M13.2 18.5c.5-1.7 1.8-2.7 3.3-2.7 1.2 0 2.2.6 2.9 1.8"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              />
+            </svg>
+          </span>
+          <span>
+            <strong>Comunidad</strong>
+            <em>Conecta con tus hermanos y seguidores.</em>
+          </span>
+        </li>
+        <li>
+          <span class="feat-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 3.5 19 6.5v5.2c0 4.2-2.9 7.6-7 8.8-4.1-1.2-7-4.6-7-8.8V6.5L12 3.5Z"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+              />
+              <path
+                d="m9.2 12.1 1.9 1.9 3.7-3.8"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+          <span>
+            <strong>Identidad verificada</strong>
+            <em>Un canal propio y oficial para tu hermandad.</em>
+          </span>
+        </li>
       </ul>
     </section>
 
     <section class="auth-panel">
-      <header class="auth-head">
-        <h2>Entrar</h2>
-        <p>Email y contraseña de Junta o de hermandad.</p>
-      </header>
+      @if (view() === 'login') {
+        <header class="auth-head">
+          <p class="auth-kicker">Solo hermandades</p>
+          <h2>Bienvenida</h2>
+          <p>Entra con la cuenta oficial verificada de tu hermandad.</p>
+        </header>
 
-      @if (!configured) {
-        <div class="banner warn">
-          Falta <code>environment.local.ts</code>. En esta carpeta ejecuta
-          <code>npm run sync-env</code> (lee el <code>env.json</code> del repo).
-        </div>
-      }
-
-      @if (denied) {
-        <div class="banner warn">
-          Sesión cerrada: esa cuenta no es de Junta ni de hermandad.
-        </div>
-      }
-
-      <form class="auth-form" (ngSubmit)="submit()" #f="ngForm">
-        <label class="field">
-          <span>Email</span>
-          <input
-            name="email"
-            type="email"
-            autocomplete="username"
-            placeholder="tu@correo.com"
-            [(ngModel)]="email"
-            required
-          />
-        </label>
-        <label class="field">
-          <span>Contraseña</span>
-          <input
-            name="password"
-            type="password"
-            autocomplete="current-password"
-            placeholder="••••••••"
-            [(ngModel)]="password"
-            required
-          />
-        </label>
-
-        @if (error()) {
-          <p class="error" role="alert">{{ error() }}</p>
+        @if (!configured) {
+          <div class="banner warn">
+            Falta <code>environment.local.ts</code>. En esta carpeta ejecuta
+            <code>npm run sync-env</code>.
+          </div>
         }
 
-        <button class="submit" type="submit" [disabled]="loading() || !configured">
-          <span>{{ loading() ? 'Entrando…' : 'Entrar al panel' }}</span>
-        </button>
-      </form>
+        @if (denied) {
+          <div class="banner warn">
+            Sesión cerrada. Este portal es solo para hermandades verificadas.
+          </div>
+        }
 
-      <p class="auth-foot">Junta · Hermandades · Círculo Cofrade</p>
+        <form class="auth-form" (ngSubmit)="submitLogin()" novalidate>
+          <label class="field" [class.invalid]="hasFieldError('email')">
+            <span>Email</span>
+            <div class="field-shell">
+              <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-9Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+                <path
+                  d="m5.2 7.2 6.8 5.2 6.8-5.2"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <input
+                name="email"
+                type="email"
+                autocomplete="username"
+                placeholder="hermandad@correo.com"
+                [(ngModel)]="email"
+                (ngModelChange)="clearField('email')"
+                [attr.aria-invalid]="hasFieldError('email')"
+              />
+            </div>
+            @if (fieldError('email'); as msg) {
+              <small class="field-hint">{{ msg }}</small>
+            }
+          </label>
+
+          <label class="field" [class.invalid]="hasFieldError('password')">
+            <span>Contraseña</span>
+            <div class="field-shell">
+              <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect
+                  x="5"
+                  y="10"
+                  width="14"
+                  height="10"
+                  rx="2"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+                <path
+                  d="M8.5 10V8a3.5 3.5 0 0 1 7 0v2"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <input
+                name="password"
+                [type]="showPassword() ? 'text' : 'password'"
+                autocomplete="current-password"
+                placeholder="Tu contraseña"
+                [(ngModel)]="password"
+                (ngModelChange)="clearField('password')"
+                [attr.aria-invalid]="hasFieldError('password')"
+              />
+              <button
+                type="button"
+                class="field-eye"
+                (click)="togglePassword()"
+                [attr.aria-label]="showPassword() ? 'Ocultar contraseña' : 'Ver contraseña'"
+              >
+                @if (showPassword()) {
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M3 3l18 18M10.5 10.6A3 3 0 0 0 13.4 13.5M9.9 5.5A10.5 10.5 0 0 1 12 5.2c5 0 9.2 3.2 10.5 6.8a11.4 11.4 0 0 1-4.1 4.9M6.2 6.3A11.3 11.3 0 0 0 1.5 12c1.3 3.6 5.5 6.8 10.5 6.8 1.2 0 2.4-.2 3.5-.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                } @else {
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                    />
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="3"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                    />
+                  </svg>
+                }
+              </button>
+            </div>
+            @if (fieldError('password'); as msg) {
+              <small class="field-hint">{{ msg }}</small>
+            }
+          </label>
+
+          <div class="auth-meta">
+            <label class="remember">
+              <input type="checkbox" name="remember" [(ngModel)]="remember" />
+              <span>Recordarme en este dispositivo</span>
+            </label>
+            <button type="button" class="linkish" (click)="showForgot()">
+              ¿Has olvidado tu contraseña?
+            </button>
+          </div>
+
+          @if (error()) {
+            <p class="error" role="alert">{{ error() }}</p>
+          }
+
+          <button class="submit" type="submit" [disabled]="loading() || !configured">
+            <span>{{ loading() ? 'Entrando…' : 'Acceder al canal' }}</span>
+            @if (!loading()) {
+              <span class="submit-arrow" aria-hidden="true">→</span>
+            }
+          </button>
+        </form>
+
+        <div class="auth-divider" aria-hidden="true"></div>
+
+        <div class="request-cta">
+          <p>
+            <span class="request-q" aria-hidden="true">?</span>
+            ¿Aún no tienes acceso? Solicita las credenciales para tu hermandad.
+          </p>
+          <button type="button" class="btn-outline" (click)="showRequest()">
+            Solicitar acceso
+          </button>
+        </div>
+      }
+
+      @if (view() === 'request') {
+        <header class="auth-head">
+          <p class="auth-kicker">Solicitud</p>
+          <h2>Pedir acceso</h2>
+          <p>
+            La Junta revisará tu solicitud. No se crea ninguna cuenta hasta que
+            la aprueben.
+          </p>
+        </header>
+
+        @if (info()) {
+          <div class="banner ok">{{ info() }}</div>
+        }
+
+        <form class="auth-form form-request" (ngSubmit)="submitRequest()" novalidate>
+          <!-- Honeypot: invisible para humanos -->
+          <label class="hp" aria-hidden="true">
+            <span>Web</span>
+            <input
+              name="website"
+              type="text"
+              tabindex="-1"
+              autocomplete="off"
+              [(ngModel)]="reqWebsite"
+            />
+          </label>
+
+          <label class="field" [class.invalid]="hasFieldError('reqHermandad')">
+            <span>Hermandad</span>
+            <input
+              name="hermandad"
+              type="text"
+              placeholder="Nombre oficial"
+              [(ngModel)]="reqHermandad"
+              (ngModelChange)="clearField('reqHermandad')"
+              maxlength="120"
+              [attr.aria-invalid]="hasFieldError('reqHermandad')"
+            />
+            @if (fieldError('reqHermandad'); as msg) {
+              <small class="field-hint">{{ msg }}</small>
+            }
+          </label>
+          <label class="field" [class.invalid]="hasFieldError('reqCity')">
+            <span>Ciudad</span>
+            <input
+              name="city"
+              type="text"
+              placeholder="Sevilla"
+              [(ngModel)]="reqCity"
+              (ngModelChange)="clearField('reqCity')"
+              maxlength="80"
+            />
+            @if (fieldError('reqCity'); as msg) {
+              <small class="field-hint">{{ msg }}</small>
+            }
+          </label>
+          <label class="field" [class.invalid]="hasFieldError('reqContact')">
+            <span>Persona de contacto</span>
+            <input
+              name="contact"
+              type="text"
+              placeholder="Nombre y apellidos"
+              [(ngModel)]="reqContact"
+              (ngModelChange)="clearField('reqContact')"
+              maxlength="80"
+              [attr.aria-invalid]="hasFieldError('reqContact')"
+            />
+            @if (fieldError('reqContact'); as msg) {
+              <small class="field-hint">{{ msg }}</small>
+            }
+          </label>
+          <label class="field" [class.invalid]="hasFieldError('reqEmail')">
+            <span>Email de contacto</span>
+            <input
+              name="reqEmail"
+              type="email"
+              placeholder="hermandad@correo.com"
+              [(ngModel)]="reqEmail"
+              (ngModelChange)="clearField('reqEmail')"
+              maxlength="160"
+              [attr.aria-invalid]="hasFieldError('reqEmail')"
+            />
+            @if (fieldError('reqEmail'); as msg) {
+              <small class="field-hint">{{ msg }}</small>
+            }
+          </label>
+          <label class="field field-span" [class.invalid]="hasFieldError('reqPhone')">
+            <span>Teléfono (opcional)</span>
+            <input
+              name="phone"
+              type="tel"
+              placeholder="+34 …"
+              [(ngModel)]="reqPhone"
+              (ngModelChange)="clearField('reqPhone')"
+              maxlength="40"
+            />
+            @if (fieldError('reqPhone'); as msg) {
+              <small class="field-hint">{{ msg }}</small>
+            }
+          </label>
+          <label class="field field-span">
+            <span>Mensaje (opcional)</span>
+            <textarea
+              name="message"
+              rows="2"
+              placeholder="Cuéntanos brevemente quién sois…"
+              [(ngModel)]="reqMessage"
+              maxlength="1000"
+            ></textarea>
+          </label>
+
+          @if (error()) {
+            <p class="error field-span" role="alert">{{ error() }}</p>
+          }
+
+          <div class="form-actions field-span">
+            <button class="submit" type="submit" [disabled]="loading() || !configured">
+              <span>{{ loading() ? 'Enviando…' : 'Enviar solicitud' }}</span>
+            </button>
+            <button type="button" class="btn-ghost" (click)="showLogin()" [disabled]="loading()">
+              Volver al acceso
+            </button>
+          </div>
+        </form>
+      }
+
+      @if (view() === 'forgot') {
+        <header class="auth-head">
+          <p class="auth-kicker">Cuenta</p>
+          <h2>Recuperar acceso</h2>
+          <p>
+            Te enviaremos un enlace si la cuenta existe. Por seguridad hay un
+            límite de envíos (máx. 2 por hora desde este dispositivo).
+          </p>
+        </header>
+
+        @if (info()) {
+          <div class="banner ok">{{ info() }}</div>
+        }
+
+        <form class="auth-form" (ngSubmit)="submitForgot()" novalidate>
+          <label class="field" [class.invalid]="hasFieldError('forgotEmail')">
+            <span>Email</span>
+            <input
+              name="forgotEmail"
+              type="email"
+              autocomplete="username"
+              placeholder="hermandad@correo.com"
+              [(ngModel)]="forgotEmail"
+              (ngModelChange)="clearField('forgotEmail')"
+              [attr.aria-invalid]="hasFieldError('forgotEmail')"
+            />
+            @if (fieldError('forgotEmail'); as msg) {
+              <small class="field-hint">{{ msg }}</small>
+            }
+          </label>
+
+          @if (error()) {
+            <p class="error" role="alert">{{ error() }}</p>
+          }
+
+          <button class="submit" type="submit" [disabled]="loading() || !configured">
+            <span>{{ loading() ? 'Enviando…' : 'Enviar enlace' }}</span>
+          </button>
+          <button type="button" class="btn-ghost" (click)="showLogin()" [disabled]="loading()">
+            Volver al acceso
+          </button>
+        </form>
+      }
+
+      <p class="auth-foot">Hermandades · Círculo Cofrade</p>
     </section>
   </main>
 </div>

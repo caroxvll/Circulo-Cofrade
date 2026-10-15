@@ -1703,9 +1703,10 @@ String _placementWhereHint(AdPlacement placement) {
     AdPlacement.hermandades =>
       'Banner en el canal Hermandades (listado por días).',
     AdPlacement.calendar => 'Banner fijo encima de la bottom nav en Calendario.',
-    AdPlacement.search => 'Banner en Buscar (pantalla inicial, sin resultados).',
+    AdPlacement.search =>
+      'Banner en Buscar (pantalla modal, sin resultados).',
     AdPlacement.noticias =>
-      'Banner anclado en Noticias (encima de la barra inferior).',
+      'Banner anclado en el tab Noticias (encima de la barra inferior).',
     AdPlacement.profile => 'Reservado · perfil.',
     AdPlacement.home => 'Reservado · inicio.',
   };

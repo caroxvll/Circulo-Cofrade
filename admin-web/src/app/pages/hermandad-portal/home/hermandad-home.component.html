@@ -23,10 +23,11 @@
       >
         <div class="hero-veil"></div>
         <div class="hero-copy">
-          <p class="eyebrow">Canal oficial</p>
+          <p class="eyebrow">Panel de gestión</p>
           <h1>{{ greeting() }}, {{ displayName() }}</h1>
           <p class="lead">
-            Gestiona la comunicación oficial de tu hermandad en Círculo Cofrade.
+            Resumen de tu canal: publica, revisa eventos y sigue a tu comunidad
+            desde un solo lugar.
           </p>
           <div class="hero-actions">
             <a routerLink="/hermandad/publicar" class="btn-ico primary">
@@ -224,7 +225,7 @@
                   </div>
                   <button
                     type="button"
-                    class="btn-ico soft event-delete"
+                    class="event-delete"
                     title="Quitar del calendario"
                     aria-label="Quitar del calendario"
                     (click)="deleteEvent(ev.id, ev.title)"
@@ -234,7 +235,7 @@
                         d="M6 7h12M10 7V5h4v2m-6 3v8m4-8v8m4-8v8M8 7l1 12a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2l1-12"
                         fill="none"
                         stroke="currentColor"
-                        stroke-width="1.6"
+                        stroke-width="1.85"
                         stroke-linecap="round"
                         stroke-linejoin="round"
                       />

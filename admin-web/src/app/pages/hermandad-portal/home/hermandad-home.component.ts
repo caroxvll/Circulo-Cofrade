@@ -119,10 +119,8 @@ export class HermandadHomePageComponent implements OnInit {
   readonly olderPosts = computed(() => this.filteredRecentPosts().slice(1));
 
   ngOnInit(): void {
-    // Refrescar siempre: publicaciones del cron u otra sesión no estaban en memoria.
-    if (!this.store.loading()) {
-      void this.store.reload();
-    }
+    // Cache 60s en el store: evita re-fetch masivo al volver a Inicio.
+    void this.store.ensureLoaded();
   }
 
   shiftEvents(delta: number): void {

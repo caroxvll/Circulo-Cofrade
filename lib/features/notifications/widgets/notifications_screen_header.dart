@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/calendar_quick_access_button.dart';
+import '../../../core/widgets/search_quick_access_button.dart';
 import '../notifications_design.dart';
 
 class NotificationsScreenHeader extends StatelessWidget {
@@ -34,6 +35,7 @@ class NotificationsScreenHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            const SearchQuickAccessButton(),
             const CalendarQuickAccessButton(),
           ],
         ),

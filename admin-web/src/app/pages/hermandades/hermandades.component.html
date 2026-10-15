@@ -37,6 +37,97 @@
     </div>
   }
 
+  <!-- Solicitudes de acceso (portal) -->
+  <div class="section-head">
+    <h2 class="block-title">
+      Solicitudes de acceso
+      @if (accessRequests().length) {
+        <span class="req-count">{{ accessRequests().length }}</span>
+      }
+    </h2>
+  </div>
+  <p class="filter-hint">
+    Llegan desde el portal («Solicitar acceso»). Revisa, crea la cuenta abajo y
+    marca como aprobada. Nada entra sin tu visto bueno.
+  </p>
+
+  @if (!loading() && accessRequests().length === 0) {
+    <div class="empty-box">No hay solicitudes pendientes.</div>
+  }
+
+  @if (accessRequests().length) {
+    <div class="req-list">
+      @for (req of accessRequests(); track req.id) {
+        <article class="req-card">
+          <header class="req-head">
+            <div>
+              <h3>{{ req.hermandadName }}</h3>
+              <p>
+                {{ req.contactName }}
+                @if (req.city) {
+                  · {{ req.city }}
+                }
+                · {{ timeAgo(req.createdAt) }}
+              </p>
+            </div>
+            <span class="req-badge">Pendiente</span>
+          </header>
+          <dl class="req-meta">
+            <div>
+              <dt>Email</dt>
+              <dd>
+                <a [href]="'mailto:' + req.contactEmail">{{ req.contactEmail }}</a>
+              </dd>
+            </div>
+            @if (req.contactPhone) {
+              <div>
+                <dt>Teléfono</dt>
+                <dd>{{ req.contactPhone }}</dd>
+              </div>
+            }
+          </dl>
+          @if (req.message) {
+            <p class="req-msg">{{ req.message }}</p>
+          }
+          <div class="req-actions">
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="busyKey() === 'req:' + req.id"
+              (click)="prefillFromRequest(req)"
+            >
+              Preparar alta
+            </button>
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="busyKey() === 'req:' + req.id"
+              (click)="markRequestApproved(req)"
+            >
+              Marcar aprobada
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost"
+              [disabled]="busyKey() === 'req:' + req.id"
+              (click)="rejectAccessRequest(req)"
+            >
+              Rechazar
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost"
+              [disabled]="busyKey() === 'req:' + req.id"
+              (click)="rejectAccessRequest(req, true)"
+            >
+              Spam
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+  }
+
   <!-- Tablones -->
   <div class="section-head">
     <h2 class="block-title">Tablones del directorio</h2>
@@ -132,7 +223,7 @@
   }
 
   <!-- Cuentas -->
-  <h2 class="block-title">Cuentas oficiales</h2>
+  <h2 class="block-title" id="create-hermandad-account">Cuentas oficiales</h2>
   <div class="two-col">
     <div class="panel">
       <h2>Crear cuenta</h2>

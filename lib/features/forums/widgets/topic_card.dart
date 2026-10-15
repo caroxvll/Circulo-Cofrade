@@ -16,6 +16,7 @@ import '../../search/follows_provider.dart';
 import '../forum_topics_typography.dart';
 import '../data/topic_icon_assets.dart';
 import '../data/mock_forums.dart';
+import '../utils/forum_navigation.dart';
 import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
 import '../utils/topic_list_order.dart';
@@ -1188,7 +1189,7 @@ class TopicCardFollowMark extends ConsumerWidget {
     final user = ref.read(currentUserProvider);
     if (user == null) {
       await context.push(
-        '/login?redirect=${Uri.encodeComponent('/foros/$forumId/tema/$topicId')}',
+        '/login?redirect=${Uri.encodeComponent(forumTopicLocation(forumId, topicId))}',
       );
       return;
     }
@@ -1203,7 +1204,7 @@ class TopicCardFollowMark extends ConsumerWidget {
     } on FollowRequiresAuthException {
       if (context.mounted) {
         await context.push(
-          '/login?redirect=${Uri.encodeComponent('/foros/$forumId/tema/$topicId')}',
+          '/login?redirect=${Uri.encodeComponent(forumTopicLocation(forumId, topicId))}',
         );
       }
     } catch (_) {

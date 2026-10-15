@@ -10,6 +10,9 @@ alter table public.forum_pillars
 alter table public.forum_pillars
   add column if not exists last_topic_title text;
 
+alter table public.forum_pillars
+  add column if not exists last_topic_excerpt text;
+
 create or replace function public.refresh_forum_pillar_stats(p_forum_id text)
 returns void
 language plpgsql
@@ -21,6 +24,7 @@ declare
   v_reply_count int;
   v_last_topic_id text;
   v_last_topic_title text;
+  v_last_topic_excerpt text;
   v_last_activity timestamptz;
 begin
   select count(*)::int
@@ -36,12 +40,13 @@ begin
   where t.forum_id = p_forum_id
     and t.status = 'published';
 
-  select ta.topic_id, ta.title, ta.activity_at
-  into v_last_topic_id, v_last_topic_title, v_last_activity
+  select ta.topic_id, ta.title, ta.excerpt, ta.activity_at
+  into v_last_topic_id, v_last_topic_title, v_last_topic_excerpt, v_last_activity
   from (
     select
       t.id as topic_id,
       t.title,
+      t.excerpt,
       greatest(
         t.created_at,
         coalesce((
@@ -63,7 +68,8 @@ begin
     message_count = coalesce(v_reply_count, 0),
     last_activity_at = v_last_activity,
     last_topic_id = v_last_topic_id,
-    last_topic_title = v_last_topic_title
+    last_topic_title = v_last_topic_title,
+    last_topic_excerpt = v_last_topic_excerpt
   where id = p_forum_id;
 end;
 $$;

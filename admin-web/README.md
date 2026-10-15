@@ -4,8 +4,8 @@ Dashboard Angular para gestionar Cofradeo desde el PC. Misma verdad que la app (
 
 ## Fase 0–3 (hecho)
 
-- Login email/contraseña (cuenta staff)
-- Guard: solo admin o moderador de foro
+- Login email/contraseña
+- Guard: solo `profiles.role = admin` o hermandad verificada (`account_type = brotherhood` + `verified`)
 - Shell escritorio + menú responsive
 - **Colas reales:** temas, rechazos, reportes, eventos (admin), cierres
 - **Comunidad (admin):** usuarios/altas, moderadores por foro, hermandades
@@ -42,7 +42,7 @@ npm run sync-env:pre   # → proyecto pre
 npm start
 ```
 
-Abre http://localhost:4200 y entra con una cuenta **admin** (o moderador) **de ese mismo proyecto**.
+Abre http://localhost:4200 y entra con una cuenta **admin** o **hermandad verificada** **de ese mismo proyecto**.
 
 App Flutter contra pre:
 ```powershell
@@ -68,7 +68,7 @@ y pega `SUPABASE_URL` / `SUPABASE_ANON_KEY`.
 ## Seguridad
 
 - Solo **anon key** en el front (nunca `service_role`)
-- El acceso real lo cierran RLS + comprobación de perfil/moderación en el cliente
+- El acceso web lo cierran guards + `signIn`: solo admin y hermandad verificada (RLS sigue aplicando en datos)
 - `meta robots = noindex`
 
 ## Próximo

@@ -50,9 +50,7 @@ export class HermandadPublishPageComponent implements OnInit {
   }
 
   private async ensureLoaded(): Promise<void> {
-    if (!this.store.boards().length) {
-      await this.store.reload();
-    }
+    await this.store.ensureLoaded();
     this.topicId = this.store.activeTopicId() ?? '';
     this.applyKindDefaults(this.kindId);
   }

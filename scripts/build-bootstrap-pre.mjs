@@ -84,6 +84,7 @@ const ORDERED = [
   'hermandad_follow_notify_sections.sql',
   'forum_official_post_images.sql',
   'junta_create_hermandad_account.sql',
+  'hermandad_access_requests.sql',
   'hermandades_todos_los_dias.sql',
   'pinned_topics.sql',
   'pinned_topics_admin.sql',
