@@ -338,108 +338,189 @@ class _ForumHotTopicStrip extends StatelessWidget {
     final ago = forum.lastMessageAgo == 'sin actividad'
         ? null
         : forum.lastMessageAgo;
+    final excerpt = (forum.lastTopicExcerpt?.trim().isNotEmpty ?? false)
+        ? forum.lastTopicExcerpt!.trim()
+        : 'Toca para abrir el hilo y unirte al debate.';
 
     return Material(
-      color: AppColors.gold.withValues(alpha: 0.14),
+      color: AppColors.burgundyDark,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: () => context.push(forumTopicLocation(forum.id, topicId)),
         borderRadius: BorderRadius.circular(10),
+        splashColor: AppColors.gold.withValues(alpha: 0.12),
+        highlightColor: AppColors.gold.withValues(alpha: 0.06),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            9,
-            fillHeight ? 8 : 6,
-            9,
-            fillHeight ? 8 : 6,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.local_fire_department_rounded,
-                    size: metaSize + 2.5,
-                    color: AppColors.burgundy,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'AHORA',
-                    style: AppTypography.labelSmall(
-                      color: AppColors.burgundy,
-                    ).copyWith(
-                      fontSize: metaSize,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.6,
-                      height: 1,
-                    ),
-                  ),
-                  if (ago != null) ...[
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        ago,
-                        style: AppTypography.labelSmall(
-                          color: AppColors.textMuted,
-                        ).copyWith(fontSize: metaSize - 0.5, height: 1),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              SizedBox(height: fillHeight ? 5 : 3),
-              Text(
-                title,
-                style: AppTypography.bodyMedium(
-                  color: AppColors.textPrimary,
-                ).copyWith(
-                  fontSize: metaSize + (fillHeight ? 2 : 1.5),
-                  fontWeight: FontWeight.w700,
-                  height: 1.18,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (fillHeight) ...[
-                const SizedBox(height: 4),
-                Expanded(
-                  child: Text(
-                    (forum.lastTopicExcerpt?.trim().isNotEmpty ?? false)
-                        ? forum.lastTopicExcerpt!.trim()
-                        : 'Toca para abrir el hilo y unirte al debate.',
-                    style: AppTypography.bodyMedium(
-                      color: AppColors.textSecondary,
-                    ).copyWith(
-                      fontSize: metaSize + 0.5,
-                      fontWeight: FontWeight.w400,
-                      height: 1.25,
-                    ),
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    'Abrir hilo ›',
-                    style: AppTypography.labelSmall(
-                      color: AppColors.burgundy,
-                    ).copyWith(
-                      fontSize: metaSize,
-                      fontWeight: FontWeight.w700,
-                      height: 1,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
+          padding: const EdgeInsets.fromLTRB(9, 6, 9, 6),
+          child: fillHeight
+              ? LayoutBuilder(
+                  builder: (context, constraints) {
+                    return _buildAdaptiveBody(
+                      title: title,
+                      ago: ago,
+                      excerpt: excerpt,
+                      maxHeight: constraints.maxHeight,
+                    );
+                  },
+                )
+              : _buildCompactBody(title: title, ago: ago),
         ),
       ),
+    );
+  }
+
+  Widget _buildCompactBody({
+    required String title,
+    required String? ago,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ahoraHeader(ago),
+        const SizedBox(height: 3),
+        Text(
+          title,
+          style: _titleStyle(fillHeight: false),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  /// Calcula líneas enteras del extracto según la altura real (evita
+  /// que la última línea se pinte a medias y quede cortada).
+  Widget _buildAdaptiveBody({
+    required String title,
+    required String? ago,
+    required String excerpt,
+    required double maxHeight,
+  }) {
+    const gapAfterHeader = 4.0;
+    const gapAfterTitle = 3.0;
+    const gapBeforeCta = 3.0;
+    const heightSafety = 1.5;
+
+    final headerH = metaSize + 2.5;
+    final titleFontSize = metaSize + 2;
+    final titleLineH = titleFontSize * 1.18;
+    final excerptFontSize = metaSize + 0.5;
+    final excerptLineH = excerptFontSize * 1.22;
+    final ctaH = metaSize;
+
+    var budget = maxHeight - headerH - gapAfterHeader - heightSafety;
+
+    // Título: 2 líneas si cabe; si no, 1.
+    final titleMaxLines = budget >= titleLineH * 2 + gapAfterTitle ? 2 : 1;
+    budget -= titleLineH * titleMaxLines + gapAfterTitle;
+
+    // CTA solo si queda hueco para ≥1 línea de extracto + enlace.
+    final canShowCta = budget >= excerptLineH + gapBeforeCta + ctaH;
+    if (canShowCta) {
+      budget -= gapBeforeCta + ctaH;
+    }
+
+    final excerptMaxLines =
+        (budget / excerptLineH).floor().clamp(0, 3);
+
+    return SizedBox(
+      height: maxHeight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ahoraHeader(ago),
+          const SizedBox(height: gapAfterHeader),
+          Text(
+            title,
+            style: _titleStyle(fillHeight: true),
+            maxLines: titleMaxLines,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (excerptMaxLines > 0) ...[
+            const SizedBox(height: gapAfterTitle),
+            SizedBox(
+              height: excerptMaxLines * excerptLineH,
+              child: Text(
+                excerpt,
+                style: AppTypography.bodyMedium(
+                  color: AppColors.goldPale.withValues(alpha: 0.88),
+                ).copyWith(
+                  fontSize: excerptFontSize,
+                  fontWeight: FontWeight.w400,
+                  height: 1.22,
+                ),
+                maxLines: excerptMaxLines,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+          if (canShowCta) ...[
+            const Spacer(),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'Abrir hilo ›',
+                style: AppTypography.labelSmall(
+                  color: AppColors.gold,
+                ).copyWith(
+                  fontSize: metaSize,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _ahoraHeader(String? ago) {
+    return Row(
+      children: [
+        Icon(
+          Icons.local_fire_department_rounded,
+          size: metaSize + 2.5,
+          color: AppColors.gold,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          'AHORA',
+          style: AppTypography.labelSmall(
+            color: AppColors.gold,
+          ).copyWith(
+            fontSize: metaSize,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+            height: 1,
+          ),
+        ),
+        if (ago != null) ...[
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              ago,
+              style: AppTypography.labelSmall(
+                color: AppColors.goldPale.withValues(alpha: 0.75),
+              ).copyWith(fontSize: metaSize - 0.5, height: 1),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  TextStyle _titleStyle({required bool fillHeight}) {
+    return AppTypography.bodyMedium(
+      color: AppColors.textOnDark,
+    ).copyWith(
+      fontSize: metaSize + (fillHeight ? 2 : 1.5),
+      fontWeight: FontWeight.w700,
+      height: 1.18,
     );
   }
 }

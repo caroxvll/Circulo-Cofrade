@@ -1,0 +1,81 @@
+================================================================================
+CÍRCULO COFRADE · Ficha de Play Store (pegar en la consola)
+================================================================================
+Idioma: Español (España) — es-ES
+Assets: icon-512.png · feature-graphic-1024x500.png (esta misma carpeta)
+
+--------------------------------------------------------------------------------
+NOMBRE DE LA APLICACIÓN (máx. 30)
+--------------------------------------------------------------------------------
+Círculo Cofrade
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN BREVE (máx. 80 caracteres)
+--------------------------------------------------------------------------------
+Para quien vive la Semana Santa con respeto. Foros, agenda y hermandades.
+
+(74 caracteres)
+
+--------------------------------------------------------------------------------
+DESCRIPCIÓN COMPLETA
+--------------------------------------------------------------------------------
+Círculo Cofrade es la aplicación de referencia para quien vive la Semana Santa con respeto y de raíz: conversación ordenada, información clara y un entorno pensado para el cofrade exigente — durante todo el año, no solo en Cuaresma.
+
+FUNCIONES
+
+• Foros — Espacios de conversación por pilares (noticias, música, debate, hermandades), con seguimiento y participación moderada.
+• Noticias — Lectura editorial independiente del tablón general.
+• Calendario — Ensayos, cultos, conciertos y citas de la temporada.
+• Hermandades — Directorio y cuentas oficiales.
+• Semana Santa en directo — Durante las jornadas abiertas: avisos de calle y participación verificada.
+• Buscar y notificaciones — Acceso preciso a lo que sigue cada usuario.
+
+A QUIÉN SE DIRIGE
+
+A hermanos, costaleros, músicos y aficionados que buscan profundidad, criterio y respeto por la tradición cofrade. No es un espacio de cotilleo ni de discusión vacía.
+
+NORMAS Y MODERACIÓN
+
+El contenido lo generan los usuarios. Existe sistema de denuncias y supervisión por la Junta.
+
+No se admiten insultos, lenguaje ofensivo, amenazas, acoso, contenido ilegal ni comportamientos que atenten contra el respeto debido al mundo cofrade o a otros usuarios. Quien incumpla las normas podrá ser sancionado y, si procede, expulsado de la aplicación de forma definitiva.
+
+Círculo Cofrade — Sevilla.
+
+--------------------------------------------------------------------------------
+CATEGORÍA SUGERIDA
+--------------------------------------------------------------------------------
+Principal: Social (o Estilo de vida)
+Etiquetas libres (si piden): cofradía, hermandad, Sevilla, Semana Santa, foros
+
+--------------------------------------------------------------------------------
+CONTACTO / PRIVACIDAD (completar con tus datos reales)
+--------------------------------------------------------------------------------
+Email de soporte:  (ej. soporte@circulo-cofrade.com o el que uses)
+Política de privacidad (URL pública obligatoria):  https://…
+
+--------------------------------------------------------------------------------
+CAPTURAS DE PANTALLA (teléfono)
+--------------------------------------------------------------------------------
+Pendiente: las subirás tú (capturas reales del móvil).
+Tamaño habitual: 1080×1920 (9:16). PNG o JPEG. Mínimo 2.
+
+Orden sugerido: Foros → Noticias → Calendario → Semana Santa / Directo.
+
+Tablet: opcional.
+TV / Wear: no hace falta.
+
+--------------------------------------------------------------------------------
+GRÁFICOS OBLIGATORIOS
+--------------------------------------------------------------------------------
+• Icono de la aplicación: icon-512.png (512×512, sin transparencia)
+• Gráfico de funciones: feature-graphic-1024x500.png (1024×500)
+
+--------------------------------------------------------------------------------
+OTROS REQUISITOS ANTES DE PRODUCCIÓN
+--------------------------------------------------------------------------------
+• Clasificación de contenido (cuestionario IARC)
+• Público objetivo / edad
+• Declarar UGC (contenido de usuarios) + moderación / reportes / expulsión
+• Política de privacidad publicada
+• Ficha completa + AAB en el track que toque

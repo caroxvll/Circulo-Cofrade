@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/calendar_quick_access_button.dart';
 import '../../core/widgets/cofradeo_skeleton.dart';
+import '../../core/widgets/screen_title_row.dart';
 import '../auth/auth_provider.dart';
 import '../auth/email_verification_gate.dart';
 import '../ads/models/sponsored_ad.dart';
@@ -299,8 +300,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           ),
                         ),
                         Expanded(
-                          child: Text(
-                            'BUSCAR',
+                          child: AdaptiveScreenTitle(
+                            text: 'BUSCAR',
                             style: SearchDesign.screenTitle(),
                           ),
                         ),
