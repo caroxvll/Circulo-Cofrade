@@ -244,7 +244,21 @@ export class AuthService {
     if (!trimmed) {
       throw new Error('Indica un email.');
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(trimmed);
+    const redirectTo = `${window.location.origin}/reset-password`;
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+      redirectTo,
+    });
+    if (error) throw error;
+  }
+
+  /** Tras el enlace del correo (evento PASSWORD_RECOVERY). */
+  async updatePassword(password: string): Promise<void> {
+    const supabase = getSupabase();
+    const trimmed = password.trim();
+    if (trimmed.length < 8) {
+      throw new Error('La contraseña debe tener al menos 8 caracteres.');
+    }
+    const { error } = await supabase.auth.updateUser({ password: trimmed });
     if (error) throw error;
   }
 }
