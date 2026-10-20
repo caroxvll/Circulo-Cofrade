@@ -1,0 +1,11 @@
+{
+  "buildCommand": "npm run build:vercel",
+  "outputDirectory": "dist/admin-web/browser",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

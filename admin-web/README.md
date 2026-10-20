@@ -64,6 +64,18 @@ y pega `SUPABASE_URL` / `SUPABASE_ANON_KEY`.
 | `npm run sync-env:pre` | Igual, desde `../env.pre.json` (staging) |
 | `npm run sync-env:prod` | Igual, desde `../env.json` |
 | `npm run build` | Build producción |
+| `npm run build:vercel` | Sync env (archivo o `SUPABASE_*`) + build (Vercel) |
+
+## Deploy Vercel (panel Junta / hermandades)
+
+1. [vercel.com](https://vercel.com) → Importar el repo → **Root Directory:** `admin-web`
+2. Variables de entorno (Production):
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY` (anon, nunca service_role)
+3. Deploy. URL tipo `https://….vercel.app`
+4. Dominio: en Vercel → Domains → `panel.circulocofrade.es` (recomendado) o el que elijas
+5. En Arsys DNS: CNAME `panel` → `cname.vercel-dns.com` (el que indique Vercel)
+6. Supabase → Auth → URL Configuration: añade `https://panel.circulocofrade.es/**` a Redirect URLs
 
 ## Seguridad
 
