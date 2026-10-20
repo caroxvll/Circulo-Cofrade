@@ -244,6 +244,7 @@ export class AuthService {
     if (!trimmed) {
       throw new Error('Indica un email.');
     }
+    // Exacto y en allow-list de Supabase (URL Configuration → Redirect URLs).
     const redirectTo = `${window.location.origin}/reset-password`;
     const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
       redirectTo,
