@@ -303,6 +303,35 @@ export class CommunityService {
     if (error) throw error;
   }
 
+  /**
+   * Elimina Auth + perfil. Por defecto también borra temas (salvo tablones
+   * hermandad / sistema) y comentarios del usuario.
+   * Requiere Edge Function `admin-delete-user` desplegada.
+   */
+  async deleteUser(
+    profileId: string,
+    options: { deleteContent?: boolean } = {},
+  ): Promise<{ deletedTopics: number; deletedReplies: number }> {
+    const { data, error } = await getSupabase().functions.invoke(
+      'admin-delete-user',
+      {
+        body: {
+          profileId,
+          deleteContent: options.deleteContent !== false,
+        },
+      },
+    );
+    if (error) throw error;
+    const payload = data as Record<string, unknown>;
+    if (payload?.['error']) {
+      throw new Error(String(payload['error']));
+    }
+    return {
+      deletedTopics: Number(payload['deletedTopics'] ?? 0),
+      deletedReplies: Number(payload['deletedReplies'] ?? 0),
+    };
+  }
+
   async fetchForumPillars(): Promise<ForumPillarOption[]> {
     const { data, error } = await getSupabase()
       .from('forum_pillars')

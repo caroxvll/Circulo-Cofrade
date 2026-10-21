@@ -95,6 +95,29 @@ class ForumsRepository {
     );
   }
 
+  /// Tablones de hermandad con cuenta oficial verificada y activa.
+  ///
+  /// Requiere `list_registered_hermandad_topics.sql` desplegado en Supabase.
+  Future<Set<String>> fetchRegisteredHermandadTopicIds() async {
+    if (!_useRemote) {
+      return {for (final t in topicsForForum('hermandades')) t.id};
+    }
+
+    final rows = await _client!.rpc('list_registered_hermandad_topic_ids');
+    if (rows is! List) return {};
+
+    final ids = <String>{};
+    for (final row in rows) {
+      if (row is Map) {
+        final id = row['topic_id'];
+        if (id is String && id.isNotEmpty) ids.add(id);
+      } else if (row is String && row.isNotEmpty) {
+        ids.add(row);
+      }
+    }
+    return ids;
+  }
+
   Future<ForumTopic?> fetchTopic(String forumId, String topicId) async {
     if (!_useRemote) return topicById(forumId, topicId);
 

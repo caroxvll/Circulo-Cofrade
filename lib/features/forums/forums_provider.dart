@@ -100,6 +100,12 @@ final forumAboutModeratorsProvider =
   return ref.read(forumsRepositoryProvider).fetchForumModerators(forumId);
 });
 
+/// IDs de tablones con hermandad oficial registrada y activa (verificada).
+final registeredHermandadTopicIdsProvider =
+    FutureProvider<Set<String>>((ref) async {
+  return ref.watch(forumsRepositoryProvider).fetchRegisteredHermandadTopicIds();
+});
+
 final forumTopicsProvider = AsyncNotifierProvider.family<ForumTopicsNotifier,
     List<ForumTopic>, String>(
   ForumTopicsNotifier.new,

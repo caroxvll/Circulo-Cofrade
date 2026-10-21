@@ -155,4 +155,53 @@ export class UsersPageComponent implements OnInit {
       this.busyId.set(null);
     }
   }
+
+  async deleteUser(user: AdminUserRow): Promise<void> {
+    if (user.id === this.selfId()) {
+      this.error.set('No puedes eliminarte a ti mismo.');
+      return;
+    }
+    if (
+      !confirm(
+        `¿Eliminar a @${user.handle}?\n\n` +
+          'Se borrará la cuenta (Auth + perfil), sus temas y sus comentarios.\n' +
+          'No se tocan los tablones del foro Hermandades ni temas de sistema.',
+      )
+    ) {
+      return;
+    }
+    if (
+      !confirm(
+        `Última confirmación: borrar permanentemente a @${user.handle}. Esta acción no se puede deshacer.`,
+      )
+    ) {
+      return;
+    }
+
+    this.busyId.set(user.id);
+    this.error.set(null);
+    try {
+      const result = await this.community.deleteUser(user.id, {
+        deleteContent: true,
+      });
+      this.users.update((list) => list.filter((u) => u.id !== user.id));
+      const stats = this.stats();
+      if (stats) {
+        this.stats.set({
+          ...stats,
+          total: Math.max(0, stats.total - 1),
+        });
+      }
+      alert(
+        `Eliminado @${user.handle}.\n` +
+          `Temas: ${result.deletedTopics} · Comentarios: ${result.deletedReplies}`,
+      );
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo eliminar el usuario',
+      );
+    } finally {
+      this.busyId.set(null);
+    }
+  }
 }

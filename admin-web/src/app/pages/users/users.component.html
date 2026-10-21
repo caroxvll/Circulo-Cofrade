@@ -4,8 +4,9 @@
       <p class="eyebrow">Comunidad · solo admin</p>
       <h1>Usuarios y altas</h1>
       <p class="lead">
-        Altas recientes, búsqueda y gestión de rol, verificación y suspensión.
-        El email no está en profiles (vive en Auth).
+        Altas recientes, búsqueda y gestión de rol, verificación, suspensión y
+        borrado. Eliminar quita Auth + perfil y, con ello, temas y comentarios
+        del usuario (no los tablones de Hermandades).
       </p>
     </div>
     <div class="queue-toolbar">
@@ -112,6 +113,15 @@
                   (click)="toggleSuspend(user)"
                 >
                   {{ user.suspendedAt ? 'Reactivar' : 'Suspender' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  [disabled]="busyId() === user.id || user.id === selfId()"
+                  (click)="deleteUser(user)"
+                  title="Borra Auth, perfil, temas y comentarios"
+                >
+                  Eliminar
                 </button>
               </td>
             </tr>

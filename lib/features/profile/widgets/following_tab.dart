@@ -1002,136 +1002,148 @@ class _HermandadDiscoverPane extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final boardsAsync = ref.watch(forumTopicsProvider('hermandades'));
+    final registeredAsync = ref.watch(registeredHermandadTopicIdsProvider);
 
-    return boardsAsync.when(
-      skipLoadingOnReload: true,
-      loading: () => const HermandadCardsSkeleton(showChrome: false),
-      error: (_, _) => Center(
+    if (boardsAsync.isLoading || registeredAsync.isLoading) {
+      return const HermandadCardsSkeleton(showChrome: false);
+    }
+    if (boardsAsync.hasError || registeredAsync.hasError) {
+      return Center(
         child: Text(
           'No se pudo cargar el directorio de hermandades.',
           style: AppTypography.bodyMedium(),
           textAlign: TextAlign.center,
         ),
-      ),
-      data: (raw) {
-        // Solo las que aún no sigues (para “Seguir otra”).
-        final ordered = _ordered([
-          for (final t in raw)
-            if (!followedTopicIds.contains(t.id)) t,
-        ]);
+      );
+    }
 
-        var list = ordered;
-        final q = query.trim().toLowerCase();
-        if (q.isNotEmpty) {
-          list = [
-            for (final t in list)
-              if (t.title.toLowerCase().contains(q)) t,
-          ];
-        }
+    final raw = boardsAsync.requireValue;
+    final registeredIds = registeredAsync.requireValue;
 
-        final pageCount = list.isEmpty
-            ? 0
-            : ((list.length + _discoverPageSize - 1) ~/ _discoverPageSize);
-        final safePage =
-            pageCount == 0 ? 0 : pageIndex.clamp(0, pageCount - 1);
-        final pageItems = list
-            .skip(safePage * _discoverPageSize)
-            .take(_discoverPageSize)
-            .toList();
+    // Solo hermandades con cuenta oficial activa y que aún no sigues.
+    final ordered = _ordered([
+      for (final t in raw)
+        if (registeredIds.contains(t.id) && !followedTopicIds.contains(t.id)) t,
+    ]);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (showBackToMine && onBackToMine != null) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: InkWell(
-                  onTap: onBackToMine,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.arrow_back_rounded,
-                          size: 16,
-                          color: AppColors.burgundy,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          followedTopicIds.length == 1
-                              ? 'Volver a tu hermandad'
-                              : 'Volver a tus hermandades',
-                          style: AppTypography.labelSmall(
-                            color: AppColors.burgundy,
-                          ).copyWith(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+    var list = ordered;
+    final q = query.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = [
+        for (final t in list)
+          if (t.title.toLowerCase().contains(q)) t,
+      ];
+    }
+
+    final pageCount = list.isEmpty
+        ? 0
+        : ((list.length + _discoverPageSize - 1) ~/ _discoverPageSize);
+    final safePage = pageCount == 0 ? 0 : pageIndex.clamp(0, pageCount - 1);
+    final pageItems = list
+        .skip(safePage * _discoverPageSize)
+        .take(_discoverPageSize)
+        .toList();
+
+    final emptyMessage = () {
+      if (q.isNotEmpty) {
+        return 'Ninguna hermandad para «${query.trim()}».';
+      }
+      if (registeredIds.isEmpty) {
+        return 'Aún no hay hermandades oficiales activas. '
+            'Iremos sumándolas según se den de alta.';
+      }
+      return 'No hay más hermandades para seguir.';
+    }();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showBackToMine && onBackToMine != null) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: InkWell(
+              onTap: onBackToMine,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.arrow_back_rounded,
+                      size: 16,
+                      color: AppColors.burgundy,
                     ),
-                  ),
+                    const SizedBox(width: 4),
+                    Text(
+                      followedTopicIds.length == 1
+                          ? 'Volver a tu hermandad'
+                          : 'Volver a tus hermandades',
+                      style: AppTypography.labelSmall(
+                        color: AppColors.burgundy,
+                      ).copyWith(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 6),
-            ],
-            ProfilePeopleSearchField(
-              controller: searchController,
-              hint: 'Buscar hermandad…',
-              onChanged: onQueryChanged,
             ),
-            const SizedBox(height: 6),
-            if (list.isEmpty)
-              Expanded(
-                child: Center(
-                  child: Text(
-                    q.isEmpty
-                        ? 'No hay más hermandades para seguir.'
-                        : 'Ninguna hermandad para «${query.trim()}».',
-                    style: AppTypography.bodyMedium(),
-                    textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+        ],
+        ProfilePeopleSearchField(
+          controller: searchController,
+          hint: 'Buscar hermandad…',
+          onChanged: onQueryChanged,
+        ),
+        const SizedBox(height: 6),
+        if (list.isEmpty)
+          Expanded(
+            child: Center(
+              child: Text(
+                emptyMessage,
+                style: AppTypography.bodyMedium(),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          )
+        else ...[
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final gap = 8.0;
+                final cardW = (constraints.maxWidth - gap) / 2;
+                final cardH = constraints.maxHeight;
+                final ratio = cardW / cardH.clamp(1.0, 10000.0);
+                return GridView.builder(
+                  padding: EdgeInsets.zero,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: gap,
+                    crossAxisSpacing: gap,
+                    childAspectRatio: ratio,
                   ),
-                ),
-              )
-            else ...[
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final gap = 8.0;
-                    final cardW = (constraints.maxWidth - gap) / 2;
-                    final cardH = constraints.maxHeight;
-                    final ratio = cardW / cardH.clamp(1.0, 10000.0);
-                    return GridView.builder(
-                      padding: EdgeInsets.zero,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: gap,
-                        crossAxisSpacing: gap,
-                        childAspectRatio: ratio,
-                      ),
-                      itemCount: pageItems.length,
-                      itemBuilder: (context, index) {
-                        return _HermandadDiscoverTile(
-                          topic: pageItems[index],
-                        );
-                      },
+                  itemCount: pageItems.length,
+                  itemBuilder: (context, index) {
+                    return _HermandadDiscoverTile(
+                      topic: pageItems[index],
                     );
                   },
-                ),
-              ),
-              if (pageCount > 1)
-                _FollowingPager(
-                  pageIndex: safePage,
-                  pageCount: pageCount,
-                  onPageChanged: onPageChanged,
-                ),
-            ],
-          ],
-        );
-      },
+                );
+              },
+            ),
+          ),
+          if (pageCount > 1)
+            _FollowingPager(
+              pageIndex: safePage,
+              pageCount: pageCount,
+              onPageChanged: onPageChanged,
+            ),
+        ],
+      ],
     );
   }
 }
