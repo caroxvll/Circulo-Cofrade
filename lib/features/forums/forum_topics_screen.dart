@@ -1857,19 +1857,7 @@ class _LockedForumView extends StatelessWidget {
   }
 }
 
-const _hermandadesDayOrder = [
-  'Viernes de Dolores',
-  'Sábado de Pasión',
-  'Domingo de Ramos',
-  'Lunes Santo',
-  'Martes Santo',
-  'Miércoles Santo',
-  'Jueves Santo',
-  'Madrugá',
-  'Viernes Santo',
-  'Sábado Santo',
-  'Domingo de Resurrección',
-];
+const _hermandadesDayOrder = hermandadDirectoryDays;
 
 class _HermandadesDayChips extends StatelessWidget {
   const _HermandadesDayChips({

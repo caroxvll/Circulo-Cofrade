@@ -4,6 +4,8 @@ import {
   AdminUserRow,
   CommunityService,
   CreatedHermandadAccount,
+  HERMANDAD_DIRECTORY_DAYS,
+  HERMANDAD_GLORIAS_CATEGORY,
   HERMANDAD_STATION_DAYS,
   HandleHit,
   HermandadAccessRequest,
@@ -45,7 +47,8 @@ export class HermandadesPageComponent implements OnInit {
   readonly credentialsSaving = signal(false);
   readonly credentialsSuccess = signal<string | null>(null);
 
-  readonly stationDays = HERMANDAD_STATION_DAYS;
+  /** Días SS + Glorias (filtro y alta de tablones). */
+  readonly stationDays = HERMANDAD_DIRECTORY_DAYS;
   readonly timeAgo = formatTimeAgo;
   /** `null` = todos los días. */
   readonly dayFilter = signal<string | null>(null);
@@ -152,9 +155,31 @@ export class HermandadesPageComponent implements OnInit {
     this.handle = slug || this.handle;
     this.autoPassword = true;
     this.password = '';
+
+    const day =
+      req.boardKind === 'glorias'
+        ? HERMANDAD_GLORIAS_CATEGORY
+        : req.processionDay || HERMANDAD_STATION_DAYS[2];
+    this.boardDay = day;
+    this.boardName = req.hermandadName;
+
+    const match = this.topics().find(
+      (t) =>
+        t.processionDay === day &&
+        t.hermandadName.toLowerCase() === req.hermandadName.toLowerCase(),
+    );
+    if (match) this.linkTopicId = match.id;
+
     document
       .getElementById('create-hermandad-account')
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  requestKindLabel(req: HermandadAccessRequest): string {
+    if (req.boardKind === 'glorias') return 'Gloria';
+    return req.processionDay
+      ? `SS Sevilla · ${req.processionDay}`
+      : 'SS Sevilla';
   }
 
   async rejectAccessRequest(
@@ -204,7 +229,7 @@ export class HermandadesPageComponent implements OnInit {
 
   openCreateBoard(): void {
     this.editingBoard.set(null);
-    this.boardDay = this.dayFilter() ?? HERMANDAD_STATION_DAYS[2];
+    this.boardDay = this.dayFilter() ?? HERMANDAD_DIRECTORY_DAYS[2];
     this.boardName = '';
     this.boardCoverUrl = '';
     this.boardIconUrl = '';
@@ -216,9 +241,11 @@ export class HermandadesPageComponent implements OnInit {
     this.editingBoard.set(board);
     this.boardDay =
       board.processionDay &&
-      (HERMANDAD_STATION_DAYS as readonly string[]).includes(board.processionDay)
+      (HERMANDAD_DIRECTORY_DAYS as readonly string[]).includes(
+        board.processionDay,
+      )
         ? board.processionDay
-        : HERMANDAD_STATION_DAYS[2];
+        : HERMANDAD_DIRECTORY_DAYS[2];
     this.boardName = board.hermandadName;
     this.boardCoverUrl = board.coverImageUrl ?? '';
     this.boardIconUrl = board.iconImageUrl ?? '';

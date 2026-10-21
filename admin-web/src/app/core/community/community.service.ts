@@ -76,6 +76,8 @@ export type HermandadAccessRequestStatus =
   | 'rejected'
   | 'spam';
 
+export type HermandadBoardKind = 'semana_santa' | 'glorias';
+
 export interface HermandadAccessRequest {
   id: string;
   hermandadName: string;
@@ -84,6 +86,10 @@ export interface HermandadAccessRequest {
   contactEmail: string;
   contactPhone: string;
   message: string;
+  /** `semana_santa` (Sevilla) o `glorias`. */
+  boardKind: HermandadBoardKind;
+  /** Día de estación si es SS; vacío si es Gloria. */
+  processionDay: string;
   status: HermandadAccessRequestStatus;
   reviewNotes: string;
   createdProfileId: string | null;
@@ -98,7 +104,10 @@ export interface HermandadAccountCredentials {
   email: string;
 }
 
-/** Días de estación (mismo orden que la app). */
+/** Categoría de tablones de hermandades de Gloria (no es día de estación). */
+export const HERMANDAD_GLORIAS_CATEGORY = 'Glorias';
+
+/** Días de estación SS Sevilla (mismo orden que la app). */
 export const HERMANDAD_STATION_DAYS = [
   'Viernes de Dolores',
   'Sábado de Pasión',
@@ -112,6 +121,20 @@ export const HERMANDAD_STATION_DAYS = [
   'Sábado Santo',
   'Domingo de Resurrección',
 ] as const;
+
+/** Directorio completo: estación SS + Glorias. */
+export const HERMANDAD_DIRECTORY_DAYS = [
+  ...HERMANDAD_STATION_DAYS,
+  HERMANDAD_GLORIAS_CATEGORY,
+] as const;
+
+export function hermandadBoardSeasonKey(
+  day: string,
+): 'semana_santa' | 'glorias' {
+  return day.trim() === HERMANDAD_GLORIAS_CATEGORY
+    ? 'glorias'
+    : 'semana_santa';
+}
 
 export function parseHermandadTopicTitle(title: string): {
   processionDay: string | null;
@@ -140,10 +163,14 @@ export function hermandadBoardTemplate(name: string, day: string): {
 } {
   const n = name.trim();
   const d = day.trim();
+  const isGloria = d === HERMANDAD_GLORIAS_CATEGORY;
+  const scope = isGloria
+    ? `de ${n} (hermandad de Gloria)`
+    : `de ${n} para el ${d}`;
   return {
     excerpt: `Espacio para noticias, horarios, avisos e información oficial de ${n}.`,
     body:
-      `Este es el espacio de seguimiento de ${n} para el ${d}.\n\n` +
+      `Este es el espacio de seguimiento ${scope}.\n\n` +
       `Aquí se podrán centralizar noticias, horarios, avisos de última hora, ` +
       `comunicados, cambios de itinerario y comentarios de la comunidad.\n\n` +
       `Cuando exista una cuenta verificada de la hermandad, sus publicaciones ` +
@@ -452,7 +479,7 @@ export class CommunityService {
   }): Promise<HermandadTopicOption> {
     const day = input.processionDay.trim();
     const name = input.hermandadName.trim();
-    if (!day) throw new Error('Elige el día de estación.');
+    if (!day) throw new Error('Elige el día de estación o Glorias.');
     if (name.length < 2) {
       throw new Error('Indica el nombre de la hermandad (mín. 2 caracteres).');
     }
@@ -477,6 +504,7 @@ export class CommunityService {
         status: 'published',
         is_pinned: false,
         is_system: false,
+        season_key: hermandadBoardSeasonKey(day),
         cover_image_url: cover,
         icon_image_url: icon,
       })
@@ -514,7 +542,7 @@ export class CommunityService {
   }): Promise<void> {
     const day = input.processionDay.trim();
     const name = input.hermandadName.trim();
-    if (!day) throw new Error('Elige el día de estación.');
+    if (!day) throw new Error('Elige el día de estación o Glorias.');
     if (name.length < 2) {
       throw new Error('Indica el nombre de la hermandad (mín. 2 caracteres).');
     }
@@ -524,6 +552,7 @@ export class CommunityService {
     const patch: Record<string, unknown> = {
       title,
       excerpt: template.excerpt,
+      season_key: hermandadBoardSeasonKey(day),
     };
     if (input.resetBodyToTemplate) {
       patch['body'] = template.body;
@@ -764,6 +793,8 @@ export class CommunityService {
     contactEmail: string;
     contactPhone?: string;
     message?: string;
+    boardKind: HermandadBoardKind;
+    processionDay?: string;
     clientFingerprint: string;
     honeypot?: string;
   }): Promise<void> {
@@ -776,6 +807,11 @@ export class CommunityService {
       p_message: (input.message ?? '').trim(),
       p_client_fingerprint: input.clientFingerprint.slice(0, 128),
       p_honeypot: input.honeypot ?? '',
+      p_board_kind: input.boardKind,
+      p_procession_day:
+        input.boardKind === 'glorias'
+          ? ''
+          : (input.processionDay ?? '').trim(),
     });
     if (error) throw error;
   }
@@ -787,7 +823,7 @@ export class CommunityService {
     let query = getSupabase()
       .from('hermandad_access_requests')
       .select(
-        'id, hermandad_name, city, contact_name, contact_email, contact_phone, message, status, review_notes, created_profile_id, created_at, reviewed_at',
+        'id, hermandad_name, city, contact_name, contact_email, contact_phone, message, board_kind, procession_day, status, review_notes, created_profile_id, created_at, reviewed_at',
       )
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -816,6 +852,7 @@ export class CommunityService {
 
   private mapAccessRequest(row: Record<string, unknown>): HermandadAccessRequest {
     const status = String(row['status'] ?? 'pending');
+    const kindRaw = String(row['board_kind'] ?? 'semana_santa');
     return {
       id: String(row['id'] ?? ''),
       hermandadName: String(row['hermandad_name'] ?? ''),
@@ -824,6 +861,8 @@ export class CommunityService {
       contactEmail: String(row['contact_email'] ?? ''),
       contactPhone: String(row['contact_phone'] ?? ''),
       message: String(row['message'] ?? ''),
+      boardKind: kindRaw === 'glorias' ? 'glorias' : 'semana_santa',
+      processionDay: String(row['procession_day'] ?? ''),
       status:
         status === 'approved' ||
         status === 'rejected' ||

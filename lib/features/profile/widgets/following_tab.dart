@@ -25,19 +25,7 @@ const _pageSize = 5;
 /// Una fila de 2 cards a altura completa (sin scroll).
 const _discoverPageSize = 2;
 
-const _hermandadesDayOrder = [
-  'Viernes de Dolores',
-  'Sábado de Pasión',
-  'Domingo de Ramos',
-  'Lunes Santo',
-  'Martes Santo',
-  'Miércoles Santo',
-  'Jueves Santo',
-  'Madrugá',
-  'Viernes Santo',
-  'Sábado Santo',
-  'Domingo de Resurrección',
-];
+const _hermandadesDayOrder = hermandadDirectoryDays;
 
 enum _FollowKind { hermandad, hilo, hashtag }
 

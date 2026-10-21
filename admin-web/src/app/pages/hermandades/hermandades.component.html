@@ -4,8 +4,8 @@
       <p class="eyebrow">Comunidad · solo admin</p>
       <h1>Hermandades</h1>
       <p class="lead">
-        Gestiona el directorio (tablones por día), las cuentas oficiales y quién
-        publica en cada tablón. Es la base del área privada de cada hermandad.
+        Directorio de Sevilla: días de Semana Santa y categoría Glorias. Cuentas
+        oficiales y quién publica en cada tablón (área privada de cada hermandad).
       </p>
     </div>
     <div class="queue-toolbar">
@@ -63,16 +63,21 @@
             <div>
               <h3>{{ req.hermandadName }}</h3>
               <p>
-                {{ req.contactName }}
+                {{ requestKindLabel(req) }}
                 @if (req.city) {
                   · {{ req.city }}
                 }
+                · {{ req.contactName }}
                 · {{ timeAgo(req.createdAt) }}
               </p>
             </div>
             <span class="req-badge">Pendiente</span>
           </header>
           <dl class="req-meta">
+            <div>
+              <dt>Tipo</dt>
+              <dd>{{ requestKindLabel(req) }}</dd>
+            </div>
             <div>
               <dt>Email</dt>
               <dd>
@@ -378,7 +383,7 @@
         </button>
       </header>
 
-      <p class="field-label">1. ¿Qué día sale?</p>
+      <p class="field-label">1. Día de estación o Glorias</p>
       <div class="day-picker">
         @for (day of stationDays; track day) {
           <button
@@ -397,7 +402,7 @@
         2. Nombre de la hermandad
         <input
           [(ngModel)]="boardName"
-          placeholder="Ej. La Borriquita, El Amor, San Gonzalo…"
+          placeholder="Ej. La Borriquita, Santa Lucía, San Gonzalo…"
           autofocus
         />
       </label>

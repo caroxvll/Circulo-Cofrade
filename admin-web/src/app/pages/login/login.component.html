@@ -315,6 +315,67 @@
               <small class="field-hint">{{ msg }}</small>
             }
           </label>
+
+          <fieldset
+            class="field field-span kind-fieldset"
+            [class.invalid]="hasFieldError('reqKind')"
+          >
+            <legend>Tipo de hermandad</legend>
+            <p class="kind-hint">
+              En esta beta empezamos con Sevilla: Semana Santa y Glorias.
+            </p>
+            <div class="kind-options">
+              <label class="kind-option" [class.on]="reqKind === 'semana_santa'">
+                <input
+                  type="radio"
+                  name="reqKind"
+                  value="semana_santa"
+                  [ngModel]="reqKind"
+                  (ngModelChange)="setReqKind($event)"
+                />
+                <span>
+                  <strong>Semana Santa de Sevilla</strong>
+                  <small>Con día de estación</small>
+                </span>
+              </label>
+              <label class="kind-option" [class.on]="reqKind === 'glorias'">
+                <input
+                  type="radio"
+                  name="reqKind"
+                  value="glorias"
+                  [ngModel]="reqKind"
+                  (ngModelChange)="setReqKind($event)"
+                />
+                <span>
+                  <strong>Hermandad de Gloria</strong>
+                  <small>Sin día de estación</small>
+                </span>
+              </label>
+            </div>
+            @if (fieldError('reqKind'); as msg) {
+              <small class="field-hint">{{ msg }}</small>
+            }
+          </fieldset>
+
+          @if (reqKind === 'semana_santa') {
+            <label class="field field-span" [class.invalid]="hasFieldError('reqDay')">
+              <span>Día de salida</span>
+              <select
+                name="reqDay"
+                [(ngModel)]="reqDay"
+                (ngModelChange)="clearField('reqDay')"
+                [attr.aria-invalid]="hasFieldError('reqDay')"
+              >
+                @for (day of stationDays; track day) {
+                  <option [value]="day">{{ day }}</option>
+                }
+              </select>
+              @if (fieldError('reqDay'); as msg) {
+                <small class="field-hint">{{ msg }}</small>
+              }
+            </label>
+          }
+
           <label class="field" [class.invalid]="hasFieldError('reqCity')">
             <span>Ciudad</span>
             <input

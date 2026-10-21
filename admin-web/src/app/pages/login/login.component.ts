@@ -7,7 +7,11 @@ import {
   mapAuthEmailError,
   recordPasswordRecoverAttempt,
 } from '../../core/auth/email-rate-limit';
-import { CommunityService } from '../../core/community/community.service';
+import {
+  CommunityService,
+  HERMANDAD_STATION_DAYS,
+  HermandadBoardKind,
+} from '../../core/community/community.service';
 import { isSupabaseConfigured } from '../../core/supabase.client';
 
 type LoginView = 'login' | 'request' | 'forgot';
@@ -16,6 +20,8 @@ type FieldKey =
   | 'email'
   | 'password'
   | 'reqHermandad'
+  | 'reqKind'
+  | 'reqDay'
   | 'reqCity'
   | 'reqContact'
   | 'reqEmail'
@@ -54,13 +60,17 @@ export class LoginComponent {
   remember = !!this.email;
 
   reqHermandad = '';
-  reqCity = '';
+  reqKind: HermandadBoardKind = 'semana_santa';
+  reqDay: string = HERMANDAD_STATION_DAYS[2];
+  reqCity = 'Sevilla';
   reqContact = '';
   reqEmail = '';
   reqPhone = '';
   reqMessage = '';
   /** Honeypot anti-bot (debe quedar vacío). */
   reqWebsite = '';
+
+  readonly stationDays = HERMANDAD_STATION_DAYS;
 
   forgotEmail = this.email;
 
@@ -89,6 +99,15 @@ export class LoginComponent {
     this.view.set('request');
     this.resetMessages();
     if (!this.reqEmail && this.email) this.reqEmail = this.email;
+  }
+
+  setReqKind(kind: HermandadBoardKind): void {
+    this.reqKind = kind;
+    this.clearField('reqKind');
+    this.clearField('reqDay');
+    if (kind === 'semana_santa' && !this.reqDay) {
+      this.reqDay = HERMANDAD_STATION_DAYS[2];
+    }
   }
 
   showForgot(): void {
@@ -161,6 +180,16 @@ export class LoginComponent {
       errors.reqHermandad = 'El nombre es demasiado corto.';
     }
 
+    if (this.reqKind !== 'semana_santa' && this.reqKind !== 'glorias') {
+      errors.reqKind = 'Elige el tipo de hermandad.';
+    }
+
+    if (this.reqKind === 'semana_santa') {
+      if (!(HERMANDAD_STATION_DAYS as readonly string[]).includes(this.reqDay)) {
+        errors.reqDay = 'Indica el día de salida.';
+      }
+    }
+
     if (!contact) {
       errors.reqContact = 'Indica una persona de contacto.';
     } else if (contact.length < 2) {
@@ -199,6 +228,8 @@ export class LoginComponent {
         contactEmail: email,
         contactPhone: phone,
         message: this.reqMessage,
+        boardKind: this.reqKind,
+        processionDay: this.reqKind === 'semana_santa' ? this.reqDay : '',
         clientFingerprint: this.fingerprint(),
         honeypot: this.reqWebsite,
       });
@@ -207,7 +238,9 @@ export class LoginComponent {
       );
       this.fieldErrors.set({});
       this.reqHermandad = '';
-      this.reqCity = '';
+      this.reqKind = 'semana_santa';
+      this.reqDay = HERMANDAD_STATION_DAYS[2];
+      this.reqCity = 'Sevilla';
       this.reqContact = '';
       this.reqEmail = '';
       this.reqPhone = '';
@@ -342,6 +375,18 @@ export class LoginComponent {
       return {
         message: 'Revisa el email de contacto.',
         fields: { reqEmail: 'Email no válido.' },
+      };
+    }
+    if (lower.includes('día de salida') || lower.includes('dia de salida')) {
+      return {
+        message: 'Indica el día de salida de Semana Santa.',
+        fields: { reqDay: 'Elige el día de estación.' },
+      };
+    }
+    if (lower.includes('tipo de hermandad')) {
+      return {
+        message: 'Elige Semana Santa de Sevilla o Hermandad de Gloria.',
+        fields: { reqKind: 'Elige el tipo.' },
       };
     }
     if (lower.includes('hermandad')) {
