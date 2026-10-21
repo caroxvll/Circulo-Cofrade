@@ -77,6 +77,16 @@ y pega `SUPABASE_URL` / `SUPABASE_ANON_KEY`.
 5. En Arsys DNS: CNAME `panel` → `cname.vercel-dns.com` (el que indique Vercel)
 6. Supabase → Auth → URL Configuration: añade `https://panel.circulocofrade.es/**` a Redirect URLs
 
+### Preview (rama ≠ main)
+
+Con el repo conectado, cualquier push a una rama distinta de `main` genera una URL de preview automática en Vercel (Deployments). No hace falta config extra.
+
+### Analytics / Speed Insights
+
+1. En Vercel → proyecto → **Analytics** → Enable  
+2. **Speed Insights** → Enable  
+3. El código ya llama a `inject()` / `injectSpeedInsights()` en `src/main.ts` (tras el deploy)
+
 ## Seguridad
 
 - Solo **anon key** en el front (nunca `service_role`)

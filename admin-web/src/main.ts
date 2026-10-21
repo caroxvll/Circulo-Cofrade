@@ -1,4 +1,6 @@
 import { bootstrapApplication } from '@angular/platform-browser';
+import { inject } from '@vercel/analytics';
+import { injectSpeedInsights } from '@vercel/speed-insights';
 import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
 
@@ -10,7 +12,10 @@ if (isRecovery && !path.startsWith('/reset-password')) {
   const next = `/reset-password${window.location.search}${window.location.hash}`;
   window.location.replace(next);
 } else {
-  bootstrapApplication(AppComponent, appConfig).catch((err) =>
-    console.error(err),
-  );
+  bootstrapApplication(AppComponent, appConfig)
+    .then(() => {
+      inject();
+      injectSpeedInsights();
+    })
+    .catch((err) => console.error(err));
 }
