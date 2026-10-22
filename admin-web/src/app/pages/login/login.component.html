@@ -277,10 +277,7 @@
         <header class="auth-head">
           <p class="auth-kicker">Solicitud</p>
           <h2>Pedir acceso</h2>
-          <p>
-            La Junta revisará tu solicitud. No se crea ninguna cuenta hasta que
-            la aprueben.
-          </p>
+          <p>La Junta revisa cada alta. La cuenta no se crea hasta aprobarla.</p>
         </header>
 
         @if (info()) {
@@ -300,150 +297,174 @@
             />
           </label>
 
-          <label class="field" [class.invalid]="hasFieldError('reqHermandad')">
-            <span>Hermandad</span>
-            <input
-              name="hermandad"
-              type="text"
-              placeholder="Nombre oficial"
-              [(ngModel)]="reqHermandad"
-              (ngModelChange)="clearField('reqHermandad')"
-              maxlength="120"
-              [attr.aria-invalid]="hasFieldError('reqHermandad')"
-            />
-            @if (fieldError('reqHermandad'); as msg) {
-              <small class="field-hint">{{ msg }}</small>
-            }
-          </label>
+          <section class="req-block field-span">
+            <p class="req-block-title">Hermandad</p>
+            <p class="req-block-note">Beta Sevilla · Semana Santa y Glorias</p>
 
-          <fieldset
-            class="field field-span kind-fieldset"
-            [class.invalid]="hasFieldError('reqKind')"
-          >
-            <legend>Tipo de hermandad</legend>
-            <p class="kind-hint">
-              En esta beta empezamos con Sevilla: Semana Santa y Glorias.
-            </p>
-            <div class="kind-options">
-              <label class="kind-option" [class.on]="reqKind === 'semana_santa'">
-                <input
-                  type="radio"
-                  name="reqKind"
-                  value="semana_santa"
-                  [ngModel]="reqKind"
-                  (ngModelChange)="setReqKind($event)"
-                />
-                <span>
-                  <strong>Semana Santa de Sevilla</strong>
-                  <small>Con día de estación</small>
-                </span>
-              </label>
-              <label class="kind-option" [class.on]="reqKind === 'glorias'">
-                <input
-                  type="radio"
-                  name="reqKind"
-                  value="glorias"
-                  [ngModel]="reqKind"
-                  (ngModelChange)="setReqKind($event)"
-                />
-                <span>
-                  <strong>Hermandad de Gloria</strong>
-                  <small>Sin día de estación</small>
-                </span>
-              </label>
-            </div>
-            @if (fieldError('reqKind'); as msg) {
-              <small class="field-hint">{{ msg }}</small>
-            }
-          </fieldset>
-
-          @if (reqKind === 'semana_santa') {
-            <label class="field field-span" [class.invalid]="hasFieldError('reqDay')">
-              <span>Día de salida</span>
-              <select
-                name="reqDay"
-                [(ngModel)]="reqDay"
-                (ngModelChange)="clearField('reqDay')"
-                [attr.aria-invalid]="hasFieldError('reqDay')"
-              >
-                @for (day of stationDays; track day) {
-                  <option [value]="day">{{ day }}</option>
-                }
-              </select>
-              @if (fieldError('reqDay'); as msg) {
+            <label
+              class="field field-span"
+              [class.invalid]="hasFieldError('reqHermandad')"
+            >
+              <span>Nombre oficial</span>
+              <input
+                name="hermandad"
+                type="text"
+                placeholder="Ej. Santa Lucía, La Borriquita…"
+                [(ngModel)]="reqHermandad"
+                (ngModelChange)="clearField('reqHermandad')"
+                maxlength="120"
+                [attr.aria-invalid]="hasFieldError('reqHermandad')"
+              />
+              @if (fieldError('reqHermandad'); as msg) {
                 <small class="field-hint">{{ msg }}</small>
               }
             </label>
-          }
 
-          <label class="field" [class.invalid]="hasFieldError('reqCity')">
-            <span>Ciudad</span>
-            <input
-              name="city"
-              type="text"
-              placeholder="Sevilla"
-              [(ngModel)]="reqCity"
-              (ngModelChange)="clearField('reqCity')"
-              maxlength="80"
-            />
-            @if (fieldError('reqCity'); as msg) {
-              <small class="field-hint">{{ msg }}</small>
+            <fieldset
+              class="kind-fieldset field-span"
+              [class.invalid]="hasFieldError('reqKind')"
+            >
+              <legend class="sr-only">Tipo de hermandad</legend>
+              <div class="kind-options">
+                <label
+                  class="kind-option"
+                  [class.on]="reqKind === 'semana_santa'"
+                >
+                  <input
+                    type="radio"
+                    name="reqKind"
+                    value="semana_santa"
+                    [ngModel]="reqKind"
+                    (ngModelChange)="setReqKind($event)"
+                  />
+                  <span>
+                    <strong>Semana Santa</strong>
+                    <small>Sevilla · con día de salida</small>
+                  </span>
+                </label>
+                <label class="kind-option" [class.on]="reqKind === 'glorias'">
+                  <input
+                    type="radio"
+                    name="reqKind"
+                    value="glorias"
+                    [ngModel]="reqKind"
+                    (ngModelChange)="setReqKind($event)"
+                  />
+                  <span>
+                    <strong>Gloria</strong>
+                    <small>Sevilla · sin día de estación</small>
+                  </span>
+                </label>
+              </div>
+              @if (fieldError('reqKind'); as msg) {
+                <small class="field-hint">{{ msg }}</small>
+              }
+            </fieldset>
+
+            @if (reqKind === 'semana_santa') {
+              <label
+                class="field field-span day-field"
+                [class.invalid]="hasFieldError('reqDay')"
+              >
+                <span>Día de salida</span>
+                <select
+                  name="reqDay"
+                  [(ngModel)]="reqDay"
+                  (ngModelChange)="clearField('reqDay')"
+                  [attr.aria-invalid]="hasFieldError('reqDay')"
+                >
+                  @for (day of stationDays; track day) {
+                    <option [value]="day">{{ day }}</option>
+                  }
+                </select>
+                @if (fieldError('reqDay'); as msg) {
+                  <small class="field-hint">{{ msg }}</small>
+                }
+              </label>
             }
-          </label>
-          <label class="field" [class.invalid]="hasFieldError('reqContact')">
-            <span>Persona de contacto</span>
-            <input
-              name="contact"
-              type="text"
-              placeholder="Nombre y apellidos"
-              [(ngModel)]="reqContact"
-              (ngModelChange)="clearField('reqContact')"
-              maxlength="80"
-              [attr.aria-invalid]="hasFieldError('reqContact')"
-            />
-            @if (fieldError('reqContact'); as msg) {
-              <small class="field-hint">{{ msg }}</small>
-            }
-          </label>
-          <label class="field" [class.invalid]="hasFieldError('reqEmail')">
-            <span>Email de contacto</span>
-            <input
-              name="reqEmail"
-              type="email"
-              placeholder="hermandad@correo.com"
-              [(ngModel)]="reqEmail"
-              (ngModelChange)="clearField('reqEmail')"
-              maxlength="160"
-              [attr.aria-invalid]="hasFieldError('reqEmail')"
-            />
-            @if (fieldError('reqEmail'); as msg) {
-              <small class="field-hint">{{ msg }}</small>
-            }
-          </label>
-          <label class="field field-span" [class.invalid]="hasFieldError('reqPhone')">
-            <span>Teléfono (opcional)</span>
-            <input
-              name="phone"
-              type="tel"
-              placeholder="+34 …"
-              [(ngModel)]="reqPhone"
-              (ngModelChange)="clearField('reqPhone')"
-              maxlength="40"
-            />
-            @if (fieldError('reqPhone'); as msg) {
-              <small class="field-hint">{{ msg }}</small>
-            }
-          </label>
-          <label class="field field-span">
-            <span>Mensaje (opcional)</span>
-            <textarea
-              name="message"
-              rows="2"
-              placeholder="Cuéntanos brevemente quién sois…"
-              [(ngModel)]="reqMessage"
-              maxlength="1000"
-            ></textarea>
-          </label>
+          </section>
+
+          <section class="req-block field-span">
+            <p class="req-block-title">Contacto</p>
+
+            <div class="req-grid">
+              <label class="field" [class.invalid]="hasFieldError('reqContact')">
+                <span>Persona de contacto</span>
+                <input
+                  name="contact"
+                  type="text"
+                  placeholder="Nombre y apellidos"
+                  [(ngModel)]="reqContact"
+                  (ngModelChange)="clearField('reqContact')"
+                  maxlength="80"
+                  [attr.aria-invalid]="hasFieldError('reqContact')"
+                />
+                @if (fieldError('reqContact'); as msg) {
+                  <small class="field-hint">{{ msg }}</small>
+                }
+              </label>
+              <label class="field" [class.invalid]="hasFieldError('reqCity')">
+                <span>Ciudad</span>
+                <input
+                  name="city"
+                  type="text"
+                  placeholder="Sevilla"
+                  [(ngModel)]="reqCity"
+                  (ngModelChange)="clearField('reqCity')"
+                  maxlength="80"
+                />
+                @if (fieldError('reqCity'); as msg) {
+                  <small class="field-hint">{{ msg }}</small>
+                }
+              </label>
+              <label
+                class="field"
+                [class.invalid]="hasFieldError('reqEmail')"
+              >
+                <span>Email</span>
+                <input
+                  name="reqEmail"
+                  type="email"
+                  placeholder="hermandad@correo.com"
+                  [(ngModel)]="reqEmail"
+                  (ngModelChange)="clearField('reqEmail')"
+                  maxlength="160"
+                  [attr.aria-invalid]="hasFieldError('reqEmail')"
+                />
+                @if (fieldError('reqEmail'); as msg) {
+                  <small class="field-hint">{{ msg }}</small>
+                }
+              </label>
+              <label
+                class="field"
+                [class.invalid]="hasFieldError('reqPhone')"
+              >
+                <span>Teléfono <em>(opcional)</em></span>
+                <input
+                  name="phone"
+                  type="tel"
+                  placeholder="+34 …"
+                  [(ngModel)]="reqPhone"
+                  (ngModelChange)="clearField('reqPhone')"
+                  maxlength="40"
+                />
+                @if (fieldError('reqPhone'); as msg) {
+                  <small class="field-hint">{{ msg }}</small>
+                }
+              </label>
+            </div>
+
+            <label class="field field-span msg-field">
+              <span>Mensaje <em>(opcional)</em></span>
+              <textarea
+                name="message"
+                rows="2"
+                placeholder="Cuéntanos brevemente quién sois…"
+                [(ngModel)]="reqMessage"
+                maxlength="1000"
+              ></textarea>
+            </label>
+          </section>
 
           @if (error()) {
             <p class="error field-span" role="alert">{{ error() }}</p>
@@ -453,7 +474,12 @@
             <button class="submit" type="submit" [disabled]="loading() || !configured">
               <span>{{ loading() ? 'Enviando…' : 'Enviar solicitud' }}</span>
             </button>
-            <button type="button" class="btn-ghost" (click)="showLogin()" [disabled]="loading()">
+            <button
+              type="button"
+              class="btn-ghost"
+              (click)="showLogin()"
+              [disabled]="loading()"
+            >
               Volver al acceso
             </button>
           </div>

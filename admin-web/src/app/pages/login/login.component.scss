@@ -130,9 +130,10 @@
 }
 
 .login-stage.stage-request {
-  width: min(1080px, 100%);
-  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
-  align-items: center;
+  width: min(920px, 100%);
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  align-items: start;
+  gap: clamp(16px, 2.5vw, 32px);
 }
 
 .login-stage.stage-request .brand-features,
@@ -141,51 +142,61 @@
   display: none;
 }
 
+.login-stage.stage-request .brand-panel {
+  position: sticky;
+  top: max(16px, env(safe-area-inset-top));
+  padding-top: 12px;
+}
+
 .login-stage.stage-request .brand-mark-wrap {
-  width: 56px;
-  height: 56px;
-  margin-bottom: 12px;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 10px;
 }
 
 .login-stage.stage-request .brand-mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
 }
 
 .login-stage.stage-request .brand-name {
-  font-size: clamp(1.7rem, 3vw, 2.3rem);
+  font-size: clamp(1.55rem, 2.8vw, 2.05rem);
 }
 
 .login-stage.stage-request .brand-line {
-  margin-top: 10px;
-  font-size: 1.05rem;
+  margin-top: 8px;
+  font-size: 0.98rem;
 }
 
 .login-stage.stage-request .auth-panel {
-  padding: 18px 22px;
+  padding: 22px 24px 20px;
+  max-height: min(92dvh, 920px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201, 168, 106, 0.35) transparent;
 }
 
 .login-stage.stage-request .auth-head {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .login-stage.stage-request .auth-head p {
-  max-width: none;
+  max-width: 42ch;
 }
 
 .login-stage.stage-request .form-request {
-  gap: 10px 12px;
+  gap: 14px;
 }
 
 .login-stage.stage-request .field textarea {
-  min-height: 52px;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  min-height: 64px;
+  padding-top: 11px;
+  padding-bottom: 11px;
 }
 
 .login-stage.stage-request .auth-foot {
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .login-stage.stage-forgot {
@@ -427,8 +438,9 @@
 }
 
 .form-request {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 14px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
 }
 
 .form-request .field-span,
@@ -437,34 +449,74 @@
   grid-column: 1 / -1;
 }
 
-.kind-fieldset {
-  border: 1px solid rgba(248, 242, 233, 0.12);
-  border-radius: 12px;
-  padding: 12px 14px 14px;
+.req-block {
+  display: grid;
+  gap: 12px;
   margin: 0;
+  padding: 14px 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(248, 242, 233, 0.08);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.kind-fieldset legend {
-  padding: 0 4px;
+.req-block-title {
+  margin: 0;
   font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-weight: 650;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(248, 242, 233, 0.58);
+  color: var(--login-gold);
 }
 
-.kind-hint {
-  margin: 0 0 10px;
-  font-size: 0.82rem;
+.req-block-note {
+  margin: -6px 0 0;
+  font-size: 0.8rem;
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
-  line-height: 1.45;
-  color: rgba(248, 242, 233, 0.62);
+  color: rgba(248, 242, 233, 0.5);
+}
+
+.req-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field span em {
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: rgba(248, 242, 233, 0.38);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.kind-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.kind-fieldset.invalid .kind-option {
+  border-color: rgba(220, 80, 80, 0.45);
 }
 
 .kind-options {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -473,49 +525,78 @@
   gap: 10px;
   align-items: flex-start;
   margin: 0;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 12px 12px 11px;
+  border-radius: 11px;
   border: 1px solid rgba(248, 242, 233, 0.1);
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.22);
   cursor: pointer;
   text-transform: none;
   letter-spacing: 0;
   font-weight: 400;
   color: rgba(248, 242, 233, 0.88);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .kind-option.on {
-  border-color: rgba(201, 168, 106, 0.55);
-  background: rgba(201, 168, 106, 0.08);
+  border-color: rgba(201, 168, 106, 0.58);
+  background: rgba(201, 168, 106, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(201, 168, 106, 0.18);
 }
 
 .kind-option input {
-  margin-top: 3px;
+  margin-top: 2px;
+  flex-shrink: 0;
   accent-color: #c9a86a;
 }
 
 .kind-option strong {
   display: block;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 650;
+  line-height: 1.25;
 }
 
 .kind-option small {
   display: block;
-  margin-top: 2px;
-  font-size: 0.78rem;
-  color: rgba(248, 242, 233, 0.55);
+  margin-top: 3px;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: rgba(248, 242, 233, 0.52);
+}
+
+.day-field {
+  animation: rise 0.35s ease both;
 }
 
 .form-request select {
+  box-sizing: border-box;
   width: 100%;
+  max-width: 100%;
   min-height: 44px;
   border-radius: 10px;
-  border: 1px solid rgba(248, 242, 233, 0.14);
-  background: rgba(0, 0, 0, 0.22);
-  color: rgba(248, 242, 233, 0.92);
+  border: 1px solid var(--login-field-border);
+  background: var(--login-field);
+  color: var(--login-ink);
   padding: 0 12px;
   font: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  transition:
+    border-color 0.22s ease,
+    background 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.form-request select:focus {
+  outline: none;
+  border-color: rgba(201, 168, 106, 0.55);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px rgba(201, 168, 106, 0.12);
 }
 
 .form-actions {
@@ -1048,6 +1129,19 @@
   .form-request {
     grid-template-columns: 1fr;
   }
+
+  .login-stage.stage-request .brand-panel {
+    position: static;
+  }
+
+  .login-stage.stage-request .auth-panel {
+    max-height: none;
+  }
+
+  .kind-options,
+  .req-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 520px) {
@@ -1082,6 +1176,14 @@
 
   .auth-panel {
     padding: 18px 16px;
+  }
+
+  .req-block {
+    padding: 12px;
+  }
+
+  .kind-option {
+    padding: 11px 12px;
   }
 
   .field input,

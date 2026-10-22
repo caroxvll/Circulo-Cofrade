@@ -13,6 +13,7 @@ import { formatDateTime, formatTimeAgo } from '../../core/utils/date';
   standalone: true,
   imports: [FormsModule],
   templateUrl: './users.component.html',
+  styleUrl: './users.component.scss',
 })
 export class UsersPageComponent implements OnInit {
   private readonly community = inject(CommunityService);

@@ -1,4 +1,4 @@
-<section class="queue-page">
+<section class="queue-page users-page">
   <header>
     <div>
       <p class="eyebrow">Comunidad · solo admin</p>
@@ -30,7 +30,7 @@
       type="search"
       [(ngModel)]="search"
       (keyup.enter)="onSearch()"
-      placeholder="Buscar handle o nombre…"
+      placeholder="Buscar handle, nombre o email…"
     />
     <button type="button" class="btn btn-ghost" (click)="onSearch()">Buscar</button>
     <select [ngModel]="filter()" (ngModelChange)="filter.set($event)">
@@ -50,11 +50,13 @@
   } @else if (visibleUsers().length === 0) {
     <div class="empty-box">Sin resultados.</div>
   } @else {
-    <div class="table-wrap">
+    <!-- Desktop -->
+    <div class="table-wrap users-table">
       <table>
         <thead>
           <tr>
             <th>Usuario</th>
+            <th>Email</th>
             <th>Tipo</th>
             <th>Alta</th>
             <th>Estado</th>
@@ -67,6 +69,15 @@
               <td>
                 <strong>{{ user.displayName }}</strong>
                 <div class="sub">{{ '@' + user.handle }}</div>
+              </td>
+              <td>
+                @if (user.email) {
+                  <a class="email-link" [href]="'mailto:' + user.email">{{
+                    user.email
+                  }}</a>
+                } @else {
+                  <span class="sub">—</span>
+                }
               </td>
               <td>
                 <span class="pill">{{ user.accountType }}</span>
@@ -128,6 +139,80 @@
           }
         </tbody>
       </table>
+    </div>
+
+    <!-- Mobile cards -->
+    <div class="users-cards" aria-label="Usuarios">
+      @for (user of visibleUsers(); track user.id) {
+        <article class="user-card" [class.dim]="!!user.suspendedAt">
+          <header class="user-card-head">
+            <div>
+              <strong>{{ user.displayName }}</strong>
+              <div class="sub">{{ '@' + user.handle }}</div>
+              @if (user.email) {
+                <a class="email-link" [href]="'mailto:' + user.email">{{
+                  user.email
+                }}</a>
+              }
+            </div>
+            @if (user.suspendedAt) {
+              <span class="pill danger">suspendido</span>
+            } @else {
+              <span class="pill ok">activo</span>
+            }
+          </header>
+
+          <div class="user-card-meta">
+            <span class="pill">{{ user.accountType }}</span>
+            @if (user.role === 'admin') {
+              <span class="pill admin">admin</span>
+            }
+            @if (user.verified) {
+              <span class="pill ok">verificado</span>
+            }
+            <span class="sub">Alta · {{ timeAgo(user.createdAt) }}</span>
+          </div>
+
+          @if (user.suspendedAt && user.suspendedReason) {
+            <p class="user-card-reason">{{ user.suspendedReason }}</p>
+          }
+
+          <div class="user-card-actions">
+            <button
+              type="button"
+              class="btn btn-ghost"
+              [disabled]="busyId() === user.id || user.id === selfId()"
+              (click)="toggleAdmin(user)"
+            >
+              {{ user.role === 'admin' ? 'Quitar admin' : 'Hacer admin' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="busyId() === user.id"
+              (click)="toggleVerified(user)"
+            >
+              {{ user.verified ? 'Quitar verif.' : 'Verificar' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-danger"
+              [disabled]="busyId() === user.id || user.id === selfId()"
+              (click)="toggleSuspend(user)"
+            >
+              {{ user.suspendedAt ? 'Reactivar' : 'Suspender' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-danger"
+              [disabled]="busyId() === user.id || user.id === selfId()"
+              (click)="deleteUser(user)"
+            >
+              Eliminar
+            </button>
+          </div>
+        </article>
+      }
     </div>
   }
 </section>

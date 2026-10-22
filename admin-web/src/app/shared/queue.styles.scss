@@ -414,6 +414,11 @@ td.actions {
 }
 
 @media (max-width: 900px) {
+  .queue-page > header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -421,6 +426,16 @@ td.actions {
   .form-grid,
   .two-col {
     grid-template-columns: 1fr;
+  }
+
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters input[type='search'],
+  .filters select {
+    width: 100%;
   }
 }
 

@@ -11,6 +11,8 @@ export interface AdminUserRow {
   suspendedAt: string | null;
   suspendedReason: string | null;
   createdAt: string;
+  /** Email de Auth (solo vía admin_list_users). */
+  email: string | null;
 }
 
 export interface HandleHit {
@@ -236,31 +238,21 @@ export class CommunityService {
   }
 
   async fetchRecentUsers(limit = 40): Promise<AdminUserRow[]> {
-    const { data, error } = await getSupabase()
-      .from('profiles')
-      .select(
-        'id, handle, display_name, role, account_type, verified, suspended_at, suspended_reason, created_at',
-      )
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    if (error) throw error;
-    return (data ?? []).map((row) => this.mapUser(row));
+    return this.searchUsers('', limit);
   }
 
+  /**
+   * Listado admin con email de Auth.
+   * Requiere `admin_list_users.sql` en Supabase.
+   */
   async searchUsers(query: string, limit = 40): Promise<AdminUserRow[]> {
     const q = query.replace(/^@/, '').trim();
-    if (q.length < 2) return this.fetchRecentUsers(limit);
-
-    const { data, error } = await getSupabase()
-      .from('profiles')
-      .select(
-        'id, handle, display_name, role, account_type, verified, suspended_at, suspended_reason, created_at',
-      )
-      .or(`handle.ilike.%${q}%,display_name.ilike.%${q}%`)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    const { data, error } = await getSupabase().rpc('admin_list_users', {
+      p_query: q.length >= 2 ? q : '',
+      p_limit: limit,
+    });
     if (error) throw error;
-    return (data ?? []).map((row) => this.mapUser(row));
+    return (data ?? []).map((row: Record<string, unknown>) => this.mapUser(row));
   }
 
   async searchHandles(rawQuery: string, limit = 8): Promise<HandleHit[]> {
@@ -878,6 +870,11 @@ export class CommunityService {
   }
 
   private mapUser(row: Record<string, unknown>): AdminUserRow {
+    const emailRaw = row['email'];
+    const email =
+      typeof emailRaw === 'string' && emailRaw.trim()
+        ? emailRaw.trim()
+        : null;
     return {
       id: String(row['id'] ?? ''),
       handle: String(row['handle'] ?? ''),
@@ -888,6 +885,7 @@ export class CommunityService {
       suspendedAt: (row['suspended_at'] as string | null) ?? null,
       suspendedReason: (row['suspended_reason'] as string | null) ?? null,
       createdAt: String(row['created_at'] ?? ''),
+      email,
     };
   }
 }

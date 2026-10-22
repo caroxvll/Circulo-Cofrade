@@ -1,0 +1,74 @@
+.email-link {
+  color: var(--burgundy, #5c0610);
+  text-decoration: none;
+  word-break: break-all;
+  font-size: 0.86rem;
+}
+
+.email-link:hover {
+  text-decoration: underline;
+}
+
+.users-cards {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .users-table {
+    display: none;
+  }
+
+  .users-cards {
+    display: grid;
+    gap: 12px;
+  }
+
+  .user-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .user-card.dim {
+    opacity: 0.72;
+  }
+
+  .user-card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .user-card-head strong {
+    display: block;
+    font-size: 1rem;
+  }
+
+  .user-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .user-card-reason {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+  }
+
+  .user-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .user-card-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

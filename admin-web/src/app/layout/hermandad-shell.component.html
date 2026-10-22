@@ -6,7 +6,7 @@
 >
   <div class="backdrop" [class.visible]="menuOpen()" (click)="closeMenu()"></div>
 
-  <aside class="sidebar">
+  <aside class="sidebar" id="hermandad-sidebar">
     <div class="brand">
       @if (boards().at(0)?.iconImageUrl; as icon) {
         <img class="brand-mark crest" [src]="icon" alt="" width="44" height="44" />
@@ -81,7 +81,14 @@
 
   <div class="main">
     <header class="topbar">
-      <button type="button" class="icon-btn menu" (click)="toggleMenu()" aria-label="Menú">
+      <button
+        type="button"
+        class="icon-btn menu"
+        (click)="toggleMenu()"
+        aria-label="Menú"
+        [attr.aria-expanded]="menuOpen()"
+        aria-controls="hermandad-sidebar"
+      >
         ☰
       </button>
       <div class="topbar-copy">
