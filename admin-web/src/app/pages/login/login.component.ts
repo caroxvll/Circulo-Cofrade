@@ -373,16 +373,36 @@ export class LoginComponent {
     };
   }
 
+  private requestErrorText(err: unknown): string {
+    if (err && typeof err === 'object') {
+      const e = err as { message?: string; details?: string; hint?: string };
+      return [e.message, e.details, e.hint].filter(Boolean).join(' ');
+    }
+    if (err instanceof Error) return err.message;
+    return String(err ?? '');
+  }
+
   private mapRequestError(err: unknown): {
     message: string;
     fields?: Partial<Record<FieldKey, string>>;
   } {
-    const raw = err instanceof Error ? err.message : String(err ?? '');
+    const raw = this.requestErrorText(err);
     const lower = raw.toLowerCase();
 
     if (lower.includes('demasiadas')) {
       return {
         message: 'Has enviado demasiadas solicitudes. Espera 24 horas e inténtalo de nuevo.',
+      };
+    }
+    if (
+      lower.includes('en uso') ||
+      lower.includes('already been registered') ||
+      lower.includes('already registered') ||
+      lower.includes('user already')
+    ) {
+      return {
+        message: 'Ese email ya está en uso. Usa otro correo.',
+        fields: { reqEmail: 'Este email ya tiene una cuenta.' },
       };
     }
     if (lower.includes('pendiente')) {
