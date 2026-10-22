@@ -103,6 +103,14 @@
               <td class="actions">
                 <button
                   type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === user.id || editSaving()"
+                  (click)="openEdit(user)"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
                   class="btn btn-ghost"
                   [disabled]="busyId() === user.id || user.id === selfId()"
                   (click)="toggleAdmin(user)"
@@ -180,6 +188,14 @@
           <div class="user-card-actions">
             <button
               type="button"
+              class="btn btn-soft"
+              [disabled]="busyId() === user.id || editSaving()"
+              (click)="openEdit(user)"
+            >
+              Editar
+            </button>
+            <button
+              type="button"
               class="btn btn-ghost"
               [disabled]="busyId() === user.id || user.id === selfId()"
               (click)="toggleAdmin(user)"
@@ -216,3 +232,90 @@
     </div>
   }
 </section>
+
+@if (editingUser(); as user) {
+  <div class="modal-backdrop" (click)="closeEdit()">
+    <div class="modal-card" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+      <header>
+        <h2>Editar usuario</h2>
+        <button
+          type="button"
+          class="btn btn-ghost"
+          (click)="closeEdit()"
+          [disabled]="editSaving()"
+        >
+          Cerrar
+        </button>
+      </header>
+
+      <p class="modal-lead">
+        Perfil y acceso de
+        <strong>{{ '@' + user.handle }}</strong>. Cambiar el email cambia el login.
+      </p>
+
+      @if (editError(); as err) {
+        <div class="error-box">{{ err }}</div>
+      }
+
+      <label>
+        Nombre visible
+        <input
+          type="text"
+          [(ngModel)]="editDisplayName"
+          maxlength="80"
+          [disabled]="editSaving()"
+        />
+      </label>
+      <label>
+        Handle
+        <input
+          type="text"
+          [(ngModel)]="editHandle"
+          maxlength="30"
+          [disabled]="editSaving()"
+          placeholder="sin @"
+        />
+      </label>
+      <label>
+        Email (login)
+        <input
+          type="email"
+          [(ngModel)]="editEmail"
+          maxlength="160"
+          [disabled]="editSaving()"
+        />
+      </label>
+      <label>
+        Nueva contraseña
+        <em>(opcional, mín. 8)</em>
+        <input
+          type="text"
+          [(ngModel)]="editPassword"
+          maxlength="72"
+          [disabled]="editSaving()"
+          autocomplete="new-password"
+          placeholder="Dejar vacío para no cambiarla"
+        />
+      </label>
+
+      <div class="modal-actions">
+        <button
+          type="button"
+          class="btn btn-ghost"
+          (click)="closeEdit()"
+          [disabled]="editSaving()"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="saveEdit()"
+          [disabled]="editSaving()"
+        >
+          {{ editSaving() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

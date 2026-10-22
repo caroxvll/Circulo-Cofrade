@@ -327,6 +327,47 @@ export class CommunityService {
    * hermandad / sistema) y comentarios del usuario.
    * Requiere Edge Function `admin-delete-user` desplegada.
    */
+  async updateUser(input: {
+    profileId: string;
+    displayName: string;
+    handle: string;
+    email: string;
+    password?: string | null;
+  }): Promise<{
+    displayName: string;
+    handle: string;
+    email: string;
+    profileUpdated: boolean;
+    emailUpdated: boolean;
+    passwordUpdated: boolean;
+  }> {
+    const body: Record<string, unknown> = {
+      profileId: input.profileId,
+      displayName: input.displayName.trim(),
+      handle: input.handle.replace(/^@/, '').trim().toLowerCase(),
+      email: input.email.trim().toLowerCase(),
+    };
+    if (input.password?.trim()) body['password'] = input.password.trim();
+
+    const { data, error } = await getSupabase().functions.invoke(
+      'admin-update-user',
+      { body },
+    );
+    if (error) throw error;
+    const payload = data as Record<string, unknown>;
+    if (payload?.['error']) {
+      throw new Error(String(payload['error']));
+    }
+    return {
+      displayName: String(payload['displayName'] ?? body['displayName']),
+      handle: String(payload['handle'] ?? body['handle']),
+      email: String(payload['email'] ?? body['email']),
+      profileUpdated: Boolean(payload['profileUpdated']),
+      emailUpdated: Boolean(payload['emailUpdated']),
+      passwordUpdated: Boolean(payload['passwordUpdated']),
+    };
+  }
+
   async deleteUser(
     profileId: string,
     options: { deleteContent?: boolean } = {},

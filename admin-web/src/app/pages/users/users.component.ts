@@ -25,7 +25,14 @@ export class UsersPageComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly busyId = signal<string | null>(null);
   readonly filter = signal<'all' | 'admin' | 'brotherhood' | 'suspended'>('all');
+  readonly editingUser = signal<AdminUserRow | null>(null);
+  readonly editSaving = signal(false);
+  readonly editError = signal<string | null>(null);
   search = '';
+  editDisplayName = '';
+  editHandle = '';
+  editEmail = '';
+  editPassword = '';
   readonly timeAgo = formatTimeAgo;
   readonly dateTime = formatDateTime;
   readonly selfId = () => this.auth.profile()?.id;
@@ -154,6 +161,104 @@ export class UsersPageComponent implements OnInit {
       this.error.set(err instanceof Error ? err.message : 'No se pudo suspender');
     } finally {
       this.busyId.set(null);
+    }
+  }
+
+  openEdit(user: AdminUserRow): void {
+    this.editingUser.set(user);
+    this.editDisplayName = user.displayName;
+    this.editHandle = user.handle;
+    this.editEmail = user.email ?? '';
+    this.editPassword = '';
+    this.editError.set(null);
+  }
+
+  closeEdit(): void {
+    if (this.editSaving()) return;
+    this.editingUser.set(null);
+    this.editError.set(null);
+    this.editPassword = '';
+  }
+
+  async saveEdit(): Promise<void> {
+    const user = this.editingUser();
+    if (!user) return;
+
+    const displayName = this.editDisplayName.trim();
+    const handle = this.editHandle.replace(/^@/, '').trim().toLowerCase();
+    const email = this.editEmail.trim().toLowerCase();
+    const password = this.editPassword.trim();
+
+    if (displayName.length < 2) {
+      this.editError.set('El nombre debe tener al menos 2 caracteres.');
+      return;
+    }
+    if (handle.length < 2 || !/^[a-z0-9_]+$/.test(handle)) {
+      this.editError.set('Handle: solo a-z, 0-9 y _ (mín. 2).');
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.editError.set('Indica un email válido.');
+      return;
+    }
+    if (password && password.length < 8) {
+      this.editError.set('La contraseña nueva debe tener al menos 8 caracteres.');
+      return;
+    }
+
+    const emailChanged = email !== (user.email ?? '').toLowerCase();
+    if (emailChanged) {
+      if (
+        !confirm(
+          `Vas a cambiar el email de @${user.handle} a:\n${email}\n\n` +
+            'Ese será el nuevo acceso de login. ¿Continuar?',
+        )
+      ) {
+        return;
+      }
+    }
+
+    this.editSaving.set(true);
+    this.editError.set(null);
+    this.error.set(null);
+    try {
+      const result = await this.community.updateUser({
+        profileId: user.id,
+        displayName,
+        handle,
+        email,
+        password: password || null,
+      });
+      this.users.update((list) =>
+        list.map((u) =>
+          u.id === user.id
+            ? {
+                ...u,
+                displayName: result.displayName,
+                handle: result.handle,
+                email: result.email,
+              }
+            : u,
+        ),
+      );
+      this.editingUser.set(null);
+      this.editPassword = '';
+      const bits = [
+        result.profileUpdated ? 'perfil' : null,
+        result.emailUpdated ? 'email' : null,
+        result.passwordUpdated ? 'contraseña' : null,
+      ].filter(Boolean);
+      alert(
+        bits.length
+          ? `Actualizado @${result.handle} (${bits.join(', ')}).`
+          : `Sin cambios en @${result.handle}.`,
+      );
+    } catch (err) {
+      this.editError.set(
+        err instanceof Error ? err.message : 'No se pudo guardar',
+      );
+    } finally {
+      this.editSaving.set(false);
     }
   }
 
