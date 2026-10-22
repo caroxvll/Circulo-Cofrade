@@ -8,7 +8,11 @@
       "destination": "/privacidad.html"
     },
     {
-      "source": "/((?!privacidad\\.html$).*)",
+      "source": "/eliminar-cuenta",
+      "destination": "/eliminar-cuenta.html"
+    },
+    {
+      "source": "/((?!privacidad\\.html$|eliminar-cuenta\\.html$).*)",
       "destination": "/index.html"
     }
   ]
