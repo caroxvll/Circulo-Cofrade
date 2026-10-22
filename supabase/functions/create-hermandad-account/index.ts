@@ -160,6 +160,35 @@ Deno.serve(async (req) => {
       }
     }
 
+    // No reutilizar cuentas: un email = una cuenta (igual que el registro de la app).
+    const lookupRes = await fetch(
+      `${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+        },
+      },
+    );
+    if (lookupRes.ok) {
+      const lookupJson = (await lookupRes.json().catch(() => ({}))) as {
+        users?: Array<{ id: string; email?: string }>;
+        user?: { id: string; email?: string };
+      };
+      const emailTaken =
+        !!lookupJson.users?.some((u) => (u.email ?? "").toLowerCase() === email) ||
+        (lookupJson.user?.email ?? "").toLowerCase() === email;
+      if (emailTaken) {
+        return jsonResponse(
+          {
+            error:
+              "Ese email ya está en uso. Usa otro correo para la cuenta de la hermandad.",
+          },
+          409,
+        );
+      }
+    }
+
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email,
       password,
@@ -175,6 +204,21 @@ Deno.serve(async (req) => {
     });
 
     if (createError || !created.user) {
+      const msg = (createError?.message ?? "").toLowerCase();
+      if (
+        msg.includes("already been registered") ||
+        msg.includes("already registered") ||
+        msg.includes("already exists") ||
+        msg.includes("duplicate")
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "Ese email ya está en uso. Usa otro correo para la cuenta de la hermandad.",
+          },
+          409,
+        );
+      }
       return jsonResponse(
         { error: createError?.message ?? "No se pudo crear el usuario Auth" },
         400,

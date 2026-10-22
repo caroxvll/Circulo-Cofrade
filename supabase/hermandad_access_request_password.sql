@@ -161,6 +161,15 @@ begin
     raise exception 'Ya hay una solicitud pendiente con ese email.';
   end if;
 
+  -- Mismo criterio que el registro de la app: un email = una cuenta.
+  if exists (
+    select 1
+    from auth.users u
+    where lower(trim(coalesce(u.email, ''))) = v_email
+  ) then
+    raise exception 'Ese email ya está en uso. Usa otro correo.';
+  end if;
+
   v_enc := extensions.pgp_sym_encrypt(
     v_password,
     public._hermandad_request_pwd_key()
