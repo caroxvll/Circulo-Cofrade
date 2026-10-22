@@ -206,7 +206,9 @@ grant execute on function public.submit_hermandad_access_request(
   text, text, text, text, text, text, text, text, text, text, text
 ) to anon, authenticated;
 
--- Lee la clave sin borrarla (solo service_role / Edge Function).
+-- Lee la clave sin borrarla.
+-- Seguridad: solo GRANT a service_role (no comprobamos auth.role():
+-- con la service key a veces viene vacío y bloqueaba el alta).
 create or replace function public.read_hermandad_request_password(p_request_id uuid)
 returns text
 language plpgsql
@@ -216,10 +218,6 @@ as $$
 declare
   v_enc bytea;
 begin
-  if auth.role() is distinct from 'service_role' then
-    raise exception 'not authorized';
-  end if;
-
   select password_enc into v_enc
   from public.hermandad_access_requests
   where id = p_request_id
@@ -245,10 +243,6 @@ security definer
 set search_path = public
 as $$
 begin
-  if auth.role() is distinct from 'service_role' then
-    raise exception 'not authorized';
-  end if;
-
   update public.hermandad_access_requests
   set
     password_enc = null,

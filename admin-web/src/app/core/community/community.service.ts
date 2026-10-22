@@ -743,8 +743,16 @@ export class CommunityService {
       'create-hermandad-account',
       { body },
     );
-    if (error) throw error;
-    const payload = data as Record<string, unknown>;
+    const payload = (data ?? {}) as Record<string, unknown>;
+    if (error) {
+      throw new Error(
+        await this.edgeFunctionErrorMessage(
+          error,
+          payload,
+          'No se pudo crear la cuenta hermandad',
+        ),
+      );
+    }
     if (payload?.['error']) {
       throw new Error(String(payload['error']));
     }
@@ -892,6 +900,32 @@ export class CommunityService {
       p_created_profile_id: input.createdProfileId ?? null,
     });
     if (error) throw error;
+  }
+
+  /** Extrae el `error` del body de una Edge Function (Supabase a veces solo dice non-2xx). */
+  private async edgeFunctionErrorMessage(
+    error: unknown,
+    payload: Record<string, unknown>,
+    fallback: string,
+  ): Promise<string> {
+    if (typeof payload['error'] === 'string' && payload['error'].trim()) {
+      return payload['error'].trim();
+    }
+    const ctx = (error as { context?: Response })?.context;
+    if (ctx && typeof ctx.json === 'function') {
+      try {
+        const body = (await ctx.json()) as Record<string, unknown>;
+        if (typeof body['error'] === 'string' && body['error'].trim()) {
+          return body['error'].trim();
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (error instanceof Error && error.message.trim()) {
+      return error.message.trim();
+    }
+    return fallback;
   }
 
   private mapAccessRequest(row: Record<string, unknown>): HermandadAccessRequest {
