@@ -374,11 +374,20 @@ export class LoginComponent {
   }
 
   private requestErrorText(err: unknown): string {
+    if (typeof err === 'string') return err;
+    if (err instanceof Error && err.message.trim()) return err.message.trim();
     if (err && typeof err === 'object') {
-      const e = err as { message?: string; details?: string; hint?: string };
-      return [e.message, e.details, e.hint].filter(Boolean).join(' ');
+      const e = err as Record<string, unknown>;
+      const parts = [e['message'], e['details'], e['hint'], e['code']]
+        .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+        .map((x) => x.trim());
+      if (parts.length) return parts.join(' — ');
+      try {
+        return JSON.stringify(err);
+      } catch {
+        /* ignore */
+      }
     }
-    if (err instanceof Error) return err.message;
     return String(err ?? '');
   }
 
@@ -388,14 +397,14 @@ export class LoginComponent {
   } {
     const raw = this.requestErrorText(err);
     const lower = raw.toLowerCase();
+    console.error('[solicitud hermandad]', err, raw);
 
-    // Errores de infraestructura (el mensaje de PostgREST suele citar
-    // submit_hermandad_access_request → no confundir con el nombre).
     if (
       lower.includes('could not find the function') ||
-      (lower.includes('function') && lower.includes('does not exist')) ||
       lower.includes('pgrst202') ||
-      lower.includes('404')
+      (lower.includes('function') &&
+        lower.includes('does not exist') &&
+        lower.includes('submit_hermandad'))
     ) {
       return {
         message:
@@ -419,7 +428,11 @@ export class LoginComponent {
         fields: { reqEmail: 'Este email ya tiene una cuenta.' },
       };
     }
-    if (lower.includes('pendiente') && lower.includes('email')) {
+    if (
+      (lower.includes('pendiente') && lower.includes('email')) ||
+      lower.includes('pending_email') ||
+      (lower.includes('duplicate key') && lower.includes('hermandad_access'))
+    ) {
       return {
         message: 'Ya hay una solicitud pendiente con ese email. Te contactaremos cuando se revise.',
         fields: { reqEmail: 'Este email ya tiene una solicitud en curso.' },
@@ -467,10 +480,35 @@ export class LoginComponent {
         fields: { reqContact: 'Nombre no válido.' },
       };
     }
+    if (lower.includes('contact_phone') && lower.includes('not-null')) {
+      return {
+        message:
+          'Falta actualizar la RPC de solicitudes en Supabase (teléfono vacío). Ejecuta fix_hermandad_request_phone_null.sql.',
+      };
+    }
+    if (lower.includes('permission denied') && lower.includes('auth')) {
+      return {
+        message:
+          'No se pudo comprobar el email (permiso Auth). Ejecuta el SQL de solicitudes en Supabase.',
+      };
+    }
+    if (
+      lower.includes('password_enc') ||
+      lower.includes('_hermandad_request_pwd_key') ||
+      lower.includes('pgp_sym')
+    ) {
+      return {
+        message:
+          'Falta aplicar el SQL de contraseña en solicitudes (hermandad_access_request_password.sql).',
+      };
+    }
 
-    // Si Postgres devolvió un raise exception legible, muéstralo.
-    if (raw.trim() && !lower.includes('json') && raw.length < 180) {
-      return { message: raw.trim() };
+    // Siempre mostrar el texto del servidor (antes se tragaba y salía el genérico).
+    if (raw.trim()) {
+      return {
+        message:
+          raw.trim().length > 280 ? `${raw.trim().slice(0, 280)}…` : raw.trim(),
+      };
     }
 
     return {

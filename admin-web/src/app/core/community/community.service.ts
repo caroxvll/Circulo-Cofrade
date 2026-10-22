@@ -865,7 +865,11 @@ export class CommunityService {
           : (input.processionDay ?? '').trim(),
       p_password: input.password,
     });
-    if (error) throw error;
+    if (error) {
+      const parts = [error.message, error.details, error.hint, error.code]
+        .filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+      throw new Error(parts.join(' — ') || 'No se pudo enviar la solicitud');
+    }
   }
 
   async fetchHermandadAccessRequests(

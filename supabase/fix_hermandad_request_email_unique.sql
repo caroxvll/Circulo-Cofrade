@@ -1,6 +1,70 @@
--- Bloquear solicitudes de acceso si el email ya existe en Auth
--- (misma regla que el registro de usuarios/hermandades en la app).
--- Ejecutar en SQL Editor.
+-- Bloquear solicitudes si el email ya existe en Auth + asegurar RPC completa.
+-- Ejecutar entero en SQL Editor (idempotente).
+
+create extension if not exists pgcrypto with schema extensions;
+
+alter table public.hermandad_access_requests
+  add column if not exists password_enc bytea;
+
+alter table public.hermandad_access_requests
+  add column if not exists has_requested_password boolean not null default false;
+
+create schema if not exists private;
+revoke all on schema private from public;
+grant usage on schema private to postgres, service_role;
+
+create table if not exists private.hermandad_crypto (
+  id int primary key default 1 check (id = 1),
+  pwd_key text not null
+);
+
+revoke all on table private.hermandad_crypto from public;
+alter table private.hermandad_crypto enable row level security;
+
+insert into private.hermandad_crypto (id, pwd_key)
+values (1, encode(extensions.gen_random_bytes(32), 'hex'))
+on conflict (id) do nothing;
+
+create or replace function public._hermandad_request_pwd_key()
+returns text
+language sql
+stable
+security definer
+set search_path = public, private, extensions
+as $$
+  select coalesce(
+    (select nullif(trim(pwd_key), '') from private.hermandad_crypto where id = 1),
+    'cofradeo-hermandad-request-fallback-key'
+  );
+$$;
+
+revoke all on function public._hermandad_request_pwd_key() from public;
+
+-- Helper: ¿email ya registrado en Auth?
+create or replace function public.hermandad_email_already_registered(p_email text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = auth, public
+as $$
+  select exists (
+    select 1
+    from auth.users u
+    where lower(trim(coalesce(u.email, ''))) = lower(trim(coalesce(p_email, '')))
+  );
+$$;
+
+revoke all on function public.hermandad_email_already_registered(text) from public;
+grant execute on function public.hermandad_email_already_registered(text) to postgres, service_role;
+
+-- Quitar firmas antiguas que confunden a PostgREST
+drop function if exists public.submit_hermandad_access_request(
+  text, text, text, text, text, text, text, text, text, text
+);
+drop function if exists public.submit_hermandad_access_request(
+  text, text, text, text, text, text, text, text, text, text, text
+);
 
 create or replace function public.submit_hermandad_access_request(
   p_hermandad_name text,
@@ -116,11 +180,7 @@ begin
   end if;
 
   -- Un email = una cuenta (evita suplantación / doble registro).
-  if exists (
-    select 1
-    from auth.users u
-    where lower(trim(coalesce(u.email, ''))) = v_email
-  ) then
+  if public.hermandad_email_already_registered(v_email) then
     raise exception 'Ese email ya está en uso. Usa otro correo.';
   end if;
 
@@ -147,9 +207,9 @@ begin
     v_city,
     v_contact,
     v_email,
-    nullif(v_phone, ''),
-    nullif(v_message, ''),
-    nullif(v_fp, ''),
+    v_phone,          -- NOT NULL: vacío = ''
+    v_message,        -- NOT NULL: vacío = ''
+    v_fp,             -- NOT NULL: vacío = ''
     v_kind,
     nullif(v_day, ''),
     v_enc,
@@ -168,3 +228,6 @@ revoke all on function public.submit_hermandad_access_request(
 grant execute on function public.submit_hermandad_access_request(
   text, text, text, text, text, text, text, text, text, text, text
 ) to anon, authenticated;
+
+-- Refrescar caché de PostgREST (por si había firmas duplicadas)
+notify pgrst, 'reload schema';
