@@ -464,6 +464,51 @@
                 maxlength="1000"
               ></textarea>
             </label>
+
+            <div class="req-grid">
+              <label
+                class="field"
+                [class.invalid]="hasFieldError('reqPassword')"
+              >
+                <span>Contraseña de acceso</span>
+                <input
+                  name="reqPassword"
+                  type="password"
+                  autocomplete="new-password"
+                  placeholder="Mínimo 8 caracteres"
+                  [(ngModel)]="reqPassword"
+                  (ngModelChange)="clearField('reqPassword')"
+                  maxlength="72"
+                  [attr.aria-invalid]="hasFieldError('reqPassword')"
+                />
+                @if (fieldError('reqPassword'); as msg) {
+                  <small class="field-hint">{{ msg }}</small>
+                }
+              </label>
+              <label
+                class="field"
+                [class.invalid]="hasFieldError('reqPassword2')"
+              >
+                <span>Repetir contraseña</span>
+                <input
+                  name="reqPassword2"
+                  type="password"
+                  autocomplete="new-password"
+                  placeholder="Repite la misma"
+                  [(ngModel)]="reqPassword2"
+                  (ngModelChange)="clearField('reqPassword2')"
+                  maxlength="72"
+                  [attr.aria-invalid]="hasFieldError('reqPassword2')"
+                />
+                @if (fieldError('reqPassword2'); as msg) {
+                  <small class="field-hint">{{ msg }}</small>
+                }
+              </label>
+            </div>
+            <p class="pwd-note">
+              Esta será tu clave al entrar cuando la Junta apruebe la solicitud.
+              La Junta no puede verla.
+            </p>
           </section>
 
           @if (error()) {

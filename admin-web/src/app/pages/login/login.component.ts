@@ -26,6 +26,8 @@ type FieldKey =
   | 'reqContact'
   | 'reqEmail'
   | 'reqPhone'
+  | 'reqPassword'
+  | 'reqPassword2'
   | 'forgotEmail';
 
 const REMEMBER_KEY = 'cc_hermandad_login_email';
@@ -67,6 +69,8 @@ export class LoginComponent {
   reqEmail = '';
   reqPhone = '';
   reqMessage = '';
+  reqPassword = '';
+  reqPassword2 = '';
   /** Honeypot anti-bot (debe quedar vacío). */
   reqWebsite = '';
 
@@ -209,6 +213,19 @@ export class LoginComponent {
       errors.reqPhone = 'El teléfono es demasiado largo.';
     }
 
+    const password = this.reqPassword;
+    const password2 = this.reqPassword2;
+    if (!password || password.length < 8) {
+      errors.reqPassword = 'Mínimo 8 caracteres.';
+    } else if (password.length > 72) {
+      errors.reqPassword = 'Máximo 72 caracteres.';
+    }
+    if (!password2) {
+      errors.reqPassword2 = 'Repite la contraseña.';
+    } else if (password !== password2) {
+      errors.reqPassword2 = 'No coinciden.';
+    }
+
     this.fieldErrors.set(errors);
     this.info.set(null);
     if (Object.keys(errors).length) {
@@ -230,11 +247,12 @@ export class LoginComponent {
         message: this.reqMessage,
         boardKind: this.reqKind,
         processionDay: this.reqKind === 'semana_santa' ? this.reqDay : '',
+        password,
         clientFingerprint: this.fingerprint(),
         honeypot: this.reqWebsite,
       });
       this.info.set(
-        'Solicitud enviada. La Junta de Círculo Cofrade la revisará y te contactará si procede.',
+        'Solicitud enviada. Cuando la Junta la apruebe podrás entrar con este email y la contraseña que has elegido.',
       );
       this.fieldErrors.set({});
       this.reqHermandad = '';
@@ -245,6 +263,8 @@ export class LoginComponent {
       this.reqEmail = '';
       this.reqPhone = '';
       this.reqMessage = '';
+      this.reqPassword = '';
+      this.reqPassword2 = '';
       this.reqWebsite = '';
     } catch (err) {
       const mapped = this.mapRequestError(err);
@@ -375,6 +395,12 @@ export class LoginComponent {
       return {
         message: 'Revisa el email de contacto.',
         fields: { reqEmail: 'Email no válido.' },
+      };
+    }
+    if (lower.includes('contraseña')) {
+      return {
+        message: 'Revisa la contraseña (mínimo 8 caracteres).',
+        fields: { reqPassword: 'Contraseña no válida.' },
       };
     }
     if (lower.includes('día de salida') || lower.includes('dia de salida')) {

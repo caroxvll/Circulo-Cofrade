@@ -371,12 +371,15 @@ export class HermandadesPageComponent implements OnInit {
       (r) => r.contactEmail.toLowerCase() === emailNorm,
     );
     try {
+      const useRequestPassword = !!matchingRequest?.hasRequestedPassword;
       const result = await this.community.createHermandadAccount({
         email: this.email,
         handle: this.handle,
         displayName: this.displayName,
-        password: this.autoPassword ? null : this.password,
+        password:
+          useRequestPassword || this.autoPassword ? null : this.password,
         topicId: this.createTopicId || null,
+        accessRequestId: useRequestPassword ? matchingRequest!.id : null,
       });
       this.created.set(result);
       if (matchingRequest) {

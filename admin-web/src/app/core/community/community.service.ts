@@ -70,6 +70,8 @@ export interface CreatedHermandadAccount {
   email: string;
   topicId: string | null;
   temporaryPassword: string | null;
+  /** True si usó la clave elegida en la solicitud (no se muestra al admin). */
+  passwordFromRequest: boolean;
 }
 
 export type HermandadAccessRequestStatus =
@@ -92,6 +94,8 @@ export interface HermandadAccessRequest {
   boardKind: HermandadBoardKind;
   /** Día de estación si es SS; vacío si es Gloria. */
   processionDay: string;
+  /** La hermandad eligió clave al solicitar (no es legible por la Junta). */
+  hasRequestedPassword: boolean;
   status: HermandadAccessRequestStatus;
   reviewNotes: string;
   createdProfileId: string | null;
@@ -724,6 +728,7 @@ export class CommunityService {
     displayName: string;
     password?: string | null;
     topicId?: string | null;
+    accessRequestId?: string | null;
   }): Promise<CreatedHermandadAccount> {
     const body: Record<string, unknown> = {
       email: input.email.trim(),
@@ -732,6 +737,7 @@ export class CommunityService {
     };
     if (input.password?.trim()) body['password'] = input.password.trim();
     if (input.topicId) body['topicId'] = input.topicId;
+    if (input.accessRequestId) body['accessRequestId'] = input.accessRequestId;
 
     const { data, error } = await getSupabase().functions.invoke(
       'create-hermandad-account',
@@ -742,13 +748,16 @@ export class CommunityService {
     if (payload?.['error']) {
       throw new Error(String(payload['error']));
     }
+    const temp = payload['temporaryPassword'];
     return {
       profileId: String(payload['profileId'] ?? ''),
       handle: String(payload['handle'] ?? body['handle']),
       displayName: String(payload['displayName'] ?? body['displayName']),
       email: String(payload['email'] ?? body['email']),
       topicId: (payload['topicId'] as string | null) ?? null,
-      temporaryPassword: (payload['temporaryPassword'] as string | null) ?? null,
+      temporaryPassword:
+        typeof temp === 'string' && temp.trim() ? temp.trim() : null,
+      passwordFromRequest: Boolean(payload['passwordFromRequest']),
     };
   }
 
@@ -828,6 +837,7 @@ export class CommunityService {
     message?: string;
     boardKind: HermandadBoardKind;
     processionDay?: string;
+    password: string;
     clientFingerprint: string;
     honeypot?: string;
   }): Promise<void> {
@@ -845,6 +855,7 @@ export class CommunityService {
         input.boardKind === 'glorias'
           ? ''
           : (input.processionDay ?? '').trim(),
+      p_password: input.password,
     });
     if (error) throw error;
   }
@@ -856,7 +867,7 @@ export class CommunityService {
     let query = getSupabase()
       .from('hermandad_access_requests')
       .select(
-        'id, hermandad_name, city, contact_name, contact_email, contact_phone, message, board_kind, procession_day, status, review_notes, created_profile_id, created_at, reviewed_at',
+        'id, hermandad_name, city, contact_name, contact_email, contact_phone, message, board_kind, procession_day, has_requested_password, status, review_notes, created_profile_id, created_at, reviewed_at',
       )
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -896,6 +907,7 @@ export class CommunityService {
       message: String(row['message'] ?? ''),
       boardKind: kindRaw === 'glorias' ? 'glorias' : 'semana_santa',
       processionDay: String(row['procession_day'] ?? ''),
+      hasRequestedPassword: Boolean(row['has_requested_password']),
       status:
         status === 'approved' ||
         status === 'rejected' ||

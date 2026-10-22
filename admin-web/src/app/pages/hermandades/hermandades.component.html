@@ -25,7 +25,12 @@
   @if (created(); as account) {
     <div class="success-box">
       <strong>Cuenta creada:</strong> {{ '@' + account.handle }} · {{ account.email }}
-      @if (account.temporaryPassword) {
+      @if (account.passwordFromRequest) {
+        <p class="sub">
+          Usa la contraseña que eligió la hermandad en la solicitud. Ya pueden
+          entrar en el portal (no hace falta enviársela).
+        </p>
+      } @else if (account.temporaryPassword) {
         <div class="pwd-row">
           <code>{{ account.temporaryPassword }}</code>
           <button type="button" class="btn btn-ghost" (click)="copyPassword()">
@@ -77,6 +82,16 @@
             <div>
               <dt>Tipo</dt>
               <dd>{{ requestKindLabel(req) }}</dd>
+            </div>
+            <div>
+              <dt>Acceso</dt>
+              <dd>
+                @if (req.hasRequestedPassword) {
+                  Contraseña elegida por ellos
+                } @else {
+                  Sin contraseña en solicitud
+                }
+              </dd>
             </div>
             <div>
               <dt>Email</dt>
@@ -244,9 +259,13 @@
         Email
         <input type="email" [(ngModel)]="email" />
       </label>
+      <p class="filter-hint">
+        Si la solicitud trae contraseña elegida por ellos, se usará esa (no la
+        veréis). Si no, genera temporal o pon una manual.
+      </p>
       <label class="check">
         <input type="checkbox" [(ngModel)]="autoPassword" />
-        Generar contraseña temporal
+        Generar contraseña temporal (solo si no hay clave en la solicitud)
       </label>
       @if (!autoPassword) {
         <label>
