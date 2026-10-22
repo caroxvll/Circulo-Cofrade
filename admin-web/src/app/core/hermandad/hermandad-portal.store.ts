@@ -99,6 +99,82 @@ export class HermandadPortalStore {
     void this.startFetch({ silent: true });
   }
 
+  /** Actualiza URLs de portada/escudo en la caché local del store. */
+  patchBoardImages(
+    topicId: string,
+    patch: { coverImageUrl?: string | null; iconImageUrl?: string | null },
+  ): void {
+    this.boards.update((list) =>
+      list.map((b) => {
+        if (b.topicId !== topicId) return b;
+        return {
+          ...b,
+          coverImageUrl:
+            patch.coverImageUrl !== undefined
+              ? patch.coverImageUrl
+              : b.coverImageUrl,
+          iconImageUrl:
+            patch.iconImageUrl !== undefined
+              ? patch.iconImageUrl
+              : b.iconImageUrl,
+        };
+      }),
+    );
+  }
+
+  async updateBoardBranding(
+    topicId: string,
+    input: {
+      coverFile?: File | null;
+      iconFile?: File | null;
+      clearCover?: boolean;
+      clearIcon?: boolean;
+    },
+  ): Promise<void> {
+    let coverUrl: string | null | undefined;
+    let iconUrl: string | null | undefined;
+    let setCover = false;
+    let setIcon = false;
+
+    if (input.coverFile) {
+      coverUrl = await this.api.uploadBoardAsset(
+        topicId,
+        'cover',
+        input.coverFile,
+      );
+      setCover = true;
+    } else if (input.clearCover) {
+      coverUrl = null;
+      setCover = true;
+    }
+
+    if (input.iconFile) {
+      iconUrl = await this.api.uploadBoardAsset(
+        topicId,
+        'escudo',
+        input.iconFile,
+      );
+      setIcon = true;
+    } else if (input.clearIcon) {
+      iconUrl = null;
+      setIcon = true;
+    }
+
+    if (!setCover && !setIcon) return;
+
+    await this.api.updateBoardImages(topicId, {
+      coverImageUrl: coverUrl ?? null,
+      setCover,
+      iconImageUrl: iconUrl ?? null,
+      setIcon,
+    });
+
+    this.patchBoardImages(topicId, {
+      ...(setCover ? { coverImageUrl: coverUrl ?? null } : {}),
+      ...(setIcon ? { iconImageUrl: iconUrl ?? null } : {}),
+    });
+  }
+
   private startFetch(opts: { silent: boolean }): Promise<void> {
     if (this.inflight) return this.inflight;
     this.inflight = this.reload({ silent: opts.silent }).finally(() => {

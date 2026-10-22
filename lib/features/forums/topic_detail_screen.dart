@@ -38,6 +38,7 @@ import 'utils/official_post_categories.dart';
 import 'utils/reply_reactions.dart';
 import 'utils/reply_permissions.dart';
 import 'utils/topic_permissions.dart';
+import 'viewer_id_provider.dart';
 import 'widgets/hermandad_board_tabs_header.dart';
 import 'widgets/hermandad_board_category_tabs.dart';
 import 'widgets/hermandad_official_edit_sheet.dart';
@@ -1394,18 +1395,33 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
         topicById(widget.forumId, widget.topicId);
     if (!mounted || topic == null) return;
 
-    final manage = _manageOptionsFor(reply, manageContext, topic);
+    var displayReply = reply;
+    if (reply.isOfficial && !reply.isDeleted) {
+      try {
+        final viewerId = ref.read(viewerIdProvider);
+        final count = await ref
+            .read(forumsRepositoryProvider)
+            .incrementOfficialReplyView(reply.id, viewerId: viewerId);
+        if (count != null && count > reply.viewCount) {
+          displayReply = reply.copyWith(viewCount: count);
+        }
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    final manage = _manageOptionsFor(displayReply, manageContext, topic);
     final reactionCountsByReply =
         ref.read(replyReactionCountsProvider(widget.topicId)).asData?.value ??
             {};
     final userReactions =
         ref.read(replyUserReactionsProvider(widget.topicId)).asData?.value ??
             {};
-    final fromDb = reactionCountsByReply[reply.id.toLowerCase()];
+    final fromDb = reactionCountsByReply[displayReply.id.toLowerCase()];
     final reactionCounts = (fromDb != null && fromDb.isNotEmpty)
         ? normalizeReactionCounts(fromDb)
-        : (reply.likeCount > 0
-            ? {'❤️': reply.likeCount}
+        : (displayReply.likeCount > 0
+            ? {'❤️': displayReply.likeCount}
             : const <String, int>{});
 
     if (!mounted) return;
@@ -1461,23 +1477,24 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                 Expanded(
                   child: SingleChildScrollView(
                     child: HermandadComunicadoCard(
-                      reply: reply,
+                      reply: displayReply,
                       detailView: true,
                       manageOptions: manage,
                       reactionCounts: reactionCounts,
-                      userReaction: userReactions[reply.id.toLowerCase()],
+                      userReaction:
+                          userReactions[displayReply.id.toLowerCase()],
                       onShareTap: topic.isPublished
                           ? () => shareForumReplyLink(
                                 context,
                                 forumId: widget.forumId,
                                 topicId: widget.topicId,
-                                replyId: reply.id,
-                                section: reply.officialCategory,
+                                replyId: displayReply.id,
+                                section: displayReply.officialCategory,
                                 excerpt: plainTextForExcerpt(
-                                  reply.content,
+                                  displayReply.content,
                                   maxLength: 90,
                                 ),
-                                authorHandle: reply.authorHandle,
+                                authorHandle: displayReply.authorHandle,
                               )
                           : null,
                     ),

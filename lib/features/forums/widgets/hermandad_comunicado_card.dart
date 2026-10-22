@@ -161,6 +161,20 @@ class _HermandadComunicadoCardState extends State<HermandadComunicadoCard> {
                               ).copyWith(fontSize: 13.5, height: 1.4),
                             ),
                           ],
+                          if (widget.detailView && reply.viewCount > 0) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              reply.viewCount == 1
+                                  ? '1 visita'
+                                  : '${reply.viewCount} visitas',
+                              style: AppTypography.labelSmall(
+                                color: AppColors.textMuted,
+                              ).copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                           if (!widget.detailView) ...[
                             const SizedBox(height: 8),
                             Text(

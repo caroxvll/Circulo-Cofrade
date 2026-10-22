@@ -336,6 +336,7 @@ class ForumReply {
     this.deletedAt,
     this.isFeatured = false,
     this.imageUrl,
+    this.viewCount = 0,
   });
 
   final String id;
@@ -358,6 +359,8 @@ class ForumReply {
   final DateTime? deletedAt;
   final bool isFeatured;
   final String? imageUrl;
+  /// Visitas deduplicadas del comunicado oficial (1 por viewer/día).
+  final int viewCount;
 
   bool get isDeleted => deletedAt != null;
   bool get isEdited => editedAt != null && !isDeleted;
@@ -389,6 +392,7 @@ class ForumReply {
     bool? isFeatured,
     String? imageUrl,
     bool clearImageUrl = false,
+    int? viewCount,
   }) {
     return ForumReply(
       id: id ?? this.id,
@@ -413,6 +417,7 @@ class ForumReply {
       deletedAt: deletedAt ?? this.deletedAt,
       isFeatured: isFeatured ?? this.isFeatured,
       imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
+      viewCount: viewCount ?? this.viewCount,
     );
   }
 }

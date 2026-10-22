@@ -26,6 +26,9 @@ export class HermandadSettingsPageComponent implements OnInit {
   /** Texto del campo hex (puede ir a medias mientras escribe). */
   readonly draftHex = signal(COFRADEO_ACCENT);
   readonly savedFlash = signal(false);
+  readonly brandingBusy = signal(false);
+  readonly brandingError = signal<string | null>(null);
+  readonly brandingOk = signal<string | null>(null);
 
   readonly profile = this.auth.profile;
 
@@ -36,8 +39,14 @@ export class HermandadSettingsPageComponent implements OnInit {
       'Tu hermandad',
   );
 
+  readonly topicId = computed(() => this.store.primaryBoard()?.topicId ?? null);
+
   readonly crestUrl = computed(
     () => this.store.primaryBoard()?.iconImageUrl ?? null,
+  );
+
+  readonly coverUrl = computed(
+    () => this.store.primaryBoard()?.coverImageUrl ?? null,
   );
 
   /** Color válido del borrador (para el swatch). */
@@ -63,6 +72,66 @@ export class HermandadSettingsPageComponent implements OnInit {
 
   ngOnInit(): void {
     void this.store.ensureLoaded();
+  }
+
+  async onAssetPicked(kind: 'cover' | 'escudo', event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    const topicId = this.topicId();
+    if (!topicId) {
+      this.brandingError.set('No hay tablón asignado a tu cuenta.');
+      return;
+    }
+
+    this.brandingBusy.set(true);
+    this.brandingError.set(null);
+    this.brandingOk.set(null);
+    try {
+      await this.store.updateBoardBranding(topicId, {
+        coverFile: kind === 'cover' ? file : null,
+        iconFile: kind === 'escudo' ? file : null,
+      });
+      this.brandingOk.set(
+        kind === 'cover' ? 'Portada actualizada' : 'Escudo actualizado',
+      );
+      this.flashSaved();
+      window.setTimeout(() => this.brandingOk.set(null), 2200);
+    } catch (err) {
+      this.brandingError.set(
+        err instanceof Error ? err.message : 'No se pudo subir la imagen',
+      );
+    } finally {
+      this.brandingBusy.set(false);
+    }
+  }
+
+  async clearAsset(kind: 'cover' | 'escudo'): Promise<void> {
+    const topicId = this.topicId();
+    if (!topicId) return;
+
+    this.brandingBusy.set(true);
+    this.brandingError.set(null);
+    this.brandingOk.set(null);
+    try {
+      await this.store.updateBoardBranding(topicId, {
+        clearCover: kind === 'cover',
+        clearIcon: kind === 'escudo',
+      });
+      this.brandingOk.set(
+        kind === 'cover' ? 'Portada eliminada' : 'Escudo eliminado',
+      );
+      this.flashSaved();
+      window.setTimeout(() => this.brandingOk.set(null), 2200);
+    } catch (err) {
+      this.brandingError.set(
+        err instanceof Error ? err.message : 'No se pudo quitar la imagen',
+      );
+    } finally {
+      this.brandingBusy.set(false);
+    }
   }
 
   async selectPreset(accent: string): Promise<void> {

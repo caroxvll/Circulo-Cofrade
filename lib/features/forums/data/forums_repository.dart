@@ -199,6 +199,22 @@ class ForumsRepository {
     );
   }
 
+  /// Visita a un comunicado oficial. Devuelve el contador actual (dedupe 1/día).
+  Future<int?> incrementOfficialReplyView(
+    String replyId, {
+    required String viewerId,
+  }) async {
+    if (!_useRemote) return null;
+
+    final result = await _client!.rpc(
+      'increment_official_reply_view',
+      params: {'p_reply_id': replyId, 'p_viewer_id': viewerId},
+    );
+    if (result is int) return result;
+    if (result is num) return result.toInt();
+    return int.tryParse(result?.toString() ?? '');
+  }
+
   Future<ForumTopic> createTopic({
     required String forumId,
     required String authorId,
@@ -895,6 +911,7 @@ class ForumsRepository {
           : DateTime.parse(deletedRaw).toLocal(),
       isFeatured: row['is_featured'] as bool? ?? false,
       imageUrl: row['image_url'] as String?,
+      viewCount: row['view_count'] as int? ?? 0,
     );
   }
 

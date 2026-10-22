@@ -148,6 +148,8 @@ export interface HermandadOfficialPost {
   imageUrl: string | null;
   createdAt: string;
   deletedAt: string | null;
+  /** Visitas deduplicadas (1 por viewer/día) al abrir el comunicado en la app. */
+  viewCount: number;
 }
 
 export interface TopicFollowerRow {
@@ -335,6 +337,7 @@ export class HermandadPortalService {
       imageUrl: (row['image_url'] as string | null) ?? null,
       createdAt: String(row['created_at'] ?? ''),
       deletedAt: (row['deleted_at'] as string | null) ?? null,
+      viewCount: Number(row['view_count'] ?? 0),
     };
   }
 
@@ -346,7 +349,7 @@ export class HermandadPortalService {
     const { data, error } = await getSupabase()
       .from('forum_replies')
       .select(
-        'id, topic_id, content, official_category, image_url, created_at, deleted_at',
+        'id, topic_id, content, official_category, image_url, created_at, deleted_at, view_count',
       )
       .eq('author_id', profileId)
       .eq('is_official', true)
@@ -368,7 +371,7 @@ export class HermandadPortalService {
     const { data, error } = await getSupabase()
       .from('forum_replies')
       .select(
-        'id, topic_id, content, official_category, image_url, created_at, deleted_at',
+        'id, topic_id, content, official_category, image_url, created_at, deleted_at, view_count',
       )
       .eq('author_id', profileId)
       .eq('is_official', true)
@@ -409,6 +412,70 @@ export class HermandadPortalService {
     if (error) throw error;
     return getSupabase().storage.from('forum-post-images').getPublicUrl(path)
       .data.publicUrl;
+  }
+
+  /** Portada (header) o escudo (logo) del tablón asignado. */
+  async uploadBoardAsset(
+    topicId: string,
+    kind: 'cover' | 'escudo',
+    file: File,
+  ): Promise<string> {
+    const maxBytes = kind === 'cover' ? 3 * 1024 * 1024 : 1 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      throw new Error(
+        kind === 'cover'
+          ? 'La portada no puede superar 3 MB.'
+          : 'El escudo no puede superar 1 MB.',
+      );
+    }
+    const ok = ['image/png', 'image/jpeg', 'image/webp'].includes(file.type);
+    if (file.type && !ok) {
+      throw new Error('Usa PNG, JPEG o WebP.');
+    }
+    const fromName = (file.name.split('.').pop() || '').toLowerCase();
+    let ext = 'jpg';
+    if (
+      fromName === 'png' ||
+      fromName === 'webp' ||
+      fromName === 'jpg' ||
+      fromName === 'jpeg'
+    ) {
+      ext = fromName === 'jpeg' ? 'jpg' : fromName;
+    } else if (file.type.includes('png')) {
+      ext = 'png';
+    } else if (file.type.includes('webp')) {
+      ext = 'webp';
+    }
+    const path = `${topicId}/${kind}.${ext}`;
+    const { error } = await getSupabase()
+      .storage.from('topic-covers')
+      .upload(path, file, {
+        upsert: true,
+        contentType: file.type || 'image/jpeg',
+      });
+    if (error) throw error;
+    const base = getSupabase().storage.from('topic-covers').getPublicUrl(path)
+      .data.publicUrl;
+    return `${base}?v=${Date.now()}`;
+  }
+
+  async updateBoardImages(
+    topicId: string,
+    input: {
+      coverImageUrl?: string | null;
+      setCover?: boolean;
+      iconImageUrl?: string | null;
+      setIcon?: boolean;
+    },
+  ): Promise<void> {
+    const { error } = await getSupabase().rpc('update_hermandad_board_images', {
+      p_topic_id: topicId,
+      p_cover_image_url: input.coverImageUrl ?? null,
+      p_set_cover: input.setCover === true,
+      p_icon_image_url: input.iconImageUrl ?? null,
+      p_set_icon: input.setIcon === true,
+    });
+    if (error) throw error;
   }
 
   async createOfficialPost(input: {

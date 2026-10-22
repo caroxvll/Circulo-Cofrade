@@ -39,10 +39,6 @@
 
       <ul class="info-list">
         <li>
-          <span>Escudo</span>
-          <strong>{{ crestUrl() ? 'Vinculado al tablón' : 'Sin escudo aún' }}</strong>
-        </li>
-        <li>
           <span>Nombre público</span>
           <strong>{{ profile()?.displayName || '—' }}</strong>
         </li>
@@ -52,9 +48,83 @@
         </li>
       </ul>
 
+      <div class="branding-block">
+        <p class="field-label">Escudo (logo)</p>
+        <p class="custom-hint">PNG, JPEG o WebP · máx. 1 MB. Se ve en la app y en el panel.</p>
+        <div class="branding-row">
+          <div class="crest lg" aria-hidden="true">
+            @if (crestUrl(); as url) {
+              <img [src]="url" alt="" />
+            } @else {
+              <span>{{ boardName().slice(0, 1) }}</span>
+            }
+          </div>
+          <div class="branding-actions">
+            <label class="file-btn" [class.disabled]="brandingBusy() || !topicId()">
+              {{ crestUrl() ? 'Cambiar escudo' : 'Subir escudo' }}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                [disabled]="brandingBusy() || !topicId()"
+                (change)="onAssetPicked('escudo', $event)"
+              />
+            </label>
+            @if (crestUrl()) {
+              <button
+                type="button"
+                class="link-btn"
+                [disabled]="brandingBusy()"
+                (click)="clearAsset('escudo')"
+              >
+                Quitar
+              </button>
+            }
+          </div>
+        </div>
+
+        <p class="field-label">Portada (header)</p>
+        <p class="custom-hint">Imagen ancha · máx. 3 MB. Cabecera del tablón en la app.</p>
+        <div class="cover-box">
+          @if (coverUrl(); as url) {
+            <img [src]="url" alt="" class="cover-preview" />
+          } @else {
+            <div class="cover-preview empty">Sin portada</div>
+          }
+          <div class="branding-actions">
+            <label class="file-btn" [class.disabled]="brandingBusy() || !topicId()">
+              {{ coverUrl() ? 'Cambiar portada' : 'Subir portada' }}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                [disabled]="brandingBusy() || !topicId()"
+                (change)="onAssetPicked('cover', $event)"
+              />
+            </label>
+            @if (coverUrl()) {
+              <button
+                type="button"
+                class="link-btn"
+                [disabled]="brandingBusy()"
+                (click)="clearAsset('cover')"
+              >
+                Quitar
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (brandingBusy()) {
+          <p class="persist-msg">Subiendo…</p>
+        } @else if (brandingError()) {
+          <p class="persist-msg warn">{{ brandingError() }}</p>
+        } @else if (brandingOk()) {
+          <p class="persist-msg ok">{{ brandingOk() }}</p>
+        }
+      </div>
+
       <p class="hint">
-        El escudo y el nombre oficial del tablón los gestiona la Junta al verificar la
-        hermandad. Si necesitas cambiarlos, contacta con ellos.
+        El nombre oficial del tablón lo gestiona la Junta. El escudo y la portada los
+        puedes cambiar aquí cuando quieras.
       </p>
     </article>
 

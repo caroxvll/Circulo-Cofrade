@@ -207,6 +207,7 @@
                 <th>Publicación</th>
                 <th class="col-cat">Sección</th>
                 <th class="col-board">Tablón</th>
+                <th class="col-views">Visitas</th>
                 <th class="col-date">Fecha</th>
                 <th class="col-actions">Acciones</th>
               </tr>
@@ -233,6 +234,11 @@
                     <span class="tag">{{ categoryLabel(post.category) }}</span>
                   </td>
                   <td class="col-board">{{ boardTitle(post.topicId) }}</td>
+                  <td class="col-views">
+                    <span class="views-pill" title="Aperturas del comunicado en la app">
+                      {{ post.viewCount }}
+                    </span>
+                  </td>
                   <td class="col-date">
                     <time [attr.datetime]="post.createdAt">
                       {{ formatPublishedAt(post.createdAt) }}
@@ -408,6 +414,7 @@
           </div>
           <h3>{{ previewTitle() }}</h3>
           <p>{{ previewBody() }}</p>
+          <p class="app-views">{{ post.viewCount }} visitas</p>
           <span class="app-more">Leer más →</span>
           @if (post.imageUrl) {
             <img [src]="post.imageUrl" alt="" class="app-img" />

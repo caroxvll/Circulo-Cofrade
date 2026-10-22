@@ -365,6 +365,26 @@
   text-overflow: ellipsis;
 }
 
+.col-views {
+  width: 72px;
+  text-align: center;
+}
+
+.views-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: var(--burgundy-dark);
+  background: color-mix(in srgb, var(--burgundy) 8%, #fff);
+  border: 1px solid color-mix(in srgb, var(--burgundy) 18%, var(--border));
+}
+
 .col-date {
   width: 140px;
   font-size: 0.8rem;
@@ -555,6 +575,13 @@
   letter-spacing: 0.06em;
   color: #8a7a72;
   margin-bottom: 8px;
+}
+
+.app-views {
+  margin: 0 0 6px !important;
+  font-size: 0.78rem !important;
+  font-weight: 700;
+  color: #6b5a52 !important;
 }
 
 .app-card h3 {
