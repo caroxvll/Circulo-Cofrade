@@ -4,7 +4,11 @@
   "framework": null,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/privacidad",
+      "destination": "/privacidad.html"
+    },
+    {
+      "source": "/((?!privacidad\\.html$).*)",
       "destination": "/index.html"
     }
   ]
