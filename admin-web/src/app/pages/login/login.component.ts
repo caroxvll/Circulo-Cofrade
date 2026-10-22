@@ -389,6 +389,20 @@ export class LoginComponent {
     const raw = this.requestErrorText(err);
     const lower = raw.toLowerCase();
 
+    // Errores de infraestructura (el mensaje de PostgREST suele citar
+    // submit_hermandad_access_request → no confundir con el nombre).
+    if (
+      lower.includes('could not find the function') ||
+      (lower.includes('function') && lower.includes('does not exist')) ||
+      lower.includes('pgrst202') ||
+      lower.includes('404')
+    ) {
+      return {
+        message:
+          'El servicio de solicitudes aún no está disponible. Contacta con la Junta o inténtalo más tarde.',
+      };
+    }
+
     if (lower.includes('demasiadas')) {
       return {
         message: 'Has enviado demasiadas solicitudes. Espera 24 horas e inténtalo de nuevo.',
@@ -405,13 +419,13 @@ export class LoginComponent {
         fields: { reqEmail: 'Este email ya tiene una cuenta.' },
       };
     }
-    if (lower.includes('pendiente')) {
+    if (lower.includes('pendiente') && lower.includes('email')) {
       return {
         message: 'Ya hay una solicitud pendiente con ese email. Te contactaremos cuando se revise.',
         fields: { reqEmail: 'Este email ya tiene una solicitud en curso.' },
       };
     }
-    if (lower.includes('email')) {
+    if (lower.includes('email no válido') || lower.includes('email no valido')) {
       return {
         message: 'Revisa el email de contacto.',
         fields: { reqEmail: 'Email no válido.' },
@@ -435,24 +449,30 @@ export class LoginComponent {
         fields: { reqKind: 'Elige el tipo.' },
       };
     }
-    if (lower.includes('hermandad')) {
+    if (
+      lower.includes('nombre de hermandad no válido') ||
+      lower.includes('nombre de hermandad no valido')
+    ) {
       return {
         message: 'Revisa el nombre de la hermandad.',
         fields: { reqHermandad: 'Nombre no válido.' },
       };
     }
-    if (lower.includes('contacto') || lower.includes('nombre')) {
+    if (
+      lower.includes('nombre de contacto no válido') ||
+      lower.includes('nombre de contacto no valido')
+    ) {
       return {
         message: 'Revisa el nombre de contacto.',
         fields: { reqContact: 'Nombre no válido.' },
       };
     }
-    if (lower.includes('function') || lower.includes('rpc') || lower.includes('404')) {
-      return {
-        message:
-          'El servicio de solicitudes aún no está disponible. Contacta con la Junta o inténtalo más tarde.',
-      };
+
+    // Si Postgres devolvió un raise exception legible, muéstralo.
+    if (raw.trim() && !lower.includes('json') && raw.length < 180) {
+      return { message: raw.trim() };
     }
+
     return {
       message: 'No se pudo enviar la solicitud. Revisa los datos e inténtalo de nuevo.',
     };
