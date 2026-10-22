@@ -755,7 +755,23 @@ class CalendarRepository {
       liveForceState: EventLiveForceState.fromDb(
         row['live_force_state'] as String?,
       ),
+      viewCount: row['view_count'] as int? ?? 0,
     );
+  }
+
+  /// Visita a un evento. Devuelve el contador actual (dedupe 1/día).
+  Future<int?> incrementEventView(
+    String eventId, {
+    required String viewerId,
+  }) async {
+    if (_client == null) return null;
+    final result = await _client!.rpc(
+      'increment_calendar_event_view',
+      params: {'p_event_id': eventId, 'p_viewer_id': viewerId},
+    );
+    if (result is int) return result;
+    if (result is num) return result.toInt();
+    return int.tryParse(result?.toString() ?? '');
   }
 
   String? _nonEmptyUrl(String? raw) {

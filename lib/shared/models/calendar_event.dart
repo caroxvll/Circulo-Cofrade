@@ -125,6 +125,7 @@ class CalendarEvent {
     this.status = CalendarEventStatus.published,
     this.endsAt,
     this.liveForceState = EventLiveForceState.auto,
+    this.viewCount = 0,
   });
 
   final String? id;
@@ -162,6 +163,9 @@ class CalendarEvent {
   /// auto / open / closed — cierre manual (lluvia, etc.).
   final EventLiveForceState liveForceState;
 
+  /// Visitas deduplicadas (1 por viewer/día) al abrir el evento en la app.
+  final int viewCount;
+
   bool get isPublished => status == CalendarEventStatus.published;
   bool get isPendingReview => status == CalendarEventStatus.pendingReview;
 
@@ -191,6 +195,7 @@ class CalendarEvent {
     DateTime? endsAt,
     bool clearEndsAt = false,
     EventLiveForceState? liveForceState,
+    int? viewCount,
   }) {
     return CalendarEvent(
       id: id ?? this.id,
@@ -209,6 +214,7 @@ class CalendarEvent {
       status: status ?? this.status,
       endsAt: clearEndsAt ? null : (endsAt ?? this.endsAt),
       liveForceState: liveForceState ?? this.liveForceState,
+      viewCount: viewCount ?? this.viewCount,
     );
   }
 }

@@ -101,6 +101,10 @@
         </button>
         <p class="day-eyebrow">Ficha del evento</p>
         <h3>{{ editTitle() || ev.title }}</h3>
+        <p class="detail-views" title="Aperturas del evento en la app">
+          {{ ev.viewCount }}
+          {{ ev.viewCount === 1 ? 'visita' : 'visitas' }}
+        </p>
 
         @if (ev.coverImageUrl) {
           <img [src]="ev.coverImageUrl" alt="" class="detail-cover" />

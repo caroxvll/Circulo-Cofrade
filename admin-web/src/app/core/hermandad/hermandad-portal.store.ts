@@ -18,6 +18,7 @@ export interface HermandadUpcomingEvent {
   location: string | null;
   coverImageUrl: string | null;
   eventType: string;
+  viewCount: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -213,16 +214,26 @@ export class HermandadPortalStore {
       const topicIds = boards.map((b) => b.topicId);
       const primaryId = topicIds[0] ?? null;
 
-      const [posts, deleted, scheduled, events, followers] = await Promise.all([
-        this.api.fetchOfficialPosts(profile.id, topicIds),
+      // Primero lo crítico (posts): no bloquear la UI con papelera/programadas.
+      const posts = await this.api
+        .fetchOfficialPosts(profile.id, topicIds)
+        .catch((err) => {
+          console.warn('[hermandad] posts fetch failed', err);
+          throw err;
+        });
+      this.posts.set(posts);
+      this.lastLoadedAt = Date.now();
+      // Ya hay datos útiles: quitar “Cargando…” aunque siga el resto.
+      this.loading.set(false);
+
+      const [deleted, scheduled, events, followers] = await Promise.all([
         this.api.fetchDeletedOfficialPosts(profile.id, topicIds).catch(() => []),
         this.api.fetchScheduledPosts(profile.id, topicIds).catch(() => []),
-        this.api.fetchUpcomingOwnEvents(profile.id, 30),
+        this.api.fetchUpcomingOwnEvents(profile.id, 30).catch(() => []),
         primaryId
           ? this.api.countTopicFollowers(primaryId).catch(() => 0)
           : Promise.resolve(0),
       ]);
-      this.posts.set(posts);
       this.deletedPosts.set(deleted);
       this.scheduledPosts.set(scheduled);
       this.upcomingEvents.set(events);
@@ -449,15 +460,15 @@ export class HermandadPortalStore {
     },
   ): Promise<HermandadUpcomingEvent> {
     await this.api.updateOwnCalendarEvent(eventId, input);
+    const prev = this.upcomingEvents().find((e) => e.id === eventId);
     const next: HermandadUpcomingEvent = {
       id: eventId,
       title: input.title.trim(),
       startsAt: input.startsAtIso,
       location: input.location?.trim() || null,
-      coverImageUrl:
-        this.upcomingEvents().find((e) => e.id === eventId)?.coverImageUrl ??
-        null,
+      coverImageUrl: prev?.coverImageUrl ?? null,
       eventType: input.eventType,
+      viewCount: prev?.viewCount ?? 0,
     };
     this.upcomingEvents.update((list) =>
       list.map((e) => (e.id === eventId ? { ...e, ...next } : e)),

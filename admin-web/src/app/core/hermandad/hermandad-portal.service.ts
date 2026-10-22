@@ -264,19 +264,37 @@ export class HermandadPortalService {
       location: string | null;
       coverImageUrl: string | null;
       eventType: string;
+      viewCount: number;
     }>
   > {
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, starts_at, location, cover_image_url, event_type, status',
+        'id, title, starts_at, location, cover_image_url, event_type, status, view_count',
       )
       .eq('created_by', profileId)
       .eq('status', 'published')
       .gte('starts_at', new Date().toISOString())
       .order('starts_at', { ascending: true })
       .limit(limit);
-    if (error) throw error;
+    if (error) {
+      // Compat: si aún no está la columna view_count.
+      if (String(error.message ?? '').toLowerCase().includes('view_count')) {
+        const retry = await getSupabase()
+          .from('calendar_events')
+          .select(
+            'id, title, starts_at, location, cover_image_url, event_type, status',
+          )
+          .eq('created_by', profileId)
+          .eq('status', 'published')
+          .gte('starts_at', new Date().toISOString())
+          .order('starts_at', { ascending: true })
+          .limit(limit);
+        if (retry.error) throw retry.error;
+        return (retry.data ?? []).map((row) => this.mapCalendarEvent(row));
+      }
+      throw error;
+    }
     return (data ?? []).map((row) => this.mapCalendarEvent(row));
   }
 
@@ -293,12 +311,13 @@ export class HermandadPortalService {
       location: string | null;
       coverImageUrl: string | null;
       eventType: string;
+      viewCount: number;
     }>
   > {
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, starts_at, location, cover_image_url, event_type, status',
+        'id, title, starts_at, location, cover_image_url, event_type, status, view_count',
       )
       .eq('created_by', profileId)
       .eq('status', 'published')
@@ -306,7 +325,24 @@ export class HermandadPortalService {
       .lt('starts_at', toIso)
       .order('starts_at', { ascending: true })
       .limit(200);
-    if (error) throw error;
+    if (error) {
+      if (String(error.message ?? '').toLowerCase().includes('view_count')) {
+        const retry = await getSupabase()
+          .from('calendar_events')
+          .select(
+            'id, title, starts_at, location, cover_image_url, event_type, status',
+          )
+          .eq('created_by', profileId)
+          .eq('status', 'published')
+          .gte('starts_at', fromIso)
+          .lt('starts_at', toIso)
+          .order('starts_at', { ascending: true })
+          .limit(200);
+        if (retry.error) throw retry.error;
+        return (retry.data ?? []).map((row) => this.mapCalendarEvent(row));
+      }
+      throw error;
+    }
     return (data ?? []).map((row) => this.mapCalendarEvent(row));
   }
 
@@ -317,6 +353,7 @@ export class HermandadPortalService {
     location: string | null;
     coverImageUrl: string | null;
     eventType: string;
+    viewCount: number;
   } {
     return {
       id: String(row['id']),
@@ -325,6 +362,7 @@ export class HermandadPortalService {
       location: (row['location'] as string | null) ?? null,
       coverImageUrl: (row['cover_image_url'] as string | null) ?? null,
       eventType: String(row['event_type'] ?? 'evento'),
+      viewCount: Number(row['view_count'] ?? 0),
     };
   }
 
@@ -341,26 +379,59 @@ export class HermandadPortalService {
     };
   }
 
+  private async selectOfficialPosts(
+    profileId: string,
+    topicIds: string[],
+    opts: { deleted: boolean },
+  ): Promise<HermandadOfficialPost[]> {
+    const colsWithViews =
+      'id, topic_id, content, official_category, image_url, created_at, deleted_at, view_count';
+    const colsBasic =
+      'id, topic_id, content, official_category, image_url, created_at, deleted_at';
+
+    const run = async (cols: string) => {
+      let q = getSupabase()
+        .from('forum_replies')
+        .select(cols)
+        .eq('author_id', profileId)
+        .eq('is_official', true)
+        .in('topic_id', topicIds);
+      if (opts.deleted) {
+        q = q
+          .not('deleted_at', 'is', null)
+          .order('deleted_at', { ascending: false })
+          .limit(80);
+      } else {
+        q = q
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .limit(80);
+      }
+      return q;
+    };
+
+    const first = await run(colsWithViews);
+    if (!first.error) {
+      return (first.data ?? []).map((row) =>
+        this.mapOfficialPost(row as unknown as Record<string, unknown>),
+      );
+    }
+    if (!String(first.error.message ?? '').toLowerCase().includes('view_count')) {
+      throw first.error;
+    }
+    const retry = await run(colsBasic);
+    if (retry.error) throw retry.error;
+    return (retry.data ?? []).map((row) =>
+      this.mapOfficialPost(row as unknown as Record<string, unknown>),
+    );
+  }
+
   async fetchOfficialPosts(
     profileId: string,
     topicIds: string[],
   ): Promise<HermandadOfficialPost[]> {
     if (!topicIds.length) return [];
-    const { data, error } = await getSupabase()
-      .from('forum_replies')
-      .select(
-        'id, topic_id, content, official_category, image_url, created_at, deleted_at, view_count',
-      )
-      .eq('author_id', profileId)
-      .eq('is_official', true)
-      .in('topic_id', topicIds)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(120);
-    if (error) throw error;
-    return (data ?? []).map((row) =>
-      this.mapOfficialPost(row as Record<string, unknown>),
-    );
+    return this.selectOfficialPosts(profileId, topicIds, { deleted: false });
   }
 
   async fetchDeletedOfficialPosts(
@@ -368,21 +439,7 @@ export class HermandadPortalService {
     topicIds: string[],
   ): Promise<HermandadOfficialPost[]> {
     if (!topicIds.length) return [];
-    const { data, error } = await getSupabase()
-      .from('forum_replies')
-      .select(
-        'id, topic_id, content, official_category, image_url, created_at, deleted_at, view_count',
-      )
-      .eq('author_id', profileId)
-      .eq('is_official', true)
-      .in('topic_id', topicIds)
-      .not('deleted_at', 'is', null)
-      .order('deleted_at', { ascending: false })
-      .limit(80);
-    if (error) throw error;
-    return (data ?? []).map((row) =>
-      this.mapOfficialPost(row as Record<string, unknown>),
-    );
+    return this.selectOfficialPosts(profileId, topicIds, { deleted: true });
   }
 
   async restoreOfficialPost(replyId: string): Promise<void> {

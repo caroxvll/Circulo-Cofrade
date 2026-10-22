@@ -18,9 +18,16 @@
     </a>
   </header>
 
-  @if (store.loading()) {
+  @if (store.error()) {
+    <div class="state-box error">{{ store.error() }}</div>
+  }
+
+  @if (store.loading() && store.posts().length === 0 && store.scheduledPosts().length === 0) {
     <div class="state-box">Cargando…</div>
   } @else {
+    @if (store.refreshing() || (store.loading() && store.posts().length > 0)) {
+      <p class="refresh-hint">Actualizando…</p>
+    }
     <div class="toolbar">
       <label class="search">
         <svg viewBox="0 0 24 24" aria-hidden="true">

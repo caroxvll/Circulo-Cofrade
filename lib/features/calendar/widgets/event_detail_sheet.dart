@@ -7,6 +7,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/event_type_icon.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../../auth/auth_provider.dart';
+import '../../forums/viewer_id_provider.dart';
 import '../calendar_provider.dart';
 import '../utils/calendar_event_utils.dart';
 import 'calendar_event_image.dart';
@@ -18,6 +19,21 @@ Future<void> showEventDetailSheet(
   required CalendarEvent event,
   required DateTime focusedMonth,
 }) async {
+  var display = event;
+  final eventId = event.id;
+  if (eventId != null && eventId.isNotEmpty) {
+    try {
+      final viewerId = ref.read(viewerIdProvider);
+      final count = await ref
+          .read(calendarRepositoryProvider)
+          .incrementEventView(eventId, viewerId: viewerId);
+      if (count != null && count >= 0) {
+        display = event.copyWith(viewCount: count);
+      }
+    } catch (_) {}
+  }
+
+  if (!context.mounted) return;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -26,7 +42,8 @@ Future<void> showEventDetailSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
     ),
-    builder: (_) => _EventDetailSheet(event: event, focusedMonth: focusedMonth),
+    builder: (_) =>
+        _EventDetailSheet(event: display, focusedMonth: focusedMonth),
   );
 }
 
@@ -155,6 +172,17 @@ class _EventDetailSheet extends ConsumerWidget {
                             time: event.time,
                             location: location,
                           ),
+                          if (event.viewCount > 0) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              event.viewCount == 1
+                                  ? '1 visita'
+                                  : '${event.viewCount} visitas',
+                              style: AppTypography.labelSmall(
+                                color: AppColors.textMuted,
+                              ).copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ],
                           if (description != null) ...[
                             const SizedBox(height: 18),
                             Text(

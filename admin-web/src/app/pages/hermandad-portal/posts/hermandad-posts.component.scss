@@ -500,6 +500,21 @@
   color: var(--text-secondary);
 }
 
+.state-box.error {
+  color: #9a2b2b;
+  background: color-mix(in srgb, #9a2b2b 8%, #fff);
+  border: 1px solid color-mix(in srgb, #9a2b2b 22%, var(--border));
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.refresh-hint {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--text-muted);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
