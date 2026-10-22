@@ -12,7 +12,11 @@
       "destination": "/eliminar-cuenta.html"
     },
     {
-      "source": "/((?!privacidad\\.html$|eliminar-cuenta\\.html$).*)",
+      "source": "/seguridad-infantil",
+      "destination": "/seguridad-infantil.html"
+    },
+    {
+      "source": "/((?!privacidad\\.html$|eliminar-cuenta\\.html$|seguridad-infantil\\.html$).*)",
       "destination": "/index.html"
     }
   ]
