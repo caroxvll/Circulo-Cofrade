@@ -22,6 +22,11 @@ export class AuthService {
 
   /** Invalida applies en vuelo tras signOut / cambio de sesión. */
   private applyGeneration = 0;
+  /**
+   * Evita que onAuthStateChange compita con signIn/signOut y deje el perfil
+   * a null (falso «sin acceso» en el primer intento).
+   */
+  private suppressAuthStateApply = false;
 
   readonly session = this.sessionSignal.asReadonly();
   readonly profile = this.profileSignal.asReadonly();
@@ -70,6 +75,7 @@ export class AuthService {
       await this.applySession(data.session);
 
       supabase.auth.onAuthStateChange((_event, session) => {
+        if (this.suppressAuthStateApply) return;
         void this.applySession(session);
       });
     } catch (error) {
@@ -183,27 +189,42 @@ export class AuthService {
 
   async signIn(email: string, password: string): Promise<void> {
     const supabase = getSupabase();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    const { data } = await supabase.auth.getSession();
-    await this.applySession(data.session);
+    this.suppressAuthStateApply = true;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
 
-    if (this.isAdmin() || this.isHermandadAccount()) {
-      return;
-    }
+      const session =
+        data.session ?? (await supabase.auth.getSession()).data.session;
+      await this.applySession(session);
 
-    const profile = this.profileSignal();
-    await this.signOut();
+      // Si un apply concurrente se coló antes del suppress, reaplicar.
+      if (session?.user && !this.profileSignal()) {
+        await this.applySession(session);
+      }
 
-    if (isBrotherhoodAccount(profile?.accountType) && !profile?.verified) {
+      if (this.isAdmin() || this.isHermandadAccount()) {
+        return;
+      }
+
+      const profile = this.profileSignal();
+      await this.signOut();
+
+      if (isBrotherhoodAccount(profile?.accountType) && !profile?.verified) {
+        throw new Error(
+          'Tu hermandad aún no está verificada. Cuando se active podrás entrar al canal.',
+        );
+      }
+
       throw new Error(
-        'Tu hermandad aún no está verificada. Cuando se active podrás entrar al canal.',
+        'Esta cuenta no tiene acceso. Usa la cuenta oficial verificada de tu hermandad.',
       );
+    } finally {
+      this.suppressAuthStateApply = false;
     }
-
-    throw new Error(
-      'Esta cuenta no tiene acceso. Usa la cuenta oficial verificada de tu hermandad.',
-    );
   }
 
   /** Persiste el color de acento del panel hermandad en el perfil. */
@@ -225,13 +246,18 @@ export class AuthService {
 
   async signOut(): Promise<void> {
     // Invalida cualquier applySession en vuelo (p. ej. SIGNED_IN tardío).
+    this.suppressAuthStateApply = true;
     this.applyGeneration++;
     this.sessionSignal.set(null);
     this.profileSignal.set(null);
     this.moderatedForumIdsSignal.set(new Set());
 
-    const supabase = getSupabase();
-    await supabase.auth.signOut();
+    try {
+      const supabase = getSupabase();
+      await supabase.auth.signOut();
+    } finally {
+      this.suppressAuthStateApply = false;
+    }
   }
 
   /**

@@ -6,6 +6,13 @@
         android:label="Círculo Cofrade"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Icono / color de notificaciones FCM (barra de estado). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_cofradeo" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

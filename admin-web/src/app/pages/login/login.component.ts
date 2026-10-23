@@ -368,6 +368,17 @@ export class LoginComponent {
         message: 'No hay conexión con el servidor. Comprueba tu red e inténtalo de nuevo.',
       };
     }
+    if (
+      lower.includes('unexpected token') ||
+      lower.includes('<!doctype') ||
+      lower.includes('is not valid json') ||
+      lower.includes('index.html')
+    ) {
+      return {
+        message:
+          'El panel no pudo hablar con Supabase (respuesta HTML). Revisa SUPABASE_URL en el despliegue o recarga forzando caché.',
+      };
+    }
     return {
       message: raw || 'No se pudo iniciar sesión. Inténtalo de nuevo.',
     };
