@@ -9,12 +9,17 @@ import '../../../shared/models/forum.dart';
 import '../data/mock_forums.dart';
 import '../data/topic_icon_assets.dart';
 import '../forum_topics_typography.dart';
-import 'related_forum_chip.dart';
+import '../utils/noticias_forum.dart';
 
 const _gutter = 12.0;
-const _previewGridCount = 4;
+const _railCardWidth = 168.0;
+const _railCardHeight = 248.0;
+const _railCardHeightCompact = 228.0;
+/// Recupera el hueco que deja el solape del hero cuando el banner inferior está activo.
+const _dockedAdTopPull = 22.0;
 
-/// Slivers del feed editorial de Noticias (denso, a ancho útil).
+/// Slivers del feed editorial de Noticias:
+/// última noticia a ancho completo + carril horizontal del resto.
 List<Widget> buildNoticiasEditorialSlivers({
   required List<ForumTopic> topics,
   required bool showAllLatest,
@@ -22,60 +27,22 @@ List<Widget> buildNoticiasEditorialSlivers({
   required void Function(ForumTopic topic) onOpenTopic,
   Widget? sponsoredSlot,
   required double bottomPadding,
+  /// Banner docked encima de la bottom nav: compacta márgenes superiores.
+  bool dockedAdActive = false,
 }) {
-  final listed = [for (final t in topics) if (t.isListed) t];
-  final pinned = [
-    for (final t in listed)
-      if (t.isPinned) t,
-  ]..sort((a, b) => a.pinSortOrder.compareTo(b.pinSortOrder));
-  final community = [
-    for (final t in listed)
-      if (!t.isPinned) t,
-  ];
+  final listed = [for (final t in topics) if (t.isListed) t]
+    ..sort((a, b) {
+      final byTime = b.sortTimestamp.compareTo(a.sortTimestamp);
+      if (byTime != 0) return byTime;
+      return a.id.compareTo(b.id);
+    });
 
-  final featured = pinned.isEmpty ? null : pinned.first;
-  final rest = [
-    if (featured != null) ...pinned.skip(1),
-    ...community,
-  ];
+  final featured = listed.isEmpty ? null : listed.first;
+  final rest = featured == null ? const <ForumTopic>[] : listed.skip(1).toList();
+  final railHeight =
+      dockedAdActive ? _railCardHeightCompact : _railCardHeight;
 
   final slivers = <Widget>[];
-
-  if (featured != null) {
-    slivers.add(
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(_gutter, 0, _gutter, 4),
-          child: Text(
-            'Destacada',
-            style: AppTypography.newsHeadline(
-              color: AppColors.burgundyDark,
-            ).copyWith(fontSize: 17, fontWeight: FontWeight.w600),
-          ),
-        ),
-      ),
-    );
-    slivers.add(
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(_gutter, 0, _gutter, 0),
-        sliver: SliverToBoxAdapter(
-          child: NoticiasFeaturedEditorialCard(
-            topic: featured,
-            onTap: () => onOpenTopic(featured),
-          ),
-        ),
-      ),
-    );
-  }
-
-  if (sponsoredSlot != null) {
-    slivers.add(
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(_gutter, 10, _gutter, 0),
-        sliver: SliverToBoxAdapter(child: sponsoredSlot),
-      ),
-    );
-  }
 
   if (rest.isEmpty && featured == null) {
     slivers.add(
@@ -90,92 +57,116 @@ List<Widget> buildNoticiasEditorialSlivers({
         ),
       ),
     );
-  } else if (rest.isNotEmpty) {
-    final canExpand = rest.length > _previewGridCount;
-    final gridItems = showAllLatest || !canExpand
-        ? rest
-        : rest.take(_previewGridCount).toList();
-
-    slivers.add(
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(_gutter, 10, _gutter, 6),
+  } else {
+    final feedChildren = <Widget>[
+      if (featured != null) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_gutter, 0, _gutter, 4),
+          child: Text(
+            'Última hora',
+            style: AppTypography.newsHeadline(
+              color: AppColors.burgundyDark,
+            ).copyWith(fontSize: 17, fontWeight: FontWeight.w600),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _gutter),
+          child: NoticiasFeaturedEditorialCard(
+            topic: featured,
+            onTap: () => onOpenTopic(featured),
+            compact: dockedAdActive,
+          ),
+        ),
+      ],
+      if (sponsoredSlot != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_gutter, 8, _gutter, 0),
+          child: sponsoredSlot,
+        ),
+      if (rest.isNotEmpty) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_gutter, 8, _gutter, 4),
           child: Row(
             children: [
               Expanded(
                 child: Text(
-                  'Últimas noticias',
+                  'Más noticias',
                   style: AppTypography.newsHeadline(
                     color: AppColors.burgundyDark,
                   ).copyWith(fontSize: 17, fontWeight: FontWeight.w600),
                 ),
               ),
-              if (canExpand)
-                InkWell(
-                  onTap: onToggleShowAll,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 4,
-                    ),
-                    child: Text(
-                      showAllLatest ? 'Ver menos ›' : 'Ver todas ›',
-                      style: ForumTopicsTypography.card(
-                        color: AppColors.burgundy,
-                        fontWeight: FontWeight.w700,
-                      ).copyWith(fontSize: 12),
-                    ),
+              InkWell(
+                onTap: onToggleShowAll,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 4,
+                  ),
+                  child: Text(
+                    showAllLatest ? 'Ver menos ›' : 'Ver todas ›',
+                    style: ForumTopicsTypography.card(
+                      color: AppColors.burgundy,
+                      fontWeight: FontWeight.w700,
+                    ).copyWith(fontSize: 12),
                   ),
                 ),
+              ),
             ],
+          ),
+        ),
+        if (showAllLatest)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: _gutter),
+            child: Column(
+              children: [
+                for (var i = 0; i < rest.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  NoticiasListEditorialCard(
+                    topic: rest[i],
+                    onTap: () => onOpenTopic(rest[i]),
+                  ),
+                ],
+              ],
+            ),
+          )
+        else
+          SizedBox(
+            height: railHeight,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: _gutter),
+              itemCount: rest.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final topic = rest[index];
+                return SizedBox(
+                  width: _railCardWidth,
+                  child: NoticiasRailCard(
+                    topic: topic,
+                    onTap: () => onOpenTopic(topic),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+      // Compensa el translate superior sin abrir hueco entre secciones.
+      if (dockedAdActive) const SizedBox(height: _dockedAdTopPull),
+    ];
+
+    slivers.add(
+      SliverToBoxAdapter(
+        child: Transform.translate(
+          offset: Offset(0, dockedAdActive ? -_dockedAdTopPull : 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: feedChildren,
           ),
         ),
       ),
     );
-
-    if (showAllLatest && rest.length > _previewGridCount) {
-      slivers.add(
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: _gutter),
-          sliver: SliverList.separated(
-            itemCount: rest.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final topic = rest[index];
-              return NoticiasListEditorialCard(
-                topic: topic,
-                onTap: () => onOpenTopic(topic),
-              );
-            },
-          ),
-        ),
-      );
-    } else {
-      slivers.add(
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: _gutter),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.74,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final topic = gridItems[index];
-                return NoticiasRailCard(
-                  topic: topic,
-                  onTap: () => onOpenTopic(topic),
-                );
-              },
-              childCount: gridItems.length,
-            ),
-          ),
-        ),
-      );
-    }
   }
 
   slivers.add(
@@ -188,14 +179,7 @@ List<Widget> buildNoticiasEditorialSlivers({
 }
 
 String noticiasCategoryShort(ForumTopic topic) {
-  final id = topic.relatedForumId;
-  return switch (id) {
-    'pentagrama-cofrade' => 'Bandas',
-    'martillo-trabajadera' => 'Costal',
-    'hermandades' => 'Institucional',
-    'foro-cofradiero' => 'Comunidad',
-    _ => 'Arte y patrimonio',
-  };
+  return noticiasCategoryLabel(topic.relatedForumId);
 }
 
 class NoticiasFeaturedEditorialCard extends StatelessWidget {
@@ -203,14 +187,17 @@ class NoticiasFeaturedEditorialCard extends StatelessWidget {
     super.key,
     required this.topic,
     required this.onTap,
+    this.compact = false,
   });
 
   final ForumTopic topic;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final excerpt = topic.excerpt.trim();
+    final coverHeight = compact ? 142.0 : 168.0;
 
     return Material(
       color: Colors.transparent,
@@ -239,7 +226,7 @@ class NoticiasFeaturedEditorialCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
-                  height: 168,
+                  height: coverHeight,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
@@ -277,7 +264,7 @@ class NoticiasFeaturedEditorialCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 3),
                               Text(
-                                'DESTACADA',
+                                'ÚLTIMA HORA',
                                 style: ForumTopicsTypography.card(
                                   color: AppColors.burgundyDark,
                                   fontWeight: FontWeight.w800,
@@ -543,16 +530,10 @@ class NoticiasListEditorialCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 5),
-                      if (topic.relatedForumId != null)
-                        RelatedForumChip(
-                          relatedForumId: topic.relatedForumId!,
-                          compact: true,
-                        )
-                      else
-                        _GoldCategoryTag(
-                          label: noticiasCategoryShort(topic),
-                          compact: true,
-                        ),
+                      _GoldCategoryTag(
+                        label: noticiasCategoryShort(topic),
+                        compact: true,
+                      ),
                       const SizedBox(height: 5),
                       Text(
                         topic.excerpt,

@@ -322,6 +322,8 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
         // Misma corrección que Círculo / otros foros: el shell ya reserva la
         // bottom nav (extendBody: false), no sumar otra vez su altura.
         bottomPadding: 12,
+        // Compacta márgenes del feed (banner docked + hero overlap).
+        dockedAdActive: true,
       );
     }
 

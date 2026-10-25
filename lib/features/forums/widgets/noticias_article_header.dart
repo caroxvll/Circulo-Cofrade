@@ -16,8 +16,6 @@ import '../utils/cofrade_gamification.dart';
 import 'cofrade_rank_label.dart';
 import 'forum_post_image.dart';
 import 'noticias_editorial_feed.dart';
-import 'related_forum_chip.dart';
-import 'topic_follow_button.dart';
 import 'topic_status_badge.dart';
 
 const _articleInset = 16.0;
@@ -65,22 +63,21 @@ class NoticiasArticleHeader extends StatelessWidget {
                   topicId: topicId,
                 ),
                 const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _CategoryPill(label: category),
-                    if (topic.relatedForumId != null)
-                      RelatedForumChip(
-                        relatedForumId: topic.relatedForumId!,
-                        compact: true,
-                      ),
-                    if (topic.listStatusBadge != null)
-                      TopicStatusBadge(topic: topic),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                if (topic.relatedForumId != null ||
+                    topic.listStatusBadge != null) ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (topic.relatedForumId != null)
+                        _CategoryPill(label: category),
+                      if (topic.listStatusBadge != null)
+                        TopicStatusBadge(topic: topic),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 Text(
                   topic.title,
                   style: AppTypography.newsHeadline(
@@ -108,14 +105,37 @@ class NoticiasArticleHeader extends StatelessWidget {
             ),
           ),
           if (coverUrl != null) ...[
-            const SizedBox(height: 14),
-            ForumPostImage(
-              imageUrl: coverUrl,
-              shareText: topic.title,
-              borderRadius: BorderRadius.zero,
-              maxPreviewHeight: 340,
-              showExpandHint: false,
-              fit: BoxFit.cover,
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: _articleInset),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: AppColors.goldDark.withValues(alpha: 0.28),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.burgundyDark.withValues(alpha: 0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: ForumPostImage(
+                    imageUrl: coverUrl,
+                    shareText: topic.title,
+                    borderRadius: BorderRadius.zero,
+                    maxPreviewHeight: 300,
+                    showExpandHint: false,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
             ),
           ],
           Padding(
@@ -262,14 +282,6 @@ class _NoticiasAuthorRow extends StatelessWidget {
             ),
           ),
         ),
-        if (topic.isPublished) ...[
-          const SizedBox(width: 8),
-          TopicFollowButton(
-            forumId: forumId,
-            topicId: topicId,
-            compact: true,
-          ),
-        ],
       ],
     );
   }

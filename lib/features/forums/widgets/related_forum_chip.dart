@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
-import '../data/mock_forums.dart';
 import '../utils/noticias_forum.dart';
 
-/// Chip «Relacionado con» en noticias (etiqueta a un foro, sin duplicar el tema).
+/// Chip de etiqueta temática en noticias.
 class RelatedForumChip extends StatelessWidget {
   const RelatedForumChip({
     super.key,
@@ -21,18 +19,15 @@ class RelatedForumChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!isValidNoticiasRelatedForum(relatedForumId)) {
-      return const SizedBox.shrink();
-    }
+    final id = relatedForumId.trim();
+    if (id.isEmpty) return const SizedBox.shrink();
 
-    final forum = forumById(relatedForumId);
-    final label = forum?.name ?? relatedForumId;
+    final label = noticiasCategoryLabel(id);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap ??
-            () => context.push('/foros/$relatedForumId'),
+        onTap: onTap,
         borderRadius: BorderRadius.circular(999),
         child: Container(
           padding: EdgeInsets.symmetric(
@@ -46,30 +41,17 @@ class RelatedForumChip extends StatelessWidget {
               color: AppColors.burgundy.withValues(alpha: 0.22),
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.forum_outlined,
-                size: compact ? 12 : 13,
-                color: AppColors.burgundyDark,
-              ),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  label,
-                  style: AppTypography.labelSmall(
-                    color: AppColors.burgundyDark,
-                  ).copyWith(
-                    fontSize: compact ? 10 : 11,
-                    fontWeight: FontWeight.w600,
-                    height: 1.1,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+          child: Text(
+            label,
+            style: AppTypography.labelSmall(
+              color: AppColors.burgundyDark,
+            ).copyWith(
+              fontSize: compact ? 10 : 11,
+              fontWeight: FontWeight.w600,
+              height: 1.1,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ),

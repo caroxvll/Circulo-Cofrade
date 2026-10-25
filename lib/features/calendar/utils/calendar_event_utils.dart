@@ -418,6 +418,16 @@ String calendarSaveErrorMessage(PostgrestException error) {
       message.contains('no rows')) {
     return 'No tienes permiso para editar este evento o ya no existe.';
   }
+  if (message.contains('subtitle') ||
+      message.contains('calendar_events_subtitle')) {
+    return 'La descripción es demasiado larga (máximo 1000 caracteres).';
+  }
+  if (message.contains('title') && message.contains('check')) {
+    return 'El título debe tener entre 3 y 120 caracteres.';
+  }
+  if (message.contains('location') && message.contains('check')) {
+    return 'El lugar no puede superar 160 caracteres.';
+  }
   return 'No se pudo guardar el evento. Inténtalo de nuevo.';
 }
 

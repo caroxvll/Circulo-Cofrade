@@ -505,6 +505,21 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       setState(() => _error = 'El título debe tener al menos 3 caracteres.');
       return;
     }
+    if (title.length > 120) {
+      setState(() => _error = 'El título no puede superar 120 caracteres.');
+      return;
+    }
+    if (subtitle.length > 1000) {
+      setState(
+        () => _error =
+            'La descripción no puede superar 1000 caracteres (${subtitle.length}/1000).',
+      );
+      return;
+    }
+    if (location.length > 160) {
+      setState(() => _error = 'El lugar no puede superar 160 caracteres.');
+      return;
+    }
 
     if (_startsAt.isBefore(DateTime.now())) {
       setState(
@@ -708,13 +723,41 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _subtitleController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Descripción',
-                hintText: 'Detalle del acto cofrade…',
-              ),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _subtitleController,
+              builder: (context, value, _) {
+                final len = value.text.trim().length;
+                final over = len > 1000;
+                return TextField(
+                  controller: _subtitleController,
+                  maxLines: 4,
+                  maxLength: 1000,
+                  buildCounter: (
+                    context, {
+                    required currentLength,
+                    required isFocused,
+                    required maxLength,
+                  }) {
+                    final n = _subtitleController.text.trim().length;
+                    return Text(
+                      '$n/1000',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: n > 1000
+                            ? Theme.of(context).colorScheme.error
+                            : null,
+                      ),
+                    );
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Descripción',
+                    hintText: 'Detalle del acto cofrade…',
+                    errorText: over
+                        ? 'Máximo 1000 caracteres ($len/1000).'
+                        : null,
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 12),
             TextField(

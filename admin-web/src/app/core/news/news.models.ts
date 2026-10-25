@@ -1,10 +1,12 @@
 export const NOTICIAS_FORUM_ID = 'noticias';
 
+/** Etiquetas temáticas (opción A). Se guardan en related_forum_id. */
 export const NOTICIAS_RELATED_OPTIONS: { id: string; label: string }[] = [
-  { id: 'foro-cofradiero', label: 'Círculo Cofrade' },
-  { id: 'pentagrama-cofrade', label: 'Pentagrama Cofrade' },
-  { id: 'martillo-trabajadera', label: 'Martillo y Trabajadera' },
+  { id: 'consejo', label: 'Consejo / Institucional' },
   { id: 'hermandades', label: 'Hermandades' },
+  { id: 'musica', label: 'Música' },
+  { id: 'costaleros', label: 'Costaleros' },
+  { id: 'cultura', label: 'Cultura / Patrimonio' },
 ];
 
 export type NewsScheduleStatus = 'scheduled' | 'published' | 'cancelled';

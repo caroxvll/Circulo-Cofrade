@@ -276,14 +276,19 @@ export class NewsService {
   relatedLabel(id: string | null): string {
     if (!id) return 'Sin etiqueta';
     switch (id) {
+      case 'consejo':
       case 'foro-cofradiero':
-        return 'Círculo Cofrade';
-      case 'pentagrama-cofrade':
-        return 'Pentagrama';
-      case 'martillo-trabajadera':
-        return 'Martillo';
+        return 'Consejo / Institucional';
       case 'hermandades':
         return 'Hermandades';
+      case 'musica':
+      case 'pentagrama-cofrade':
+        return 'Música';
+      case 'costaleros':
+      case 'martillo-trabajadera':
+        return 'Costaleros';
+      case 'cultura':
+        return 'Cultura / Patrimonio';
       default:
         return id;
     }

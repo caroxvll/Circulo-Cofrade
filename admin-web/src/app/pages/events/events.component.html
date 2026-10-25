@@ -239,9 +239,12 @@
         <textarea
           [(ngModel)]="formSubtitle"
           rows="3"
-          maxlength="500"
+          maxlength="1000"
           placeholder="Detalle breve para el calendario"
         ></textarea>
+        <span class="form-hint"
+          >{{ formSubtitle.trim().length }}/1000 caracteres</span
+        >
       </label>
 
       <div class="form-row">

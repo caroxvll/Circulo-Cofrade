@@ -36,7 +36,7 @@ $$;
 create table if not exists public.calendar_events (
   id uuid primary key default gen_random_uuid(),
   title text not null check (char_length(title) between 3 and 120),
-  subtitle text not null default '' check (char_length(subtitle) <= 240),
+  subtitle text not null default '' check (char_length(subtitle) <= 1000),
   event_type text not null check (
     event_type in ('procesion', 'gloria', 'ensayo', 'iguala', 'concierto', 'evento')
   ),

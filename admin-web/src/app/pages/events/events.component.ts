@@ -258,8 +258,23 @@ export class EventsPageComponent implements OnInit {
 
   async saveForm(): Promise<void> {
     const title = this.formTitle.trim();
+    const subtitle = this.formSubtitle.trim();
     if (title.length < 3) {
       this.error.set('El título debe tener al menos 3 caracteres.');
+      return;
+    }
+    if (title.length > 120) {
+      this.error.set('El título no puede superar 120 caracteres.');
+      return;
+    }
+    if (subtitle.length > 1000) {
+      this.error.set(
+        `La descripción no puede superar 1000 caracteres (${subtitle.length}/1000).`,
+      );
+      return;
+    }
+    if (this.formLocation.trim().length > 160) {
+      this.error.set('El lugar no puede superar 160 caracteres.');
       return;
     }
     if (!this.formStartsAtLocal) {
@@ -293,7 +308,7 @@ export class EventsPageComponent implements OnInit {
 
       const input = {
         title,
-        subtitle: this.formSubtitle.trim(),
+        subtitle,
         eventType: this.formType,
         startsAt: fromDatetimeLocalValue(this.formStartsAtLocal),
         endsAt: this.formEndsAtLocal.trim()

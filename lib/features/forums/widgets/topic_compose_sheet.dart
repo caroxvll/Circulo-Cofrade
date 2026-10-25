@@ -12,14 +12,11 @@ import '../../permissions/permissions_provider.dart';
 import '../../profile/profile_provider.dart';
 import '../constants/topic_moderation_copy.dart';
 import '../data/forums_repository.dart';
-import '../data/mock_forums.dart';
 import '../forums_provider.dart';
 import '../topic_detail_typography.dart';
 import '../utils/forum_navigation.dart';
 import '../utils/noticias_forum.dart';
-import '../utils/topic_list_order.dart';
 import '../utils/topic_permissions.dart';
-import '../../../shared/models/forum.dart';
 import 'forum_compose_field.dart';
 import 'forum_compose_sheet_header.dart';
 import 'forum_compose_sheet_layout.dart';
@@ -216,23 +213,15 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
     }
   }
 
-  List<ForumCategory> _relatedForumOptions() {
-    final pillars = ref.watch(forumPillarsProvider).asData?.value;
-    final source = pillars == null
-        ? mockForumCategories
-        : visibleForumPillars(pillars);
-    final byId = {for (final f in source) f.id: f};
-    return [
-      for (final id in noticiasRelatedForumIds)
-        if (byId[id] != null) byId[id]!,
-    ];
-  }
+  List<({String id, String label})> _noticiasCategoryOptions() =>
+      noticiasCategoryOptions;
 
   @override
   Widget build(BuildContext context) {
     final isAdmin = ref.watch(isAdminProvider);
     final publishDirect = _isNoticias && isAdmin;
-    final relatedOptions = _isNoticias ? _relatedForumOptions() : const <ForumCategory>[];
+    final relatedOptions =
+        _isNoticias ? _noticiasCategoryOptions() : const <({String id, String label})>[];
 
     return ForumComposeSheetLayout(
       child: Column(
@@ -274,7 +263,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
           if (_isNoticias && relatedOptions.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
-              'RELACIONADO CON',
+              'TIPO DE NOTICIA',
               style: AppTypography.labelSmall(
                 color: AppColors.textMuted,
               ).copyWith(
@@ -284,7 +273,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Opcional · etiqueta el foro del tema (no crea un hilo nuevo)',
+              'Opcional · ayuda a clasificar la pieza para el lector',
               style: AppTypography.bodyMedium(
                 color: AppColors.textMuted,
               ).copyWith(fontSize: 12.5, height: 1.25),
@@ -295,7 +284,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
               runSpacing: 8,
               children: [
                 ChoiceChip(
-                  label: const Text('Ninguno'),
+                  label: const Text('Sin etiqueta'),
                   selected: _relatedForumId == null,
                   onSelected: _submitting
                       ? null
@@ -313,24 +302,24 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
                   ),
                   showCheckmark: false,
                 ),
-                for (final forum in relatedOptions)
+                for (final cat in relatedOptions)
                   ChoiceChip(
-                    label: Text(forum.name),
-                    selected: _relatedForumId == forum.id,
+                    label: Text(cat.label),
+                    selected: _relatedForumId == cat.id,
                     onSelected: _submitting
                         ? null
                         : (selected) => setState(
                               () => _relatedForumId =
-                                  selected ? forum.id : null,
+                                  selected ? cat.id : null,
                             ),
                     selectedColor: AppColors.burgundy.withValues(alpha: 0.14),
                     labelStyle: AppTypography.labelSmall(
-                      color: _relatedForumId == forum.id
+                      color: _relatedForumId == cat.id
                           ? AppColors.burgundyDark
                           : AppColors.textSecondary,
                     ).copyWith(fontWeight: FontWeight.w600),
                     side: BorderSide(
-                      color: _relatedForumId == forum.id
+                      color: _relatedForumId == cat.id
                           ? AppColors.burgundy.withValues(alpha: 0.35)
                           : AppColors.border,
                     ),
