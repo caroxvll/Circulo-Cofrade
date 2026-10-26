@@ -21,6 +21,7 @@ import 'forum_compose_field.dart';
 import 'forum_compose_sheet_header.dart';
 import 'forum_compose_sheet_layout.dart';
 import 'hermandad_post_image_picker.dart';
+import 'topic_poll_compose_section.dart';
 
 Future<void> showTopicComposeSheet(
   BuildContext context,
@@ -118,19 +119,30 @@ class _TopicComposeSheet extends ConsumerStatefulWidget {
 class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
+  final _pollQuestionController = TextEditingController();
+  final List<TextEditingController> _pollOptionControllers = [
+    TextEditingController(),
+    TextEditingController(),
+  ];
   Uint8List? _coverBytes;
   String? _coverMimeType;
   String? _relatedForumId;
+  bool _pollEnabled = false;
   bool _submitting = false;
   String? _error;
 
   bool get _isHermandades => widget.forumId == 'hermandades';
   bool get _isNoticias => isNoticiasForum(widget.forumId);
+  bool get _supportsPoll => !_isHermandades && !_isNoticias;
 
   @override
   void dispose() {
     _titleController.dispose();
     _bodyController.dispose();
+    _pollQuestionController.dispose();
+    for (final c in _pollOptionControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -144,6 +156,16 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
     }
     if (body.length < 10) {
       setState(() => _error = 'El mensaje debe tener al menos 10 caracteres.');
+      return;
+    }
+
+    final pollCheck = TopicPollComposeSection.validate(
+      active: _supportsPoll && _pollEnabled,
+      question: _pollQuestionController.text,
+      options: _pollOptionControllers.map((c) => c.text).toList(),
+    );
+    if (pollCheck.error != null) {
+      setState(() => _error = pollCheck.error);
       return;
     }
 
@@ -162,6 +184,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
             coverBytes: _coverBytes,
             coverMimeType: _coverMimeType,
             relatedForumId: _relatedForumId,
+            poll: pollCheck.draft,
           );
 
       if (mounted) {
@@ -343,6 +366,35 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
               });
             },
           ),
+          if (_supportsPoll) ...[
+            const SizedBox(height: 8),
+            TopicPollComposeSection(
+              enabled: !_submitting,
+              active: _pollEnabled,
+              questionController: _pollQuestionController,
+              optionControllers: _pollOptionControllers,
+              onToggle: (v) => setState(() => _pollEnabled = v),
+              onAddOption: () {
+                if (_pollOptionControllers.length >=
+                    TopicPollComposeSection.maxOptions) {
+                  return;
+                }
+                setState(
+                  () => _pollOptionControllers.add(TextEditingController()),
+                );
+              },
+              onRemoveOption: (index) {
+                if (_pollOptionControllers.length <=
+                    TopicPollComposeSection.minOptions) {
+                  return;
+                }
+                setState(() {
+                  final c = _pollOptionControllers.removeAt(index);
+                  c.dispose();
+                });
+              },
+            ),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(

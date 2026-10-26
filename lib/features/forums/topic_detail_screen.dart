@@ -64,6 +64,7 @@ import 'widgets/topic_moderation_banner.dart';
 import 'widgets/topic_moderation_sheet.dart';
 import 'topic_detail_typography.dart';
 import 'widgets/topic_detail_header.dart';
+import 'widgets/topic_poll_card.dart';
 import 'widgets/topic_status_badge.dart';
 
 class TopicDetailScreen extends ConsumerStatefulWidget {
@@ -1287,6 +1288,13 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                         displayViewCount: displayViewCount,
                         displayTotalReactions: boardTotalReactions,
                         reactionBreakdown: boardReactionBreakdown,
+                      ),
+                    ),
+                  if (!isHermandadBoard && !isNoticias)
+                    SliverToBoxAdapter(
+                      child: TopicPollCard(
+                        forumId: widget.forumId,
+                        topicId: widget.topicId,
                       ),
                     ),
                   if (!isHermandadBoard && topicAcceptsFeaturedAds(topic))

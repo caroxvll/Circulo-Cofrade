@@ -13,7 +13,9 @@ import '../profile/profile_provider.dart';
 import 'data/forums_repository.dart';
 import 'data/forum_about_moderator.dart';
 import 'data/reply_likes_repository.dart';
+import 'data/topic_polls_repository.dart';
 import 'data/topic_reactions_repository.dart';
+import 'models/topic_poll.dart';
 import 'topic_replies_provider.dart';
 import 'utils/noticias_forum.dart';
 import 'utils/topic_list_order.dart';
@@ -404,6 +406,17 @@ final topicReactionsRepositoryProvider = Provider<TopicReactionsRepository>((
   ref,
 ) {
   return createTopicReactionsRepository();
+});
+
+final topicPollsRepositoryProvider = Provider<TopicPollsRepository>((ref) {
+  return createTopicPollsRepository();
+});
+
+final topicPollProvider =
+    FutureProvider.family<TopicPoll?, String>((ref, topicId) async {
+  final repo = ref.watch(topicPollsRepositoryProvider);
+  if (!repo.isAvailable) return null;
+  return repo.fetchPollForTopic(topicId);
 });
 
 final topicUserReactionProvider =
@@ -864,6 +877,7 @@ class TopicSubmitController {
     Uint8List? coverBytes,
     String? coverMimeType,
     String? relatedForumId,
+    TopicPollDraft? poll,
   }) async {
     if (forumId == 'hermandades') {
       throw const HermandadTopicsClosedException();
@@ -915,6 +929,19 @@ class TopicSubmitController {
         coverImageUrl: url,
       );
       topic = await repo.fetchTopic(forumId, topic.id) ?? topic;
+    }
+
+    if (poll != null) {
+      try {
+        await _ref.read(topicPollsRepositoryProvider).createPoll(
+              topicId: topic.id,
+              question: poll.question,
+              options: poll.options,
+            );
+        _ref.invalidate(topicPollProvider(topic.id));
+      } catch (_) {
+        // El tema ya existe; no bloqueamos el alta por un fallo de encuesta.
+      }
     }
 
     _ref.invalidate(forumTopicsProvider(forumId));
