@@ -32,7 +32,8 @@ begin
   from public.forum_topics
   where forum_id = p_forum_id
     and status = 'published'
-    and coalesce(is_system, false) = false;
+    and coalesce(is_system, false) = false
+    and season_key is null;
 
   select count(*)::int
   into v_reply_count
@@ -40,7 +41,8 @@ begin
   join public.forum_topics t on t.id = r.topic_id
   where t.forum_id = p_forum_id
     and t.status = 'published'
-    and coalesce(t.is_system, false) = false;
+    and coalesce(t.is_system, false) = false
+    and t.season_key is null;
 
   select ta.topic_id, ta.title, ta.excerpt, ta.activity_at
   into v_last_topic_id, v_last_topic_title, v_last_topic_excerpt, v_last_activity
@@ -49,6 +51,11 @@ begin
       t.id as topic_id,
       t.title,
       t.excerpt,
+      (
+        select count(*)::int
+        from public.forum_topic_likes l
+        where l.topic_id = t.id
+      ) as reaction_count,
       greatest(
         t.created_at,
         coalesce((
@@ -61,8 +68,10 @@ begin
     where t.forum_id = p_forum_id
       and t.status = 'published'
       and coalesce(t.is_system, false) = false
+      and coalesce(t.is_pinned, false) = false
+      and t.season_key is null
   ) ta
-  order by ta.activity_at desc
+  order by ta.reaction_count desc, ta.activity_at desc
   limit 1;
 
   update public.forum_pillars

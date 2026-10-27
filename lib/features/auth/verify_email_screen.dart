@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/router/safe_redirect.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/app_logo.dart';
@@ -11,9 +12,10 @@ import 'auth_error_messages.dart';
 import 'data/auth_repository.dart';
 
 class VerifyEmailScreen extends ConsumerStatefulWidget {
-  const VerifyEmailScreen({super.key, this.email});
+  const VerifyEmailScreen({super.key, this.email, this.redirect});
 
   final String? email;
+  final String? redirect;
 
   @override
   ConsumerState<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
@@ -45,7 +47,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       await ref.read(authRepositoryProvider).syncAuthUser();
       if (!mounted) return;
       if (ref.read(isEmailVerifiedProvider)) {
-        context.go('/calendario');
+        _goNext();
         return;
       }
     } catch (_) {
@@ -113,7 +115,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Cuenta confirmada')),
         );
-        context.go('/calendario');
+        _goNext();
         return;
       }
 
@@ -144,7 +146,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cuenta confirmada')),
       );
-      context.go('/calendario');
+      _goNext();
     });
 
     return PopScope(
@@ -319,6 +321,11 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       ),
       ),
     );
+  }
+
+  void _goNext() {
+    final redirect = safeInternalLocation(widget.redirect);
+    context.go(redirect ?? '/calendario');
   }
 
   Future<void> _goBack() async {

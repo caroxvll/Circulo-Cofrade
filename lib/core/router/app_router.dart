@@ -45,6 +45,7 @@ import '../../features/search/search_screen.dart';
 import '../../features/shell/cofradeo_shell.dart';
 import '../../features/forums/utils/noticias_forum.dart';
 import 'cofradeo_page.dart';
+import 'safe_redirect.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -62,6 +63,17 @@ bool _isPublicAuthRoute(String location) =>
 
 bool _isPasswordRecoveryRoute(String location) =>
     location == '/recuperar-contrasena' || location == '/nueva-contrasena';
+
+/// Tema o noticia abiertos por enlace, con la query (comentario, sección).
+String? _sharedContentLocation(GoRouterState state) {
+  final location = state.matchedLocation;
+  if (!location.startsWith('/foros/') && !location.startsWith('/noticias')) {
+    return null;
+  }
+  final path =
+      '${state.uri.path}${state.uri.hasQuery ? '?${state.uri.query}' : ''}';
+  return safeInternalLocation(path);
+}
 
 Future<String?> _authRedirect(Ref ref, GoRouterState state) async {
   final location = state.matchedLocation;
@@ -90,10 +102,9 @@ Future<String?> _authRedirect(Ref ref, GoRouterState state) async {
       return '/login?redirect=${Uri.encodeComponent('/completar-perfil')}';
     }
     // Enlace compartido a un tema/comentario: tras login volver ahí.
-    if (location.startsWith('/foros/') || location.startsWith('/noticias')) {
-      final path =
-          '${state.uri.path}${state.uri.hasQuery ? '?${state.uri.query}' : ''}';
-      return '/login?redirect=${Uri.encodeComponent(path)}';
+    final shared = _sharedContentLocation(state);
+    if (shared != null) {
+      return '/login?redirect=${Uri.encodeComponent(shared)}';
     }
     return '/bienvenida';
   }
@@ -101,25 +112,33 @@ Future<String?> _authRedirect(Ref ref, GoRouterState state) async {
   if (isLoggedIn && !emailVerified) {
     if (_isPasswordRecoveryRoute(location)) return null;
     if (location == '/verificar-email') return null;
+    final shared = _sharedContentLocation(state);
+    if (shared != null) {
+      return '/verificar-email?redirect=${Uri.encodeComponent(shared)}';
+    }
     return '/verificar-email';
   }
 
   if (isLoggedIn && location == '/completar-perfil') {
     if (!await needsProfileOnboarding(ref)) {
-      return '/calendario';
+      return safeInternalLocation(state.uri.queryParameters['redirect']) ??
+          '/calendario';
     }
     return null;
   }
 
   if (isLoggedIn && await needsProfileOnboarding(ref)) {
+    final shared = _sharedContentLocation(state);
+    if (shared != null) {
+      return '/completar-perfil?redirect=${Uri.encodeComponent(shared)}';
+    }
     return '/completar-perfil';
   }
 
   if (isLoggedIn && _isPublicAuthRoute(location)) {
     if (_isPasswordRecoveryRoute(location)) return null;
-    if (location == '/verificar-email') return '/calendario';
-    final redirect = state.uri.queryParameters['redirect'];
-    if (redirect != null && redirect.isNotEmpty) return redirect;
+    final redirect = safeInternalLocation(state.uri.queryParameters['redirect']);
+    if (redirect != null) return redirect;
     return '/calendario';
   }
 
@@ -200,6 +219,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           state: state,
           child: VerifyEmailScreen(
             email: state.uri.queryParameters['email'],
+            redirect: state.uri.queryParameters['redirect'],
           ),
         ),
       ),

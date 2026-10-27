@@ -34,6 +34,17 @@ abstract final class ForumsHeroTokens {
         bottomPadding,
       );
 
+  /// Noticias no solapa una ficha: el aire bajo el texto es el de lectura.
+  static EdgeInsets noticiasHeroPadding(BuildContext context) {
+    final statusTop = MediaQuery.viewPaddingOf(context).top;
+    return EdgeInsets.fromLTRB(
+      8,
+      statusTop > 0 ? statusTop : 8,
+      16,
+      16,
+    );
+  }
+
   static EdgeInsets detailHeroPadding(BuildContext context) {
     // Solo lo mínimo de la status bar; el contenido empieza ya junto a ella.
     final statusTop = MediaQuery.viewPaddingOf(context).top;

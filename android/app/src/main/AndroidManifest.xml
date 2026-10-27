@@ -50,7 +50,7 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="cofradeo" android:host="reset-password"/>
             </intent-filter>
-            <!-- App Links: temas de foro (requiere assetlinks.json en cofradeo.app) -->
+            <!-- App Links: temas de foro y noticias (requiere assetlinks.json en cofradeo.app) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -59,6 +59,15 @@
                     android:scheme="https"
                     android:host="cofradeo.app"
                     android:pathPrefix="/foros"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="cofradeo.app"
+                    android:pathPrefix="/noticias"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

@@ -67,7 +67,6 @@ class ForumTopicsScreen extends ConsumerStatefulWidget {
 
 class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
     with WidgetsBindingObserver {
-  static const _panelOverlap = ForumsHeroTokens.panelOverlapReserve;
   static const _panelRadius = ForumsHeroTokens.panelTopRadius;
   static const _listTopPadding = 2.0;
 
@@ -77,6 +76,9 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
   var _filter = TopicListFilter.all;
   var _pinnedCollapsed = false;
   var _noticiasShowAllLatest = false;
+  var _noticiasArchiveVisible = 20;
+  String? _noticiasArchiveCategory;
+  final _noticiasArchiveSearch = TextEditingController();
   String? _selectedHermandadesDay;
 
   @override
@@ -95,6 +97,7 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
+    _noticiasArchiveSearch.dispose();
     super.dispose();
   }
 
@@ -183,8 +186,8 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
                   showBack: !isNoticias,
                   onBack: () => popForumTopicsList(context, forumId: forumId),
                 ),
-                Transform.translate(
-                  offset: const Offset(0, -_panelOverlap),
+                _panelSheet(
+                  overlap: !isNoticias,
                   child: Material(
                     elevation: isNoticias ? 0 : 10,
                     shadowColor: Colors.black.withValues(alpha: 0.14),
@@ -315,8 +318,25 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
       return buildNoticiasEditorialSlivers(
         topics: processed,
         showAllLatest: _noticiasShowAllLatest,
-        onToggleShowAll: () =>
-            setState(() => _noticiasShowAllLatest = !_noticiasShowAllLatest),
+        onToggleShowAll: () => setState(() {
+          _noticiasShowAllLatest = !_noticiasShowAllLatest;
+          _noticiasArchiveVisible = 20;
+        }),
+        archiveVisibleCount: _noticiasArchiveVisible,
+        onLoadMoreArchive: () {
+          if (!mounted) return;
+          setState(() => _noticiasArchiveVisible += 20);
+        },
+        archiveSearchController: _noticiasArchiveSearch,
+        archiveQuery: _noticiasArchiveSearch.text,
+        onArchiveQueryChanged: (_) => setState(() {
+          _noticiasArchiveVisible = 20;
+        }),
+        archiveCategoryId: _noticiasArchiveCategory,
+        onArchiveCategoryChanged: (id) => setState(() {
+          _noticiasArchiveCategory = id;
+          _noticiasArchiveVisible = 20;
+        }),
         onOpenTopic: (topic) async {
           await pushForumTopic(
             context,
@@ -331,11 +351,8 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
         // Sin banner a mitad de portada: Noticias ya lleva el dock inferior
         // (AdPlacement.noticias / NoticiasShellAdBar).
         sponsoredSlot: null,
-        // Misma corrección que Círculo / otros foros: el shell ya reserva la
-        // bottom nav (extendBody: false), no sumar otra vez su altura.
+        // El shell ya reserva la bottom nav (extendBody: false).
         bottomPadding: 12,
-        // Compacta márgenes del feed (banner docked + hero overlap).
-        dockedAdActive: true,
       );
     }
 
@@ -806,6 +823,16 @@ void _openSponsoredCalendarEvent(
   context.go('/calendario');
 }
 
+/// El resto de foros monta la ficha blanca sobre el hero.
+/// Noticias no: el panel es transparente y el feed sigue en flujo normal.
+Widget _panelSheet({required bool overlap, required Widget child}) {
+  if (!overlap) return child;
+  return Transform.translate(
+    offset: const Offset(0, -ForumsHeroTokens.panelOverlapReserve),
+    child: child,
+  );
+}
+
 class _ForumDetailHero extends StatelessWidget {
   const _ForumDetailHero({
     required this.forum,
@@ -887,7 +914,9 @@ class _ForumDetailHero extends StatelessWidget {
               ),
             ),
           Padding(
-            padding: ForumsHeroTokens.detailHeroPadding(context),
+            padding: isNoticias
+                ? ForumsHeroTokens.noticiasHeroPadding(context)
+                : ForumsHeroTokens.detailHeroPadding(context),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

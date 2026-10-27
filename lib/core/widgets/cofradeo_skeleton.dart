@@ -9,11 +9,17 @@ class CofradeoSkeletonBone extends StatefulWidget {
     this.width,
     this.height = 14,
     this.borderRadius = 8,
+    this.baseColor,
+    this.highlightColor,
   });
 
   final double? width;
   final double height;
   final double borderRadius;
+
+  /// Si no se indican, el hueso es el de las pantallas claras.
+  final Color? baseColor;
+  final Color? highlightColor;
 
   @override
   State<CofradeoSkeletonBone> createState() => _CofradeoSkeletonBoneState();
@@ -39,8 +45,8 @@ class _CofradeoSkeletonBoneState extends State<CofradeoSkeletonBone>
       builder: (context, child) {
         final t = Curves.easeInOut.transform(_controller.value);
         final color = Color.lerp(
-          AppColors.border.withValues(alpha: 0.55),
-          AppColors.goldPale.withValues(alpha: 0.85),
+          widget.baseColor ?? AppColors.border.withValues(alpha: 0.55),
+          widget.highlightColor ?? AppColors.goldPale.withValues(alpha: 0.85),
           t,
         )!;
         return Container(

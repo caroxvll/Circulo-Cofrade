@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/utils/image_decode_cache.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../auth/auth_provider.dart';
 import '../../forums/forum_topics_typography.dart';
@@ -789,24 +790,30 @@ class _QuizImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final cache = width.isFinite ? width : 200.0;
+        return Container(
+          height: 200,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.gold.withValues(alpha: 0.28)),
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AspectRatio(
-          aspectRatio: 16 / 10,
-          child: CofradeoNetworkImage(url: url, fit: BoxFit.cover),
-        ),
-      ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: CofradeoNetworkImage(
+              url: url,
+              fit: BoxFit.contain,
+              width: width.isFinite ? width : null,
+              height: 200,
+              cacheSize: cache,
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -956,169 +963,199 @@ class _ReadyToPlayState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-          sliver: SliverFillRemaining(
-            hasScrollBody: false,
-            child: Column(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Column(
+        children: [
+          const Spacer(),
+          const _ReadyBrandLockup(),
+          const SizedBox(height: 14),
+          Text(
+            'La pregunta del día está lista',
+            style: AppTypography.displaySmall(color: AppColors.burgundy)
+                .copyWith(fontSize: 20, height: 1.15),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _ReadyMediaChip(
+                icon: hasImage
+                    ? Icons.image_rounded
+                    : Icons.hide_image_outlined,
+                label: hasImage ? 'Con imagen' : 'Sin imagen',
+                active: hasImage,
+              ),
+              _ReadyMediaChip(
+                icon: hasAudio
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_off_outlined,
+                label: hasAudio ? 'Con sonido' : 'Sin sonido',
+                active: hasAudio,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'El tiempo no corre hasta que pulses.',
+            style: AppTypography.bodyMedium(color: AppColors.textMuted)
+                .copyWith(fontSize: 13.5, height: 1.3),
+            textAlign: TextAlign.center,
+          ),
+          if (hasAudio) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Spacer(flex: 2),
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.gold.withValues(alpha: 0.28),
-                        AppColors.burgundy.withValues(alpha: 0.1),
-                      ],
-                    ),
-                    border: Border.all(
-                      color: AppColors.gold.withValues(alpha: 0.55),
-                      width: 1.4,
-                    ),
-                  ),
-                  alignment: Alignment.center,
+                Icon(
+                  Icons.volume_up_rounded,
+                  size: 16,
+                  color: AppColors.goldDark.withValues(alpha: 0.95),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
                   child: Text(
-                    '?',
-                    style: AppTypography.displaySmall(color: AppColors.burgundy)
-                        .copyWith(
-                      fontSize: 38,
-                      fontWeight: FontWeight.w600,
-                      height: 1,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'La pregunta del día está lista',
-                  style: AppTypography.displaySmall(color: AppColors.burgundy)
-                      .copyWith(fontSize: 22, height: 1.15),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _ReadyMediaChip(
-                      icon: hasImage
-                          ? Icons.image_rounded
-                          : Icons.hide_image_outlined,
-                      label: hasImage ? 'Con imagen' : 'Sin imagen',
-                      active: hasImage,
-                    ),
-                    _ReadyMediaChip(
-                      icon: hasAudio
-                          ? Icons.volume_up_rounded
-                          : Icons.volume_off_outlined,
-                      label: hasAudio ? 'Con sonido' : 'Sin sonido',
-                      active: hasAudio,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Cuando pulses Empezar, tendrás $answerSeconds segundos '
-                  'para responder. Hasta entonces el tiempo no corre.',
-                  style: AppTypography.bodyMedium(color: AppColors.textMuted)
-                      .copyWith(fontSize: 14.5, height: 1.4),
-                  textAlign: TextAlign.center,
-                ),
-                if (hasAudio) ...[
-                  const SizedBox(height: 14),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.gold.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.volume_up_rounded,
-                          size: 20,
-                          color: AppColors.goldDark.withValues(alpha: 0.95),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Sube el volumen: el audio suena una sola vez '
-                            'al Empezar (no se puede repetir).',
-                            style: AppTypography.bodyMedium(
-                              color: AppColors.textSecondary,
-                            ).copyWith(fontSize: 13.5, height: 1.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.burgundy.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.burgundy.withValues(alpha: 0.22),
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        size: 20,
-                        color: AppColors.burgundy.withValues(alpha: 0.9),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Si sales después de Empezar, cuenta como fallo '
-                          '(-40 puntos) y no podrás volver a intentar.',
-                          style: AppTypography.bodyMedium(
-                            color: AppColors.textSecondary,
-                          ).copyWith(fontSize: 13.5, height: 1.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (error != null) ...[
-                  const SizedBox(height: 14),
-                  Text(
-                    error!,
-                    style: AppTypography.bodyMedium(color: AppColors.accentRed),
+                    'Sube el volumen: suena una vez y no se repite.',
+                    style: AppTypography.bodyMedium(
+                      color: AppColors.textSecondary,
+                    ).copyWith(fontSize: 13, height: 1.3),
                     textAlign: TextAlign.center,
                   ),
-                ],
-                const Spacer(flex: 3),
-                FilledButton(
-                  onPressed: onStart,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.burgundy,
-                    minimumSize: const Size.fromHeight(48),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            decoration: BoxDecoration(
+              color: AppColors.burgundy.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.burgundy.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 18,
+                  color: AppColors.burgundy.withValues(alpha: 0.9),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Si sales después de empezar, es fallo (−40) '
+                    'y no hay segundo intento.',
+                    style: AppTypography.bodyMedium(
+                      color: AppColors.textSecondary,
+                    ).copyWith(fontSize: 13, height: 1.3),
                   ),
-                  child: const Text('Empezar'),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+          if (error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              error!,
+              style: AppTypography.bodyMedium(color: AppColors.accentRed),
+              textAlign: TextAlign.center,
+            ),
+          ],
+          const Spacer(),
+          FilledButton(
+            onPressed: onStart,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.burgundy,
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: Text('Empezar · $answerSeconds s'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReadyBrandLockup extends StatelessWidget {
+  const _ReadyBrandLockup();
+
+  @override
+  Widget build(BuildContext context) {
+    final quizCache = ImageDecodeCache.px(context, 112);
+    final markCache = ImageDecodeCache.px(context, 40);
+    return SizedBox(
+      width: 136,
+      height: 128,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.burgundyDark.withValues(alpha: 0.18),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: Image.asset(
+                  AppAssets.quizLiveLogo,
+                  width: 112,
+                  height: 112,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.medium,
+                  cacheWidth: quizCache,
+                  cacheHeight: quizCache,
+                  gaplessPlayback: true,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.gold, width: 1.4),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.burgundyDark.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12.5),
+                child: Image.asset(
+                  AppAssets.logo,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.medium,
+                  cacheWidth: markCache,
+                  cacheHeight: markCache,
+                  gaplessPlayback: true,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1529,39 +1566,22 @@ class _ResultView extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 36),
       children: [
         Container(
-          padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isCorrect
-                  ? [
-                      const Color(0xFF2E7D32).withValues(alpha: 0.12),
-                      AppColors.goldPale.withValues(alpha: 0.45),
-                    ]
-                  : [
-                      AppColors.accentRed.withValues(alpha: 0.10),
-                      AppColors.goldPale.withValues(alpha: 0.35),
-                    ],
-            ),
+            borderRadius: BorderRadius.circular(16),
+            color: isCorrect
+                ? const Color(0xFF2E7D32).withValues(alpha: 0.08)
+                : AppColors.accentRed.withValues(alpha: 0.08),
             border: Border.all(color: accent.withValues(alpha: 0.35)),
           ),
-          child: Column(
+          child: Row(
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: accent,
                   shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: accent.withValues(alpha: 0.35),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
                 ),
                 child: Icon(
                   isCorrect
@@ -1572,32 +1592,47 @@ class _ResultView extends StatelessWidget {
                               ? Icons.timer_off_outlined
                               : Icons.close_rounded,
                   color: Colors.white,
-                  size: 30,
+                  size: 22,
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: AppTypography.displaySmall(color: accent).copyWith(
-                  fontWeight: FontWeight.w700,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.titleLarge(color: accent).copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: AppTypography.bodyMedium(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(width: 8),
               Text(
-                score >= 0 ? '+$score pts' : '$score pts',
+                score >= 0 ? '+$score' : '$score',
                 style: AppTypography.displayMedium(color: AppColors.burgundy)
-                    .copyWith(fontSize: 34, height: 1.05),
+                    .copyWith(fontSize: 26, height: 1, fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(width: 4),
               Text(
-                subtitle,
-                style: AppTypography.bodyMedium(color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
+                'pts',
+                style: AppTypography.labelSmall(color: AppColors.burgundy)
+                    .copyWith(fontWeight: FontWeight.w700),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
         Text(
           prompt,
           style: AppTypography.titleLarge(color: AppColors.textPrimary)
@@ -1607,16 +1642,9 @@ class _ResultView extends StatelessWidget {
           const SizedBox(height: 14),
           _QuizImage(url: img),
         ],
-        const SizedBox(height: 18),
-        Text(
-          'RESULTADO',
-          style: AppTypography.labelSmall(color: AppColors.textMuted).copyWith(
-            letterSpacing: 0.9,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         for (final option in QuizOption.values)
+          if (_label(option).trim().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _OptionButton(

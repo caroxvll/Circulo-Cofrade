@@ -259,18 +259,18 @@ class ProfileRepository {
       final topicRows = await _client!
           .from('forum_topics')
           .select(
-            'id, forum_id, title, excerpt, created_at, status, '
+            'id, forum_id, title, excerpt, created_at, status, season_key, '
             'view_count, comment_count, cover_image_url',
           )
           .eq('author_id', userId)
           .order('created_at', ascending: false)
-          .limit(30);
+          .limit(400);
 
       final replyRows = await _client!
           .from('forum_replies')
           .select(
             'id, topic_id, content, created_at, like_count, '
-            'forum_topics(forum_id, title, view_count, comment_count, cover_image_url)',
+            'forum_topics(forum_id, title, season_key, view_count, comment_count, cover_image_url)',
           )
           .eq('author_id', userId)
           .order('created_at', ascending: false)
@@ -305,6 +305,7 @@ class ProfileRepository {
             coverImageUrl: row['cover_image_url'] as String?,
             viewCount: row['view_count'] as int? ?? 0,
             commentCount: row['comment_count'] as int? ?? 0,
+            seasonKey: row['season_key'] as String?,
           ),
         ));
       }
@@ -334,6 +335,7 @@ class ProfileRepository {
             viewCount: topic['view_count'] as int? ?? 0,
             commentCount: topic['comment_count'] as int? ?? 0,
             reactionCount: row['like_count'] as int? ?? 0,
+            seasonKey: topic['season_key'] as String?,
           ),
         ));
       }
@@ -346,7 +348,7 @@ class ProfileRepository {
         if (aPending != bPending) return aPending ? -1 : 1;
         return b.at.compareTo(a.at);
       });
-      return items.take(30).map((e) => e.activity).toList();
+      return items.map((e) => e.activity).toList();
     } catch (_) {
       return [];
     }

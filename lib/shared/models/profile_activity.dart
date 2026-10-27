@@ -18,6 +18,7 @@ class ProfileActivity {
     this.viewCount = 0,
     this.commentCount = 0,
     this.reactionCount = 0,
+    this.seasonKey,
   });
 
   final String id;
@@ -34,6 +35,25 @@ class ProfileActivity {
   final int viewCount;
   final int commentCount;
   final int reactionCount;
+  final String? seasonKey;
+
+  /// Clave del filtro: el espacio de temporada, o el foro si no tiene.
+  String get placeKey => seasonKey ?? forumId;
+
+  /// Dónde se publicó: foro, o el espacio de temporada si no es un tema del foro.
+  String get placeName {
+    return switch (seasonKey) {
+      'cuaresma' => 'Cuaresma',
+      'semana_santa' => 'Semana Santa',
+      'glorias' => 'Glorias',
+      _ => forumName,
+    };
+  }
+
+  String get originLabel {
+    final kind = isTopic ? 'Tema' : 'Respuesta';
+    return '$kind · $placeName';
+  }
 
   String get typeLabel {
     if (type == ProfileActivityType.reply) return 'Respuesta';

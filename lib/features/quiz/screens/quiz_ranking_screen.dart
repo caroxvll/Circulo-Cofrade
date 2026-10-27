@@ -134,24 +134,7 @@ class QuizRankingScreen extends ConsumerWidget {
             ),
           ),
           boardAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.fromLTRB(20, 88, 20, 24),
-              child: Column(
-                children: [
-                  CofradeoSkeletonBone(height: 40, borderRadius: 10),
-                  SizedBox(height: 20),
-                  CofradeoSkeletonBone(height: 120, borderRadius: 16),
-                  SizedBox(height: 16),
-                  CofradeoSkeletonBone(height: 56, borderRadius: 12),
-                  SizedBox(height: 10),
-                  CofradeoSkeletonBone(height: 56, borderRadius: 12),
-                  SizedBox(height: 10),
-                  CofradeoSkeletonBone(height: 56, borderRadius: 12),
-                  SizedBox(height: 10),
-                  CofradeoSkeletonBone(height: 56, borderRadius: 12),
-                ],
-              ),
-            ),
+            loading: () => const _RankingSkeleton(),
             error: (e, _) => Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -166,11 +149,16 @@ class QuizRankingScreen extends ConsumerWidget {
             data: (bundle) {
               final monthLabel = _monthTitle(bundle.yearMonth);
               final me = bundle.me;
-              final showPodium = mode == QuizRankingMode.top &&
-                  bundle.entries.any((e) => e.rank <= 3);
+              final onPodium =
+                  bundle.entries.where((e) => e.rank <= 3).toList();
+              // Un solo jugador no llena un podio: el marcador de arriba basta.
+              final showPodium =
+                  mode == QuizRankingMode.top && onPodium.length >= 2;
               final listEntries = showPodium
                   ? bundle.entries.where((e) => e.rank > 3).toList()
-                  : bundle.entries;
+                  : mode == QuizRankingMode.top && bundle.totalPlayers < 2
+                      ? const <QuizLeaderboardEntry>[]
+                      : bundle.entries;
 
               return RefreshIndicator(
                 color: AppColors.gold,
@@ -237,37 +225,46 @@ class QuizRankingScreen extends ConsumerWidget {
                                       'Juega la pregunta en vivo para entrar '
                                       'en la clasificación de $monthLabel.',
                                 ),
-                              const SizedBox(height: 14),
-                              SizedBox(
-                                height: 40,
-                                child: ListView.separated(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: _filterOrder.length,
-                                  separatorBuilder: (_, _) =>
-                                      const SizedBox(width: 8),
-                                  itemBuilder: (context, i) {
-                                    final m = _filterOrder[i];
-                                    return _GameTab(
-                                      label: m.label,
-                                      selected: mode == m,
-                                      onTap: () => ref
-                                          .read(
-                                            quizRankingModeProvider.notifier,
-                                          )
-                                          .setMode(m),
-                                    );
-                                  },
-                                ),
-                              ),
-                              if (showPodium) ...[
-                                const SizedBox(height: 16),
-                                _GamePodium(
-                                  entries: bundle.entries
-                                      .where((e) => e.rank <= 3)
-                                      .toList(),
+                              if (bundle.totalPlayers > 0) ...[
+                                const SizedBox(height: 14),
+                                SizedBox(
+                                  height: 40,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: _filterOrder.length,
+                                    separatorBuilder: (_, _) =>
+                                        const SizedBox(width: 8),
+                                    itemBuilder: (context, i) {
+                                      final m = _filterOrder[i];
+                                      return _GameTab(
+                                        label: m.label,
+                                        selected: mode == m,
+                                        onTap: () => ref
+                                            .read(
+                                              quizRankingModeProvider.notifier,
+                                            )
+                                            .setMode(m),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ],
+                              if (showPodium) ...[
+                                const SizedBox(height: 16),
+                                _GamePodium(entries: onPodium),
+                              ],
                               const SizedBox(height: 16),
+                              if (bundle.entries.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 36),
+                                  child: _RankingEmpty(
+                                    message: mode == QuizRankingMode.above
+                                        ? 'Nadie por encima de ti.'
+                                        : mode == QuizRankingMode.below
+                                            ? 'Nadie por debajo todavía.'
+                                            : 'Temporada vacía.\n¡Sé el primero en anotar!',
+                                  ),
+                                ),
                               if (listEntries.isNotEmpty) ...[
                                 const SizedBox(height: 4),
                                 Row(
@@ -309,27 +306,7 @@ class QuizRankingScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    if (bundle.entries.isEmpty)
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(28),
-                            child: Text(
-                              mode == QuizRankingMode.above
-                                  ? 'Nadie por encima.\n¡Vas líder!'
-                                  : mode == QuizRankingMode.below
-                                      ? 'Nadie por debajo todavía.'
-                                      : 'Temporada vacía.\n¡Sé el primero en anotar!',
-                              style: AppTypography.bodyLarge(
-                                color: AppColors.goldPale,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      )
-                    else if (listEntries.isNotEmpty)
+                    if (listEntries.isNotEmpty)
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 36),
                         sliver: SliverList.separated(
@@ -352,6 +329,149 @@ class QuizRankingScreen extends ConsumerWidget {
                 ),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RankingSkeleton extends StatelessWidget {
+  const _RankingSkeleton();
+
+  static const _base = Color(0xFF3A1218);
+  static const _shine = Color(0xFF7A5A3A);
+
+  @override
+  Widget build(BuildContext context) {
+    return const SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CofradeoSkeletonBone(
+                        width: 88,
+                        height: 10,
+                        borderRadius: 4,
+                        baseColor: _base,
+                        highlightColor: _shine,
+                      ),
+                      SizedBox(height: 8),
+                      CofradeoSkeletonBone(
+                        width: 156,
+                        height: 22,
+                        borderRadius: 6,
+                        baseColor: _base,
+                        highlightColor: _shine,
+                      ),
+                    ],
+                  ),
+                ),
+                CofradeoSkeletonBone(
+                  width: 96,
+                  height: 48,
+                  borderRadius: 14,
+                  baseColor: _base,
+                  highlightColor: _shine,
+                ),
+              ],
+            ),
+            SizedBox(height: 18),
+            Row(
+              children: [
+                CofradeoSkeletonBone(
+                  width: 64,
+                  height: 34,
+                  borderRadius: 99,
+                  baseColor: _base,
+                  highlightColor: _shine,
+                ),
+                SizedBox(width: 8),
+                CofradeoSkeletonBone(
+                  width: 108,
+                  height: 34,
+                  borderRadius: 99,
+                  baseColor: _base,
+                  highlightColor: _shine,
+                ),
+                SizedBox(width: 8),
+                CofradeoSkeletonBone(
+                  width: 96,
+                  height: 34,
+                  borderRadius: 99,
+                  baseColor: _base,
+                  highlightColor: _shine,
+                ),
+              ],
+            ),
+            SizedBox(height: 18),
+            CofradeoSkeletonBone(
+              height: 64,
+              borderRadius: 14,
+              baseColor: _base,
+              highlightColor: _shine,
+            ),
+            SizedBox(height: 8),
+            CofradeoSkeletonBone(
+              height: 64,
+              borderRadius: 14,
+              baseColor: _base,
+              highlightColor: _shine,
+            ),
+            SizedBox(height: 8),
+            CofradeoSkeletonBone(
+              height: 64,
+              borderRadius: 14,
+              baseColor: _base,
+              highlightColor: _shine,
+            ),
+            SizedBox(height: 8),
+            CofradeoSkeletonBone(
+              height: 64,
+              borderRadius: 14,
+              baseColor: _base,
+              highlightColor: _shine,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RankingEmpty extends StatelessWidget {
+  const _RankingEmpty({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
+      decoration: BoxDecoration(
+        color: const Color(0xCC1A0508),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.emoji_events_outlined,
+            color: AppColors.gold,
+            size: 34,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: AppTypography.bodyLarge(color: AppColors.goldPale),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -426,7 +546,11 @@ class _PlayerHud extends StatelessWidget {
         children: [
           Row(
             children: [
-              _RankBadge(rank: entry.rank, size: 48),
+              _RankBadge(
+                rank: entry.rank,
+                size: 48,
+                awarded: entry.points > 0,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -476,9 +600,7 @@ class _PlayerHud extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              entry.rank == 1
-                  ? '¡Lideras la temporada!'
-                  : 'Progreso hacia el podio',
+              _hudStatus(entry, total),
               style: AppTypography.labelSmall(color: AppColors.goldLight)
                   .copyWith(fontSize: 10, letterSpacing: 0.2),
             ),
@@ -723,7 +845,9 @@ class _PodiumTower extends StatelessWidget {
           ),
           Text(
             '${entry!.points} pts',
-            style: AppTypography.labelSmall(color: AppColors.gold).copyWith(
+            style: AppTypography.labelSmall(
+              color: entry!.points < 0 ? AppColors.accentRed : AppColors.gold,
+            ).copyWith(
               fontWeight: FontWeight.w700,
               letterSpacing: 0.3,
             ),
@@ -794,23 +918,29 @@ class _PtsChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final negative = points < 0;
+    final tone = negative ? AppColors.accentRed : AppColors.gold;
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: large ? 12 : 9,
         vertical: large ? 8 : 6,
       ),
       decoration: BoxDecoration(
-        color: AppColors.burgundy,
+        color: const Color(0xCC1A0508),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: negative
+              ? AppColors.accentRed.withValues(alpha: 0.75)
+              : AppColors.gold.withValues(alpha: 0.5),
+        ),
       ),
       child: Column(
         children: [
           Text(
             '$points',
             style: (large
-                    ? AppTypography.displaySmall(color: AppColors.gold)
-                    : AppTypography.titleLarge(color: AppColors.gold))
+                    ? AppTypography.displaySmall(color: tone)
+                    : AppTypography.titleLarge(color: tone))
                 .copyWith(
               fontWeight: FontWeight.w800,
               fontSize: large ? 22 : 15,
@@ -819,8 +949,11 @@ class _PtsChip extends StatelessWidget {
           ),
           Text(
             'PTS',
-            style: AppTypography.labelSmall(color: AppColors.goldLight)
-                .copyWith(
+            style: AppTypography.labelSmall(
+              color: negative
+                  ? AppColors.accentRed.withValues(alpha: 0.85)
+                  : AppColors.goldLight,
+            ).copyWith(
               fontWeight: FontWeight.w800,
               fontSize: 9,
               letterSpacing: 0.8,
@@ -830,6 +963,18 @@ class _PtsChip extends StatelessWidget {
       ),
     );
   }
+}
+
+String _hudStatus(QuizLeaderboardEntry entry, int total) {
+  if (entry.rank == 1 && entry.points > 0) {
+    return '¡Lideras la temporada!';
+  }
+  if (entry.rank == 1) {
+    return total <= 1
+        ? 'Eres el único. El marcador está en negativo.'
+        : 'Vas primero, con el marcador en negativo.';
+  }
+  return 'Progreso hacia el podio';
 }
 
 class _MedalStyle {
@@ -848,14 +993,21 @@ _MedalStyle _medalFor(int rank) {
 }
 
 class _RankBadge extends StatelessWidget {
-  const _RankBadge({required this.rank, this.size = 40});
+  const _RankBadge({
+    required this.rank,
+    this.size = 40,
+    this.awarded = true,
+  });
 
   final int rank;
   final double size;
 
+  /// Medalla solo si el marcador suma. Un puesto alto en negativo no es podio.
+  final bool awarded;
+
   @override
   Widget build(BuildContext context) {
-    if (rank >= 1 && rank <= 3) {
+    if (awarded && rank >= 1 && rank <= 3) {
       final medal = _medalFor(rank);
       return Container(
         width: size,
@@ -912,7 +1064,11 @@ class _ScoreboardRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _RankBadge(rank: entry.rank, size: 38),
+          _RankBadge(
+            rank: entry.rank,
+            size: 38,
+            awarded: entry.points > 0,
+          ),
           const SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.all(1.5),
@@ -982,8 +1138,11 @@ class _ScoreboardRow extends StatelessWidget {
             children: [
               Text(
                 '${entry.points}',
-                style: AppTypography.displaySmall(color: AppColors.gold)
-                    .copyWith(
+                style: AppTypography.displaySmall(
+                  color: entry.points < 0
+                      ? AppColors.accentRed
+                      : AppColors.gold,
+                ).copyWith(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
                   height: 1,
@@ -992,7 +1151,9 @@ class _ScoreboardRow extends StatelessWidget {
               Text(
                 'pts',
                 style: AppTypography.labelSmall(
-                  color: AppColors.gold.withValues(alpha: 0.7),
+                  color: entry.points < 0
+                      ? AppColors.accentRed.withValues(alpha: 0.8)
+                      : AppColors.gold.withValues(alpha: 0.7),
                 ).copyWith(
                   fontSize: 9,
                   letterSpacing: 0.8,

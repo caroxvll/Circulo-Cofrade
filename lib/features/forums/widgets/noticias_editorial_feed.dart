@@ -14,11 +14,9 @@ import '../utils/noticias_forum.dart';
 import '../utils/noticias_stories.dart';
 
 const _gutter = 12.0;
+const _noticiasRailLimit = 12;
 const _railCardWidth = 168.0;
 const _railCardHeight = 248.0;
-const _railCardHeightCompact = 228.0;
-/// Recupera el hueco que deja el solape del hero cuando el banner inferior está activo.
-const _dockedAdTopPull = 22.0;
 
 /// Slivers del feed editorial de Noticias:
 /// última noticia a ancho completo + carril horizontal del resto.
@@ -26,19 +24,23 @@ List<Widget> buildNoticiasEditorialSlivers({
   required List<ForumTopic> topics,
   required bool showAllLatest,
   required VoidCallback onToggleShowAll,
+  required int archiveVisibleCount,
+  required VoidCallback onLoadMoreArchive,
+  required TextEditingController archiveSearchController,
+  required String archiveQuery,
+  required ValueChanged<String> onArchiveQueryChanged,
+  required String? archiveCategoryId,
+  required ValueChanged<String?> onArchiveCategoryChanged,
   required void Function(ForumTopic topic) onOpenTopic,
   Widget? sponsoredSlot,
   required double bottomPadding,
-  /// Banner docked encima de la bottom nav: compacta márgenes superiores.
-  bool dockedAdActive = false,
 }) {
   final stories = groupNoticiasForFeed(topics);
   final featured = stories.isEmpty ? null : stories.first;
   final rest = featured == null
       ? const <NoticiasStory>[]
       : stories.skip(1).toList();
-  final railHeight =
-      dockedAdActive ? _railCardHeightCompact : _railCardHeight;
+  const railHeight = _railCardHeight;
 
   final slivers = <Widget>[];
 
@@ -73,12 +75,10 @@ List<Widget> buildNoticiasEditorialSlivers({
               ? NoticiasFeaturedStoryCarousel(
                   story: featured,
                   onOpen: onOpenTopic,
-                  compact: dockedAdActive,
                 )
               : NoticiasFeaturedEditorialCard(
                   topic: featured.lead,
                   onTap: () => onOpenTopic(featured.lead),
-                  compact: dockedAdActive,
                 ),
         ),
       ],
@@ -87,92 +87,107 @@ List<Widget> buildNoticiasEditorialSlivers({
           padding: const EdgeInsets.fromLTRB(_gutter, 8, _gutter, 0),
           child: sponsoredSlot,
         ),
-      if (rest.isNotEmpty) ...[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(_gutter, 8, _gutter, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Más noticias',
-                  style: AppTypography.newsHeadline(
-                    color: AppColors.burgundyDark,
-                  ).copyWith(fontSize: 17, fontWeight: FontWeight.w600),
+      if (rest.isNotEmpty)
+        _NoticiasMoreHeader(
+          showAllLatest: showAllLatest,
+          onToggleShowAll: onToggleShowAll,
+        ),
+      if (rest.isNotEmpty && showAllLatest)
+        _NoticiasArchiveControls(
+          stories: rest,
+          searchController: archiveSearchController,
+          categoryId: archiveCategoryId,
+          onQueryChanged: onArchiveQueryChanged,
+          onCategoryChanged: onArchiveCategoryChanged,
+        ),
+      if (rest.isNotEmpty && !showAllLatest)
+        SizedBox(
+          height: railHeight,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: _gutter),
+            itemCount: rest.length < _noticiasRailLimit
+                ? rest.length
+                : _noticiasRailLimit,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final story = rest[index];
+              return SizedBox(
+                width: _railCardWidth,
+                child: NoticiasRailCard(
+                  topic: story.lead,
+                  accounts: story.isGrouped ? story.topics : null,
+                  onTap: () => onOpenTopic(story.lead),
                 ),
-              ),
-              InkWell(
-                onTap: onToggleShowAll,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 4,
-                  ),
-                  child: Text(
-                    showAllLatest ? 'Ver menos ›' : 'Ver todas ›',
-                    style: ForumTopicsTypography.card(
-                      color: AppColors.burgundy,
-                      fontWeight: FontWeight.w700,
-                    ).copyWith(fontSize: 12),
-                  ),
-                ),
-              ),
-            ],
+              );
+            },
           ),
         ),
-        if (showAllLatest)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: _gutter),
-            child: Column(
-              children: [
-                for (var i = 0; i < rest.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 8),
-                  NoticiasListEditorialCard(
-                    topic: rest[i].lead,
-                    accounts: rest[i].isGrouped ? rest[i].topics : null,
-                    onTap: () => onOpenTopic(rest[i].lead),
-                  ),
-                ],
-              ],
-            ),
-          )
-        else
-          SizedBox(
-            height: railHeight,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: _gutter),
-              itemCount: rest.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final story = rest[index];
-                return SizedBox(
-                  width: _railCardWidth,
-                  child: NoticiasRailCard(
-                    topic: story.lead,
-                    accounts: story.isGrouped ? story.topics : null,
-                    onTap: () => onOpenTopic(story.lead),
-                  ),
-                );
-              },
-            ),
-          ),
-      ],
-      // Compensa el translate superior sin abrir hueco entre secciones.
-      if (dockedAdActive) const SizedBox(height: _dockedAdTopPull),
     ];
 
     slivers.add(
       SliverToBoxAdapter(
-        child: Transform.translate(
-          offset: Offset(0, dockedAdActive ? -_dockedAdTopPull : 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: feedChildren,
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: feedChildren,
         ),
       ),
     );
+
+    if (showAllLatest && rest.isNotEmpty) {
+      final filtered = _filterNoticiasStories(
+        rest,
+        categoryId: archiveCategoryId,
+        query: archiveQuery,
+      );
+      final shown = archiveVisibleCount < filtered.length
+          ? archiveVisibleCount
+          : filtered.length;
+      if (filtered.isEmpty) {
+        slivers.add(
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(24, 12, 24, 8),
+              child: Text(
+                'Ninguna noticia con ese filtro.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+            ),
+          ),
+        );
+      } else {
+        slivers.add(
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: _gutter),
+            sliver: SliverList.separated(
+              itemCount: shown,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final story = filtered[index];
+                return NoticiasListEditorialCard(
+                  topic: story.lead,
+                  accounts: story.isGrouped ? story.topics : null,
+                  onTap: () => onOpenTopic(story.lead),
+                );
+              },
+            ),
+          ),
+        );
+        if (shown < filtered.length) {
+          slivers.add(
+            SliverToBoxAdapter(
+              child: _NoticiasArchiveLoadMore(
+                key: ValueKey(shown),
+                shown: shown,
+                total: filtered.length,
+                onVisible: onLoadMoreArchive,
+              ),
+            ),
+          );
+        }
+      }
+    }
   }
 
   slivers.add(
@@ -187,6 +202,254 @@ List<Widget> buildNoticiasEditorialSlivers({
 String noticiasCategoryShort(ForumTopic topic) {
   return noticiasCategoryLabel(topic.relatedForumId);
 }
+
+List<NoticiasStory> _filterNoticiasStories(
+  List<NoticiasStory> stories, {
+  required String? categoryId,
+  required String query,
+}) {
+  final needle = query.trim().toLowerCase();
+  return [
+    for (final story in stories)
+      if (_storyMatchesCategory(story, categoryId) &&
+          _storyMatchesQuery(story, needle))
+        story,
+  ];
+}
+
+bool _storyMatchesCategory(NoticiasStory story, String? categoryId) {
+  if (categoryId == null || categoryId.isEmpty) return true;
+  final label = noticiasCategoryLabel(story.lead.relatedForumId);
+  if (categoryId == 'actualidad') return label == 'Actualidad';
+  return noticiasCategoryLabel(categoryId) == label;
+}
+
+bool _storyMatchesQuery(NoticiasStory story, String needle) {
+  if (needle.isEmpty) return true;
+  for (final topic in story.topics) {
+    final haystack = '${topic.title} ${topic.excerpt} ${topic.authorHandle}'
+        .toLowerCase();
+    if (haystack.contains(needle)) return true;
+  }
+  return false;
+}
+
+class _NoticiasMoreHeader extends StatelessWidget {
+  const _NoticiasMoreHeader({
+    required this.showAllLatest,
+    required this.onToggleShowAll,
+  });
+
+  final bool showAllLatest;
+  final VoidCallback onToggleShowAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_gutter, 8, _gutter, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Más noticias',
+              style: AppTypography.newsHeadline(
+                color: AppColors.burgundyDark,
+              ).copyWith(fontSize: 17, fontWeight: FontWeight.w600),
+            ),
+          ),
+          InkWell(
+            onTap: onToggleShowAll,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Text(
+                showAllLatest ? 'Ver menos ›' : 'Ver todas ›',
+                style: ForumTopicsTypography.card(
+                  color: AppColors.burgundy,
+                  fontWeight: FontWeight.w700,
+                ).copyWith(fontSize: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoticiasArchiveLoadMore extends StatefulWidget {
+  const _NoticiasArchiveLoadMore({
+    super.key,
+    required this.shown,
+    required this.total,
+    required this.onVisible,
+  });
+
+  final int shown;
+  final int total;
+  final VoidCallback onVisible;
+
+  @override
+  State<_NoticiasArchiveLoadMore> createState() =>
+      _NoticiasArchiveLoadMoreState();
+}
+
+class _NoticiasArchiveLoadMoreState extends State<_NoticiasArchiveLoadMore> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onVisible();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_gutter, 10, _gutter, 4),
+      child: Text(
+        '${widget.shown} de ${widget.total}',
+        textAlign: TextAlign.center,
+        style: ForumTopicsTypography.card(
+          color: AppColors.textMuted,
+          fontWeight: FontWeight.w600,
+        ).copyWith(fontSize: 12),
+      ),
+    );
+  }
+}
+
+class _NoticiasArchiveControls extends StatelessWidget {
+  const _NoticiasArchiveControls({
+    required this.stories,
+    required this.searchController,
+    required this.categoryId,
+    required this.onQueryChanged,
+    required this.onCategoryChanged,
+  });
+
+  final List<NoticiasStory> stories;
+  final TextEditingController searchController;
+  final String? categoryId;
+  final ValueChanged<String> onQueryChanged;
+  final ValueChanged<String?> onCategoryChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <({String? id, String label, int count})>[
+      (id: null, label: 'Todas', count: stories.length),
+    ];
+    for (final option in noticiasCategoryOptions) {
+      final label = noticiasCategoryLabel(option.id);
+      final count = stories
+          .where(
+            (story) =>
+                noticiasCategoryLabel(story.lead.relatedForumId) == label,
+          )
+          .length;
+      if (count == 0) continue;
+      chips.add((id: option.id, label: label, count: count));
+    }
+    final actualidad = stories
+        .where(
+          (story) =>
+              noticiasCategoryLabel(story.lead.relatedForumId) == 'Actualidad',
+        )
+        .length;
+    if (actualidad > 0) {
+      chips.add((id: 'actualidad', label: 'Actualidad', count: actualidad));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_gutter, 0, _gutter, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 38,
+            child: TextField(
+              controller: searchController,
+              onChanged: onQueryChanged,
+              style: ForumTopicsTypography.style(),
+              decoration: InputDecoration(
+                hintText: 'Buscar noticia...',
+                hintStyle: ForumTopicsTypography.style(
+                  color: AppColors.textMuted,
+                ),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: AppColors.textMuted,
+                  size: 18,
+                ),
+                filled: true,
+                fillColor: AppColors.surface,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                isDense: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: AppColors.gold.withValues(alpha: 0.35),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: AppColors.gold.withValues(alpha: 0.35),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (chips.length > 2) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 30,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: chips.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 6),
+                itemBuilder: (context, index) {
+                  final chip = chips[index];
+                  final selected = categoryId == chip.id ||
+                      (categoryId == null && chip.id == null);
+                  return Material(
+                    color: selected ? AppColors.burgundy : AppColors.surface,
+                    borderRadius: BorderRadius.circular(999),
+                    child: InkWell(
+                      onTap: () => onCategoryChanged(chip.id),
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: selected
+                                ? AppColors.burgundy
+                                : AppColors.gold.withValues(alpha: 0.45),
+                          ),
+                        ),
+                        child: Text(
+                          '${chip.label} ${chip.count}',
+                          style: AppTypography.labelSmall(
+                            color: selected
+                                ? AppColors.textOnDark
+                                : AppColors.burgundy,
+                          ).copyWith(fontSize: 11, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 
 class NoticiasFeaturedEditorialCard extends StatelessWidget {
   const NoticiasFeaturedEditorialCard({

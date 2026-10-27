@@ -1125,6 +1125,8 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
               ref.read(currentUserProvider)?.id,
             ),
             canModerate: _canModerateCurrentForum() && topic.isPublished,
+            canDeleteTopic:
+                _canModerateCurrentForum() && topic.isPublished && !topic.isSystem,
             canRequestClose: canRequestTopicClose(
               topic,
               ref.read(currentUserProvider)?.id,
@@ -1145,6 +1147,17 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
               forumId: widget.forumId,
               topic: topic,
             ),
+            onDeleteTopic: () async {
+              final deleted = await confirmAndDeleteForumTopic(
+                context,
+                ref,
+                topic: topic,
+                forumId: widget.forumId,
+              );
+              if (deleted && context.mounted) {
+                popForumTopic(context, forumId: widget.forumId);
+              }
+            },
             onRequestClose: () => _requestTopicClose(topic),
             onReport: _reportTopic,
           ),
@@ -1785,6 +1798,7 @@ enum _TopicOverflowAction {
   scheduledPosts,
   editTopic,
   moderate,
+  deleteTopic,
   requestClose,
   report,
 }
@@ -1795,11 +1809,13 @@ class _TopicDetailOverflowMenu extends StatelessWidget {
     required this.canPublishOfficial,
     required this.canEditTopic,
     required this.canModerate,
+    required this.canDeleteTopic,
     required this.canRequestClose,
     required this.canReport,
     required this.onScheduledPosts,
     required this.onEditTopic,
     required this.onModerate,
+    required this.onDeleteTopic,
     required this.onRequestClose,
     required this.onReport,
   });
@@ -1808,11 +1824,13 @@ class _TopicDetailOverflowMenu extends StatelessWidget {
   final bool canPublishOfficial;
   final bool canEditTopic;
   final bool canModerate;
+  final bool canDeleteTopic;
   final bool canRequestClose;
   final bool canReport;
   final VoidCallback onScheduledPosts;
   final VoidCallback onEditTopic;
   final VoidCallback onModerate;
+  final VoidCallback onDeleteTopic;
   final VoidCallback onRequestClose;
   final VoidCallback onReport;
 
@@ -1820,6 +1838,7 @@ class _TopicDetailOverflowMenu extends StatelessWidget {
       (isHermandadBoard && canPublishOfficial) ||
       canEditTopic ||
       canModerate ||
+      canDeleteTopic ||
       canRequestClose ||
       canReport;
 
@@ -1838,6 +1857,8 @@ class _TopicDetailOverflowMenu extends StatelessWidget {
             onEditTopic();
           case _TopicOverflowAction.moderate:
             onModerate();
+          case _TopicOverflowAction.deleteTopic:
+            onDeleteTopic();
           case _TopicOverflowAction.requestClose:
             onRequestClose();
           case _TopicOverflowAction.report:
@@ -1859,6 +1880,11 @@ class _TopicDetailOverflowMenu extends StatelessWidget {
           const PopupMenuItem(
             value: _TopicOverflowAction.moderate,
             child: Text('Moderar tema'),
+          ),
+        if (canDeleteTopic)
+          const PopupMenuItem(
+            value: _TopicOverflowAction.deleteTopic,
+            child: Text('Eliminar tema'),
           ),
         if (canRequestClose)
           const PopupMenuItem(

@@ -118,15 +118,15 @@ class _FillBody extends StatelessWidget {
     final excerptText = preview.isNotEmpty
         ? preview
         : (activity.isTopic
-            ? 'Tema publicado en ${activity.forumName}'
-            : 'Respuesta en ${activity.forumName}');
+            ? 'Tema publicado en ${activity.placeName}'
+            : 'Respuesta en ${activity.placeName}');
 
     final meta = Row(
       children: [
         Flexible(
           child: _ForumChip(
             icon: forumIcon,
-            label: activity.forumName,
+            label: activity.originLabel,
             compact: true,
           ),
         ),
@@ -267,8 +267,8 @@ class _IntrinsicBody extends StatelessWidget {
     final excerptText = preview.isNotEmpty
         ? preview
         : (activity.isTopic
-            ? 'Tema publicado en ${activity.forumName}'
-            : 'Respuesta en ${activity.forumName}');
+            ? 'Tema publicado en ${activity.placeName}'
+            : 'Respuesta en ${activity.placeName}');
 
     return IntrinsicHeight(
       child: Row(
@@ -283,7 +283,7 @@ class _IntrinsicBody extends StatelessWidget {
                     Flexible(
                       child: _ForumChip(
                         icon: forumIcon,
-                        label: activity.forumName,
+                        label: activity.originLabel,
                         compact: dense,
                       ),
                     ),

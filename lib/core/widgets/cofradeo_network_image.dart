@@ -51,7 +51,8 @@ class CofradeoNetworkImage extends StatelessWidget {
     }
 
     final pixelRatio = MediaQuery.devicePixelRatioOf(context);
-    final logical = cacheSize ?? width ?? height;
+    final raw = cacheSize ?? width ?? height;
+    final logical = raw != null && raw.isFinite ? raw : null;
     final cachePx = logical != null ? (logical * pixelRatio).round() : null;
     final memCache = _resolveMemCache(cachePx, width, height);
 

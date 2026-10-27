@@ -547,18 +547,26 @@ class AdminRepository {
     return rows.map(_topicFromRow).toList();
   }
 
-  /// Elimina un tema (y respuestas por cascade). Requiere poder moderar el foro.
+  /// Elimina un tema y sus respuestas. Requiere poder moderar el foro.
   Future<void> deleteTopic(String topicId) async {
     if (_client == null) throw const AdminUnavailableException();
 
-    final deleted = await _client!
-        .from('forum_topics')
-        .delete()
-        .eq('id', topicId)
-        .select('id');
+    try {
+      await _client!.rpc(
+        'delete_forum_topic',
+        params: {'p_topic_id': topicId},
+      );
+    } on PostgrestException catch (error) {
+      final missing = error.code == 'PGRST202' ||
+          error.message.contains('delete_forum_topic');
+      if (!missing) throw const TopicDeleteFailedException();
 
-    if (deleted.isEmpty) {
-      throw const TopicDeleteFailedException();
+      final deleted = await _client!
+          .from('forum_topics')
+          .delete()
+          .eq('id', topicId)
+          .select('id');
+      if (deleted.isEmpty) throw const TopicDeleteFailedException();
     }
   }
 
