@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
@@ -143,48 +144,52 @@ class CuaresmaHubHeroStack extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: CuaresmaHubElevatedCard(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hoy en Cuaresma',
-                          style: TopicDetailTypography.body(
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'HOY EN CUARESMA',
+                          style: AppTypography.labelSmall(
                             color: AppColors.burgundy,
-                          ).copyWith(fontWeight: FontWeight.w700),
+                          ).copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            letterSpacing: 1.1,
+                            height: 1,
+                          ),
                         ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 4,
-                          children: [
-                            CuaresmaHubStatChip(
-                              icon: Icons.fiber_manual_record_rounded,
-                              label: liveEnsayoCount > 0
-                                  ? (liveEnsayoCount == 1
-                                      ? '1 ensayo en directo'
-                                      : '$liveEnsayoCount ensayos en directo')
-                                  : (todayEnsayoCount == 1
-                                      ? '1 ensayo hoy'
-                                      : '$todayEnsayoCount ensayos hoy'),
-                              highlighted: liveEnsayoCount > 0,
-                            ),
-                            CuaresmaHubStatChip(
-                              icon: Icons.chat_bubble_outline_rounded,
-                              label: topicsCount == 1
-                                  ? '1 tema abierto'
-                                  : '$topicsCount temas abiertos',
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                      ),
+                      CuaresmaHubNewTopicButton(onPressed: onNewTopic),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  CuaresmaHubNewTopicButton(onPressed: onNewTopic),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _HubCountPill(
+                        icon: Icons.campaign_outlined,
+                        label: liveEnsayoCount > 0
+                            ? (liveEnsayoCount == 1
+                                ? '1 ensayo en directo'
+                                : '$liveEnsayoCount ensayos en directo')
+                            : (todayEnsayoCount == 1
+                                ? '1 ensayo hoy'
+                                : '$todayEnsayoCount ensayos hoy'),
+                        live: liveEnsayoCount > 0,
+                      ),
+                      _HubCountPill(
+                        icon: Icons.forum_outlined,
+                        label: topicsCount == 1
+                            ? '1 tema abierto'
+                            : '$topicsCount temas abiertos',
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -192,6 +197,53 @@ class CuaresmaHubHeroStack extends StatelessWidget {
         ),
         const SizedBox(height: 0),
       ],
+    );
+  }
+}
+
+class _HubCountPill extends StatelessWidget {
+  const _HubCountPill({
+    required this.icon,
+    required this.label,
+    this.live = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool live;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = live ? const Color(0xFF1F7A52) : AppColors.textSecondary;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: live
+            ? const Color(0xFF2F9E6E).withValues(alpha: 0.1)
+            : AppColors.background,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: live
+              ? const Color(0xFF2F9E6E).withValues(alpha: 0.35)
+              : AppColors.gold.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TopicDetailTypography.meta(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ).copyWith(fontSize: 12),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -8,14 +8,12 @@ import '../../forums/topic_detail_typography.dart';
 class SemanaSantaHubSummaryCard extends StatelessWidget {
   const SemanaSantaHubSummaryCard({
     super.key,
-    required this.liveUpdateCount,
     required this.onPublish,
     this.liveOpen = true,
     this.canInform = false,
     this.jornadaLabel,
   });
 
-  final int liveUpdateCount;
   final VoidCallback onPublish;
   final bool liveOpen;
   final bool canInform;
@@ -23,100 +21,134 @@ class SemanaSantaHubSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avisosLabel = liveUpdateCount == 1
-        ? '1 aviso en directo'
-        : '$liveUpdateCount avisos en directo';
+    final day = jornadaLabel?.trim();
+    final title = (day != null && day.isNotEmpty) ? day : 'Sin jornada activa';
+    final statusLabel = liveOpen
+        ? 'En directo'
+        : (day != null && day.isNotEmpty ? 'En pausa' : 'Cerrado');
 
-    return Material(
-      color: AppColors.surface,
-      elevation: 1.5,
-      shadowColor: AppColors.burgundyDark.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(16),
-      child: Ink(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.gold.withValues(alpha: 0.22)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.hermandadName(
+                  color: AppColors.textPrimary,
+                ).copyWith(fontSize: 26, height: 1, letterSpacing: 0),
+              ),
+            ),
+            if (liveOpen) ...[
+              const SizedBox(width: 8),
+              Text(
+                'últimas 12 h',
+                style: TopicDetailTypography.meta(
+                  color: AppColors.textMuted,
+                ).copyWith(fontSize: 12),
+              ),
+            ],
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _HubPill(
+              label: statusLabel,
+              filled: liveOpen,
+              leading: _LiveDot(live: liveOpen),
+            ),
+            if (liveOpen && canInform) ...[
+              const SizedBox(width: 8),
+              _HubPill(
+                label: 'Informar',
+                filled: true,
+                onTap: onPublish,
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _HubPill extends StatelessWidget {
+  const _HubPill({
+    required this.label,
+    required this.filled,
+    this.leading,
+    this.onTap,
+  });
+
+  final String label;
+  final bool filled;
+  final Widget? leading;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(999);
+    return Material(
+      color: filled ? AppColors.burgundy : AppColors.surface,
+      borderRadius: radius,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: filled
+                  ? AppColors.burgundy
+                  : AppColors.gold.withValues(alpha: 0.45),
+            ),
+          ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.burgundy.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.campaign_rounded,
-                  color: AppColors.burgundy,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Hoy en la calle',
-                      style: AppTypography.displaySmall(
-                        color: AppColors.burgundy,
-                      ).copyWith(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        height: 1.05,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      liveOpen
-                          ? (canInform
-                              ? avisosLabel
-                              : '$avisosLabel · reacciona y comenta')
-                          : (jornadaLabel != null
-                              ? 'Cerrado · $jornadaLabel'
-                              : 'El en directo está cerrado'),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TopicDetailTypography.meta(
-                        color: AppColors.textSecondary,
-                      ).copyWith(fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              if (liveOpen && canInform) ...[
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: onPublish,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.burgundy,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                  ),
-                  child: Text(
-                    '+ Informar',
-                    style: TopicDetailTypography.body(
-                      color: Colors.white,
-                    ).copyWith(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
+              if (leading != null) ...[
+                leading!,
+                const SizedBox(width: 6),
               ],
+              Text(
+                label,
+                style: TopicDetailTypography.body(
+                  color: filled ? Colors.white : AppColors.textSecondary,
+                ).copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  height: 1,
+                ),
+              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveDot extends StatelessWidget {
+  const _LiveDot({required this.live});
+
+  final bool live;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: live ? const Color(0xFF3DDC97) : AppColors.textMuted,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: live ? Colors.white : Colors.transparent,
+          width: 1.2,
         ),
       ),
     );

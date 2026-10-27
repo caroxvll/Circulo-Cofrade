@@ -47,7 +47,7 @@ Future<void> showEventComposeSheet(
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Solo moderadores de foro pueden proponer eventos al calendario.',
+            'Solo moderadores, o cuentas con acceso al calendario, pueden proponer eventos.',
           ),
         ),
       );

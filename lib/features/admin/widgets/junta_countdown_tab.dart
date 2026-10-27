@@ -5,9 +5,9 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/cofrade_countdown_banner.dart';
 import '../../../shared/models/liturgical_countdown_settings.dart';
-import '../../calendar/data/liturgical_countdown_repository.dart';
 import '../../calendar/liturgical_countdown_provider.dart';
 import '../../calendar/utils/holy_week_countdown.dart';
+import '../../semana_santa/data/ss_live_gate_repository.dart';
 import '../junta_ui.dart';
 
 class JuntaCountdownTab extends ConsumerStatefulWidget {
@@ -24,6 +24,8 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
   DateTime? _easterOverride;
   var _loadedYear = 0;
   var _saving = false;
+  bool? _liveEnabled;
+  var _savingLive = false;
 
   @override
   void dispose() {
@@ -156,10 +158,46 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
     }
   }
 
+  Future<void> _setLiveEnabled(bool enabled) async {
+    setState(() {
+      _liveEnabled = enabled;
+      _savingLive = true;
+    });
+    try {
+      await ref.read(ssLiveGateRepositoryProvider).setLiveEnabled(enabled);
+      ref.invalidate(ssLiveMasterEnabledProvider);
+      ref.invalidate(ssLiveGateProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              enabled
+                  ? 'En directo de Semana Santa activado'
+                  : 'En directo de Semana Santa en pausa',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _liveEnabled = !enabled);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo cambiar el en directo'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _savingLive = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final year = DateTime.now().year;
     final settingsAsync = ref.watch(liturgicalCountdownSettingsProvider(year));
+    final liveAsync = ref.watch(ssLiveMasterEnabledProvider);
+    final liveOn = _liveEnabled ?? liveAsync.asData?.value ?? false;
     final dateFormat = DateFormat("EEEE d 'de' MMMM", 'es');
     final computed = computedLiturgicalDates(year);
 
@@ -190,6 +228,25 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
                   'ajustar fechas, visibilidad o desactivar el banner.',
             ),
             const SizedBox(height: JuntaUi.sectionGap),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                'En directo de Semana Santa',
+                style: JuntaUi.cardTitle(),
+              ),
+              subtitle: Text(
+                liveOn
+                    ? 'Los avisos de la jornada abierta se pueden publicar'
+                    : 'En pausa. Aunque una jornada esté forzada abierta, no deja informar',
+                style: JuntaUi.caption(),
+              ),
+              value: liveOn,
+              activeThumbColor: AppColors.burgundy,
+              onChanged: _savingLive || liveAsync.isLoading
+                  ? null
+                  : _setLiveEnabled,
+            ),
+            const SizedBox(height: 8),
             _InfoCard(
               title: 'Cálculo automático ($_loadedYear)',
               body:

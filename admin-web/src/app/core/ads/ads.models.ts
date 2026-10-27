@@ -8,7 +8,8 @@ export type AdPlacement =
   | 'search'
   | 'profile'
   | 'hermandades'
-  | 'noticias';
+  | 'noticias'
+  | 'semana_santa';
 
 export const ADMIN_AD_PLACEMENTS: AdPlacement[] = [
   'forums_top',
@@ -19,6 +20,7 @@ export const ADMIN_AD_PLACEMENTS: AdPlacement[] = [
   'calendar',
   'search',
   'noticias',
+  'semana_santa',
 ];
 
 export const PACK_AD_PLACEMENTS: AdPlacement[] = [
@@ -29,6 +31,7 @@ export const PACK_AD_PLACEMENTS: AdPlacement[] = [
   'calendar',
   'search',
   'noticias',
+  'semana_santa',
 ];
 
 export const AD_FORUM_IDS = [
@@ -192,6 +195,8 @@ export function placementCommercialName(placement: string): string {
       return 'Buscar · banner';
     case 'noticias':
       return 'Noticias · banner';
+    case 'semana_santa':
+      return 'Semana Santa · banner';
     case 'profile':
       return 'Perfil';
     case 'home':
@@ -219,6 +224,8 @@ export function placementWhereHint(placement: string): string {
       return 'Banner en Buscar (pantalla inicial, sin resultados).';
     case 'noticias':
       return 'Banner anclado en Noticias (encima de la barra inferior).';
+    case 'semana_santa':
+      return 'Banner fijo en el en directo de Semana Santa, encima de la barra inferior.';
     default:
       return '';
   }
@@ -278,6 +285,8 @@ export function adTargetDetail(ad: SponsoredAd): string {
       return 'Pantalla: Buscar (inicio)';
     case 'noticias':
       return 'Pantalla: Noticias';
+    case 'semana_santa':
+      return 'Pantalla: en directo de Semana Santa';
     default:
       return '';
   }
@@ -335,6 +344,8 @@ export function placementShortName(placement: string): string {
       return 'Buscar';
     case 'noticias':
       return 'Noticias';
+    case 'semana_santa':
+      return 'Semana Santa';
     default:
       return placementCommercialName(placement);
   }

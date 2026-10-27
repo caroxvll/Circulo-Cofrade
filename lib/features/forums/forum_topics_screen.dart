@@ -26,6 +26,7 @@ import 'data/mock_forums.dart';
 import 'forums_hero_tokens.dart';
 import 'forum_topics_typography.dart';
 import 'forums_provider.dart';
+import '../calendar/calendar_contributors_provider.dart';
 import 'news_publishers_provider.dart';
 import '../profile/profile_provider.dart';
 import 'utils/forum_activity_badge.dart';
@@ -116,12 +117,17 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
     final isNewsPublisher = userId == null
         ? false
         : ref.watch(isNewsPublisherProvider(userId)).asData?.value ?? false;
+    final isCalendarContributor = userId == null
+        ? false
+        : ref.watch(isCalendarContributorProvider(userId)).asData?.value ??
+            false;
     final canCreateTopic = !isSuspended &&
         canCreateTopicInForum(
           forumId: forumId,
           isAdmin: isAdmin,
           moderatedForumIds: moderatedForumIds,
           isNewsPublisher: isNewsPublisher,
+          isCalendarContributor: isCalendarContributor,
         );
     final forum =
         ref.watch(forumPillarProvider(forumId)).asData?.value ??

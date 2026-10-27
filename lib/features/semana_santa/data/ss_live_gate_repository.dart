@@ -34,16 +34,23 @@ class SsLiveGateState {
   final SsLiturgicalDay? activeDay;
   final bool settingsLoaded;
 
+  /// La jornada está forzada o dentro de horario, pero el interruptor
+  /// general de Temporada («En directo de Semana Santa») está apagado.
+  bool get pausedByMasterSwitch =>
+      !isOpen && activeDay != null && activeDay!.isOpen;
+
   String get closedMessage {
-    if (activeDay == null && isOpen) {
-      return '';
+    if (isOpen) return '';
+    final day = activeDay;
+    if (day != null && day.isOpen) {
+      return 'El en directo está en pausa. En Temporada, activa '
+          '«En directo de Semana Santa», en Perfil → Junta → Temporada. '
+          'La jornada «${day.label}» está abierta.';
     }
-    if (!isOpen) {
-      return activeDay == null
-          ? 'El en directo está cerrado. Vuelve en la próxima jornada.'
-          : 'La jornada «${activeDay!.label}» no admite avisos ahora.';
+    if (day == null) {
+      return 'El en directo está cerrado. Vuelve en la próxima jornada.';
     }
-    return '';
+    return 'La jornada «${day.label}» no admite avisos ahora.';
   }
 }
 
@@ -51,6 +58,27 @@ class SsLiveGateRepository {
   SsLiveGateRepository({SupabaseClient? client}) : _client = client;
 
   final SupabaseClient? _client;
+
+  Future<bool> fetchLiveEnabled() async {
+    final client = _client;
+    if (client == null) return true;
+    final row = await client
+        .from('ss_live_settings')
+        .select('is_enabled')
+        .eq('id', 1)
+        .maybeSingle();
+    return row?['is_enabled'] as bool? ?? true;
+  }
+
+  Future<void> setLiveEnabled(bool enabled) async {
+    final client = _client;
+    if (client == null) return;
+    await client.from('ss_live_settings').upsert({
+      'id': 1,
+      'is_enabled': enabled,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
 
   Future<SsLiveGateState> fetchGate() async {
     final client = _client;
@@ -95,6 +123,10 @@ SsLiveGateRepository createSsLiveGateRepository() {
 
 final ssLiveGateRepositoryProvider = Provider<SsLiveGateRepository>((ref) {
   return createSsLiveGateRepository();
+});
+
+final ssLiveMasterEnabledProvider = FutureProvider.autoDispose<bool>((ref) {
+  return ref.watch(ssLiveGateRepositoryProvider).fetchLiveEnabled();
 });
 
 final ssLiveGateProvider = FutureProvider.autoDispose<SsLiveGateState>((ref) {

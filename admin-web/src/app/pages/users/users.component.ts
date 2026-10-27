@@ -25,7 +25,7 @@ export class UsersPageComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly busyId = signal<string | null>(null);
   readonly filter = signal<
-    'all' | 'admin' | 'brotherhood' | 'suspended' | 'noticias'
+    'all' | 'admin' | 'brotherhood' | 'suspended' | 'noticias' | 'calendario' | 'moderador'
   >('all');
   readonly editingUser = signal<AdminUserRow | null>(null);
   readonly editSaving = signal(false);
@@ -47,13 +47,20 @@ export class UsersPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [stats, users, publisherIds] = await Promise.all([
-        this.community.fetchSignupStats(),
-        this.community.searchUsers(this.search),
-        this.community.fetchNewsPublisherIds().catch(() => new Set<string>()),
-      ]);
+      const [stats, users, publisherIds, calendarIds, moderatorIds] =
+        await Promise.all([
+          this.community.fetchSignupStats(),
+          this.community.searchUsers(this.search),
+          this.community.fetchNewsPublisherIds().catch(() => new Set<string>()),
+          this.community
+            .fetchCalendarContributorIds()
+            .catch(() => new Set<string>()),
+          this.community.fetchForumModeratorIds().catch(() => new Set<string>()),
+        ]);
       this.stats.set(stats);
-      this.users.set(this.withNewsAccess(users, publisherIds));
+      this.users.set(
+        this.withAccess(users, publisherIds, calendarIds, moderatorIds),
+      );
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo cargar');
     } finally {
@@ -65,11 +72,17 @@ export class UsersPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [users, publisherIds] = await Promise.all([
+      const [users, publisherIds, calendarIds, moderatorIds] = await Promise.all([
         this.community.searchUsers(this.search),
         this.community.fetchNewsPublisherIds().catch(() => new Set<string>()),
+        this.community
+          .fetchCalendarContributorIds()
+          .catch(() => new Set<string>()),
+        this.community.fetchForumModeratorIds().catch(() => new Set<string>()),
       ]);
-      this.users.set(this.withNewsAccess(users, publisherIds));
+      this.users.set(
+        this.withAccess(users, publisherIds, calendarIds, moderatorIds),
+      );
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Error de búsqueda');
     } finally {
@@ -87,7 +100,11 @@ export class UsersPageComponent implements OnInit {
       case 'suspended':
         return list.filter((u) => !!u.suspendedAt);
       case 'noticias':
-        return list.filter((u) => u.newsPublisher);
+        return list.filter((u) => u.newsPublisher || u.forumModerator);
+      case 'calendario':
+        return list.filter((u) => u.calendarContributor || u.forumModerator);
+      case 'moderador':
+        return list.filter((u) => u.forumModerator);
       default:
         return list;
     }
@@ -117,7 +134,7 @@ export class UsersPageComponent implements OnInit {
   async toggleNewsPublisher(user: AdminUserRow): Promise<void> {
     const next = !user.newsPublisher;
     const question = next
-      ? `¿Dejar que @${user.handle} publique noticias? Solo noticias: no verifica la cuenta ni abre calendario ni tablón.`
+      ? `¿Dejar que @${user.handle} publique noticias? El verificado dorado sale en su perfil. El calendario oficial no se abre con esto.`
       : `¿Quitar a @${user.handle} el acceso a noticias? Lo ya publicado sigue con su firma.`;
     if (!confirm(question)) return;
     this.busyId.set(user.id);
@@ -139,14 +156,49 @@ export class UsersPageComponent implements OnInit {
     }
   }
 
-  private withNewsAccess(
+  private withAccess(
     users: AdminUserRow[],
     publisherIds: Set<string>,
+    calendarIds: Set<string>,
+    moderatorIds: Set<string>,
   ): AdminUserRow[] {
     return users.map((user) => ({
       ...user,
       newsPublisher: publisherIds.has(user.id),
+      calendarContributor: calendarIds.has(user.id),
+      forumModerator: moderatorIds.has(user.id),
     }));
+  }
+
+  async toggleCalendarContributor(user: AdminUserRow): Promise<void> {
+    const next = !user.calendarContributor;
+    const question = next
+      ? `¿Dejar que @${user.handle} proponga eventos? Quedan en revisión de la Junta. También podrá publicar noticias.`
+      : `¿Quitar a @${user.handle} el acceso al calendario? El acceso a noticias, si lo tiene, se queda.`;
+    if (!confirm(question)) return;
+    this.busyId.set(user.id);
+    try {
+      await this.community.setCalendarContributor(user.id, next);
+      this.users.update((list) =>
+        list.map((u) =>
+          u.id === user.id
+            ? {
+                ...u,
+                calendarContributor: next,
+                newsPublisher: next ? true : u.newsPublisher,
+              }
+            : u,
+        ),
+      );
+    } catch (err) {
+      this.error.set(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo actualizar. ¿Ejecutaste calendar_contributors.sql?',
+      );
+    } finally {
+      this.busyId.set(null);
+    }
   }
 
   async toggleVerified(user: AdminUserRow): Promise<void> {

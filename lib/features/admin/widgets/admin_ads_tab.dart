@@ -1656,6 +1656,7 @@ const _adminAdPlacements = [
   AdPlacement.calendar,
   AdPlacement.search,
   AdPlacement.noticias,
+  AdPlacement.semanaSanta,
 ];
 
 const _adTargetForumIds = [
@@ -1685,6 +1686,7 @@ String _placementCommercialName(AdPlacement placement) {
     AdPlacement.calendar => 'Calendario · banner',
     AdPlacement.search => 'Buscar · banner',
     AdPlacement.noticias => 'Noticias · banner',
+    AdPlacement.semanaSanta => 'Semana Santa · banner',
     AdPlacement.profile => 'Perfil',
     AdPlacement.home => 'Inicio',
   };
@@ -1707,6 +1709,8 @@ String _placementWhereHint(AdPlacement placement) {
       'Banner en Buscar (pantalla modal, sin resultados).',
     AdPlacement.noticias =>
       'Banner anclado en el tab Noticias (encima de la barra inferior).',
+    AdPlacement.semanaSanta =>
+      'Banner fijo en el en directo de Semana Santa, encima de la barra inferior.',
     AdPlacement.profile => 'Reservado · perfil.',
     AdPlacement.home => 'Reservado · inicio.',
   };
@@ -1717,7 +1721,9 @@ String _placementLabel(AdPlacement placement) =>
 
 String _imageHelperForPlacement(AdPlacement placement) {
   return switch (placement) {
-    AdPlacement.forumsTop || AdPlacement.noticias =>
+    AdPlacement.forumsTop ||
+    AdPlacement.noticias ||
+    AdPlacement.semanaSanta =>
       'Banner 1200×276 px. Deja libre la esquina inferior derecha para el botón.',
     AdPlacement.calendar ||
     AdPlacement.search ||

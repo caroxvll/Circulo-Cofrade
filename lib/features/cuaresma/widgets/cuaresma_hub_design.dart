@@ -19,10 +19,11 @@ class CuaresmaHubElevatedCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.28)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textPrimary.withValues(alpha: 0.06),
-            blurRadius: 16,
+            color: AppColors.burgundyDark.withValues(alpha: 0.05),
+            blurRadius: 14,
             offset: const Offset(0, 4),
           ),
         ],
@@ -45,24 +46,25 @@ class CuaresmaHubNewTopicButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
+    return FilledButton.icon(
       onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.burgundy,
-        side: const BorderSide(color: AppColors.burgundy, width: 1.2),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        minimumSize: const Size(0, 32),
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.burgundy,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        minimumSize: const Size(0, 34),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(999),
         ),
       ),
       icon: const Icon(Icons.add_rounded, size: 16),
       label: Text(
         'Tema',
         style: TopicDetailTypography.body(
-          color: AppColors.burgundy,
-        ).copyWith(fontWeight: FontWeight.w600, fontSize: 12.5),
+          color: Colors.white,
+        ).copyWith(fontWeight: FontWeight.w700, fontSize: 13, height: 1),
       ),
     );
   }

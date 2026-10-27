@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../shared/models/forum.dart';
 import '../../forums/data/mock_forums.dart';
@@ -58,7 +59,7 @@ class _CuaresmaTopicsPanelState extends ConsumerState<CuaresmaTopicsPanel> {
         final hasMore = community.length > _defaultVisibleTopics;
 
         return CuaresmaHubElevatedCard(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -67,10 +68,9 @@ class _CuaresmaTopicsPanelState extends ConsumerState<CuaresmaTopicsPanel> {
                   Expanded(
                     child: Text(
                       'Temas',
-                      style: TopicDetailTypography.body().copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
+                      style: AppTypography.hermandadName(
+                        color: AppColors.textPrimary,
+                      ).copyWith(fontSize: 22, height: 1),
                     ),
                   ),
                   if (hasMore && !_showAll)
@@ -89,21 +89,31 @@ class _CuaresmaTopicsPanelState extends ConsumerState<CuaresmaTopicsPanel> {
                   ),
                 ),
               ] else ...[
-                const SizedBox(height: 4),
-                ...visible.map(
-                  (topic) => _CuaresmaHubTopicRow(
-                    topic: topic,
-                    forumId: widget.forumId,
-                    onTap: () async {
-                      await context.push(
-                        '/foros/${widget.forumId}/tema/${topic.id}',
+                const SizedBox(height: 6),
+                for (var i = 0; i < visible.length; i++) ...[
+                  if (i > 0)
+                    Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: AppColors.gold.withValues(alpha: 0.22),
+                    ),
+                  Builder(
+                    builder: (context) {
+                      final topic = visible[i];
+                      return _CuaresmaHubTopicRow(
+                        topic: topic,
+                        onTap: () async {
+                          await context.push(
+                            '/foros/${widget.forumId}/tema/${topic.id}',
+                          );
+                          if (context.mounted) {
+                            ref.invalidate(forumTopicsProvider(widget.forumId));
+                          }
+                        },
                       );
-                      if (context.mounted) {
-                        ref.invalidate(forumTopicsProvider(widget.forumId));
-                      }
                     },
                   ),
-                ),
+                ],
               ],
             ],
           ),
@@ -116,97 +126,75 @@ class _CuaresmaTopicsPanelState extends ConsumerState<CuaresmaTopicsPanel> {
 class _CuaresmaHubTopicRow extends StatelessWidget {
   const _CuaresmaHubTopicRow({
     required this.topic,
-    required this.forumId,
     required this.onTap,
   });
 
   final ForumTopic topic;
-  final String forumId;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final isNew = isTopicNew(topic);
-    final title = topic.excerpt.trim().isNotEmpty
-        ? topic.excerpt.trim()
-        : topic.title.trim();
+    final title = topic.title.trim().isNotEmpty
+        ? topic.title.trim()
+        : topic.excerpt.trim();
+    final handle = topic.authorHandle.startsWith('@')
+        ? topic.authorHandle
+        : '@${topic.authorHandle}';
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                CofradeoAvatar(
-                  imageUrl: topic.authorAvatarUrl,
-                  icon: topic.avatarIcon,
-                  size: 40,
-                  backgroundColor: AppColors.backgroundElevated,
-                ),
-                if (isNew)
-                  Positioned(
-                    top: -4,
-                    left: -4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.gold,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Nuevo',
-                        style: TopicDetailTypography.meta(
-                          color: AppColors.chipSelectedText,
-                          fontWeight: FontWeight.w800,
-                        ).copyWith(fontSize: 8),
-                      ),
-                    ),
-                  ),
-              ],
+            CofradeoAvatar(
+              imageUrl: topic.authorAvatarUrl,
+              icon: topic.avatarIcon,
+              size: 36,
+              backgroundColor: AppColors.backgroundElevated,
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          handle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TopicDetailTypography.meta(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ).copyWith(fontSize: 13),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        topic.timeAgo,
+                        style: TopicDetailTypography.meta(
+                          color: AppColors.textMuted,
+                        ).copyWith(fontSize: 11.5),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   Text(
                     title,
-                    style: TopicDetailTypography.body().copyWith(
-                      fontWeight: FontWeight.w600,
-                      height: 1.25,
+                    style: AppTypography.newsHeadline().copyWith(
+                      fontSize: 18.5,
+                      height: 1.15,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    topic.authorHandle.startsWith('@')
-                        ? topic.authorHandle
-                        : '@${topic.authorHandle}',
-                    style: TopicDetailTypography.meta(
-                      color: AppColors.burgundy,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  _TopicCompactMeta(topic: topic),
+                  const SizedBox(height: 6),
+                  _TopicCompactMeta(topic: topic, isNew: isNew),
                 ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: AppColors.textMuted.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -217,9 +205,13 @@ class _CuaresmaHubTopicRow extends StatelessWidget {
 }
 
 class _TopicCompactMeta extends StatelessWidget {
-  const _TopicCompactMeta({required this.topic});
+  const _TopicCompactMeta({
+    required this.topic,
+    required this.isNew,
+  });
 
   final ForumTopic topic;
+  final bool isNew;
 
   @override
   Widget build(BuildContext context) {
@@ -230,18 +222,30 @@ class _TopicCompactMeta extends StatelessWidget {
 
     return Row(
       children: [
-        const Icon(Icons.chat_bubble_outline, size: 11, color: AppColors.textMuted),
-        const SizedBox(width: 3),
-        Text('${topic.commentCount}', style: style),
-        const SizedBox(width: 10),
-        const Icon(Icons.visibility_outlined, size: 11, color: AppColors.textMuted),
-        const SizedBox(width: 3),
-        Text(formatCount(topic.viewCount), style: style),
-        const SizedBox(width: 10),
-        Text(
-          topic.timeAgo,
-          style: style,
+        const Icon(
+          Icons.chat_bubble_outline,
+          size: 13,
+          color: AppColors.textMuted,
         ),
+        const SizedBox(width: 4),
+        Text('${topic.commentCount}', style: style),
+        const SizedBox(width: 12),
+        const Icon(
+          Icons.visibility_outlined,
+          size: 13,
+          color: AppColors.textMuted,
+        ),
+        const SizedBox(width: 4),
+        Text(formatCount(topic.viewCount), style: style),
+        const Spacer(),
+        if (isNew)
+          Text(
+            'Nuevo',
+            style: TopicDetailTypography.meta(
+              color: AppColors.burgundy,
+              fontWeight: FontWeight.w700,
+            ).copyWith(fontSize: 12),
+          ),
       ],
     );
   }

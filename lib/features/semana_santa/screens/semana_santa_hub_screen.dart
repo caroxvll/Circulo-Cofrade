@@ -8,6 +8,9 @@ import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../auth/auth_provider.dart';
 import '../../forums/forums_provider.dart';
 import '../../forums/mis_hermandades_provider.dart';
+import '../../ads/models/sponsored_ad.dart';
+import '../../ads/widgets/sponsored_ad_card.dart';
+import '../../ads/widgets/sponsored_placement_slot.dart';
 import '../../forums/utils/forum_navigation.dart';
 import '../models/ss_live_update.dart';
 import '../semana_santa_provider.dart';
@@ -34,7 +37,6 @@ class SemanaSantaHubScreen extends ConsumerWidget {
     ref.watch(topicViewTrackerProvider(topicKey));
 
     final topicAsync = ref.watch(forumTopicProvider(topicKey));
-    final stats = ref.watch(ssLiveStatsProvider);
     final topicsAsync = ref.watch(forumTopicsProvider(forumId));
     final gate = ref.watch(ssLiveGateProvider).asData?.value;
     if (supabaseReady) {
@@ -142,20 +144,19 @@ class SemanaSantaHubScreen extends ConsumerWidget {
             ],
           ),
           body: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SemanaSantaHubSummaryCard(
-                  liveUpdateCount: stats.total,
                   liveOpen: liveOpen,
                   canInform: canInform,
                   jornadaLabel: gate?.activeDay?.label,
                   onPublish: openInformar,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 const SemanaSantaHubHermandadesStrip(),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Expanded(
                   child: SemanaSantaRadarSection(
                     forumId: forumId,
@@ -163,6 +164,12 @@ class SemanaSantaHubScreen extends ConsumerWidget {
                     fillHeight: true,
                     onRefresh: refresh,
                   ),
+                ),
+                const SizedBox(height: 8),
+                const SponsoredPlacementSlot(
+                  placement: AdPlacement.semanaSanta,
+                  style: SponsoredAdCardStyle.forumsDocked,
+                  refreshOnMount: true,
                 ),
               ],
             ),

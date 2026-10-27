@@ -25,7 +25,7 @@ void main() {
         isAdmin: false,
         moderatedForumIds: {'foro-cofradiero'},
       ),
-      isFalse,
+      isTrue,
     );
     expect(
       canCreateTopicInForum(
@@ -35,6 +35,23 @@ void main() {
         isNewsPublisher: true,
       ),
       isTrue,
+    );
+    expect(
+      canCreateTopicInForum(
+        forumId: 'noticias',
+        isAdmin: false,
+        moderatedForumIds: {},
+        isCalendarContributor: true,
+      ),
+      isTrue,
+    );
+    expect(
+      canCreateTopicInForum(
+        forumId: 'noticias',
+        isAdmin: false,
+        moderatedForumIds: {},
+      ),
+      isFalse,
     );
   });
 

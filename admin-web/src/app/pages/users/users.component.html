@@ -4,9 +4,10 @@
       <p class="eyebrow">Comunidad · solo admin</p>
       <h1>Usuarios y altas</h1>
       <p class="lead">
-        Altas recientes, búsqueda y gestión de rol, verificación, acceso a
-        noticias, suspensión y borrado. «Noticias» solo deja publicar en ese
-        canal. Verificar sigue siendo la cuenta oficial de hermandad.
+        Altas recientes, búsqueda y gestión de rol, verificación, noticias,
+        calendario, suspensión y borrado. Verificar es la cuenta oficial.
+        Noticias lleva el verificado dorado. Calendario propone eventos y
+        también abre noticias. Un moderador de foro ya puede las dos cosas.
       </p>
     </div>
     <div class="queue-toolbar">
@@ -39,6 +40,8 @@
       <option value="brotherhood">Hermandades</option>
       <option value="suspended">Suspendidos</option>
       <option value="noticias">Pueden publicar noticias</option>
+      <option value="calendario">Pueden proponer calendario</option>
+      <option value="moderador">Moderadores de foro</option>
     </select>
   </div>
 
@@ -88,8 +91,14 @@
                 @if (user.verified) {
                   <span class="pill ok">verificado</span>
                 }
-                @if (user.newsPublisher) {
+                @if (user.newsPublisher || user.forumModerator) {
                   <span class="pill">noticias</span>
+                }
+                @if (user.calendarContributor || user.forumModerator) {
+                  <span class="pill">calendario</span>
+                }
+                @if (user.forumModerator) {
+                  <span class="pill">moderador</span>
                 }
               </td>
               <td>
@@ -136,6 +145,14 @@
                   (click)="toggleNewsPublisher(user)"
                 >
                   {{ user.newsPublisher ? 'Quitar noticias' : 'Dar noticias' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === user.id"
+                  (click)="toggleCalendarContributor(user)"
+                >
+                  {{ user.calendarContributor ? 'Quitar calendario' : 'Dar calendario' }}
                 </button>
                 <button
                   type="button"
@@ -190,8 +207,14 @@
             @if (user.verified) {
               <span class="pill ok">verificado</span>
             }
-            @if (user.newsPublisher) {
+            @if (user.newsPublisher || user.forumModerator) {
               <span class="pill">noticias</span>
+            }
+            @if (user.calendarContributor || user.forumModerator) {
+              <span class="pill">calendario</span>
+            }
+            @if (user.forumModerator) {
+              <span class="pill">moderador</span>
             }
             <span class="sub">Alta · {{ timeAgo(user.createdAt) }}</span>
           </div>
@@ -232,6 +255,14 @@
               (click)="toggleNewsPublisher(user)"
             >
               {{ user.newsPublisher ? 'Quitar noticias' : 'Dar noticias' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="busyId() === user.id"
+              (click)="toggleCalendarContributor(user)"
+            >
+              {{ user.calendarContributor ? 'Quitar calendario' : 'Dar calendario' }}
             </button>
             <button
               type="button"

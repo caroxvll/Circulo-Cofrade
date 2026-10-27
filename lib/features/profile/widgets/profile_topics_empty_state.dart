@@ -17,69 +17,79 @@ class ProfileTopicsEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 20),
-      child: Column(
-        children: [
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Image.asset(
-              AppAssets.profileEmptyCathedral,
-              fit: BoxFit.contain,
-              alignment: Alignment.center,
-              filterQuality: FilterQuality.medium,
-            ),
-          ),
-          const SizedBox(height: 18),
-          const ProfileFleurDivider(),
-          const SizedBox(height: 16),
-          Text(
-            isOwnProfile
-                ? 'Aún no has publicado ningún tema'
-                : 'Aún no hay temas publicados',
-            style: AppTypography.displaySmall(
-              color: AppColors.textPrimary,
-            ).copyWith(fontSize: 18, height: 1.25),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isOwnProfile
-                ? 'Comparte tus ideas, abre un debate o inicia '
-                    'una conversación con la comunidad.'
-                : 'Cuando publique en los foros, aparecerán aquí.',
-            style: AppTypography.bodyMedium(
-              color: AppColors.textSecondary,
-            ).copyWith(fontSize: 13.5, height: 1.4),
-            textAlign: TextAlign.center,
-          ),
-          if (isOwnProfile) ...[
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => context.go('/foros'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.burgundy,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tight =
+            constraints.maxHeight.isFinite && constraints.maxHeight < 340;
+        return SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(8, tight ? 4 : 8, 8, tight ? 8 : 20),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: tight ? 64 : 120,
+                  child: Image.asset(
+                    AppAssets.profileEmptyCathedral,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.center,
+                    filterQuality: FilterQuality.medium,
                   ),
                 ),
-                icon: const Icon(Icons.add_rounded, size: 20),
-                label: Text(
-                  'Crear tema',
-                  style: AppTypography.titleLarge(color: Colors.white).copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
+                SizedBox(height: tight ? 8 : 18),
+                const ProfileFleurDivider(),
+                SizedBox(height: tight ? 8 : 16),
+                Text(
+                  isOwnProfile
+                      ? 'Aún no has publicado ningún tema'
+                      : 'Aún no hay temas publicados',
+                  style: AppTypography.displaySmall(
+                    color: AppColors.textPrimary,
+                  ).copyWith(fontSize: tight ? 16 : 18, height: 1.25),
+                  textAlign: TextAlign.center,
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  isOwnProfile
+                      ? 'Comparte tus ideas, abre un debate o inicia '
+                          'una conversación con la comunidad.'
+                      : 'Cuando publique en los foros, aparecerán aquí.',
+                  style: AppTypography.bodyMedium(
+                    color: AppColors.textSecondary,
+                  ).copyWith(fontSize: 13.5, height: 1.4),
+                  textAlign: TextAlign.center,
+                ),
+                if (isOwnProfile) ...[
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => context.go('/foros'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.burgundy,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 20),
+                      label: Text(
+                        'Crear tema',
+                        style: AppTypography.titleLarge(color: Colors.white)
+                            .copyWith(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 }

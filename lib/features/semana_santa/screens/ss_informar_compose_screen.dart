@@ -349,6 +349,8 @@ class _SsInformarComposeScreenState
   @override
   Widget build(BuildContext context) {
     final color = ssKindColor(widget.kind);
+    final gate = ref.watch(ssLiveGateProvider).asData?.value;
+    final liveClosed = gate != null && !gate.isOpen;
     final hermandadesAsync = ref.watch(ssDayHermandadesProvider);
     final options = hermandadesAsync.asData?.value ?? const [];
     final chars = _messageController.text.characters.length;
@@ -384,6 +386,31 @@ class _SsInformarComposeScreenState
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (liveClosed) ...[
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.burgundy.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.burgundy.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Text(
+                        gate.closedMessage.isEmpty
+                            ? 'El en directo está cerrado.'
+                            : gate.closedMessage,
+                        style: TopicDetailTypography.meta(
+                          color: AppColors.burgundyDark,
+                        ).copyWith(
+                          fontSize: 13,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -643,7 +670,7 @@ class _SsInformarComposeScreenState
                           SizedBox(
                             height: 48,
                             child: FilledButton(
-                              onPressed: _isPosting ? null : _submit,
+                              onPressed: _isPosting || liveClosed ? null : _submit,
                               style: FilledButton.styleFrom(
                                 backgroundColor: AppColors.burgundy,
                                 foregroundColor: Colors.white,

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase/supabase_bootstrap.dart';
 import '../../shared/models/forum.dart';
 import '../auth/auth_provider.dart';
+import '../calendar/calendar_contributors_provider.dart';
 import '../notifications/notifications_provider.dart';
 import '../permissions/permissions_provider.dart';
 import '../profile/profile_provider.dart';
@@ -895,11 +896,14 @@ class TopicSubmitController {
           _ref.read(moderatedForumIdsProvider).asData?.value ?? const <String>{};
       final isNewsPublisher =
           await _ref.read(isNewsPublisherProvider(user.id).future);
+      final isCalendarContributor =
+          await _ref.read(isCalendarContributorProvider(user.id).future);
       if (!canCreateTopicInForum(
         forumId: forumId,
         isAdmin: isAdmin,
         moderatedForumIds: moderated,
         isNewsPublisher: isNewsPublisher,
+        isCalendarContributor: isCalendarContributor,
       )) {
         throw const NoticiasStaffRequiredException();
       }

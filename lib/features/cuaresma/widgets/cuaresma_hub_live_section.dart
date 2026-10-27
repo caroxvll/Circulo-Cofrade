@@ -310,20 +310,42 @@ class _CuaresmaNoLiveHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CuaresmaHubElevatedCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Row(
         children: [
-          Icon(
-            Icons.event_available_outlined,
-            size: 22,
-            color: AppColors.textMuted.withValues(alpha: 0.85),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.goldPale.withValues(alpha: 0.7),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.event_available_outlined,
+              size: 18,
+              color: AppColors.burgundy,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              'Hoy no hay ensayos en directo. Cuando empiecen, aparecerán aquí.',
-              style: TopicDetailTypography.meta(
-                color: AppColors.textSecondary,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ENSAYOS',
+                  style: TopicDetailTypography.meta(
+                    color: AppColors.burgundy,
+                    fontWeight: FontWeight.w800,
+                  ).copyWith(fontSize: 10, letterSpacing: 1),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Hoy no hay ensayos en directo. Cuando empiecen, aparecerán aquí.',
+                  style: TopicDetailTypography.meta(
+                    color: AppColors.textSecondary,
+                  ).copyWith(fontSize: 12.5, height: 1.3),
+                ),
+              ],
             ),
           ),
         ],

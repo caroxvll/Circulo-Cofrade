@@ -8,7 +8,8 @@ enum AdPlacement {
   search('search'),
   profile('profile'),
   hermandades('hermandades'),
-  noticias('noticias');
+  noticias('noticias'),
+  semanaSanta('semana_santa');
 
   const AdPlacement(this.value);
 

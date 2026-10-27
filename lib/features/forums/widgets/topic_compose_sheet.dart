@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../admin/admin_provider.dart';
+import '../../calendar/calendar_contributors_provider.dart';
 import '../../auth/auth_provider.dart';
 import '../../auth/email_verification_gate.dart';
 import '../../permissions/permissions_provider.dart';
@@ -59,18 +61,22 @@ Future<void> showTopicComposeSheet(
   final isNewsPublisher = userId == null
       ? false
       : await ref.read(isNewsPublisherProvider(userId).future);
+  final isCalendarContributor = userId == null
+      ? false
+      : await ref.read(isCalendarContributorProvider(userId).future);
   if (!canCreateTopicInForum(
     forumId: forumId,
     isAdmin: isAdmin,
     moderatedForumIds: moderatedForumIds,
     isNewsPublisher: isNewsPublisher,
+    isCalendarContributor: isCalendarContributor,
   )) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             isNoticiasForum(forumId)
-                ? 'Solo la Junta puede publicar noticias.'
+                ? 'Solo moderadores, o cuentas con acceso a noticias o al calendario, pueden publicar noticias.'
                 : 'No puedes crear temas en este foro.',
           ),
         ),
@@ -197,14 +203,19 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
         Navigator.pop(context);
         final isAdmin = ref.read(isAdminProvider);
         final publishedNow = _isNoticias && isAdmin && topic.isPublished;
-        ScaffoldMessenger.of(context).showSnackBar(
+        ref.invalidate(pendingTopicsProvider);
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
           SnackBar(
             content: Text(
               publishedNow
                   ? 'Noticia publicada. Los cofrades ya pueden leerla y opinar.'
                   : TopicModerationCopy.submitSuccess,
             ),
-            duration: const Duration(seconds: 6),
+            duration: const Duration(seconds: 5),
+            persist: false,
+            showCloseIcon: !publishedNow,
             action: publishedNow
                 ? null
                 : SnackBarAction(

@@ -11,12 +11,11 @@ final isNewsPublisherProvider =
   if (client == null) return false;
 
   try {
-    final row = await client
-        .from('news_publishers')
-        .select('profile_id')
-        .eq('profile_id', profileId)
-        .maybeSingle();
-    return row != null;
+    final raw = await client.rpc(
+      'is_news_publisher',
+      params: {'p_user_id': profileId},
+    );
+    return raw == true;
   } catch (_) {
     return false;
   }

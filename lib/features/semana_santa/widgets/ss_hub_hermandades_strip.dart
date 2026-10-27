@@ -51,25 +51,13 @@ class SemanaSantaHubHermandadesStrip extends ConsumerWidget {
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        dayTitle,
-                        style: AppTypography.displaySmall(
-                          color: AppColors.textPrimary,
-                        ).copyWith(fontSize: 15, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        selected == null
-                            ? 'Pulsa una hermandad para filtrar el chat'
-                            : 'Filtrado · toca otra o Todas',
-                        style: TopicDetailTypography.meta(
-                          color: AppColors.textMuted,
-                        ).copyWith(fontSize: 11.5),
-                      ),
-                    ],
+                  child: Text(
+                    selected == null
+                        ? 'Pulsa una hermandad para filtrar el chat'
+                        : 'Filtrado · toca otra o Todas',
+                    style: TopicDetailTypography.meta(
+                      color: AppColors.textMuted,
+                    ).copyWith(fontSize: 11.5),
                   ),
                 ),
                 if (selected != null)
@@ -94,7 +82,7 @@ class SemanaSantaHubHermandadesStrip extends ConsumerWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             SizedBox(
               height: 78,
               child: ListView.separated(
@@ -284,8 +272,6 @@ class _HermandadesStripSkeleton extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const CofradeoSkeletonBone(width: 140, height: 14, borderRadius: 6),
-        const SizedBox(height: 6),
         const CofradeoSkeletonBone(width: 200, height: 11, borderRadius: 5),
         const SizedBox(height: 10),
         SizedBox(

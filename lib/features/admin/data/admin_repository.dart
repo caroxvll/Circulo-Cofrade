@@ -250,6 +250,36 @@ class AdminRepository {
     });
   }
 
+  /// Propone eventos (quedan en revisión) y también puede publicar noticias.
+  Future<void> setCalendarContributor({
+    required String profileId,
+    required bool enabled,
+  }) async {
+    final client = _client;
+    if (client == null) throw const AdminUnavailableException();
+
+    if (!enabled) {
+      await client
+          .from('calendar_contributors')
+          .delete()
+          .eq('profile_id', profileId);
+      return;
+    }
+
+    final assignedBy = client.auth.currentUser?.id;
+    final assignedAt = DateTime.now().toUtc().toIso8601String();
+    await client.from('calendar_contributors').upsert({
+      'profile_id': profileId,
+      'assigned_by': assignedBy,
+      'assigned_at': assignedAt,
+    });
+    await client.from('news_publishers').upsert({
+      'profile_id': profileId,
+      'assigned_by': assignedBy,
+      'assigned_at': assignedAt,
+    });
+  }
+
   Future<void> unifyNoticias({
     required String topicId,
     required String otherTopicId,

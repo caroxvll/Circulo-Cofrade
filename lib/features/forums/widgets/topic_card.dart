@@ -97,6 +97,17 @@ class _StandardTopicCard extends StatelessWidget {
         ? '@cofrade'
         : (rawHandle.startsWith('@') ? rawHandle : '@$rawHandle');
 
+    if (pinned && !compact) {
+      return _PinnedForumTopicCard(
+        topic: topic,
+        onTap: onTap,
+        displayTitle: displayTitle,
+        excerpt: excerpt,
+        coverUrl: coverUrl,
+        handle: handle,
+      );
+    }
+
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(radius),
@@ -281,6 +292,245 @@ class _StandardTopicCard extends StatelessWidget {
                   ],
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PinnedForumTopicCard extends StatelessWidget {
+  const _PinnedForumTopicCard({
+    required this.topic,
+    required this.onTap,
+    required this.displayTitle,
+    required this.excerpt,
+    required this.coverUrl,
+    required this.handle,
+  });
+
+  final ForumTopic topic;
+  final VoidCallback onTap;
+  final String displayTitle;
+  final String excerpt;
+  final String? coverUrl;
+  final String handle;
+
+  @override
+  Widget build(BuildContext context) {
+    const radius = 14.0;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.burgundyDark.withValues(alpha: 0.1),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(radius),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(radius),
+          splashColor: AppColors.burgundy.withValues(alpha: 0.06),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              color: AppColors.surface,
+              border: Border.all(
+                color: AppColors.goldDark.withValues(alpha: 0.45),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(radius - 1),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (coverUrl != null)
+                    SizedBox(
+                      height: 132,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CofradeoNetworkImage(
+                            url: coverUrl!,
+                            fit: BoxFit.cover,
+                            borderRadius: BorderRadius.zero,
+                          ),
+                          const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Color(0x00000000), Color(0x73000000)],
+                                stops: [0.45, 1],
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: 10,
+                            bottom: 10,
+                            right: 10,
+                            child: Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                const _HermandadMetaPill(
+                                  label: 'Destacado',
+                                  foreground: AppColors.goldDark,
+                                  background: AppColors.goldPale,
+                                  icon: Icons.push_pin,
+                                ),
+                                TopicStatusBadge(topic: topic),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    const SizedBox(
+                      height: 4,
+                      child: ColoredBox(color: AppColors.gold),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CofradeoAvatar(
+                              imageUrl: topic.authorAvatarUrl,
+                              icon: topic.avatarIcon,
+                              size: 30,
+                              backgroundColor: AppColors.backgroundElevated,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      handle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: ForumTopicsTypography.card(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                      ).copyWith(fontSize: 13),
+                                    ),
+                                  ),
+                                  if (topic.authorVerified) ...[
+                                    const SizedBox(width: 4),
+                                    const VerifiedAccountIcon(size: 14),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              topic.timeAgo,
+                              style: ForumTopicsTypography.card(
+                                color: AppColors.textMuted,
+                                fontWeight: FontWeight.w500,
+                              ).copyWith(fontSize: 11.5),
+                            ),
+                          ],
+                        ),
+                        if (coverUrl == null) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              const _HermandadMetaPill(
+                                label: 'Destacado',
+                                foreground: AppColors.goldDark,
+                                background: AppColors.goldPale,
+                                icon: Icons.push_pin,
+                              ),
+                              TopicStatusBadge(topic: topic),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          displayTitle,
+                          style: AppTypography.newsHeadline(
+                            color: AppColors.textPrimary,
+                          ).copyWith(
+                            fontSize: 22,
+                            height: 1.12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (topic.relatedForumId != null) ...[
+                          const SizedBox(height: 8),
+                          RelatedForumChip(
+                            relatedForumId: topic.relatedForumId!,
+                            compact: true,
+                          ),
+                        ],
+                        if (excerpt.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            excerpt,
+                            style: ForumTopicsTypography.card(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w400,
+                            ).copyWith(fontSize: 13.5, height: 1.35),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.chat_bubble_outline,
+                              size: 14,
+                              color: AppColors.textMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${topic.commentCount}',
+                              style: ForumTopicsTypography.card(
+                                color: AppColors.textMuted,
+                                fontWeight: FontWeight.w600,
+                              ).copyWith(fontSize: 12),
+                            ),
+                            const SizedBox(width: 14),
+                            Icon(
+                              Icons.visibility_outlined,
+                              size: 14,
+                              color: AppColors.textMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${formatCount(topic.viewCount)} vistas',
+                              style: ForumTopicsTypography.card(
+                                color: AppColors.textMuted,
+                                fontWeight: FontWeight.w600,
+                              ).copyWith(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

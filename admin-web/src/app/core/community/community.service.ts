@@ -10,6 +10,10 @@ export interface AdminUserRow {
   verified: boolean;
   /** Puede publicar en Noticias. No es la verificación de hermandad. */
   newsPublisher: boolean;
+  /** Puede proponer eventos. Quedan en revisión de la Junta. */
+  calendarContributor: boolean;
+  /** Modera al menos un foro. */
+  forumModerator: boolean;
   suspendedAt: string | null;
   suspendedReason: string | null;
   createdAt: string;
@@ -299,6 +303,44 @@ export class CommunityService {
       .select('profile_id');
     if (error) throw error;
     return new Set((data ?? []).map((row) => String(row.profile_id)));
+  }
+
+  async fetchCalendarContributorIds(): Promise<Set<string>> {
+    const { data, error } = await getSupabase()
+      .from('calendar_contributors')
+      .select('profile_id');
+    if (error) throw error;
+    return new Set((data ?? []).map((row) => String(row.profile_id)));
+  }
+
+  async fetchForumModeratorIds(): Promise<Set<string>> {
+    const { data, error } = await getSupabase()
+      .from('forum_moderators')
+      .select('profile_id');
+    if (error) throw error;
+    return new Set((data ?? []).map((row) => String(row.profile_id)));
+  }
+
+  async setCalendarContributor(profileId: string, enabled: boolean): Promise<void> {
+    if (!enabled) {
+      const { error } = await getSupabase()
+        .from('calendar_contributors')
+        .delete()
+        .eq('profile_id', profileId);
+      if (error) throw error;
+      return;
+    }
+
+    const { data: session } = await getSupabase().auth.getUser();
+    const assignedBy = session.user?.id ?? null;
+    const assignedAt = new Date().toISOString();
+    const calendar = await getSupabase().from('calendar_contributors').upsert({
+      profile_id: profileId,
+      assigned_by: assignedBy,
+      assigned_at: assignedAt,
+    });
+    if (calendar.error) throw calendar.error;
+    await this.setNewsPublisher(profileId, true);
   }
 
   async setNewsPublisher(profileId: string, enabled: boolean): Promise<void> {
@@ -1003,6 +1045,8 @@ export class CommunityService {
       accountType: String(row['account_type'] ?? 'cofrade'),
       verified: Boolean(row['verified']),
       newsPublisher: false,
+      calendarContributor: false,
+      forumModerator: false,
       suspendedAt: (row['suspended_at'] as string | null) ?? null,
       suspendedReason: (row['suspended_reason'] as string | null) ?? null,
       createdAt: String(row['created_at'] ?? ''),
