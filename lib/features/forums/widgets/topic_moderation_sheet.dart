@@ -10,6 +10,7 @@ import '../../permissions/permissions_provider.dart';
 import '../forums_provider.dart';
 import '../utils/forum_navigation.dart';
 import '../utils/noticias_forum.dart';
+import 'noticias_unify_sheet.dart';
 
 Future<void> showTopicModerationSheet(
   BuildContext context,
@@ -250,7 +251,7 @@ class _TopicModerationSheetState extends ConsumerState<_TopicModerationSheet> {
         topic.authorId != currentUserId &&
         !topic.isSystem;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -265,6 +266,48 @@ class _TopicModerationSheetState extends ConsumerState<_TopicModerationSheet> {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 20),
+          if (isNoticiasForum(widget.forumId) && topic.isPublished) ...[
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(
+                Icons.view_carousel_outlined,
+                color: AppColors.burgundy,
+              ),
+              title: Text(
+                topic.newsGroupId == null
+                    ? 'Unir con otra noticia'
+                    : 'Añadir otra cuenta al carrusel',
+              ),
+              subtitle: Text(
+                'Misma noticia, una ficha, se pasa con el dedo',
+                style: AppTypography.bodyMedium(color: AppColors.textMuted),
+              ),
+              onTap: _busy
+                  ? null
+                  : () => showUnifyNoticiaSheet(context, ref, topic: topic),
+            ),
+            if (topic.newsGroupId != null)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(
+                  Icons.call_split,
+                  color: AppColors.burgundy,
+                ),
+                title: const Text('Separar esta noticia'),
+                subtitle: Text(
+                  'Vuelve a ser una ficha propia',
+                  style: AppTypography.bodyMedium(color: AppColors.textMuted),
+                ),
+                onTap: _busy
+                    ? null
+                    : () => _run(
+                          () => ref
+                              .read(adminRepositoryProvider)
+                              .splitNoticia(topic.id),
+                          'Noticia separada',
+                        ),
+              ),
+          ],
           if (!topic.isSystem)
             ListTile(
               contentPadding: EdgeInsets.zero,

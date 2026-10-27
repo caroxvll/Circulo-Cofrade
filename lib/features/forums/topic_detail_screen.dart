@@ -63,6 +63,7 @@ import 'widgets/topic_edit_sheet.dart';
 import 'widgets/topic_moderation_banner.dart';
 import 'widgets/topic_moderation_sheet.dart';
 import 'topic_detail_typography.dart';
+import 'widgets/noticias_story_header.dart';
 import 'widgets/topic_detail_header.dart';
 import 'widgets/topic_poll_card.dart';
 import 'widgets/topic_status_badge.dart';
@@ -814,6 +815,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
       return ReplyThreadList(
         sliver: sliver,
         officialChannelStyle: isHermandadBoard,
+        boardTopic: isHermandadBoard ? topic : null,
         nodes: buildReplyTree(replies),
         topicAuthorId: topic.authorId,
         highlightReplyId: widget.highlightReplyId,
@@ -911,7 +913,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
           ),
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 248,
+              height: 262,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -919,9 +921,9 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                 separatorBuilder: (_, _) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
                   if (index >= rest.length) {
-                    return const SizedBox(
+                      return const SizedBox(
                       width: 72,
-                      height: 248,
+                      height: 262,
                       child: Center(
                         child: SizedBox(
                           width: 22,
@@ -935,6 +937,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                   return HermandadComunicadoRailCard(
                     key: ValueKey('rail_${reply.id}'),
                     reply: reply,
+                    boardTopic: topic,
                     onTap: () => _openHermandadComunicadoSheet(
                       reply,
                       manageContext: manageContext,
@@ -1279,16 +1282,22 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                     ),
                   if (!isHermandadBoard)
                     SliverToBoxAdapter(
-                      child: TopicDetailHeader(
-                        topic: topic,
-                        forumId: widget.forumId,
-                        topicId: widget.topicId,
-                        isHermandadBoard: isHermandadBoard,
-                        displayCommentCount: displayCommentCount,
-                        displayViewCount: displayViewCount,
-                        displayTotalReactions: boardTotalReactions,
-                        reactionBreakdown: boardReactionBreakdown,
-                      ),
+                      child: isNoticias
+                          ? NoticiasStoryHeader(
+                              topic: topic,
+                              forumId: widget.forumId,
+                              displayViewCount: displayViewCount,
+                            )
+                          : TopicDetailHeader(
+                              topic: topic,
+                              forumId: widget.forumId,
+                              topicId: widget.topicId,
+                              isHermandadBoard: isHermandadBoard,
+                              displayCommentCount: displayCommentCount,
+                              displayViewCount: displayViewCount,
+                              displayTotalReactions: boardTotalReactions,
+                              reactionBreakdown: boardReactionBreakdown,
+                            ),
                     ),
                   if (!isHermandadBoard && !isNoticias)
                     SliverToBoxAdapter(
@@ -1487,6 +1496,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                     child: HermandadComunicadoCard(
                       reply: displayReply,
                       detailView: true,
+                      boardTopic: topic,
                       manageOptions: manage,
                       reactionCounts: reactionCounts,
                       userReaction:

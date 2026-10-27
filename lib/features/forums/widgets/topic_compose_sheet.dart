@@ -15,6 +15,7 @@ import '../data/forums_repository.dart';
 import '../forums_provider.dart';
 import '../topic_detail_typography.dart';
 import '../utils/forum_navigation.dart';
+import '../news_publishers_provider.dart';
 import '../utils/noticias_forum.dart';
 import '../utils/topic_permissions.dart';
 import 'forum_compose_field.dart';
@@ -54,10 +55,15 @@ Future<void> showTopicComposeSheet(
   final isAdmin = ref.read(isAdminProvider);
   final moderatedForumIds =
       ref.read(moderatedForumIdsProvider).asData?.value ?? const <String>{};
+  final userId = ref.read(currentUserProvider)?.id;
+  final isNewsPublisher = userId == null
+      ? false
+      : await ref.read(isNewsPublisherProvider(userId).future);
   if (!canCreateTopicInForum(
     forumId: forumId,
     isAdmin: isAdmin,
     moderatedForumIds: moderatedForumIds,
+    isNewsPublisher: isNewsPublisher,
   )) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

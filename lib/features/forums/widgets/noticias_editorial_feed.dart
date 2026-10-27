@@ -5,11 +5,13 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../shared/models/forum.dart';
 import '../data/mock_forums.dart';
 import '../data/topic_icon_assets.dart';
 import '../forum_topics_typography.dart';
 import '../utils/noticias_forum.dart';
+import '../utils/noticias_stories.dart';
 
 const _gutter = 12.0;
 const _railCardWidth = 168.0;
@@ -30,15 +32,11 @@ List<Widget> buildNoticiasEditorialSlivers({
   /// Banner docked encima de la bottom nav: compacta márgenes superiores.
   bool dockedAdActive = false,
 }) {
-  final listed = [for (final t in topics) if (t.isListed) t]
-    ..sort((a, b) {
-      final byTime = b.sortTimestamp.compareTo(a.sortTimestamp);
-      if (byTime != 0) return byTime;
-      return a.id.compareTo(b.id);
-    });
-
-  final featured = listed.isEmpty ? null : listed.first;
-  final rest = featured == null ? const <ForumTopic>[] : listed.skip(1).toList();
+  final stories = groupNoticiasForFeed(topics);
+  final featured = stories.isEmpty ? null : stories.first;
+  final rest = featured == null
+      ? const <NoticiasStory>[]
+      : stories.skip(1).toList();
   final railHeight =
       dockedAdActive ? _railCardHeightCompact : _railCardHeight;
 
@@ -71,11 +69,17 @@ List<Widget> buildNoticiasEditorialSlivers({
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: _gutter),
-          child: NoticiasFeaturedEditorialCard(
-            topic: featured,
-            onTap: () => onOpenTopic(featured),
-            compact: dockedAdActive,
-          ),
+          child: featured.isGrouped
+              ? NoticiasFeaturedStoryCarousel(
+                  story: featured,
+                  onOpen: onOpenTopic,
+                  compact: dockedAdActive,
+                )
+              : NoticiasFeaturedEditorialCard(
+                  topic: featured.lead,
+                  onTap: () => onOpenTopic(featured.lead),
+                  compact: dockedAdActive,
+                ),
         ),
       ],
       if (sponsoredSlot != null)
@@ -124,8 +128,9 @@ List<Widget> buildNoticiasEditorialSlivers({
                 for (var i = 0; i < rest.length; i++) ...[
                   if (i > 0) const SizedBox(height: 8),
                   NoticiasListEditorialCard(
-                    topic: rest[i],
-                    onTap: () => onOpenTopic(rest[i]),
+                    topic: rest[i].lead,
+                    accounts: rest[i].isGrouped ? rest[i].topics : null,
+                    onTap: () => onOpenTopic(rest[i].lead),
                   ),
                 ],
               ],
@@ -140,12 +145,13 @@ List<Widget> buildNoticiasEditorialSlivers({
               itemCount: rest.length,
               separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
-                final topic = rest[index];
+                final story = rest[index];
                 return SizedBox(
                   width: _railCardWidth,
                   child: NoticiasRailCard(
-                    topic: topic,
-                    onTap: () => onOpenTopic(topic),
+                    topic: story.lead,
+                    accounts: story.isGrouped ? story.topics : null,
+                    onTap: () => onOpenTopic(story.lead),
                   ),
                 );
               },
@@ -314,6 +320,8 @@ class NoticiasFeaturedEditorialCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _NoticiasByline(topic: topic),
+                      const SizedBox(height: 8),
                       if (excerpt.isNotEmpty) ...[
                         Text(
                           excerpt,
@@ -385,10 +393,14 @@ class NoticiasRailCard extends StatelessWidget {
     super.key,
     required this.topic,
     required this.onTap,
+    this.accounts,
   });
 
   final ForumTopic topic;
   final VoidCallback onTap;
+
+  /// Cuentas unificadas. En el carril no hay carrusel: el dedo ya mueve las fichas.
+  final List<ForumTopic>? accounts;
 
   @override
   Widget build(BuildContext context) {
@@ -416,7 +428,18 @@ class NoticiasRailCard extends StatelessWidget {
                 ),
                 child: SizedBox(
                   height: 108,
-                  child: _NoticiasEditorialCover(topic: topic),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _NoticiasEditorialCover(topic: topic),
+                      if (accounts != null && accounts!.length > 1)
+                        Positioned(
+                          left: 6,
+                          bottom: 6,
+                          child: NoticiasAccountStack(topics: accounts!),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               Expanded(
@@ -441,20 +464,14 @@ class NoticiasRailCard extends StatelessWidget {
                       const Spacer(),
                       Row(
                         children: [
-                          Icon(
-                            Icons.visibility_outlined,
-                            size: 12,
-                            color: AppColors.textMuted,
+                          Expanded(
+                            child: _NoticiasByline(
+                              topic: topic,
+                              avatarSize: 16,
+                              fontSize: 10,
+                            ),
                           ),
-                          const SizedBox(width: 3),
-                          Text(
-                            formatCount(topic.viewCount),
-                            style: ForumTopicsTypography.card(
-                              color: AppColors.textMuted,
-                              fontWeight: FontWeight.w500,
-                            ).copyWith(fontSize: 10),
-                          ),
-                          const Spacer(),
+                          const SizedBox(width: 4),
                           Text(
                             topic.timeAgo,
                             style: ForumTopicsTypography.card(
@@ -462,7 +479,6 @@ class NoticiasRailCard extends StatelessWidget {
                               fontWeight: FontWeight.w500,
                             ).copyWith(fontSize: 9.5),
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -483,10 +499,12 @@ class NoticiasListEditorialCard extends StatelessWidget {
     super.key,
     required this.topic,
     required this.onTap,
+    this.accounts,
   });
 
   final ForumTopic topic;
   final VoidCallback onTap;
+  final List<ForumTopic>? accounts;
 
   @override
   Widget build(BuildContext context) {
@@ -529,6 +547,16 @@ class NoticiasListEditorialCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 6),
+                      _NoticiasByline(
+                        topic: topic,
+                        avatarSize: 18,
+                        fontSize: 11,
+                      ),
+                      if (accounts != null && accounts!.length > 1) ...[
+                        const SizedBox(height: 6),
+                        NoticiasAccountStack(topics: accounts!, size: 18),
+                      ],
                       const SizedBox(height: 5),
                       _GoldCategoryTag(
                         label: noticiasCategoryShort(topic),
@@ -665,6 +693,306 @@ class _NoticiasEditorialCover extends StatelessWidget {
         color: AppColors.burgundy.withValues(alpha: 0.55),
       ),
       errorWidget: placeholder(),
+    );
+  }
+}
+
+/// Ficha de última hora cuando la junta ha unido varias cuentas.
+/// El dedo pasa de una versión a otra. La primera en publicarse va delante.
+class NoticiasFeaturedStoryCarousel extends StatefulWidget {
+  const NoticiasFeaturedStoryCarousel({
+    super.key,
+    required this.story,
+    required this.onOpen,
+    this.compact = false,
+  });
+
+  final NoticiasStory story;
+  final void Function(ForumTopic topic) onOpen;
+  final bool compact;
+
+  @override
+  State<NoticiasFeaturedStoryCarousel> createState() =>
+      _NoticiasFeaturedStoryCarouselState();
+}
+
+class _NoticiasFeaturedStoryCarouselState
+    extends State<NoticiasFeaturedStoryCarousel> {
+  late final PageController _pages;
+  var _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topics = widget.story.topics;
+    final coverHeight = widget.compact ? 132.0 : 158.0;
+    final pageHeight = coverHeight + (widget.compact ? 118 : 132);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: AppColors.surface,
+        border: Border.all(
+          color: AppColors.goldDark.withValues(alpha: 0.28),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.burgundyDark.withValues(alpha: 0.1),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: pageHeight,
+              child: PageView.builder(
+                controller: _pages,
+                itemCount: topics.length,
+                onPageChanged: (index) => setState(() => _index = index),
+                itemBuilder: (context, index) {
+                  final topic = topics[index];
+                  final excerpt = topic.excerpt.trim();
+                  return GestureDetector(
+                    onTap: () => widget.onOpen(topic),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: coverHeight,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              _NoticiasEditorialCover(topic: topic, wide: true),
+                              const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Color(0x33000000),
+                                      Color(0x00000000),
+                                      Color(0x99000000),
+                                    ],
+                                    stops: [0, 0.45, 1],
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                left: 12,
+                                right: 12,
+                                bottom: 12,
+                                child: Text(
+                                  topic.title,
+                                  style: AppTypography.newsHeadline(
+                                    color: Colors.white,
+                                  ).copyWith(
+                                    fontSize: 17,
+                                    height: 1.15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                          child: Row(
+                            children: [
+                              CofradeoAvatar(
+                                imageUrl: topic.authorAvatarUrl,
+                                icon: topic.avatarIcon,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  topic.authorHandle.startsWith('@')
+                                      ? topic.authorHandle
+                                      : '@${topic.authorHandle}',
+                                  style: ForumTopicsTypography.card(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ).copyWith(fontSize: 12),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Text(
+                                topic.timeAgo,
+                                style: ForumTopicsTypography.card(
+                                  color: AppColors.textMuted,
+                                  fontWeight: FontWeight.w500,
+                                ).copyWith(fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (excerpt.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                            child: Text(
+                              excerpt,
+                              style: ForumTopicsTypography.card(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w400,
+                              ).copyWith(fontSize: 12.5, height: 1.3),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+              child: Row(
+                children: [
+                  NoticiasAccountStack(topics: topics, activeIndex: _index),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_index + 1} de ${topics.length}',
+                    style: ForumTopicsTypography.card(
+                      color: AppColors.textMuted,
+                      fontWeight: FontWeight.w600,
+                    ).copyWith(fontSize: 11),
+                  ),
+                  const Spacer(),
+                  for (var i = 0; i < topics.length; i++)
+                    Container(
+                      width: i == _index ? 14 : 6,
+                      height: 6,
+                      margin: const EdgeInsets.only(left: 4),
+                      decoration: BoxDecoration(
+                        color: i == _index
+                            ? AppColors.burgundy
+                            : AppColors.gold.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoticiasByline extends StatelessWidget {
+  const _NoticiasByline({
+    required this.topic,
+    this.avatarSize = 22,
+    this.fontSize = 12,
+  });
+
+  final ForumTopic topic;
+  final double avatarSize;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final raw = topic.authorHandle.trim();
+    final handle = raw.isEmpty
+        ? '@cofradeo'
+        : (raw.startsWith('@') ? raw : '@$raw');
+
+    return Row(
+      children: [
+        CofradeoAvatar(
+          imageUrl: topic.authorAvatarUrl,
+          icon: topic.avatarIcon,
+          size: avatarSize,
+        ),
+        SizedBox(width: avatarSize > 18 ? 8 : 5),
+        Expanded(
+          child: Text(
+            handle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: ForumTopicsTypography.card(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w700,
+            ).copyWith(fontSize: fontSize, height: 1.1),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class NoticiasAccountStack extends StatelessWidget {
+  const NoticiasAccountStack({
+    super.key,
+    required this.topics,
+    this.activeIndex,
+    this.size = 16,
+  });
+
+  final List<ForumTopic> topics;
+  final int? activeIndex;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = topics.take(4).toList();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < shown.length; i++)
+          Transform.translate(
+            offset: Offset(i == 0 ? 0 : -6.0 * i, 0),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: activeIndex == i
+                      ? AppColors.gold
+                      : AppColors.surface,
+                  width: 1.5,
+                ),
+              ),
+              child: CofradeoAvatar(
+                imageUrl: shown[i].authorAvatarUrl,
+                icon: shown[i].avatarIcon,
+                size: size,
+              ),
+            ),
+          ),
+        if (topics.length > shown.length)
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Text(
+              '+${topics.length - shown.length}',
+              style: ForumTopicsTypography.card(
+                color: AppColors.textMuted,
+                fontWeight: FontWeight.w700,
+              ).copyWith(fontSize: 10),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -26,6 +26,7 @@ import 'data/mock_forums.dart';
 import 'forums_hero_tokens.dart';
 import 'forum_topics_typography.dart';
 import 'forums_provider.dart';
+import 'news_publishers_provider.dart';
 import '../profile/profile_provider.dart';
 import 'utils/forum_activity_badge.dart';
 import 'utils/forum_navigation.dart';
@@ -111,11 +112,16 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
     final isAdmin = ref.watch(isAdminProvider);
     final moderatedForumIds =
         ref.watch(moderatedForumIdsProvider).asData?.value ?? const <String>{};
+    final userId = ref.watch(currentUserProvider)?.id;
+    final isNewsPublisher = userId == null
+        ? false
+        : ref.watch(isNewsPublisherProvider(userId)).asData?.value ?? false;
     final canCreateTopic = !isSuspended &&
         canCreateTopicInForum(
           forumId: forumId,
           isAdmin: isAdmin,
           moderatedForumIds: moderatedForumIds,
+          isNewsPublisher: isNewsPublisher,
         );
     final forum =
         ref.watch(forumPillarProvider(forumId)).asData?.value ??
@@ -708,7 +714,9 @@ class _ForumTopicsScreenState extends ConsumerState<ForumTopicsScreen>
       pinned: pinned || topic.isPinned,
       variant: isNoticias
           ? TopicCardVariant.noticias
-          : TopicCardVariant.premium,
+          : widget.forumId == 'hermandades'
+              ? TopicCardVariant.premium
+              : TopicCardVariant.standard,
       forumId: widget.forumId,
       onTap: () async {
         await pushForumTopic(

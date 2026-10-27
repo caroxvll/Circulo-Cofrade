@@ -449,6 +449,9 @@ class ForumsRepository {
           ? null
           : DateTime.parse(row['edited_at'] as String),
       relatedForumId: row['related_forum_id'] as String?,
+      newsGroupId: (row['news_group_id'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (row['news_group_id'] as String).trim(),
     );
   }
 
@@ -864,6 +867,9 @@ class ForumsRepository {
         isClosed: parsed.isClosed,
         editedAt: parsed.editedAt ?? previous.editedAt,
         relatedForumId: parsed.relatedForumId ?? previous.relatedForumId,
+        newsGroupId: record.containsKey('news_group_id')
+            ? parsed.newsGroupId
+            : previous.newsGroupId,
       );
     } catch (_) {
       return null;

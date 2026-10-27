@@ -22,6 +22,7 @@ export interface NewsTopic {
   coverImageUrl: string | null;
   createdAt: string;
   commentCount: number;
+  newsGroupId: string | null;
 }
 
 export interface ScheduledNews {

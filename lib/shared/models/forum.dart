@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+const _keepNewsGroup = Object();
+
 enum TopicStatus { pending, published, rejected }
 
 enum TopicCloseStatus { open, closeRequested, closed }
@@ -190,6 +192,7 @@ class ForumTopic {
     this.rejectionReason,
     this.rejectedAt,
     this.relatedForumId,
+    this.newsGroupId,
   });
 
   final String id;
@@ -232,6 +235,9 @@ class ForumTopic {
 
   /// Foro etiquetado en noticias (p. ej. `pentagrama-cofrade`). No duplica el tema.
   final String? relatedForumId;
+
+  /// Noticias unificadas a mano. Null = ficha suelta.
+  final String? newsGroupId;
 
   bool get isPublished => status == TopicStatus.published;
   bool get isPending => status == TopicStatus.pending;
@@ -276,6 +282,7 @@ class ForumTopic {
     String? rejectionReason,
     DateTime? rejectedAt,
     String? relatedForumId,
+    Object? newsGroupId = _keepNewsGroup,
   }) {
     return ForumTopic(
       id: id ?? this.id,
@@ -310,6 +317,9 @@ class ForumTopic {
       rejectionReason: rejectionReason ?? this.rejectionReason,
       rejectedAt: rejectedAt ?? this.rejectedAt,
       relatedForumId: relatedForumId ?? this.relatedForumId,
+      newsGroupId: identical(newsGroupId, _keepNewsGroup)
+          ? this.newsGroupId
+          : newsGroupId as String?,
     );
   }
 }

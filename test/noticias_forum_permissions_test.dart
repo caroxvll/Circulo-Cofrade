@@ -27,6 +27,15 @@ void main() {
       ),
       isFalse,
     );
+    expect(
+      canCreateTopicInForum(
+        forumId: 'noticias',
+        isAdmin: false,
+        moderatedForumIds: {},
+        isNewsPublisher: true,
+      ),
+      isTrue,
+    );
   });
 
   test('foros normales siguen abiertos a miembros', () {

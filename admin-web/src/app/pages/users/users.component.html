@@ -4,9 +4,9 @@
       <p class="eyebrow">Comunidad · solo admin</p>
       <h1>Usuarios y altas</h1>
       <p class="lead">
-        Altas recientes, búsqueda y gestión de rol, verificación, suspensión y
-        borrado. Eliminar quita Auth + perfil y, con ello, temas y comentarios
-        del usuario (no los tablones de Hermandades).
+        Altas recientes, búsqueda y gestión de rol, verificación, acceso a
+        noticias, suspensión y borrado. «Noticias» solo deja publicar en ese
+        canal. Verificar sigue siendo la cuenta oficial de hermandad.
       </p>
     </div>
     <div class="queue-toolbar">
@@ -38,6 +38,7 @@
       <option value="admin">Solo admins</option>
       <option value="brotherhood">Hermandades</option>
       <option value="suspended">Suspendidos</option>
+      <option value="noticias">Pueden publicar noticias</option>
     </select>
   </div>
 
@@ -87,6 +88,9 @@
                 @if (user.verified) {
                   <span class="pill ok">verificado</span>
                 }
+                @if (user.newsPublisher) {
+                  <span class="pill">noticias</span>
+                }
               </td>
               <td>
                 <div>{{ timeAgo(user.createdAt) }}</div>
@@ -124,6 +128,14 @@
                   (click)="toggleVerified(user)"
                 >
                   {{ user.verified ? 'Quitar verif.' : 'Verificar' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === user.id"
+                  (click)="toggleNewsPublisher(user)"
+                >
+                  {{ user.newsPublisher ? 'Quitar noticias' : 'Dar noticias' }}
                 </button>
                 <button
                   type="button"
@@ -178,6 +190,9 @@
             @if (user.verified) {
               <span class="pill ok">verificado</span>
             }
+            @if (user.newsPublisher) {
+              <span class="pill">noticias</span>
+            }
             <span class="sub">Alta · {{ timeAgo(user.createdAt) }}</span>
           </div>
 
@@ -209,6 +224,14 @@
               (click)="toggleVerified(user)"
             >
               {{ user.verified ? 'Quitar verif.' : 'Verificar' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="busyId() === user.id"
+              (click)="toggleNewsPublisher(user)"
+            >
+              {{ user.newsPublisher ? 'Quitar noticias' : 'Dar noticias' }}
             </button>
             <button
               type="button"

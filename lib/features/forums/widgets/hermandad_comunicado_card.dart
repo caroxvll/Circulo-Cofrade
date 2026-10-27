@@ -4,8 +4,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/forum.dart';
+import '../utils/hermandad_board_display.dart';
 import 'forum_post_image_viewer.dart';
 import 'reply_card.dart';
+import 'topic_card.dart';
 
 /// Card del canal oficial: jerarquía clara, extracto limpio e imagen ampliable.
 class HermandadComunicadoCard extends StatefulWidget {
@@ -21,6 +23,7 @@ class HermandadComunicadoCard extends StatefulWidget {
     this.detailView = false,
     /// Si se define, el tap abre el detalle en vez de expandir en el feed.
     this.onOpen,
+    this.boardTopic,
   });
 
   final ForumReply reply;
@@ -31,6 +34,7 @@ class HermandadComunicadoCard extends StatefulWidget {
   final Future<void> Function(String? reaction)? onReactionChanged;
   final bool detailView;
   final VoidCallback? onOpen;
+  final ForumTopic? boardTopic;
 
   @override
   State<HermandadComunicadoCard> createState() => _HermandadComunicadoCardState();
@@ -64,6 +68,23 @@ class _HermandadComunicadoCardState extends State<HermandadComunicadoCard> {
     final meta = _categoryMeta(reply.officialCategory);
     final imageUrl = reply.imageUrl?.trim();
     final hasImage = imageUrl != null && imageUrl.isNotEmpty;
+    final showBody = parsed.body.isNotEmpty &&
+        parsed.body.trim().toLowerCase() != parsed.title.trim().toLowerCase();
+
+    if (!widget.detailView) {
+      return _FeedCard(
+        onTap: _onBodyTap,
+        hasImage: hasImage,
+        imageUrl: imageUrl,
+        shareText: parsed.title,
+        meta: meta,
+        timeAgo: reply.timeAgo,
+        title: parsed.title,
+        body: showBody ? parsed.body : null,
+        manageOptions: widget.manageOptions,
+        boardTopic: widget.boardTopic,
+      );
+    }
 
     return Material(
       color: AppColors.surface,
@@ -86,45 +107,11 @@ class _HermandadComunicadoCardState extends State<HermandadComunicadoCard> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 8, 0),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.burgundy.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(meta.icon, size: 12, color: AppColors.burgundy),
-                        const SizedBox(width: 4),
-                        Text(
-                          meta.kicker,
-                          style: AppTypography.labelSmall(
-                            color: AppColors.burgundy,
-                          ).copyWith(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 10,
-                            letterSpacing: 0.55,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    reply.timeAgo,
-                    style: AppTypography.labelSmall(
-                      color: AppColors.textMuted,
-                    ).copyWith(fontSize: 11),
-                  ),
-                  if (widget.manageOptions != null)
-                    _ManageMini(options: widget.manageOptions!),
-                ],
+              child: _HermandadByline(
+                topic: widget.boardTopic,
+                timeAgo: reply.timeAgo,
+                manageOptions: widget.manageOptions,
+                trailing: _CategoryPill(meta: meta, onDark: false),
               ),
             ),
             InkWell(
@@ -148,7 +135,7 @@ class _HermandadComunicadoCardState extends State<HermandadComunicadoCard> {
                               height: 1.2,
                             ),
                           ),
-                          if (parsed.body.isNotEmpty) ...[
+                          if (showBody) ...[
                             const SizedBox(height: 6),
                             Text(
                               parsed.body,
@@ -214,6 +201,304 @@ class _HermandadComunicadoCardState extends State<HermandadComunicadoCard> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HermandadByline extends StatelessWidget {
+  const _HermandadByline({
+    required this.topic,
+    required this.timeAgo,
+    this.manageOptions,
+    this.trailing,
+    this.compact = false,
+  });
+
+  final ForumTopic? topic;
+  final String timeAgo;
+  final ReplyManageOptions? manageOptions;
+  final Widget? trailing;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final board = topic;
+    final rawName = board == null
+        ? ''
+        : parseHermandadTopicTitle(board.title).hermandadName.trim();
+    final crest = compact ? 26.0 : 36.0;
+
+    return Row(
+      children: [
+        if (board != null) ...[
+          PinnedTopicMark(topic: board, size: crest, circular: true),
+          SizedBox(width: compact ? 6 : 10),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (rawName.isNotEmpty)
+                Text(
+                  rawName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.bodyMedium(
+                    color: AppColors.textPrimary,
+                  ).copyWith(
+                    fontSize: compact ? 11.5 : 13.5,
+                    fontWeight: FontWeight.w700,
+                    height: 1.15,
+                  ),
+                ),
+              Text(
+                timeAgo,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.labelSmall(
+                  color: AppColors.textMuted,
+                ).copyWith(
+                  fontSize: compact ? 10 : 11.5,
+                  fontWeight: FontWeight.w500,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 6),
+          trailing!,
+        ],
+        if (manageOptions != null) _ManageMini(options: manageOptions!),
+      ],
+    );
+  }
+}
+
+class _FeedCard extends StatelessWidget {
+  const _FeedCard({
+    required this.onTap,
+    required this.hasImage,
+    required this.imageUrl,
+    required this.shareText,
+    required this.meta,
+    required this.timeAgo,
+    required this.title,
+    required this.body,
+    required this.manageOptions,
+    required this.boardTopic,
+  });
+
+  final VoidCallback onTap;
+  final bool hasImage;
+  final String? imageUrl;
+  final String shareText;
+  final ({String kicker, IconData icon}) meta;
+  final String timeAgo;
+  final String title;
+  final String? body;
+  final ReplyManageOptions? manageOptions;
+  final ForumTopic? boardTopic;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.burgundyDark.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.gold.withValues(alpha: 0.28),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (hasImage && imageUrl != null)
+                  _Cover(
+                    imageUrl: imageUrl!,
+                    shareText: shareText,
+                    meta: meta,
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 8, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _HermandadByline(
+                        topic: boardTopic,
+                        timeAgo: timeAgo,
+                        manageOptions: manageOptions,
+                        trailing: hasImage
+                            ? null
+                            : _CategoryPill(meta: meta, onDark: false),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.hermandadName().copyWith(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          height: 1.12,
+                        ),
+                      ),
+                      if (body != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          body!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.bodyMedium(
+                            color: AppColors.textSecondary,
+                          ).copyWith(fontSize: 13.5, height: 1.35),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Cover extends StatelessWidget {
+  const _Cover({
+    required this.imageUrl,
+    required this.shareText,
+    required this.meta,
+  });
+
+  final String imageUrl;
+  final String shareText;
+  final ({String kicker, IconData icon}) meta;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 168,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CofradeoNetworkImage(
+            url: imageUrl,
+            fit: BoxFit.cover,
+            borderRadius: BorderRadius.zero,
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x00000000), Color(0x66000000)],
+                stops: [0.55, 1],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 10,
+            bottom: 10,
+            child: _CategoryPill(meta: meta, onDark: true),
+          ),
+          Positioned(
+            right: 8,
+            bottom: 8,
+            child: _ZoomBadgeButton(
+              onTap: () => showForumPostImageViewer(
+                context,
+                imageUrl: imageUrl,
+                shareText: shareText,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryPill extends StatelessWidget {
+  const _CategoryPill({required this.meta, required this.onDark});
+
+  final ({String kicker, IconData icon}) meta;
+  final bool onDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = onDark ? Colors.white : AppColors.burgundy;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: onDark
+            ? AppColors.burgundy.withValues(alpha: 0.92)
+            : AppColors.burgundy.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(meta.icon, size: 12, color: foreground),
+            const SizedBox(width: 4),
+            Text(
+              meta.kicker,
+              style: AppTypography.labelSmall(color: foreground).copyWith(
+                fontWeight: FontWeight.w800,
+                fontSize: 10,
+                letterSpacing: 0.55,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ZoomBadgeButton extends StatelessWidget {
+  const _ZoomBadgeButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: const Padding(
+          padding: EdgeInsets.all(6),
+          child: Icon(
+            Icons.zoom_out_map_rounded,
+            size: 14,
+            color: Colors.white,
+          ),
         ),
       ),
     );
@@ -351,10 +636,12 @@ class HermandadComunicadoRailCard extends StatelessWidget {
     super.key,
     required this.reply,
     required this.onTap,
+    this.boardTopic,
   });
 
   final ForumReply reply;
   final VoidCallback onTap;
+  final ForumTopic? boardTopic;
 
   @override
   Widget build(BuildContext context) {
@@ -362,41 +649,52 @@ class HermandadComunicadoRailCard extends StatelessWidget {
     final meta = _categoryMeta(reply.officialCategory);
     final imageUrl = reply.imageUrl?.trim();
     final hasImage = imageUrl != null && imageUrl.isNotEmpty;
+    final showBody = parsed.body.isNotEmpty &&
+        parsed.body.trim().toLowerCase() != parsed.title.trim().toLowerCase();
 
     return SizedBox(
-      width: 196,
-      height: 248,
-      child: Material(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        elevation: 1.5,
-        shadowColor: AppColors.burgundyDark.withValues(alpha: 0.1),
-        child: InkWell(
-          onTap: onTap,
+      width: 200,
+      height: 262,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          child: Ink(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: AppColors.gold.withValues(alpha: 0.2),
-              ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.burgundyDark.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(14),
-                  ),
-                  child: SizedBox(
-                    height: 104,
-                    child: hasImage
-                        ? CofradeoNetworkImage(
+          ],
+        ),
+        child: Material(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: 0.28),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: 112,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (hasImage)
+                          CofradeoNetworkImage(
                             url: imageUrl,
                             fit: BoxFit.cover,
                             borderRadius: BorderRadius.zero,
                           )
-                        : ColoredBox(
+                        else
+                          ColoredBox(
                             color: AppColors.burgundy.withValues(alpha: 0.06),
                             child: Icon(
                               meta.icon,
@@ -404,68 +702,63 @@ class HermandadComunicadoRailCard extends StatelessWidget {
                               color: AppColors.burgundy.withValues(alpha: 0.55),
                             ),
                           ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 2,
-                          ),
+                        const DecoratedBox(
                           decoration: BoxDecoration(
-                            color: AppColors.burgundy.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            meta.kicker,
-                            style: AppTypography.labelSmall(
-                              color: AppColors.burgundy,
-                            ).copyWith(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 9.5,
-                              letterSpacing: 0.4,
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0x00000000), Color(0x59000000)],
+                              stops: [0.5, 1],
                             ),
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          parsed.title,
-                          style: AppTypography.hermandadName().copyWith(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            height: 1.15,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (parsed.body.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            parsed.body,
-                            style: AppTypography.bodyMedium(
-                              color: AppColors.textSecondary,
-                            ).copyWith(fontSize: 11, height: 1.3),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                        const Spacer(),
-                        Text(
-                          reply.timeAgo,
-                          style: AppTypography.labelSmall(
-                            color: AppColors.textMuted,
-                          ).copyWith(fontSize: 10),
+                        Positioned(
+                          left: 8,
+                          bottom: 8,
+                          child: _CategoryPill(meta: meta, onDark: hasImage),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _HermandadByline(
+                            topic: boardTopic,
+                            timeAgo: reply.timeAgo,
+                            compact: true,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            parsed.title,
+                            style: AppTypography.hermandadName().copyWith(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              height: 1.12,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (showBody) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              parsed.body,
+                              style: AppTypography.bodyMedium(
+                                color: AppColors.textSecondary,
+                              ).copyWith(fontSize: 11.5, height: 1.3),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

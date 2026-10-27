@@ -294,6 +294,30 @@
     }
 
     @if (tab() === 'published') {
+      @if (publishedForUnify().length > 1) {
+        <form class="filters" (ngSubmit)="unifySelected()">
+          <span class="field-label">Unir en carrusel</span>
+          <select [(ngModel)]="unifyA" name="unifyA">
+            <option value="">Primera noticia</option>
+            @for (item of publishedForUnify(); track item.id) {
+              <option [value]="item.id">
+                {{ item.authorHandle || '@—' }} — {{ item.title }}
+              </option>
+            }
+          </select>
+          <select [(ngModel)]="unifyB" name="unifyB">
+            <option value="">Segunda noticia</option>
+            @for (item of publishedForUnify(); track item.id) {
+              <option [value]="item.id">
+                {{ item.authorHandle || '@—' }} — {{ item.title }}
+              </option>
+            }
+          </select>
+          <button type="submit" class="btn btn-soft" [disabled]="busy()">
+            Unir
+          </button>
+        </form>
+      }
       @if (loading()) {
         <div class="state-box">Cargando…</div>
       } @else if (published().length === 0) {
@@ -311,6 +335,9 @@
                     {{ statusLabel(item.status) }}
                   </span>
                   <span class="pill soft">{{ relatedLabel(item.relatedForumId) }}</span>
+                  @if (item.newsGroupId) {
+                    <span class="pill ok">carrusel</span>
+                  }
                 </div>
                 <h2>{{ item.title }}</h2>
                 <p class="queue-meta">
@@ -328,6 +355,16 @@
                   >
                     Editar
                   </button>
+                  @if (item.newsGroupId) {
+                    <button
+                      type="button"
+                      class="btn btn-ghost"
+                      [disabled]="busy()"
+                      (click)="splitPublished(item)"
+                    >
+                      Separar
+                    </button>
+                  }
                   <button
                     type="button"
                     class="btn btn-danger"

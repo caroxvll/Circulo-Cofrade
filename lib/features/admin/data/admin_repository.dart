@@ -230,6 +230,46 @@ class AdminRepository {
         .eq('id', profileId);
   }
 
+  /// Permiso aparte de la verificación: solo publicar noticias.
+  Future<void> setNewsPublisher({
+    required String profileId,
+    required bool enabled,
+  }) async {
+    final client = _client;
+    if (client == null) throw const AdminUnavailableException();
+
+    if (!enabled) {
+      await client.from('news_publishers').delete().eq('profile_id', profileId);
+      return;
+    }
+
+    await client.from('news_publishers').upsert({
+      'profile_id': profileId,
+      'assigned_by': client.auth.currentUser?.id,
+      'assigned_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  Future<void> unifyNoticias({
+    required String topicId,
+    required String otherTopicId,
+  }) async {
+    final client = _client;
+    if (client == null) throw const AdminUnavailableException();
+    await client.rpc(
+      'unify_noticias',
+      params: {
+        'p_topic_ids': [topicId, otherTopicId],
+      },
+    );
+  }
+
+  Future<void> splitNoticia(String topicId) async {
+    final client = _client;
+    if (client == null) throw const AdminUnavailableException();
+    await client.rpc('split_noticia', params: {'p_topic_id': topicId});
+  }
+
   Future<List<ModerationReport>> _enrichReportTargets(
     List<ModerationReport> reports,
   ) async {

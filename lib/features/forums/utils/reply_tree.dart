@@ -128,6 +128,7 @@ class ReplyThreadList extends StatefulWidget {
     this.officialChannelStyle = false,
     /// Abrir comunicado oficial a pantalla casi completa.
     this.onOfficialOpen,
+    this.boardTopic,
   });
 
   final List<ReplyTreeNode> nodes;
@@ -147,6 +148,7 @@ class ReplyThreadList extends StatefulWidget {
   final bool sliver;
   final bool officialChannelStyle;
   final void Function(ForumReply reply)? onOfficialOpen;
+  final ForumTopic? boardTopic;
 
   @override
   State<ReplyThreadList> createState() => _ReplyThreadListState();
@@ -229,6 +231,7 @@ class _ReplyThreadListState extends State<ReplyThreadList> {
           showReport: widget.showReport,
           officialChannelStyle: widget.officialChannelStyle,
           onOfficialOpen: widget.onOfficialOpen,
+          boardTopic: widget.boardTopic,
         ),
         if (node.children.isNotEmpty && !widget.officialChannelStyle)
           _ReplyThreadBranch(
@@ -446,6 +449,7 @@ class _ReplyCardSlot extends StatelessWidget {
     this.showReport,
     this.officialChannelStyle = false,
     this.onOfficialOpen,
+    this.boardTopic,
   });
 
   final ReplyTreeNode node;
@@ -464,6 +468,7 @@ class _ReplyCardSlot extends StatelessWidget {
   final bool Function(ForumReply reply)? showReport;
   final bool officialChannelStyle;
   final void Function(ForumReply reply)? onOfficialOpen;
+  final ForumTopic? boardTopic;
 
   bool get _isTopicAuthor {
     final authorId = topicAuthorId;
@@ -495,6 +500,7 @@ class _ReplyCardSlot extends StatelessWidget {
               ? (reaction) => onReactionChanged!(reply, reaction)
               : null,
           onOpen: onOfficialOpen != null ? () => onOfficialOpen!(reply) : null,
+          boardTopic: boardTopic,
         ),
       );
     }

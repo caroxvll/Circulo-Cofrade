@@ -54,14 +54,17 @@ bool canModerateForum({
 }
 
 /// Quién puede abrir «Nuevo tema» en un foro.
-/// En [noticiasForumId] solo admin / moderadores de ese foro.
+/// En [noticiasForumId]: admin, moderadores de ese foro, o cuenta
+/// autorizada solo para noticias ([isNewsPublisher]).
 bool canCreateTopicInForum({
   required String forumId,
   required bool isAdmin,
   required Set<String> moderatedForumIds,
+  bool isNewsPublisher = false,
 }) {
   if (forumId == 'hermandades') return false;
   if (isNoticiasForum(forumId)) {
+    if (isNewsPublisher) return true;
     return canModerateForum(
       forumId: forumId,
       isAdmin: isAdmin,

@@ -11,6 +11,7 @@ import '../notifications/notifications_provider.dart';
 import '../permissions/permissions_provider.dart';
 import '../profile/profile_provider.dart';
 import 'data/forums_repository.dart';
+import 'news_publishers_provider.dart';
 import 'data/forum_about_moderator.dart';
 import 'data/reply_likes_repository.dart';
 import 'data/topic_polls_repository.dart';
@@ -892,10 +893,13 @@ class TopicSubmitController {
       final isAdmin = _ref.read(isAdminProvider);
       final moderated =
           _ref.read(moderatedForumIdsProvider).asData?.value ?? const <String>{};
+      final isNewsPublisher =
+          await _ref.read(isNewsPublisherProvider(user.id).future);
       if (!canCreateTopicInForum(
         forumId: forumId,
         isAdmin: isAdmin,
         moderatedForumIds: moderated,
+        isNewsPublisher: isNewsPublisher,
       )) {
         throw const NoticiasStaffRequiredException();
       }

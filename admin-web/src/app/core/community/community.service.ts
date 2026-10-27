@@ -8,6 +8,8 @@ export interface AdminUserRow {
   role: 'member' | 'admin';
   accountType: 'cofrade' | 'brotherhood' | string;
   verified: boolean;
+  /** Puede publicar en Noticias. No es la verificación de hermandad. */
+  newsPublisher: boolean;
   suspendedAt: string | null;
   suspendedReason: string | null;
   createdAt: string;
@@ -288,6 +290,33 @@ export class CommunityService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', profileId);
+    if (error) throw error;
+  }
+
+  async fetchNewsPublisherIds(): Promise<Set<string>> {
+    const { data, error } = await getSupabase()
+      .from('news_publishers')
+      .select('profile_id');
+    if (error) throw error;
+    return new Set((data ?? []).map((row) => String(row.profile_id)));
+  }
+
+  async setNewsPublisher(profileId: string, enabled: boolean): Promise<void> {
+    if (!enabled) {
+      const { error } = await getSupabase()
+        .from('news_publishers')
+        .delete()
+        .eq('profile_id', profileId);
+      if (error) throw error;
+      return;
+    }
+
+    const { data: session } = await getSupabase().auth.getUser();
+    const { error } = await getSupabase().from('news_publishers').upsert({
+      profile_id: profileId,
+      assigned_by: session.user?.id ?? null,
+      assigned_at: new Date().toISOString(),
+    });
     if (error) throw error;
   }
 
@@ -973,6 +1002,7 @@ export class CommunityService {
       role: row['role'] === 'admin' ? 'admin' : 'member',
       accountType: String(row['account_type'] ?? 'cofrade'),
       verified: Boolean(row['verified']),
+      newsPublisher: false,
       suspendedAt: (row['suspended_at'] as string | null) ?? null,
       suspendedReason: (row['suspended_reason'] as string | null) ?? null,
       createdAt: String(row['created_at'] ?? ''),
