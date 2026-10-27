@@ -73,30 +73,29 @@ class EventCard extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (time != null)
-                      Text(
-                        time,
-                        style: AppTypography.displaySmall().copyWith(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          height: 1,
-                          color: AppColors.burgundy,
-                          letterSpacing: 0.2,
-                        ),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (time != null)
+                            Text(
+                              time,
+                              style: AppTypography.displaySmall().copyWith(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                height: 1,
+                                color: AppColors.burgundy,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          if (kind.isNotEmpty) _KindChip(label: kind),
+                        ],
                       ),
-                    if (time != null && kind.isNotEmpty)
-                      const SizedBox(width: 8),
-                    if (kind.isNotEmpty)
-                      Flexible(
-                        fit: FlexFit.loose,
-                        child: _KindChip(label: kind),
-                      ),
-                    if (timing != null) ...[
-                      const SizedBox(width: 6),
-                      _TimingBadge(timing: timing),
-                    ],
-                    const Spacer(),
+                    ),
                     if (showBookmark)
                       IconButton(
                         onPressed: onBookmarkToggle,
@@ -116,6 +115,10 @@ class EventCard extends ConsumerWidget {
                       ),
                   ],
                 ),
+                if (timing != null) ...[
+                  const SizedBox(height: 6),
+                  _TimingBadge(timing: timing),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   event.title,
