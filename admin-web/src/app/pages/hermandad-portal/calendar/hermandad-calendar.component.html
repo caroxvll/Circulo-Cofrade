@@ -159,6 +159,16 @@
               placeholder="Opcional"
             />
           </label>
+          <label class="field">
+            Entrada
+            <input
+              type="text"
+              [ngModel]="editAdmission()"
+              (ngModelChange)="editAdmission.set($event)"
+              maxlength="40"
+              placeholder="12 €, desde 8 €, donativo. Vacío si no hay"
+            />
+          </label>
         </div>
 
         @if (saveError()) {
@@ -215,7 +225,8 @@
                     <strong>{{ item.title }}</strong>
                     <p>
                       {{ formatTime(item.startsAt)
-                      }}{{ item.location ? ' · ' + item.location : '' }}
+                      }}{{ item.location ? ' · ' + item.location : ''
+                      }}{{ item.admissionLabel ? ' · Entrada ' + item.admissionLabel : '' }}
                     </p>
                   </div>
                   <span class="open-hint" aria-hidden="true">›</span>

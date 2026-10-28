@@ -171,6 +171,7 @@ class _EventDetailSheet extends ConsumerWidget {
                             dateLabel: formattedDate,
                             time: event.time,
                             location: location,
+                            admission: event.admissionChip,
                           ),
                           if (event.viewCount > 0) ...[
                             const SizedBox(height: 10),
@@ -459,11 +460,13 @@ class _MetaBlock extends StatelessWidget {
     required this.dateLabel,
     this.time,
     this.location,
+    this.admission,
   });
 
   final String dateLabel;
   final String? time;
   final String? location;
+  final String? admission;
 
   @override
   Widget build(BuildContext context) {
@@ -477,6 +480,13 @@ class _MetaBlock extends StatelessWidget {
         if (location != null) ...[
           const SizedBox(height: 10),
           _MetaRow(icon: Icons.location_on_outlined, text: location!),
+        ],
+        if (admission != null && admission!.trim().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _MetaRow(
+            icon: Icons.confirmation_number_outlined,
+            text: admission!.trim(),
+          ),
         ],
       ],
     );

@@ -8,6 +8,12 @@ export type CalendarEventType =
   | 'ensayo'
   | 'iguala'
   | 'concierto'
+  | 'culto'
+  | 'besamanos'
+  | 'quinario'
+  | 'triduo'
+  | 'pregon'
+  | 'traslado'
   | 'evento';
 
 export interface CalendarEventRow {
@@ -20,6 +26,7 @@ export interface CalendarEventRow {
   liveForceState: EventLiveForceState;
   dayLabel: string | null;
   location: string | null;
+  admissionLabel: string | null;
   organizerLabel: string | null;
   customIconUrl: string | null;
   coverImageUrl: string | null;
@@ -38,6 +45,7 @@ export interface CalendarEventInput {
   endsAt?: string | null;
   dayLabel?: string | null;
   location?: string | null;
+  admissionLabel?: string | null;
   organizerLabel?: string | null;
   customIconUrl?: string | null;
   coverImageUrl?: string | null;
@@ -61,6 +69,12 @@ export const CALENDAR_EVENT_TYPES: { value: CalendarEventType; label: string; ce
     { value: 'ensayo', label: 'Ensayos', cellLabel: 'Ensayo' },
     { value: 'iguala', label: 'Igualás', cellLabel: 'Iguala' },
     { value: 'concierto', label: 'Conciertos', cellLabel: 'Concierto' },
+    { value: 'culto', label: 'Cultos', cellLabel: 'Culto' },
+    { value: 'besamanos', label: 'Besamanos', cellLabel: 'Besamanos' },
+    { value: 'quinario', label: 'Quinarios', cellLabel: 'Quinario' },
+    { value: 'triduo', label: 'Triduos', cellLabel: 'Triduo' },
+    { value: 'pregon', label: 'Pregones', cellLabel: 'Pregón' },
+    { value: 'traslado', label: 'Traslados', cellLabel: 'Traslado' },
     { value: 'evento', label: 'Eventos', cellLabel: 'Evento' },
   ];
 

@@ -29,6 +29,12 @@ class FilterChipRow extends StatelessWidget {
     EventFilter.ensayos,
     EventFilter.conciertos,
     EventFilter.glorias,
+    EventFilter.cultos,
+    EventFilter.besamanos,
+    EventFilter.quinarios,
+    EventFilter.triduos,
+    EventFilter.traslados,
+    EventFilter.pregones,
     EventFilter.eventos,
     EventFilter.guardados,
   ];

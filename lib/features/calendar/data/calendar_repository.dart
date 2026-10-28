@@ -153,6 +153,7 @@ class CalendarRepository {
     String? publisherHandle,
     String? customIconUrl,
     String? coverImageUrl,
+    String? admissionLabel,
   }) async {
     if (_client == null) throw CalendarRemoteUnavailableException();
 
@@ -169,6 +170,7 @@ class CalendarRepository {
           'organizer_label': organizerLabel ?? '',
           'custom_icon_url': customIconUrl ?? '',
           'cover_image_url': coverImageUrl ?? '',
+          'admission_label': _admissionOrNull(admissionLabel),
           'created_by': userId,
         })
         .select('*, profiles!created_by(handle, display_name)')
@@ -190,6 +192,7 @@ class CalendarRepository {
     String? organizerLabel,
     String? customIconUrl,
     String? coverImageUrl,
+    String? admissionLabel,
   }) async {
     if (_client == null) throw CalendarRemoteUnavailableException();
 
@@ -203,6 +206,7 @@ class CalendarRepository {
       'organizer_label': organizerLabel ?? '',
       'custom_icon_url': customIconUrl ?? '',
       'cover_image_url': coverImageUrl ?? '',
+      'admission_label': _admissionOrNull(admissionLabel),
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
     if (clearEndsAt) {
@@ -756,6 +760,7 @@ class CalendarRepository {
         row['live_force_state'] as String?,
       ),
       viewCount: row['view_count'] as int? ?? 0,
+      admissionLabel: _admissionOrNull(row['admission_label'] as String?),
     );
   }
 
@@ -772,6 +777,12 @@ class CalendarRepository {
     if (result is int) return result;
     if (result is num) return result.toInt();
     return int.tryParse(result?.toString() ?? '');
+  }
+
+  String? _admissionOrNull(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) return null;
+    return text.length > 40 ? text.substring(0, 40) : text;
   }
 
   String? _nonEmptyUrl(String? raw) {

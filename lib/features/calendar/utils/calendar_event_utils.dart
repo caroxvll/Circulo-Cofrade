@@ -147,6 +147,12 @@ Duration _defaultEventDuration(EventType type) => switch (type) {
       EventType.ensayo => const Duration(hours: 4),
       EventType.iguala => const Duration(hours: 4),
       EventType.concierto => const Duration(hours: 2),
+      EventType.culto => const Duration(hours: 2),
+      EventType.besamanos => const Duration(hours: 2),
+      EventType.quinario => const Duration(hours: 2),
+      EventType.triduo => const Duration(hours: 2),
+      EventType.pregon => const Duration(hours: 2),
+      EventType.traslado => const Duration(hours: 2),
       EventType.evento => const Duration(hours: 2),
     };
 

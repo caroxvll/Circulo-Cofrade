@@ -18,6 +18,7 @@ export interface HermandadUpcomingEvent {
   location: string | null;
   coverImageUrl: string | null;
   eventType: string;
+  admissionLabel: string | null;
   viewCount: number;
 }
 
@@ -457,6 +458,7 @@ export class HermandadPortalStore {
       startsAtIso: string;
       location?: string | null;
       eventType: string;
+      admissionLabel?: string | null;
     },
   ): Promise<HermandadUpcomingEvent> {
     await this.api.updateOwnCalendarEvent(eventId, input);
@@ -468,6 +470,7 @@ export class HermandadPortalStore {
       location: input.location?.trim() || null,
       coverImageUrl: prev?.coverImageUrl ?? null,
       eventType: input.eventType,
+      admissionLabel: input.admissionLabel?.trim() || null,
       viewCount: prev?.viewCount ?? 0,
     };
     this.upcomingEvents.update((list) =>

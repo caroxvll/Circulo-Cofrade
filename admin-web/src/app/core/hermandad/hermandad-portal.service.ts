@@ -264,13 +264,14 @@ export class HermandadPortalService {
       location: string | null;
       coverImageUrl: string | null;
       eventType: string;
+      admissionLabel: string | null;
       viewCount: number;
     }>
   > {
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, starts_at, location, cover_image_url, event_type, status, view_count',
+        'id, title, starts_at, location, cover_image_url, event_type, admission_label, status, view_count',
       )
       .eq('created_by', profileId)
       .eq('status', 'published')
@@ -278,8 +279,9 @@ export class HermandadPortalService {
       .order('starts_at', { ascending: true })
       .limit(limit);
     if (error) {
-      // Compat: si aún no está la columna view_count.
-      if (String(error.message ?? '').toLowerCase().includes('view_count')) {
+      // Compat: columnas nuevas (entrada) o view_count aún no aplicadas.
+      const msg = String(error.message ?? '').toLowerCase();
+      if (msg.includes('admission_label') || msg.includes('view_count')) {
         const retry = await getSupabase()
           .from('calendar_events')
           .select(
@@ -311,13 +313,14 @@ export class HermandadPortalService {
       location: string | null;
       coverImageUrl: string | null;
       eventType: string;
+      admissionLabel: string | null;
       viewCount: number;
     }>
   > {
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, starts_at, location, cover_image_url, event_type, status, view_count',
+        'id, title, starts_at, location, cover_image_url, event_type, admission_label, status, view_count',
       )
       .eq('created_by', profileId)
       .eq('status', 'published')
@@ -326,7 +329,8 @@ export class HermandadPortalService {
       .order('starts_at', { ascending: true })
       .limit(200);
     if (error) {
-      if (String(error.message ?? '').toLowerCase().includes('view_count')) {
+      const msg = String(error.message ?? '').toLowerCase();
+      if (msg.includes('admission_label') || msg.includes('view_count')) {
         const retry = await getSupabase()
           .from('calendar_events')
           .select(
@@ -353,8 +357,10 @@ export class HermandadPortalService {
     location: string | null;
     coverImageUrl: string | null;
     eventType: string;
+    admissionLabel: string | null;
     viewCount: number;
   } {
+    const admission = String(row['admission_label'] ?? '').trim();
     return {
       id: String(row['id']),
       title: String(row['title'] ?? ''),
@@ -362,6 +368,7 @@ export class HermandadPortalService {
       location: (row['location'] as string | null) ?? null,
       coverImageUrl: (row['cover_image_url'] as string | null) ?? null,
       eventType: String(row['event_type'] ?? 'evento'),
+      admissionLabel: admission || null,
       viewCount: Number(row['view_count'] ?? 0),
     };
   }
@@ -706,6 +713,7 @@ export class HermandadPortalService {
       startsAtIso: string;
       location?: string | null;
       eventType: string;
+      admissionLabel?: string | null;
     },
   ): Promise<void> {
     const title = input.title.trim();
@@ -719,6 +727,7 @@ export class HermandadPortalService {
         starts_at: input.startsAtIso,
         location: input.location?.trim() || null,
         event_type: input.eventType,
+        admission_label: input.admissionLabel?.trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', eventId);

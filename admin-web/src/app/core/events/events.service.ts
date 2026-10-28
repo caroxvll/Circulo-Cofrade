@@ -27,7 +27,7 @@ export class EventsService {
     let req = getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
+        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
       )
       .limit(limit);
 
@@ -89,7 +89,7 @@ export class EventsService {
         status: input.status ?? 'published',
       })
       .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
+        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
       )
       .single();
     if (error) throw error;
@@ -107,7 +107,7 @@ export class EventsService {
       })
       .eq('id', eventId)
       .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
+        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
       )
       .single();
     if (error) throw error;
@@ -236,6 +236,7 @@ export class EventsService {
       ...(endsAt !== undefined ? { ends_at: endsAt } : {}),
       day_label: (input.dayLabel?.trim() || eventTypeCellLabel(type)).trim(),
       location: (input.location ?? '').trim(),
+      admission_label: emptyToNull(input.admissionLabel),
       organizer_label: (input.organizerLabel ?? '').trim(),
       custom_icon_url: (input.customIconUrl ?? '').trim(),
       cover_image_url: (input.coverImageUrl ?? '').trim(),
@@ -289,6 +290,7 @@ export class EventsService {
       liveForceState,
       dayLabel: (row['day_label'] as string | null) ?? null,
       location: emptyToNull(row['location'] as string | null),
+      admissionLabel: emptyToNull(row['admission_label'] as string | null),
       organizerLabel: emptyToNull(row['organizer_label'] as string | null),
       customIconUrl: emptyToNull(row['custom_icon_url'] as string | null),
       coverImageUrl: emptyToNull(row['cover_image_url'] as string | null),

@@ -107,6 +107,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   final _titleController = TextEditingController();
   final _subtitleController = TextEditingController();
   final _locationController = TextEditingController();
+  final _admissionController = TextEditingController();
   final _organizerController = TextEditingController();
 
   late DateTime _date;
@@ -143,6 +144,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       _titleController.text = existing.title;
       _subtitleController.text = existing.subtitle;
       _locationController.text = existing.location ?? '';
+      _admissionController.text = existing.admissionLabel ?? '';
       _organizerController.text = existing.organizerLabel ?? '';
       _date = existing.date;
       _type = existing.type;
@@ -270,6 +272,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     _titleController.dispose();
     _subtitleController.dispose();
     _locationController.dispose();
+    _admissionController.dispose();
     _organizerController.dispose();
     super.dispose();
   }
@@ -499,6 +502,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     final title = _titleController.text.trim();
     final subtitle = _subtitleController.text.trim();
     final location = _locationController.text.trim();
+    final admission = _admissionController.text.trim();
     final organizer = _organizerController.text.trim();
 
     if (title.length < 3) {
@@ -585,6 +589,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           organizerLabel: organizer,
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
+          admissionLabel: admission,
         );
       } else {
         await repo.createEvent(
@@ -599,6 +604,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           publisherHandle: handle,
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
+          admissionLabel: admission,
         );
       }
 
@@ -765,6 +771,17 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               decoration: const InputDecoration(
                 labelText: 'Lugar',
                 hintText: 'Parroquia, calle, templo…',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _admissionController,
+              maxLength: 40,
+              decoration: const InputDecoration(
+                labelText: 'Entrada',
+                hintText: '12 €, desde 8 €, donativo',
+                helperText: 'Opcional. Si lo dejas vacío, no se muestra.',
+                counterText: '',
               ),
             ),
             const SizedBox(height: 12),

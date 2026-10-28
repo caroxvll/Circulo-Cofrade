@@ -115,6 +115,10 @@ class EventCard extends ConsumerWidget {
                       ),
                   ],
                 ),
+                if (event.admissionChip != null) ...[
+                  const SizedBox(height: 6),
+                  _AdmissionChip(label: event.admissionChip!),
+                ],
                 if (timing != null) ...[
                   const SizedBox(height: 6),
                   _TimingBadge(timing: timing),
@@ -183,6 +187,34 @@ String _formatTimeCompact(String time) {
   final trimmed = time.trim();
   if (trimmed.isEmpty) return trimmed;
   return trimmed.replaceAll('h', '').trim();
+}
+
+class _AdmissionChip extends StatelessWidget {
+  const _AdmissionChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.gold.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.55)),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTypography.labelSmall(color: AppColors.goldDark).copyWith(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w700,
+          height: 1,
+        ),
+      ),
+    );
+  }
 }
 
 class _KindChip extends StatelessWidget {

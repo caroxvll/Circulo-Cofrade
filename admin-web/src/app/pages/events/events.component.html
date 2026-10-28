@@ -84,6 +84,9 @@
               <div class="event-body">
                 <div class="event-kicker">
                   <span class="type-pill">{{ typeLabel(event.eventType) }}</span>
+                  @if (event.admissionLabel) {
+                    <span class="type-pill">Entrada · {{ event.admissionLabel }}</span>
+                  }
                   <span>{{ dateTime(event.startsAt) }}</span>
                   @if (event.endsAt) {
                     <span>· fin {{ dateTime(event.endsAt) }}</span>
@@ -164,7 +167,7 @@
               <div class="event-body">
                 <div class="event-kicker">
                   <span class="type-pill pending">Pendiente</span>
-                  <span>{{ typeLabel(event.eventType) }} · {{ dateTime(event.startsAt) }}</span>
+                  <span>{{ typeLabel(event.eventType) }} · {{ dateTime(event.startsAt) }}@if (event.admissionLabel) { · Entrada {{ event.admissionLabel }} }</span>
                 </div>
                 <h2>{{ event.title }}</h2>
                 <p class="queue-meta">
@@ -217,7 +220,7 @@
     <div class="dialog form-dialog" (click)="$event.stopPropagation()">
       <h3>{{ formTitleText() }}</h3>
       <p class="form-lead">
-        Misma ficha que en la app: tipo, fecha, lugar, organizador, portada e icono.
+        Misma ficha que en la app: tipo, fecha, lugar, entrada, organizador, portada e icono.
       </p>
 
       <label>
@@ -267,7 +270,16 @@
           Lugar
           <input [(ngModel)]="formLocation" maxlength="160" placeholder="Calle, templo…" />
         </label>
+        <label>
+          Entrada
+          <input
+            [(ngModel)]="formAdmission"
+            maxlength="40"
+            placeholder="12 €, desde 8 €, donativo"
+          />
+        </label>
       </div>
+      <p class="form-hint">Si la dejas vacía, la app no muestra el precio.</p>
 
       <div class="organizer-block">
         <div class="organizer-head">

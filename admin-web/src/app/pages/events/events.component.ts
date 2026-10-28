@@ -53,6 +53,7 @@ export class EventsPageComponent implements OnInit {
   formSubtitle = '';
   formType: CalendarEventType = 'evento';
   formLocation = '';
+  formAdmission = '';
   formOrganizer = '';
   formStartsAtLocal = '';
   formEndsAtLocal = '';
@@ -154,6 +155,7 @@ export class EventsPageComponent implements OnInit {
     this.formSubtitle = event.subtitle;
     this.formType = event.eventType;
     this.formLocation = event.location ?? '';
+    this.formAdmission = event.admissionLabel ?? '';
     this.formOrganizer = event.organizerLabel ?? '';
     this.formStartsAtLocal = toDatetimeLocalValue(new Date(event.startsAt));
     this.formEndsAtLocal = event.endsAt
@@ -233,6 +235,7 @@ export class EventsPageComponent implements OnInit {
     this.formSubtitle = '';
     this.formType = 'evento';
     this.formLocation = '';
+    this.formAdmission = '';
     this.formOrganizer = '';
     this.formStartsAtLocal = '';
     this.formEndsAtLocal = '';
@@ -315,6 +318,7 @@ export class EventsPageComponent implements OnInit {
           ? fromDatetimeLocalValue(this.formEndsAtLocal)
           : null,
         location: this.formLocation,
+        admissionLabel: this.formAdmission.trim() || null,
         organizerLabel,
         coverImageUrl,
         customIconUrl,

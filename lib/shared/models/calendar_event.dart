@@ -11,6 +11,18 @@ enum EventType {
 
   concierto('Conciertos'),
 
+  culto('Cultos'),
+
+  besamanos('Besamanos'),
+
+  quinario('Quinarios'),
+
+  triduo('Triduos'),
+
+  pregon('Pregones'),
+
+  traslado('Traslados'),
+
   evento('Eventos');
 
   const EventType(this.label);
@@ -29,6 +41,18 @@ enum EventType {
 
       'concierto' => EventType.concierto,
 
+      'culto' => EventType.culto,
+
+      'besamanos' => EventType.besamanos,
+
+      'quinario' => EventType.quinario,
+
+      'triduo' => EventType.triduo,
+
+      'pregon' => EventType.pregon,
+
+      'traslado' => EventType.traslado,
+
       _ => EventType.evento,
     };
   }
@@ -44,6 +68,18 @@ enum EventType {
 
     EventType.concierto => 'concierto',
 
+    EventType.culto => 'culto',
+
+    EventType.besamanos => 'besamanos',
+
+    EventType.quinario => 'quinario',
+
+    EventType.triduo => 'triduo',
+
+    EventType.pregon => 'pregon',
+
+    EventType.traslado => 'traslado',
+
     EventType.evento => 'evento',
   };
 
@@ -54,6 +90,12 @@ enum EventType {
     EventType.ensayo => 'Ensayo',
     EventType.iguala => 'Iguala',
     EventType.concierto => 'Concierto',
+    EventType.culto => 'Culto',
+    EventType.besamanos => 'Besamanos',
+    EventType.quinario => 'Quinario',
+    EventType.triduo => 'Triduo',
+    EventType.pregon => 'Pregón',
+    EventType.traslado => 'Traslado',
     EventType.evento => 'Evento',
   };
 }
@@ -126,6 +168,7 @@ class CalendarEvent {
     this.endsAt,
     this.liveForceState = EventLiveForceState.auto,
     this.viewCount = 0,
+    this.admissionLabel,
   });
 
   final String? id;
@@ -166,6 +209,15 @@ class CalendarEvent {
   /// Visitas deduplicadas (1 por viewer/día) al abrir el evento en la app.
   final int viewCount;
 
+  /// Texto corto de entrada, si la hay. Vacío = no se muestra.
+  final String? admissionLabel;
+
+  String? get admissionChip {
+    final text = admissionLabel?.trim() ?? '';
+    if (text.isEmpty) return null;
+    return 'Entrada · $text';
+  }
+
   bool get isPublished => status == CalendarEventStatus.published;
   bool get isPendingReview => status == CalendarEventStatus.pendingReview;
 
@@ -196,6 +248,8 @@ class CalendarEvent {
     bool clearEndsAt = false,
     EventLiveForceState? liveForceState,
     int? viewCount,
+    String? admissionLabel,
+    bool clearAdmissionLabel = false,
   }) {
     return CalendarEvent(
       id: id ?? this.id,
@@ -215,6 +269,9 @@ class CalendarEvent {
       endsAt: clearEndsAt ? null : (endsAt ?? this.endsAt),
       liveForceState: liveForceState ?? this.liveForceState,
       viewCount: viewCount ?? this.viewCount,
+      admissionLabel: clearAdmissionLabel
+          ? null
+          : (admissionLabel ?? this.admissionLabel),
     );
   }
 }
@@ -233,6 +290,18 @@ enum EventFilter {
   procesiones('Procesiones'),
 
   glorias('Glorias'),
+
+  cultos('Cultos'),
+
+  besamanos('Besamanos'),
+
+  quinarios('Quinarios'),
+
+  triduos('Triduos'),
+
+  pregones('Pregones'),
+
+  traslados('Traslados'),
 
   eventos('Eventos'),
 
@@ -255,6 +324,18 @@ enum EventFilter {
     EventFilter.procesiones => EventType.procesion,
 
     EventFilter.glorias => EventType.gloria,
+
+    EventFilter.cultos => EventType.culto,
+
+    EventFilter.besamanos => EventType.besamanos,
+
+    EventFilter.quinarios => EventType.quinario,
+
+    EventFilter.triduos => EventType.triduo,
+
+    EventFilter.pregones => EventType.pregon,
+
+    EventFilter.traslados => EventType.traslado,
 
     EventFilter.eventos => EventType.evento,
   };

@@ -25,9 +25,8 @@ class EventTypeIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconPath = customIconUrl?.trim().isNotEmpty == true
-        ? customIconUrl!.trim()
-        : AppAssets.eventIconPath(type);
+    final custom = customIconUrl?.trim() ?? '';
+    final iconPath = custom.isNotEmpty ? custom : AppAssets.eventIconPath(type);
     final fallback = Icon(
       _fallbackIcon(type),
       color: AppColors.burgundy,
@@ -47,7 +46,9 @@ class EventTypeIcon extends StatelessWidget {
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      child: _IconImage(path: iconPath, size: size, fallback: fallback),
+      child: iconPath.isEmpty
+          ? Center(child: fallback)
+          : _IconImage(path: iconPath, size: size, fallback: fallback),
     );
   }
 
@@ -58,6 +59,12 @@ class EventTypeIcon extends StatelessWidget {
       EventType.ensayo => Icons.groups_outlined,
       EventType.iguala => Icons.handshake_outlined,
       EventType.concierto => Icons.music_note,
+      EventType.culto => Icons.menu_book_outlined,
+      EventType.besamanos => Icons.front_hand_outlined,
+      EventType.quinario => Icons.auto_stories_outlined,
+      EventType.triduo => Icons.church_outlined,
+      EventType.pregon => Icons.campaign_outlined,
+      EventType.traslado => Icons.directions_walk_outlined,
       EventType.evento => Icons.event_outlined,
     };
   }

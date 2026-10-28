@@ -86,6 +86,7 @@ export class HermandadCalendarPageComponent implements OnInit {
   readonly editDate = signal('');
   readonly editTime = signal('');
   readonly editLocation = signal('');
+  readonly editAdmission = signal('');
   readonly editType = signal<CalendarEventType>('evento');
   readonly saving = signal(false);
   readonly saveError = signal<string | null>(null);
@@ -168,6 +169,7 @@ export class HermandadCalendarPageComponent implements OnInit {
       this.editDate() !== parts.date ||
       this.editTime() !== parts.time ||
       (this.editLocation().trim() || '') !== (ev.location?.trim() || '') ||
+      (this.editAdmission().trim() || '') !== (ev.admissionLabel?.trim() || '') ||
       this.editType() !== ev.eventType
     );
   });
@@ -210,6 +212,7 @@ export class HermandadCalendarPageComponent implements OnInit {
     this.editDate.set(parts.date);
     this.editTime.set(parts.time);
     this.editLocation.set(ev.location ?? '');
+    this.editAdmission.set(ev.admissionLabel ?? '');
     this.editType.set(
       (CALENDAR_EVENT_TYPES.some((t) => t.value === ev.eventType)
         ? ev.eventType
@@ -261,6 +264,7 @@ export class HermandadCalendarPageComponent implements OnInit {
         startsAtIso,
         location: this.editLocation().trim() || null,
         eventType: this.editType(),
+        admissionLabel: this.editAdmission().trim() || null,
       });
       this.events.update((list) =>
         list.map((e) =>
@@ -271,6 +275,7 @@ export class HermandadCalendarPageComponent implements OnInit {
                 startsAt: updated.startsAt,
                 location: updated.location,
                 eventType: updated.eventType,
+                admissionLabel: updated.admissionLabel,
               }
             : e,
         ),
@@ -281,6 +286,7 @@ export class HermandadCalendarPageComponent implements OnInit {
         startsAt: updated.startsAt,
         location: updated.location,
         eventType: updated.eventType,
+        admissionLabel: updated.admissionLabel,
       });
       const parts = toLocalParts(updated.startsAt);
       this.editDate.set(parts.date);
