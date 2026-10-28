@@ -8,6 +8,7 @@ import {
   CalendarEventType,
   OrganizerLogo,
   eventTypeLabel,
+  scheduleLabel,
 } from '../../core/events/events.models';
 import { EventsService } from '../../core/events/events.service';
 import { ModerationService } from '../../core/moderation/moderation.service';
@@ -57,6 +58,8 @@ export class EventsPageComponent implements OnInit {
   formOrganizer = '';
   formStartsAtLocal = '';
   formEndsAtLocal = '';
+  formFirstEnd = '';
+  formExtraSlots: { start: string; end: string }[] = [];
   formCoverUrl = '';
   formIconUrl = '';
 
@@ -64,6 +67,32 @@ export class EventsPageComponent implements OnInit {
   readonly typeLabel = eventTypeLabel;
   readonly timeAgo = formatTimeAgo;
   readonly dateTime = formatDateTime;
+  readonly scheduleOf = (event: CalendarEventRow) => scheduleLabel(event.timeSlots);
+
+  addExtraSlot(): void {
+    if (this.formExtraSlots.length >= 5) return;
+    this.formExtraSlots = [...this.formExtraSlots, { start: '19:00', end: '' }];
+  }
+
+  removeExtraSlot(index: number): void {
+    this.formExtraSlots = this.formExtraSlots.filter((_, i) => i !== index);
+  }
+
+  private slotsFromForm(): { start: string; end?: string | null }[] | null {
+    const match = this.formStartsAtLocal.match(/T(\d{2}:\d{2})/);
+    const start = match?.[1];
+    if (!start) return null;
+    const slots = [
+      { start, end: this.formFirstEnd.trim() || null },
+      ...this.formExtraSlots
+        .map((slot) => ({
+          start: slot.start.trim(),
+          end: slot.end.trim() || null,
+        }))
+        .filter((slot) => /^\d{2}:\d{2}$/.test(slot.start)),
+    ];
+    return slots;
+  }
 
   readonly formTitleText = computed(() =>
     this.editing() ? 'Editar evento' : 'Nuevo evento',
@@ -158,6 +187,12 @@ export class EventsPageComponent implements OnInit {
     this.formAdmission = event.admissionLabel ?? '';
     this.formOrganizer = event.organizerLabel ?? '';
     this.formStartsAtLocal = toDatetimeLocalValue(new Date(event.startsAt));
+    const slots = event.timeSlots ?? [];
+    this.formFirstEnd = slots[0]?.end ?? '';
+    this.formExtraSlots = slots.slice(1).map((slot) => ({
+      start: slot.start,
+      end: slot.end ?? '',
+    }));
     this.formEndsAtLocal = event.endsAt
       ? toDatetimeLocalValue(new Date(event.endsAt))
       : '';
@@ -239,6 +274,8 @@ export class EventsPageComponent implements OnInit {
     this.formOrganizer = '';
     this.formStartsAtLocal = '';
     this.formEndsAtLocal = '';
+    this.formFirstEnd = '';
+    this.formExtraSlots = [];
     this.formCoverUrl = '';
     this.formIconUrl = '';
     this.organizerSearch = '';
@@ -319,6 +356,7 @@ export class EventsPageComponent implements OnInit {
           : null,
         location: this.formLocation,
         admissionLabel: this.formAdmission.trim() || null,
+        timeSlots: this.slotsFromForm(),
         organizerLabel,
         coverImageUrl,
         customIconUrl,

@@ -1,7 +1,11 @@
 import { Injectable } from '@angular/core';
 import { getSupabase } from '../supabase.client';
 import { parseHermandadTopicTitle } from '../community/community.service';
-import type { CalendarEventType } from '../events/events.models';
+import {
+  type CalendarEventType,
+  type CalendarTimeSlot,
+  parseTimeSlots,
+} from '../events/events.models';
 
 /** Categoría en tablón (BD / app). */
 export const OFFICIAL_CATEGORIES = [
@@ -265,13 +269,14 @@ export class HermandadPortalService {
       coverImageUrl: string | null;
       eventType: string;
       admissionLabel: string | null;
+      timeSlots: CalendarTimeSlot[];
       viewCount: number;
     }>
   > {
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, starts_at, location, cover_image_url, event_type, admission_label, status, view_count',
+        'id, title, starts_at, location, cover_image_url, event_type, admission_label, time_slots, status, view_count',
       )
       .eq('created_by', profileId)
       .eq('status', 'published')
@@ -281,7 +286,11 @@ export class HermandadPortalService {
     if (error) {
       // Compat: columnas nuevas (entrada) o view_count aún no aplicadas.
       const msg = String(error.message ?? '').toLowerCase();
-      if (msg.includes('admission_label') || msg.includes('view_count')) {
+      if (
+        msg.includes('admission_label') ||
+        msg.includes('view_count') ||
+        msg.includes('time_slots')
+      ) {
         const retry = await getSupabase()
           .from('calendar_events')
           .select(
@@ -314,13 +323,14 @@ export class HermandadPortalService {
       coverImageUrl: string | null;
       eventType: string;
       admissionLabel: string | null;
+      timeSlots: CalendarTimeSlot[];
       viewCount: number;
     }>
   > {
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, starts_at, location, cover_image_url, event_type, admission_label, status, view_count',
+        'id, title, starts_at, location, cover_image_url, event_type, admission_label, time_slots, status, view_count',
       )
       .eq('created_by', profileId)
       .eq('status', 'published')
@@ -330,7 +340,11 @@ export class HermandadPortalService {
       .limit(200);
     if (error) {
       const msg = String(error.message ?? '').toLowerCase();
-      if (msg.includes('admission_label') || msg.includes('view_count')) {
+      if (
+        msg.includes('admission_label') ||
+        msg.includes('view_count') ||
+        msg.includes('time_slots')
+      ) {
         const retry = await getSupabase()
           .from('calendar_events')
           .select(
@@ -357,8 +371,9 @@ export class HermandadPortalService {
     location: string | null;
     coverImageUrl: string | null;
     eventType: string;
-    admissionLabel: string | null;
-    viewCount: number;
+      admissionLabel: string | null;
+      timeSlots: CalendarTimeSlot[];
+      viewCount: number;
   } {
     const admission = String(row['admission_label'] ?? '').trim();
     return {
@@ -369,6 +384,7 @@ export class HermandadPortalService {
       coverImageUrl: (row['cover_image_url'] as string | null) ?? null,
       eventType: String(row['event_type'] ?? 'evento'),
       admissionLabel: admission || null,
+      timeSlots: parseTimeSlots(row['time_slots']),
       viewCount: Number(row['view_count'] ?? 0),
     };
   }
@@ -714,6 +730,7 @@ export class HermandadPortalService {
       location?: string | null;
       eventType: string;
       admissionLabel?: string | null;
+      timeSlots?: { start: string; end?: string | null }[] | null;
     },
   ): Promise<void> {
     const title = input.title.trim();
@@ -728,6 +745,7 @@ export class HermandadPortalService {
         location: input.location?.trim() || null,
         event_type: input.eventType,
         admission_label: input.admissionLabel?.trim() || null,
+        time_slots: normalizeHermandadSlots(input.timeSlots),
         updated_at: new Date().toISOString(),
       })
       .eq('id', eventId);
@@ -835,4 +853,15 @@ export class HermandadPortalService {
   categoryLabel(value: string): string {
     return OFFICIAL_CATEGORIES.find((c) => c.value === value)?.label ?? value;
   }
+}
+
+function normalizeHermandadSlots(
+  slots: { start: string; end?: string | null }[] | null | undefined,
+): { start: string; end?: string }[] | null {
+  const list = parseTimeSlots(slots ?? []);
+  const hasRange = list.some((slot) => !!slot.end);
+  if (list.length < 2 && !hasRange) return null;
+  return list.map((slot) =>
+    slot.end ? { start: slot.start, end: slot.end } : { start: slot.start },
+  );
 }

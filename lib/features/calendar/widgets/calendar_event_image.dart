@@ -16,6 +16,7 @@ class CalendarEventImage extends StatelessWidget {
     this.borderRadius = BorderRadius.zero,
     this.showTypeFallback = true,
     this.compact = false,
+    this.expand = false,
   });
 
   final CalendarEvent event;
@@ -24,6 +25,10 @@ class CalendarEventImage extends StatelessWidget {
   final BorderRadius borderRadius;
   final bool showTypeFallback;
   final bool compact;
+
+  /// Llena el hueco del padre y recorta con [fit]. Hace falta en la miniatura,
+  /// donde si no la foto se queda a su proporción y deja blanco.
+  final bool expand;
 
   static bool hasDisplayableCover(CalendarEvent event) {
     final cover = event.coverImageUrl?.trim();
@@ -42,12 +47,15 @@ class CalendarEventImage extends StatelessWidget {
     final hasCover = cover != null && cover.isNotEmpty && !_isPatternPlaceholder(cover);
     final isAsset = hasCover && cover.startsWith('assets/');
 
+    final double? side = expand ? double.infinity : null;
     Widget child;
     if (hasCover && isAsset) {
       child = CofradeoAssetImage(
         assetPath: cover,
         fit: fit,
         alignment: alignment,
+        width: side,
+        height: side,
         filterQuality: FilterQuality.medium,
         cacheWidth: ImageDecodeCache.px(
           context,
@@ -62,12 +70,18 @@ class CalendarEventImage extends StatelessWidget {
         url: cover,
         fit: fit,
         alignment: alignment,
+        width: side,
+        height: side,
         cacheSize: cacheSize,
         filterQuality: FilterQuality.medium,
         errorWidget: _fallback(),
       );
     } else {
       child = _fallback();
+    }
+
+    if (expand) {
+      child = SizedBox.expand(child: child);
     }
 
     return ClipRRect(

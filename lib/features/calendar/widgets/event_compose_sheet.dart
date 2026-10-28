@@ -134,6 +134,8 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   String? _initialOrganizerKey;
 
   bool get _isEditing => widget.existing?.id != null;
+  TimeOfDay? _firstEnd;
+  final List<({TimeOfDay start, TimeOfDay? end})> _extraSlots = [];
 
   @override
   void initState() {
@@ -157,6 +159,16 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               minute: int.tryParse(parts[1]) ?? 0,
             )
           : const TimeOfDay(hour: 12, minute: 0);
+      if (existing.slots.isNotEmpty) {
+        final first = existing.slots.first;
+        _time = _timeFromClock(first.start) ?? _time;
+        _firstEnd = _timeFromClock(first.end);
+        for (final slot in existing.slots.skip(1)) {
+          final start = _timeFromClock(slot.start);
+          if (start == null) continue;
+          _extraSlots.add((start: start, end: _timeFromClock(slot.end)));
+        }
+      }
     } else {
       _date = DateTime(
         (widget.initialDate ?? DateTime.now()).year,
@@ -304,6 +316,80 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
         _ensureTimeNotInPast();
       });
     }
+  }
+
+  TimeOfDay? _timeFromClock(String? raw) {
+    final text = raw?.trim() ?? '';
+    final parts = text.split(':');
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _clockLabel(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  String? _endAfter(TimeOfDay start, TimeOfDay? end) {
+    if (end == null) return null;
+    final startMin = start.hour * 60 + start.minute;
+    final endMin = end.hour * 60 + end.minute;
+    if (endMin <= startMin) return null;
+    return _clockLabel(end);
+  }
+
+  List<EventTimeSlot> _collectSlots() {
+    final slots = <EventTimeSlot>[
+      EventTimeSlot(
+        start: _clockLabel(_time),
+        end: _endAfter(_time, _firstEnd),
+      ),
+      for (final extra in _extraSlots)
+        EventTimeSlot(
+          start: _clockLabel(extra.start),
+          end: _endAfter(extra.start, extra.end),
+        ),
+    ];
+    slots.sort((a, b) => a.start.compareTo(b.start));
+    final hasRange = slots.any((slot) => (slot.end ?? '').isNotEmpty);
+    if (slots.length < 2 && !hasRange) return const [];
+    return slots;
+  }
+
+  Future<void> _pickFirstEnd() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _firstEnd ?? _time,
+    );
+    if (picked != null) setState(() => _firstEnd = picked);
+  }
+
+  Future<void> _pickExtraStart(int index) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _extraSlots[index].start,
+    );
+    if (picked == null) return;
+    setState(() {
+      _extraSlots[index] = (start: picked, end: _extraSlots[index].end);
+    });
+  }
+
+  Future<void> _pickExtraEnd(int index) async {
+    final current = _extraSlots[index];
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: current.end ?? current.start,
+    );
+    if (picked == null) return;
+    setState(() {
+      _extraSlots[index] = (start: current.start, end: picked);
+    });
   }
 
   Future<void> _pickCover() async {
@@ -503,6 +589,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     final subtitle = _subtitleController.text.trim();
     final location = _locationController.text.trim();
     final admission = _admissionController.text.trim();
+    final slots = _collectSlots();
     final organizer = _organizerController.text.trim();
 
     if (title.length < 3) {
@@ -525,7 +612,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       return;
     }
 
-    if (_startsAt.isBefore(DateTime.now())) {
+    if (!_isEditing && _startsAt.isBefore(DateTime.now())) {
       setState(
         () => _error = 'La fecha y hora del evento deben ser futuras.',
       );
@@ -590,6 +677,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
           admissionLabel: admission,
+          timeSlots: slots,
         );
       } else {
         await repo.createEvent(
@@ -605,6 +693,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
           admissionLabel: admission,
+          timeSlots: slots,
         );
       }
 
@@ -802,6 +891,76 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _submitting ? null : _pickFirstEnd,
+                icon: const Icon(Icons.flag_outlined, size: 18),
+                label: Text(
+                  _firstEnd == null
+                      ? 'Fin del tramo (opcional)'
+                      : 'Hasta ${_clockLabel(_firstEnd!)}',
+                ),
+              ),
+            ),
+            if (_firstEnd != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _submitting
+                      ? null
+                      : () => setState(() => _firstEnd = null),
+                  child: const Text('Quitar el fin'),
+                ),
+              ),
+            for (var i = 0; i < _extraSlots.length; i++) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _submitting ? null : () => _pickExtraStart(i),
+                      child: Text(_clockLabel(_extraSlots[i].start)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _submitting ? null : () => _pickExtraEnd(i),
+                      child: Text(
+                        _extraSlots[i].end == null
+                            ? 'Fin'
+                            : 'Hasta ${_clockLabel(_extraSlots[i].end!)}',
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _submitting
+                        ? null
+                        : () => setState(() => _extraSlots.removeAt(i)),
+                    icon: const Icon(Icons.close, size: 18),
+                    tooltip: 'Quitar tramo',
+                  ),
+                ],
+              ),
+            ],
+            if (_extraSlots.length < 5)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _submitting
+                      ? null
+                      : () => setState(() {
+                            _extraSlots.add((
+                              start: const TimeOfDay(hour: 19, minute: 0),
+                              end: null,
+                            ));
+                          }),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Añadir otro tramo'),
+                ),
+              ),
             if (_error != null) ...[
               const SizedBox(height: 8),
               Text(

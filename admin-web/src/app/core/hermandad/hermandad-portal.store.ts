@@ -1,5 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { AuthService } from '../auth/auth.service';
+import { CalendarTimeSlot } from '../events/events.models';
+import { CalendarTimeSlot } from '../events/events.models';
 import {
   HermandadBoard,
   HermandadOfficialPost,
@@ -19,6 +21,7 @@ export interface HermandadUpcomingEvent {
   coverImageUrl: string | null;
   eventType: string;
   admissionLabel: string | null;
+  timeSlots: CalendarTimeSlot[];
   viewCount: number;
 }
 
@@ -459,6 +462,7 @@ export class HermandadPortalStore {
       location?: string | null;
       eventType: string;
       admissionLabel?: string | null;
+      timeSlots?: CalendarTimeSlot[] | null;
     },
   ): Promise<HermandadUpcomingEvent> {
     await this.api.updateOwnCalendarEvent(eventId, input);
@@ -471,6 +475,7 @@ export class HermandadPortalStore {
       coverImageUrl: prev?.coverImageUrl ?? null,
       eventType: input.eventType,
       admissionLabel: input.admissionLabel?.trim() || null,
+      timeSlots: input.timeSlots ?? [],
       viewCount: prev?.viewCount ?? 0,
     };
     this.upcomingEvents.update((list) =>

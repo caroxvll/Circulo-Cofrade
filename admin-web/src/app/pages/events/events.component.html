@@ -88,6 +88,9 @@
                     <span class="type-pill">Entrada · {{ event.admissionLabel }}</span>
                   }
                   <span>{{ dateTime(event.startsAt) }}</span>
+                  @if (scheduleOf(event)) {
+                    <span>{{ scheduleOf(event) }}</span>
+                  }
                   @if (event.endsAt) {
                     <span>· fin {{ dateTime(event.endsAt) }}</span>
                   }
@@ -264,6 +267,30 @@
         Si dejas el fin vacío, la app usa la duración por defecto (procesión/ensayo/iguala 4 h).
         En lluvia o fin anticipado usa «Cerrar live» en la lista.
       </p>
+
+      <div class="form-row">
+        <label>
+          Fin del primer tramo
+          <input type="time" [(ngModel)]="formFirstEnd" />
+        </label>
+      </div>
+      <p class="form-hint">Opcional. Es la hora a la que cierra ese tramo, distinta del fin del directo.</p>
+      @for (slot of formExtraSlots; track $index) {
+        <div class="form-row">
+          <label>
+            Otro tramo
+            <input type="time" [(ngModel)]="slot.start" />
+          </label>
+          <label>
+            Fin
+            <input type="time" [(ngModel)]="slot.end" />
+          </label>
+          <button type="button" class="btn" (click)="removeExtraSlot($index)">Quitar</button>
+        </div>
+      }
+      @if (formExtraSlots.length < 5) {
+        <button type="button" class="btn" (click)="addExtraSlot()">Añadir otro tramo</button>
+      }
 
       <div class="form-row">
         <label>

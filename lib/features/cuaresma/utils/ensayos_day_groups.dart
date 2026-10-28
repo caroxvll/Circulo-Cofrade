@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../../calendar/utils/calendar_event_utils.dart';
 
@@ -120,8 +121,8 @@ Color? ensayoStatusColor(CalendarEvent event, {DateTime? now}) {
   if (timing != null) return timing.color;
   final bucket = _bucketFor(event, now ?? DateTime.now());
   return switch (bucket) {
-    EnsayoDayBucket.finished => const Color(0xFF9E9E9E),
-    _ => const Color(0xFF757575),
+    EnsayoDayBucket.finished => AppColors.textMuted,
+    _ => AppColors.textSecondary,
   };
 }
 

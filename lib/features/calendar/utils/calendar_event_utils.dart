@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../models/organizer_logo.dart';
 
@@ -214,35 +215,40 @@ CalendarEventTiming? calendarEventTiming(
     return const CalendarEventTiming(
       kind: CalendarEventTimingKind.finished,
       label: 'Finalizado',
-      color: Color(0xFF9E9E9E),
+      color: AppColors.textMuted,
     );
   }
 
-  final start = eventStartDateTime(event);
-  if (start == null) return null;
-
-  final end = eventEndDateTime(event) ?? start.add(_defaultEventDuration(event.type));
+  final windows = _eventWindows(event);
+  if (windows.isEmpty) return null;
+  final start = windows.first.start;
 
   if (event.liveForceState == EventLiveForceState.open) {
     if (clock.isBefore(start)) {
       return const CalendarEventTiming(
         kind: CalendarEventTimingKind.inProgress,
         label: 'En curso',
-        color: Color(0xFF2E7D32),
+        color: AppColors.burgundy,
       );
     }
   }
 
-  if (!clock.isBefore(start) && clock.isBefore(end)) {
-    return const CalendarEventTiming(
-      kind: CalendarEventTimingKind.inProgress,
-      label: 'En curso',
-      color: Color(0xFF2E7D32),
-    );
+  for (final window in windows) {
+    if (!clock.isBefore(window.start) && clock.isBefore(window.end)) {
+      return const CalendarEventTiming(
+        kind: CalendarEventTimingKind.inProgress,
+        label: 'En curso',
+        color: AppColors.burgundy,
+      );
+    }
   }
 
-  if (clock.isBefore(start)) {
-    final diff = start.difference(clock);
+  final next = windows.cast<_EventWindow?>().firstWhere(
+        (window) => clock.isBefore(window!.start),
+        orElse: () => null,
+      );
+  if (next != null) {
+    final diff = next.start.difference(clock);
     if (diff <= const Duration(minutes: 90)) {
       final mins = diff.inMinutes;
       final label = mins <= 1
@@ -253,21 +259,96 @@ CalendarEventTiming? calendarEventTiming(
       return CalendarEventTiming(
         kind: CalendarEventTimingKind.startsSoon,
         label: label,
-        color: const Color(0xFFE65100),
+        color: AppColors.goldDark,
       );
     }
     return const CalendarEventTiming(
       kind: CalendarEventTimingKind.scheduled,
       label: 'Programado',
-      color: Color(0xFF757575),
+      color: AppColors.textSecondary,
     );
   }
 
   return const CalendarEventTiming(
     kind: CalendarEventTimingKind.finished,
     label: 'Finalizado',
-    color: Color(0xFF9E9E9E),
+    color: AppColors.textMuted,
   );
+}
+
+class _EventWindow {
+  const _EventWindow({required this.start, required this.end, required this.label});
+
+  final DateTime start;
+  final DateTime end;
+  final String label;
+}
+
+List<_EventWindow> _eventWindows(CalendarEvent event) {
+  final fallback = _defaultEventDuration(event.type);
+  if (event.slots.isEmpty) {
+    final start = eventStartDateTime(event);
+    if (start == null) return const [];
+    final end = eventEndDateTime(event) ?? start.add(fallback);
+    return [
+      _EventWindow(start: start, end: end, label: event.time ?? ''),
+    ];
+  }
+
+  final windows = <_EventWindow>[];
+  for (final slot in event.slots) {
+    final startMin = timeStringToMinutes(slot.start);
+    if (startMin == null) continue;
+    final start = DateTime(
+      event.date.year,
+      event.date.month,
+      event.date.day,
+      startMin ~/ 60,
+      startMin % 60,
+    );
+    final endMin = timeStringToMinutes(slot.end);
+    final end = endMin != null
+        ? DateTime(
+            event.date.year,
+            event.date.month,
+            event.date.day,
+            endMin ~/ 60,
+            endMin % 60,
+          )
+        : start.add(fallback);
+    if (!end.isAfter(start)) continue;
+    windows.add(_EventWindow(start: start, end: end, label: slot.start));
+  }
+  windows.sort((a, b) => a.start.compareTo(b.start));
+  return windows;
+}
+
+/// Hora de la miniatura: el tramo en curso, si no el siguiente, si no el primero.
+String? eventThumbTime(CalendarEvent event, {DateTime? now}) {
+  final windows = _eventWindows(event);
+  if (windows.isEmpty) return event.time;
+  final clock = now ?? DateTime.now();
+  if (!isSameCalendarDay(event.date, DateTime(clock.year, clock.month, clock.day))) {
+    return windows.first.label.isEmpty ? event.time : windows.first.label;
+  }
+  for (final window in windows) {
+    if (!clock.isBefore(window.start) && clock.isBefore(window.end)) {
+      return window.label;
+    }
+  }
+  for (final window in windows) {
+    if (clock.isBefore(window.start)) return window.label;
+  }
+  return windows.first.label.isEmpty ? event.time : windows.first.label;
+}
+
+/// Línea con todos los tramos. Null si solo hay una hora de inicio.
+String? eventScheduleLabel(CalendarEvent event) {
+  final slots = event.slots;
+  if (slots.isEmpty) return null;
+  final hasRange = slots.any((slot) => (slot.end ?? '').isNotEmpty);
+  if (slots.length < 2 && !hasRange) return null;
+  return slots.map((slot) => slot.label).join(' · ');
 }
 
 String formatCalendarDayHeading(DateTime date) {

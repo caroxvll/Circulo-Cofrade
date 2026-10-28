@@ -34,7 +34,10 @@ class EventCard extends ConsumerWidget {
     final organizer = resolvedOrganizerLabel(logos, event);
     final shieldUrl = resolvedOrganizerShieldUrl(logos, event);
     final timing = calendarEventTiming(event);
-    final time = event.time == null ? null : _formatTimeCompact(event.time!);
+    final time = eventThumbTime(event) == null
+        ? null
+        : _formatTimeCompact(eventThumbTime(event)!);
+    final schedule = eventScheduleLabel(event);
     final kind = event.calendarCellLabel.trim();
     final storedPlace = event.location?.trim() ?? '';
     final subtitle = event.subtitle.trim();
@@ -56,16 +59,16 @@ class EventCard extends ConsumerWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textPrimary.withValues(alpha: 0.035),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: AppColors.burgundyDark.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Thumbnail(event: event),
+          _Thumbnail(event: event, time: time),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -76,24 +79,10 @@ class EventCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          if (time != null)
-                            Text(
-                              time,
-                              style: AppTypography.displaySmall().copyWith(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                height: 1,
-                                color: AppColors.burgundy,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                          if (kind.isNotEmpty) _KindChip(label: kind),
-                        ],
+                      child: _Kicker(
+                        kind: kind,
+                        timing: timing,
+                        admission: event.admissionChip,
                       ),
                     ),
                     if (showBookmark)
@@ -103,26 +92,20 @@ class EventCard extends ConsumerWidget {
                           isBookmarked
                               ? Icons.bookmark
                               : Icons.bookmark_border,
-                          color: AppColors.burgundy,
+                          color: isBookmarked
+                              ? AppColors.burgundy
+                              : AppColors.textMuted,
                           size: CalendarDesign.eventBookmarkSize,
                         ),
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(
-                          minWidth: 28,
-                          minHeight: 28,
+                          minWidth: 24,
+                          minHeight: 24,
                         ),
                       ),
                   ],
                 ),
-                if (event.admissionChip != null) ...[
-                  const SizedBox(height: 6),
-                  _AdmissionChip(label: event.admissionChip!),
-                ],
-                if (timing != null) ...[
-                  const SizedBox(height: 6),
-                  _TimingBadge(timing: timing),
-                ],
                 const SizedBox(height: 4),
                 Text(
                   event.title,
@@ -130,6 +113,21 @@ class EventCard extends ConsumerWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (schedule != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    schedule,
+                    style: AppTypography.bodyMedium(
+                      color: AppColors.textSecondary,
+                    ).copyWith(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
                 if (organizer != null) ...[
                   const SizedBox(height: 8),
                   Row(
@@ -143,7 +141,7 @@ class EventCard extends ConsumerWidget {
                         child: Text(
                           organizer,
                           style: AppTypography.bodyMedium(
-                            color: AppColors.textPrimary,
+                            color: AppColors.textSecondary,
                           ).copyWith(
                             fontSize: CalendarDesign.eventMetaSize,
                             fontWeight: FontWeight.w600,
@@ -157,7 +155,7 @@ class EventCard extends ConsumerWidget {
                   ),
                 ],
                 if (showPlace) ...[
-                  const SizedBox(height: 4),
+                  SizedBox(height: organizer != null ? 3 : 8),
                   _MetaLine(
                     icon: Icons.location_on_outlined,
                     text: location,
@@ -189,120 +187,172 @@ String _formatTimeCompact(String time) {
   return trimmed.replaceAll('h', '').trim();
 }
 
-class _AdmissionChip extends StatelessWidget {
-  const _AdmissionChip({required this.label});
+class _Kicker extends StatelessWidget {
+  const _Kicker({
+    required this.kind,
+    required this.timing,
+    required this.admission,
+  });
 
-  final String label;
+  final String kind;
+  final CalendarEventTiming? timing;
+  final String? admission;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.gold.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.55)),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: AppTypography.labelSmall(color: AppColors.goldDark).copyWith(
-          fontSize: 9.5,
-          fontWeight: FontWeight.w700,
-          height: 1,
+    final pieces = <Widget>[];
+    if (kind.isNotEmpty) {
+      pieces.add(
+        Text(
+          kind.toUpperCase(),
+          style: AppTypography.labelSmall(color: AppColors.goldDark).copyWith(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            height: 1.1,
+            letterSpacing: 0.85,
+          ),
         ),
-      ),
-    );
-  }
-}
-
-class _KindChip extends StatelessWidget {
-  const _KindChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.burgundy.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: AppTypography.labelSmall(color: AppColors.burgundy).copyWith(
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          height: 1,
-          letterSpacing: 0.4,
+      );
+    }
+    if (timing != null) {
+      pieces.add(_TimingMark(timing: timing!));
+    }
+    final price = admission?.trim() ?? '';
+    if (price.isNotEmpty) {
+      pieces.add(
+        Text(
+          price,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypography.labelSmall(color: AppColors.goldDark).copyWith(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            height: 1.1,
+            letterSpacing: 0,
+          ),
         ),
-      ),
-    );
-  }
-}
+      );
+    }
+    if (pieces.isEmpty) return const SizedBox(height: 14);
 
-class _TimingBadge extends StatelessWidget {
-  const _TimingBadge({required this.timing});
-
-  final CalendarEventTiming timing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: timing.color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Wrap(
+        spacing: 7,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Container(
-            width: 5,
-            height: 5,
-            decoration: BoxDecoration(
-              color: timing.color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            timing.label,
-            style: AppTypography.labelSmall(color: timing.color).copyWith(
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-              height: 1,
-            ),
-          ),
+          for (var i = 0; i < pieces.length; i++) ...[
+            if (i > 0)
+              Text(
+                '·',
+                style: AppTypography.labelSmall(color: AppColors.goldLight)
+                    .copyWith(fontSize: 12, height: 1),
+              ),
+            pieces[i],
+          ],
         ],
       ),
     );
   }
 }
 
-class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({required this.event});
+class _TimingMark extends StatelessWidget {
+  const _TimingMark({required this.timing});
 
-  final CalendarEvent event;
+  final CalendarEventTiming timing;
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          decoration: BoxDecoration(
+            color: timing.color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          timing.label,
+          style: AppTypography.labelSmall(color: timing.color).copyWith(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            height: 1.1,
+            letterSpacing: 0,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Thumbnail extends StatelessWidget {
+  const _Thumbnail({required this.event, required this.time});
+
+  final CalendarEvent event;
+  final String? time;
+
+  @override
+  Widget build(BuildContext context) {
+    final clock = time?.trim() ?? '';
     return ClipRRect(
       borderRadius: BorderRadius.circular(CalendarDesign.eventThumbRadius),
       child: SizedBox(
         width: CalendarDesign.eventThumbWidth,
         height: CalendarDesign.eventThumbHeight,
-        child: CalendarEventImage(
-          event: event,
-          fit: BoxFit.cover,
-          alignment: Alignment.center,
-          borderRadius: BorderRadius.circular(CalendarDesign.eventThumbRadius),
-          compact: true,
-          showTypeFallback: false,
+        child: Column(
+          children: [
+            Expanded(
+              child: CalendarEventImage(
+                event: event,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                compact: true,
+                showTypeFallback: false,
+                expand: true,
+              ),
+            ),
+            if (clock.isNotEmpty)
+              Container(
+                width: double.infinity,
+                color: AppColors.burgundy,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      clock,
+                      style: AppTypography.displaySmall(
+                        color: AppColors.textOnDark,
+                      ).copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        height: 1,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(width: 1),
+                    Text(
+                      'h',
+                      style: AppTypography.displaySmall(
+                        color: AppColors.goldPale,
+                      ).copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        height: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -352,13 +402,13 @@ class _MetaLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 13, color: AppColors.textMuted),
-        const SizedBox(width: 3),
+        Icon(icon, size: 14, color: AppColors.goldDark),
+        const SizedBox(width: 4),
         Expanded(
           child: Text(
             text,
             style: AppTypography.bodyMedium(
-              color: AppColors.textMuted,
+              color: AppColors.textSecondary,
             ).copyWith(
               fontSize: CalendarDesign.eventMetaSize,
               height: 1.1,

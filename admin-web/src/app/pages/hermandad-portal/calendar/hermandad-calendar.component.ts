@@ -5,7 +5,9 @@ import { AuthService } from '../../../core/auth/auth.service';
 import {
   CALENDAR_EVENT_TYPES,
   CalendarEventType,
+  CalendarTimeSlot,
   eventTypeLabel,
+  scheduleLabel,
 } from '../../../core/events/events.models';
 import { HermandadPortalService } from '../../../core/hermandad/hermandad-portal.service';
 import {
@@ -87,6 +89,8 @@ export class HermandadCalendarPageComponent implements OnInit {
   readonly editTime = signal('');
   readonly editLocation = signal('');
   readonly editAdmission = signal('');
+  readonly editFirstEnd = signal('');
+  readonly editExtraSlots = signal<{ start: string; end: string }[]>([]);
   readonly editType = signal<CalendarEventType>('evento');
   readonly saving = signal(false);
   readonly saveError = signal<string | null>(null);
@@ -170,6 +174,14 @@ export class HermandadCalendarPageComponent implements OnInit {
       this.editTime() !== parts.time ||
       (this.editLocation().trim() || '') !== (ev.location?.trim() || '') ||
       (this.editAdmission().trim() || '') !== (ev.admissionLabel?.trim() || '') ||
+      this.editFirstEnd() !== (ev.timeSlots[0]?.end ?? '') ||
+      JSON.stringify(this.editExtraSlots()) !==
+        JSON.stringify(
+          ev.timeSlots.slice(1).map((slot) => ({
+            start: slot.start,
+            end: slot.end ?? '',
+          })),
+        ) ||
       this.editType() !== ev.eventType
     );
   });
@@ -213,12 +225,54 @@ export class HermandadCalendarPageComponent implements OnInit {
     this.editTime.set(parts.time);
     this.editLocation.set(ev.location ?? '');
     this.editAdmission.set(ev.admissionLabel ?? '');
+    this.editFirstEnd.set(ev.timeSlots[0]?.end ?? '');
+    this.editExtraSlots.set(
+      ev.timeSlots.slice(1).map((slot) => ({
+        start: slot.start,
+        end: slot.end ?? '',
+      })),
+    );
     this.editType.set(
       (CALENDAR_EVENT_TYPES.some((t) => t.value === ev.eventType)
         ? ev.eventType
         : 'evento') as CalendarEventType,
     );
     this.saveError.set(null);
+  }
+
+  slotsOf(ev: HermandadUpcomingEvent): string | null {
+    return scheduleLabel(ev.timeSlots);
+  }
+
+  addExtraSlot(): void {
+    if (this.editExtraSlots().length >= 5) return;
+    this.editExtraSlots.update((list) => [...list, { start: '19:00', end: '' }]);
+  }
+
+  removeExtraSlot(index: number): void {
+    this.editExtraSlots.update((list) => list.filter((_, i) => i !== index));
+  }
+
+  updateExtraSlot(index: number, patch: { start?: string; end?: string }): void {
+    this.editExtraSlots.update((list) =>
+      list.map((slot, i) => (i === index ? { ...slot, ...patch } : slot)),
+    );
+  }
+
+  private slotsFromForm(): CalendarTimeSlot[] {
+    const slots: CalendarTimeSlot[] = [
+      {
+        start: this.editTime().trim() || '00:00',
+        end: this.editFirstEnd().trim() || null,
+      },
+      ...this.editExtraSlots()
+        .filter((slot) => /^\d{2}:\d{2}$/.test(slot.start.trim()))
+        .map((slot) => ({
+          start: slot.start.trim(),
+          end: slot.end.trim() || null,
+        })),
+    ];
+    return slots;
   }
 
   closeDetail(): void {
@@ -265,6 +319,7 @@ export class HermandadCalendarPageComponent implements OnInit {
         location: this.editLocation().trim() || null,
         eventType: this.editType(),
         admissionLabel: this.editAdmission().trim() || null,
+        timeSlots: this.slotsFromForm(),
       });
       this.events.update((list) =>
         list.map((e) =>
@@ -276,6 +331,7 @@ export class HermandadCalendarPageComponent implements OnInit {
                 location: updated.location,
                 eventType: updated.eventType,
                 admissionLabel: updated.admissionLabel,
+                timeSlots: updated.timeSlots,
               }
             : e,
         ),
@@ -287,6 +343,7 @@ export class HermandadCalendarPageComponent implements OnInit {
         location: updated.location,
         eventType: updated.eventType,
         admissionLabel: updated.admissionLabel,
+        timeSlots: updated.timeSlots,
       });
       const parts = toLocalParts(updated.startsAt);
       this.editDate.set(parts.date);

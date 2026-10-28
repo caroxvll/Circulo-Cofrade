@@ -148,7 +148,43 @@
                 (ngModelChange)="editTime.set($event)"
               />
             </label>
+            <label class="field">
+              Fin del tramo
+              <input
+                type="time"
+                [ngModel]="editFirstEnd()"
+                (ngModelChange)="editFirstEnd.set($event)"
+              />
+            </label>
           </div>
+          @for (slot of editExtraSlots(); track $index) {
+            <div class="field-row">
+              <label class="field">
+                Otro tramo
+                <input
+                  type="time"
+                  [ngModel]="slot.start"
+                  (ngModelChange)="updateExtraSlot($index, { start: $event })"
+                />
+              </label>
+              <label class="field">
+                Fin
+                <input
+                  type="time"
+                  [ngModel]="slot.end"
+                  (ngModelChange)="updateExtraSlot($index, { end: $event })"
+                />
+              </label>
+            </div>
+            <button type="button" class="text-btn" (click)="removeExtraSlot($index)">
+              Quitar tramo
+            </button>
+          }
+          @if (editExtraSlots().length < 5) {
+            <button type="button" class="text-btn" (click)="addExtraSlot()">
+              Añadir otro tramo
+            </button>
+          }
           <label class="field">
             Lugar
             <input
@@ -226,7 +262,8 @@
                     <p>
                       {{ formatTime(item.startsAt)
                       }}{{ item.location ? ' · ' + item.location : ''
-                      }}{{ item.admissionLabel ? ' · Entrada ' + item.admissionLabel : '' }}
+                      }}{{ item.admissionLabel ? ' · Entrada ' + item.admissionLabel : ''
+                      }}{{ slotsOf(item) ? ' · ' + slotsOf(item) : '' }}
                     </p>
                   </div>
                   <span class="open-hint" aria-hidden="true">›</span>

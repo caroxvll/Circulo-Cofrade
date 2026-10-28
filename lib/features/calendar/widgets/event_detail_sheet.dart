@@ -169,7 +169,10 @@ class _EventDetailSheet extends ConsumerWidget {
                           const SizedBox(height: 14),
                           _MetaBlock(
                             dateLabel: formattedDate,
-                            time: event.time,
+                            time: eventScheduleLabel(event) ??
+                                (event.time == null || event.time!.trim().isEmpty
+                                    ? null
+                                    : '${event.time!.trim()} h'),
                             location: location,
                             admission: event.admissionChip,
                           ),

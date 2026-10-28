@@ -137,6 +137,50 @@ extension CalendarEventStatusX on CalendarEventStatus {
   bool get isVisibleInCalendar => this == CalendarEventStatus.published;
 }
 
+/// Un tramo horario del mismo día (`18:30` o `18:30–20:00`).
+class EventTimeSlot {
+  const EventTimeSlot({required this.start, this.end});
+
+  final String start;
+  final String? end;
+
+  static final RegExp _clock = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$');
+
+  String get label {
+    final until = end?.trim() ?? '';
+    if (until.isEmpty) return '$start h';
+    return '$start–$until h';
+  }
+
+  Map<String, String> toJson() => {
+        'start': start,
+        if (end != null && end!.trim().isNotEmpty) 'end': end!.trim(),
+      };
+
+  static EventTimeSlot? tryParse(Object? raw) {
+    if (raw is! Map) return null;
+    final start = '${raw['start'] ?? ''}'.trim();
+    if (!_clock.hasMatch(start)) return null;
+    final endRaw = '${raw['end'] ?? ''}'.trim();
+    final end =
+        _clock.hasMatch(endRaw) && endRaw.compareTo(start) > 0 ? endRaw : null;
+    return EventTimeSlot(start: start, end: end);
+  }
+
+  static List<EventTimeSlot> listFrom(Object? raw) {
+    if (raw is! List) return const [];
+    final slots = <EventTimeSlot>[];
+    for (final item in raw) {
+      final slot = tryParse(item);
+      if (slot == null) continue;
+      slots.add(slot);
+      if (slots.length == 6) break;
+    }
+    slots.sort((a, b) => a.start.compareTo(b.start));
+    return slots;
+  }
+}
+
 class CalendarEvent {
   const CalendarEvent({
     this.id,
@@ -169,6 +213,7 @@ class CalendarEvent {
     this.liveForceState = EventLiveForceState.auto,
     this.viewCount = 0,
     this.admissionLabel,
+    this.slots = const [],
   });
 
   final String? id;
@@ -212,6 +257,9 @@ class CalendarEvent {
   /// Texto corto de entrada, si la hay. Vacío = no se muestra.
   final String? admissionLabel;
 
+  /// Tramos del mismo día. Vacío = solo vale [time].
+  final List<EventTimeSlot> slots;
+
   String? get admissionChip {
     final text = admissionLabel?.trim() ?? '';
     if (text.isEmpty) return null;
@@ -250,6 +298,7 @@ class CalendarEvent {
     int? viewCount,
     String? admissionLabel,
     bool clearAdmissionLabel = false,
+    List<EventTimeSlot>? slots,
   }) {
     return CalendarEvent(
       id: id ?? this.id,
@@ -272,6 +321,7 @@ class CalendarEvent {
       admissionLabel: clearAdmissionLabel
           ? null
           : (admissionLabel ?? this.admissionLabel),
+      slots: slots ?? this.slots,
     );
   }
 }

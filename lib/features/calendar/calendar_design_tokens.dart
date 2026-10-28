@@ -50,13 +50,13 @@ abstract final class CalendarDesign {
   static const weekStripHeight = 54.0;
 
   // Tarjetas de evento
-  static const eventCardRadius = 12.0;
-  static const eventCardPadding = 10.0;
-  static const eventCardGap = 8.0;
+  static const eventCardRadius = 14.0;
+  static const eventCardPadding = 12.0;
+  static const eventCardGap = 10.0;
   static const eventThumbWidth = 74.0;
   static const eventThumbHeight = 92.0;
   static const eventThumbRadius = 10.0;
-  static const eventTitleSize = 15.0;
+  static const eventTitleSize = 16.5;
   static const eventMetaSize = 12.0;
   static const eventTimeFontSize = 13.0;
   static const eventBookmarkSize = 18.0;
@@ -71,7 +71,8 @@ abstract final class CalendarDesign {
   static TextStyle eventTitle({Color? color}) =>
       AppTypography.displaySmall(color: color).copyWith(
         fontSize: eventTitleSize,
-        fontWeight: FontWeight.w700,
-        height: 1.22,
+        fontWeight: FontWeight.w600,
+        height: 1.16,
+        letterSpacing: -0.15,
       );
 }
