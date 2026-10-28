@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import 'profile_create_topic_sheet.dart';
 import 'profile_fleur_divider.dart';
 
 /// Empty state de la pestaña Temas: catedral + CTA.
-class ProfileTopicsEmptyState extends StatelessWidget {
+class ProfileTopicsEmptyState extends ConsumerWidget {
   const ProfileTopicsEmptyState({
     super.key,
     this.isOwnProfile = true,
@@ -16,7 +17,7 @@ class ProfileTopicsEmptyState extends StatelessWidget {
   final bool isOwnProfile;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final tight =
@@ -64,7 +65,7 @@ class ProfileTopicsEmptyState extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: () => context.go('/foros'),
+                      onPressed: () => showProfileCreateTopicSheet(context, ref),
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.burgundy,
                         foregroundColor: Colors.white,

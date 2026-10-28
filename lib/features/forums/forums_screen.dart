@@ -129,18 +129,26 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
   }
 }
 
-/// Lista de foros anclada arriba y estirada para ocupar el alto útil.
+/// Lista de foros. Con anuncio el alto ya viene justo. Sin anuncio las
+/// fichas crecen un poco para no dejar un hueco beige abajo, con tope:
+/// el bloque AHORA sigue ceñido al texto.
 class _FilledForumsBlock extends StatelessWidget {
   const _FilledForumsBlock({required this.pillars});
 
   final List<ForumCategory> pillars;
 
   static const _sectionHeaderHeight = 26.0;
-  static const _afterHeaderGap = 4.0;
-  static const _topInset = 2.0;
-  /// Margen mínimo bajo la última card (antes del banner).
+  static const _afterHeaderGap = 8.0;
+  /// Aire entre el hero y «Foros destacados».
+  static const _topInset = 14.0;
   static const _bottomInset = 2.0;
   static const _minCard = 112.0;
+  /// Alto en el que título, descripción y AHORA llenan la ficha.
+  static const _snugCard = 168.0;
+  /// Tope si sobra pantalla (sin anuncio). Por encima no se estira más.
+  static const _maxCard = 208.0;
+  static const _maxGap = 14.0;
+  static const _maxBottomInset = 16.0;
   static const _sidePad = 14.0;
 
   @override
@@ -149,26 +157,50 @@ class _FilledForumsBlock extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final gaps = (pillars.length - 1) * ForumCategoryCard.cardGap;
-        final availableForCards = (constraints.maxHeight -
-                _topInset -
-                _sectionHeaderHeight -
-                _afterHeaderGap -
-                _bottomInset)
+        final n = pillars.length;
+        final gapCount = n - 1;
+        final minGap = ForumCategoryCard.cardGap;
+        final chrome = _topInset + _sectionHeaderHeight + _afterHeaderGap;
+        final available = (constraints.maxHeight - chrome)
             .clamp(0.0, constraints.maxHeight);
 
-        // Sin tope alto: las cards rellenan hasta el banner.
-        final raw = pillars.isEmpty
-            ? _minCard
-            : (availableForCards - gaps) / pillars.length;
-        final cardHeight = raw.floorToDouble().clamp(_minCard, availableForCards);
+        final snug =
+            n * _snugCard + gapCount * minGap + _bottomInset;
+        final gapBudget = gapCount * (_maxGap - minGap);
+        final bottomBudget = _maxBottomInset - _bottomInset;
+        final cardBudget = n * (_maxCard - _snugCard);
+
+        late final double cardHeight;
+        late final double gap;
+        late final double bottom;
+
+        if (available <= snug) {
+          final room =
+              (available - gapCount * minGap - _bottomInset).clamp(0.0, available);
+          final raw = room / n;
+          final upper = raw < _minCard ? _minCard : raw;
+          cardHeight = raw.floorToDouble().clamp(_minCard, upper);
+          gap = minGap;
+          bottom = _bottomInset;
+        } else {
+          var extra = available - snug;
+          final cardTake = extra < cardBudget ? extra : cardBudget;
+          extra -= cardTake;
+          final gapTake = extra < gapBudget ? extra : gapBudget;
+          extra -= gapTake;
+          final bottomTake = extra < bottomBudget ? extra : bottomBudget;
+
+          cardHeight = (_snugCard + cardTake / n).floorToDouble();
+          gap = gapCount == 0 ? 0 : minGap + gapTake / gapCount;
+          bottom = _bottomInset + bottomTake;
+        }
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
             _sidePad,
             _topInset,
             _sidePad,
-            _bottomInset,
+            bottom,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -181,8 +213,8 @@ class _FilledForumsBlock extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: _afterHeaderGap),
-              for (var i = 0; i < pillars.length; i++) ...[
-                if (i > 0) const SizedBox(height: ForumCategoryCard.cardGap),
+              for (var i = 0; i < n; i++) ...[
+                if (i > 0) SizedBox(height: gap),
                 SizedBox(
                   height: cardHeight,
                   child: _ForumCard(

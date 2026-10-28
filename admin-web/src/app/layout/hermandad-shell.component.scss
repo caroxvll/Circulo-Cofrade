@@ -26,6 +26,7 @@
   height: 100dvh;
   border-right: 1px solid rgba(255, 255, 255, 0.04);
   box-shadow: 8px 0 28px rgba(20, 12, 10, 0.12);
+  overflow: hidden;
 }
 
 .brand {
@@ -35,6 +36,7 @@
   padding: 2px 8px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   margin-bottom: 16px;
+  flex-shrink: 0;
 }
 
 .brand-mark {
@@ -85,6 +87,7 @@
   text-transform: uppercase;
   color: rgba(207, 167, 74, 0.75);
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 nav {
@@ -93,7 +96,12 @@ nav {
   align-content: start;
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
 nav a {
@@ -139,6 +147,7 @@ nav a.active .nav-ico {
 }
 
 .sidebar-foot {
+  flex-shrink: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 14px;
   display: grid;

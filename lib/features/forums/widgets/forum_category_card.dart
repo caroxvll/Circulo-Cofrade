@@ -155,6 +155,7 @@ class _ForumCardContent extends StatelessWidget {
         metrics.verticalPad,
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
@@ -219,12 +220,10 @@ class _ForumCardContent extends StatelessWidget {
               ),
             )
           else if (hasHotTopic)
-            Expanded(
-              child: _ForumHotTopicStrip(
-                forum: forum,
-                metaSize: metrics.metaSize,
-                fillHeight: true,
-              ),
+            _ForumHotTopicStrip(
+              forum: forum,
+              metaSize: metrics.metaSize,
+              maxHeight: _hotTopicSlot(height),
             )
           else
             Expanded(
@@ -238,6 +237,17 @@ class _ForumCardContent extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Hueco del bloque AHORA: cabe el texto y, si la ficha es más alta,
+  /// el grupo (título, descripción y AHORA) queda centrado.
+  double _hotTopicSlot(double cardHeight) {
+    final reserve = cardHeight >= 160
+        ? 74.0
+        : cardHeight >= 120
+            ? 66.0
+            : 58.0;
+    return (cardHeight - reserve).clamp(40.0, 112.0);
   }
 
   TextStyle _titleStyle(bool locked, double titleSize) {
@@ -319,17 +329,17 @@ class _CardContentMetrics {
   }
 }
 
-/// Hilo con actividad más reciente; [fillHeight] ocupa el hueco de la card.
+/// Vista previa del hilo. La card abre el foro; solo «Abrir hilo» entra al tema.
 class _ForumHotTopicStrip extends StatelessWidget {
   const _ForumHotTopicStrip({
     required this.forum,
     required this.metaSize,
-    this.fillHeight = false,
+    required this.maxHeight,
   });
 
   final ForumCategory forum;
   final double metaSize;
-  final bool fillHeight;
+  final double maxHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -338,110 +348,62 @@ class _ForumHotTopicStrip extends StatelessWidget {
     final ago = forum.lastMessageAgo == 'sin actividad'
         ? null
         : forum.lastMessageAgo;
-    final excerpt = (forum.lastTopicExcerpt?.trim().isNotEmpty ?? false)
-        ? forum.lastTopicExcerpt!.trim()
-        : 'Toca para abrir el hilo y unirte al debate.';
+    final excerpt = forum.lastTopicExcerpt?.trim() ?? '';
 
-    return Material(
-      color: AppColors.burgundyDark,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: () => context.push(forumTopicLocation(forum.id, topicId)),
-        borderRadius: BorderRadius.circular(10),
-        splashColor: AppColors.gold.withValues(alpha: 0.12),
-        highlightColor: AppColors.gold.withValues(alpha: 0.06),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(9, 6, 9, 6),
-          child: fillHeight
-              ? LayoutBuilder(
-                  builder: (context, constraints) {
-                    return _buildAdaptiveBody(
-                      title: title,
-                      ago: ago,
-                      excerpt: excerpt,
-                      maxHeight: constraints.maxHeight,
-                    );
-                  },
-                )
-              : _buildCompactBody(title: title, ago: ago),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompactBody({
-    required String title,
-    required String? ago,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _ahoraHeader(ago),
-        const SizedBox(height: 3),
-        Text(
-          title,
-          style: _titleStyle(fillHeight: false),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-
-  /// Calcula líneas enteras del extracto según la altura real (evita
-  /// que la última línea se pinte a medias y quede cortada).
-  Widget _buildAdaptiveBody({
-    required String title,
-    required String? ago,
-    required String excerpt,
-    required double maxHeight,
-  }) {
+    const padV = 6.0;
     const gapAfterHeader = 4.0;
     const gapAfterTitle = 3.0;
-    const gapBeforeCta = 3.0;
-    const heightSafety = 1.5;
+    const gapBeforeCta = 2.0;
+    const heightSafety = 4.0;
 
     final headerH = metaSize + 2.5;
     final titleFontSize = metaSize + 2;
     final titleLineH = titleFontSize * 1.18;
     final excerptFontSize = metaSize + 0.5;
     final excerptLineH = excerptFontSize * 1.22;
-    final ctaH = metaSize;
+    final ctaH = metaSize + 4;
 
-    var budget = maxHeight - headerH - gapAfterHeader - heightSafety;
+    final available = maxHeight.isFinite ? maxHeight : 96.0;
+    var budget =
+        available - (padV * 2) - heightSafety - headerH - gapAfterHeader;
+    final titleMaxLines =
+        budget >= titleLineH * 2 + gapBeforeCta + ctaH ? 2 : 1;
+    budget -= titleLineH * titleMaxLines;
+    final canShowCta = budget >= gapBeforeCta + ctaH;
+    if (canShowCta) budget -= gapBeforeCta + ctaH;
+    budget -= gapAfterTitle;
+    final excerptMaxLines = excerpt.isEmpty
+        ? 0
+        : (budget / excerptLineH).floor().clamp(0, 2);
 
-    // Título: 2 líneas si cabe; si no, 1.
-    final titleMaxLines = budget >= titleLineH * 2 + gapAfterTitle ? 2 : 1;
-    budget -= titleLineH * titleMaxLines + gapAfterTitle;
-
-    // CTA solo si queda hueco para ≥1 línea de extracto + enlace.
-    final canShowCta = budget >= excerptLineH + gapBeforeCta + ctaH;
-    if (canShowCta) {
-      budget -= gapBeforeCta + ctaH;
-    }
-
-    final excerptMaxLines =
-        (budget / excerptLineH).floor().clamp(0, 3);
-
-    return SizedBox(
-      height: maxHeight,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _ahoraHeader(ago),
-          const SizedBox(height: gapAfterHeader),
-          Text(
-            title,
-            style: _titleStyle(fillHeight: true),
-            maxLines: titleMaxLines,
-            overflow: TextOverflow.ellipsis,
-          ),
-          if (excerptMaxLines > 0) ...[
-            const SizedBox(height: gapAfterTitle),
-            SizedBox(
-              height: excerptMaxLines * excerptLineH,
-              child: Text(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.burgundyDark,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(9, padV, 9, padV),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ahoraHeader(ago),
+            const SizedBox(height: gapAfterHeader),
+            Text(
+              title,
+              style: AppTypography.bodyMedium(
+                color: AppColors.textOnDark,
+              ).copyWith(
+                fontSize: titleFontSize,
+                fontWeight: FontWeight.w700,
+                height: 1.18,
+              ),
+              maxLines: titleMaxLines,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (excerptMaxLines > 0) ...[
+              const SizedBox(height: gapAfterTitle),
+              Text(
                 excerpt,
                 style: AppTypography.bodyMedium(
                   color: AppColors.goldPale.withValues(alpha: 0.88),
@@ -453,25 +415,34 @@ class _ForumHotTopicStrip extends StatelessWidget {
                 maxLines: excerptMaxLines,
                 overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
-          if (canShowCta) ...[
-            const Spacer(),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'Abrir hilo ›',
-                style: AppTypography.labelSmall(
-                  color: AppColors.gold,
-                ).copyWith(
-                  fontSize: metaSize,
-                  fontWeight: FontWeight.w700,
-                  height: 1,
+            ],
+            if (canShowCta) ...[
+              const SizedBox(height: gapBeforeCta),
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => context.push(
+                    forumTopicLocation(forum.id, topicId),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 2, 0, 1),
+                    child: Text(
+                      'Abrir hilo ›',
+                      style: AppTypography.labelSmall(
+                        color: AppColors.gold,
+                      ).copyWith(
+                        fontSize: metaSize,
+                        fontWeight: FontWeight.w700,
+                        height: 1,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -514,15 +485,6 @@ class _ForumHotTopicStrip extends StatelessWidget {
     );
   }
 
-  TextStyle _titleStyle({required bool fillHeight}) {
-    return AppTypography.bodyMedium(
-      color: AppColors.textOnDark,
-    ).copyWith(
-      fontSize: metaSize + (fillHeight ? 2 : 1.5),
-      fontWeight: FontWeight.w700,
-      height: 1.18,
-    );
-  }
 }
 
 /// Panel cuando aún no hay hilo caliente: rellena el hueco con stats.

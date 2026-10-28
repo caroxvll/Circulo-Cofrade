@@ -171,7 +171,12 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
           children: [
-            const Center(child: AppLogo(forLogin: true, size: 200)),
+            const Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.all(Radius.circular(28)),
+                child: AppLogo(size: 120),
+              ),
+            ),
             const SizedBox(height: 16),
             if (displayEmail.isNotEmpty) ...[
               Text(
