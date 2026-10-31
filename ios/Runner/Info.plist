@@ -62,5 +62,11 @@
 		<false/>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Usamos tu ubicación para indicar dónde va el ensayo en el mapa.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>Usamos tu ubicación para indicar dónde va el ensayo en el mapa.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Usamos tus fotos para la imagen de perfil y las publicaciones.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>Usamos la cámara para hacer fotos de perfil y de las publicaciones.</string>
 	</dict>
 </plist>
