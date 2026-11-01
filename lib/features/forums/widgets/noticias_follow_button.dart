@@ -14,10 +14,14 @@ class NoticiasFollowButton extends ConsumerWidget {
   const NoticiasFollowButton({
     super.key,
     this.heroStyle = false,
+    this.iconOnly = false,
   });
 
   /// Compacto para el hero oscuro (junto a la lupa).
   final bool heroStyle;
+
+  /// Campana suelta, para la cabecera tipográfica.
+  final bool iconOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -28,26 +32,29 @@ class NoticiasFollowButton extends ConsumerWidget {
 
     return followingAsync.when(
       skipLoadingOnReload: true,
-      loading: () => heroStyle
-          ? _NoticiasHeroFollowChip(
-              isFollowing: false,
-              onTap: () => _toggle(context, ref, false),
-            )
-          : _NoticiasFollowChip(
-              isFollowing: false,
-              onTap: () => _toggle(context, ref, false),
-            ),
+      loading: () => _chip(
+        isFollowing: false,
+        onTap: () => _toggle(context, ref, false),
+      ),
       error: (_, _) => const SizedBox.shrink(),
-      data: (isFollowing) => heroStyle
-          ? _NoticiasHeroFollowChip(
-              isFollowing: isFollowing,
-              onTap: () => _toggle(context, ref, isFollowing),
-            )
-          : _NoticiasFollowChip(
-              isFollowing: isFollowing,
-              onTap: () => _toggle(context, ref, isFollowing),
-            ),
+      data: (isFollowing) => _chip(
+        isFollowing: isFollowing,
+        onTap: () => _toggle(context, ref, isFollowing),
+      ),
     );
+  }
+
+  Widget _chip({
+    required bool isFollowing,
+    required VoidCallback onTap,
+  }) {
+    if (iconOnly) {
+      return _NoticiasFollowIcon(isFollowing: isFollowing, onTap: onTap);
+    }
+    if (heroStyle) {
+      return _NoticiasHeroFollowChip(isFollowing: isFollowing, onTap: onTap);
+    }
+    return _NoticiasFollowChip(isFollowing: isFollowing, onTap: onTap);
   }
 
   Future<void> _toggle(
@@ -87,6 +94,37 @@ class NoticiasFollowButton extends ConsumerWidget {
         ),
       );
     }
+  }
+}
+
+class _NoticiasFollowIcon extends StatelessWidget {
+  const _NoticiasFollowIcon({
+    required this.isFollowing,
+    required this.onTap,
+  });
+
+  final bool isFollowing;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isFollowing ? AppColors.goldDark : AppColors.textPrimary;
+
+    return IconButton(
+      onPressed: onTap,
+      tooltip: isFollowing ? 'Siguiendo noticias' : 'Seguir noticias',
+      icon: Icon(
+        isFollowing
+            ? Icons.notifications_active_rounded
+            : Icons.notifications_outlined,
+      ),
+      color: color,
+      iconSize: 24,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(44, 44),
+        overlayColor: color.withValues(alpha: 0.12),
+      ),
+    );
   }
 }
 
