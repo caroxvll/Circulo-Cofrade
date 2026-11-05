@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -10,6 +9,7 @@ import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../forums/topic_detail_typography.dart';
 import '../../forums/utils/hermandad_board_display.dart';
 import '../../forums/utils/hermandad_local_assets.dart';
+import '../../profile/open_hermandad_picker.dart';
 import '../models/ss_live_update.dart';
 import '../semana_santa_provider.dart';
 import '../utils/ss_informar_helpers.dart';
@@ -42,7 +42,7 @@ class SemanaSantaHubHermandadesStrip extends ConsumerWidget {
         if (options.isEmpty) {
           return _EmptyDayCta(
             message: '$dayTitle · aún no hay hermandades listadas',
-            onExplore: () => context.push('/foros/hermandades'),
+            onExplore: () => openHermandadPicker(context, ref),
           );
         }
         return Column(

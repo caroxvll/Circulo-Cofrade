@@ -264,18 +264,17 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
         _isNoticias ? _noticiasCategoryOptions() : const <({String id, String label})>[];
 
     return ForumComposeSheetLayout(
+      header: ForumComposeSheetTitleBar(
+        closeEnabled: !_submitting,
+        title: Text(
+          _isNoticias ? 'Nueva noticia' : 'Nuevo tema',
+          style: TopicDetailTypography.title(),
+        ),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ForumComposeSheetTitleBar(
-            closeEnabled: !_submitting,
-            title: Text(
-              _isNoticias ? 'Nueva noticia' : 'Nuevo tema',
-              style: TopicDetailTypography.title(),
-            ),
-          ),
-          const SizedBox(height: 12),
           TextField(
             controller: _titleController,
             autofocus: true,

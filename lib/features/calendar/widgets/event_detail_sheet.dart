@@ -34,6 +34,7 @@ Future<void> showEventDetailSheet(
   }
 
   if (!context.mounted) return;
+  final hasCover = CalendarEventImage.hasDisplayableCover(display);
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -42,16 +43,30 @@ Future<void> showEventDetailSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
     ),
-    builder: (_) =>
-        _EventDetailSheet(event: display, focusedMonth: focusedMonth),
+    builder: (_) => DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: hasCover ? 0.78 : 0.62,
+      minChildSize: 0.28,
+      maxChildSize: hasCover ? 0.92 : 0.82,
+      builder: (context, scrollController) => _EventDetailSheet(
+        event: display,
+        focusedMonth: focusedMonth,
+        scrollController: scrollController,
+      ),
+    ),
   );
 }
 
 class _EventDetailSheet extends ConsumerWidget {
-  const _EventDetailSheet({required this.event, required this.focusedMonth});
+  const _EventDetailSheet({
+    required this.event,
+    required this.focusedMonth,
+    required this.scrollController,
+  });
 
   final CalendarEvent event;
   final DateTime focusedMonth;
+  final ScrollController scrollController;
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
@@ -114,7 +129,6 @@ class _EventDetailSheet extends ConsumerWidget {
     final formattedDate = dateLabel[0].toUpperCase() + dateLabel.substring(1);
     final hasCover = CalendarEventImage.hasDisplayableCover(event);
     final media = MediaQuery.of(context);
-    final maxHeight = media.size.height * (hasCover ? 0.88 : 0.72);
     final bottomPad = media.padding.bottom + 16;
     final location = event.location?.trim().isNotEmpty == true
         ? event.location!.trim()
@@ -125,22 +139,14 @@ class _EventDetailSheet extends ConsumerWidget {
       location: location,
     );
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: Material(
-          color: AppColors.background,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: EdgeInsets.zero,
-                  children: [
+    return Material(
+      color: AppColors.background,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+      clipBehavior: Clip.antiAlias,
+      child: ListView(
+        controller: scrollController,
+        padding: EdgeInsets.zero,
+        children: [
                     _MediaHeader(
                       event: event,
                       hasCover: hasCover,
@@ -244,13 +250,8 @@ class _EventDetailSheet extends ConsumerWidget {
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      ],
+    ),
     );
   }
 }

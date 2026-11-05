@@ -17,6 +17,7 @@ import '../../forums/utils/hermandad_local_assets.dart';
 import '../../forums/widgets/hermandad_crest_hero.dart';
 import '../../forums/widgets/hermandad_follow_sections_sheet.dart';
 import '../../search/follows_provider.dart';
+import '../profile_provider.dart';
 import '../profile_design.dart';
 import 'profile_people_mode.dart';
 import 'profile_screen_header.dart';
@@ -113,6 +114,18 @@ class _FollowingTabState extends ConsumerState<FollowingTab> {
   Widget build(BuildContext context) {
     final hashtagsAsync = ref.watch(followedHashtagsProvider);
     final topicsAsync = ref.watch(followedTopicsDetailsProvider);
+
+    ref.listen(profileFollowingIntentProvider, (previous, next) {
+      if (next == null || !mounted) return;
+      setState(() {
+        _filter = _FollowFilter.hermandad;
+        _exploreMoreHermandades = next.openDiscover;
+        _pageIndex = 0;
+        _discoverPageIndex = 0;
+        _query = '';
+        _searchCtrl.clear();
+      });
+    });
 
     return topicsAsync.when(
       skipLoadingOnReload: true,

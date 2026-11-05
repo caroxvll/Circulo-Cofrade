@@ -32,6 +32,7 @@ List<Widget> buildNoticiasEditorialSlivers({
   required String? archiveCategoryId,
   required ValueChanged<String?> onArchiveCategoryChanged,
   required void Function(ForumTopic topic) onOpenTopic,
+  required VoidCallback? onNewTopic,
   Widget? sponsoredSlot,
   required double bottomPadding,
 }) {
@@ -40,9 +41,12 @@ List<Widget> buildNoticiasEditorialSlivers({
   final rest = featured == null
       ? const <NoticiasStory>[]
       : stories.skip(1).toList();
-  const railHeight = _railCardHeight;
 
-  final slivers = <Widget>[];
+  final slivers = <Widget>[
+    SliverToBoxAdapter(
+      child: _NoticiasLatestHeader(onNewTopic: onNewTopic),
+    ),
+  ];
 
   if (rest.isEmpty && featured == null) {
     slivers.add(
@@ -59,16 +63,7 @@ List<Widget> buildNoticiasEditorialSlivers({
     );
   } else {
     final feedChildren = <Widget>[
-      if (featured != null) ...[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(_gutter, 0, _gutter, 4),
-          child: Text(
-            'Última hora',
-            style: AppTypography.newsHeadline(
-              color: AppColors.burgundyDark,
-            ).copyWith(fontSize: 17, fontWeight: FontWeight.w600),
-          ),
-        ),
+      if (featured != null)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: _gutter),
           child: featured.isGrouped
@@ -81,7 +76,6 @@ List<Widget> buildNoticiasEditorialSlivers({
                   onTap: () => onOpenTopic(featured.lead),
                 ),
         ),
-      ],
       if (sponsoredSlot != null)
         Padding(
           padding: const EdgeInsets.fromLTRB(_gutter, 8, _gutter, 0),
@@ -102,7 +96,7 @@ List<Widget> buildNoticiasEditorialSlivers({
         ),
       if (rest.isNotEmpty && !showAllLatest)
         SizedBox(
-          height: railHeight,
+          height: _railCardHeight,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: _gutter),
@@ -234,6 +228,48 @@ bool _storyMatchesQuery(NoticiasStory story, String needle) {
   return false;
 }
 
+class _NoticiasLatestHeader extends StatelessWidget {
+  const _NoticiasLatestHeader({required this.onNewTopic});
+
+  final VoidCallback? onNewTopic;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_gutter, 2, _gutter, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Última hora',
+              style: AppTypography.newsHeadline(
+                color: AppColors.burgundyDark,
+              ).copyWith(fontSize: 22, fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (onNewTopic != null)
+            FilledButton.icon(
+              onPressed: onNewTopic,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.burgundy,
+                foregroundColor: AppColors.textOnDark,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                minimumSize: const Size(0, 34),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: const StadiumBorder(),
+              ),
+              icon: const Icon(Icons.add, size: 16),
+              label: Text(
+                'Nueva noticia',
+                style: AppTypography.buttonLabel(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _NoticiasMoreHeader extends StatelessWidget {
   const _NoticiasMoreHeader({
     required this.showAllLatest,
@@ -254,7 +290,7 @@ class _NoticiasMoreHeader extends StatelessWidget {
               'Más noticias',
               style: AppTypography.newsHeadline(
                 color: AppColors.burgundyDark,
-              ).copyWith(fontSize: 17, fontWeight: FontWeight.w600),
+              ).copyWith(fontSize: 22, fontWeight: FontWeight.w600),
             ),
           ),
           InkWell(

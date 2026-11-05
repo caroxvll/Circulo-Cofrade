@@ -64,7 +64,9 @@
         @for (pillar of visible(); track pillar.id) {
           <article class="pillar-card" [class.off]="!pillar.isEnabled">
             <div class="cover">
-              @if (pillar.coverImageUrl) {
+              @if (pillar.id === 'noticias') {
+                <div class="cover-fallback cover-type">Aa</div>
+              } @else if (pillar.coverImageUrl) {
                 <img [src]="pillar.coverImageUrl" alt="" />
               } @else {
                 <div class="cover-fallback">{{ pillar.name.charAt(0) }}</div>
@@ -77,6 +79,11 @@
               <h3>{{ pillar.name }}</h3>
               <p class="id">{{ pillar.id }}</p>
               <p class="desc">{{ pillar.description || 'Sin descripción' }}</p>
+              @if (pillar.id === 'noticias') {
+                <p class="queue-meta">
+                  Cabecera tipográfica. La app no usa portada en este apartado.
+                </p>
+              }
               <p class="queue-meta">
                 Orden {{ pillar.sortOrder }} · {{ pillar.topicCount }} temas ·
                 {{ pillar.messageCount }} msgs
@@ -101,9 +108,11 @@
                 >
                   {{ pillar.isActive ? 'Quitar Activo' : 'Badge Activo' }}
                 </button>
-                <button type="button" class="btn btn-ghost" (click)="openCover(pillar)">
-                  Portada
-                </button>
+                @if (pillar.id !== 'noticias') {
+                  <button type="button" class="btn btn-ghost" (click)="openCover(pillar)">
+                    Portada
+                  </button>
+                }
                 <button type="button" class="btn btn-primary" (click)="openEdit(pillar)">
                   Textos
                 </button>

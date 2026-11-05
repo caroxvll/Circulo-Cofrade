@@ -195,7 +195,8 @@ class JuntaPillarsTab extends ConsumerWidget {
                 ),
                 child: Text(
                   'Gestiona la imagen del hero de FOROS y las portadas de cada '
-                  'foro (tarjeta y cabecera del detalle). Los iconos son fijos '
+                  'foro (tarjeta y cabecera del detalle). Noticias no lleva '
+                  'portada: su cabecera es tipográfica. Los iconos son fijos '
                   'en la app. También puedes crear foros, temas fijos y '
                   'controlar su visibilidad.',
                   style: JuntaUi.body(),
@@ -1399,12 +1400,13 @@ class _PillarAdminCardState extends ConsumerState<_PillarAdminCard> {
                   tooltip: 'Cambiar nombre',
                   color: AppColors.burgundy,
                 ),
-                IconButton(
-                  onPressed: _busy ? null : _editAppearance,
-                  icon: const Icon(Icons.image_outlined),
-                  tooltip: 'Cambiar portada',
-                  color: AppColors.burgundy,
-                ),
+                if (pillar.id != 'noticias')
+                  IconButton(
+                    onPressed: _busy ? null : _editAppearance,
+                    icon: const Icon(Icons.image_outlined),
+                    tooltip: 'Cambiar portada',
+                    color: AppColors.burgundy,
+                  ),
                 IconButton(
                   onPressed: _busy ? null : _confirmDelete,
                   icon: const Icon(Icons.delete_outline),

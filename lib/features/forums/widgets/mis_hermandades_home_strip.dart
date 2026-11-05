@@ -11,6 +11,7 @@ import '../mis_hermandades_provider.dart';
 import '../utils/forum_navigation.dart';
 import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
+import '../../profile/open_hermandad_picker.dart';
 import 'hermandad_crest_hero.dart';
 
 /// Bloque compacto en la home de Foros → «Tus Hermandades».
@@ -36,12 +37,12 @@ class MisHermandadesHomeStrip extends ConsumerWidget {
     return boardsAsync.when(
       loading: () => const SizedBox(height: heightEmpty),
       error: (_, _) => _EmptyStrip(
-        onExplore: () => context.push('/foros/hermandades'),
+        onExplore: () => openHermandadPicker(context, ref),
       ),
       data: (boards) {
         if (boards.isEmpty) {
           return _EmptyStrip(
-            onExplore: () => context.push('/foros/hermandades'),
+            onExplore: () => openHermandadPicker(context, ref),
           );
         }
         return _FollowingStrip(boards: boards);
@@ -112,7 +113,7 @@ class _FollowingStrip extends ConsumerWidget {
               itemBuilder: (context, index) {
                 if (index == boards.length) {
                   return _AddChip(
-                    onTap: () => context.push('/foros/hermandades'),
+                    onTap: () => openHermandadPicker(context, ref),
                   );
                 }
                 final board = boards[index];

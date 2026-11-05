@@ -166,6 +166,7 @@ class ForumTopic {
     required this.excerpt,
     required this.body,
     required this.authorHandle,
+    this.authorDisplayName,
     required this.timeAgo,
     required this.commentCount,
     required this.viewCount,
@@ -201,6 +202,7 @@ class ForumTopic {
   final String excerpt;
   final String body;
   final String authorHandle;
+  final String? authorDisplayName;
   final String timeAgo;
   final int commentCount;
   final int viewCount;
@@ -256,6 +258,7 @@ class ForumTopic {
     String? excerpt,
     String? body,
     String? authorHandle,
+    String? authorDisplayName,
     String? timeAgo,
     int? commentCount,
     int? viewCount,
@@ -291,6 +294,7 @@ class ForumTopic {
       excerpt: excerpt ?? this.excerpt,
       body: body ?? this.body,
       authorHandle: authorHandle ?? this.authorHandle,
+      authorDisplayName: authorDisplayName ?? this.authorDisplayName,
       timeAgo: timeAgo ?? this.timeAgo,
       commentCount: commentCount ?? this.commentCount,
       viewCount: viewCount ?? this.viewCount,

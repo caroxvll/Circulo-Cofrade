@@ -110,7 +110,6 @@ class _FillBody extends StatelessWidget {
     final h = maxHeight;
     final pad = h < 110 ? 8.0 : 10.0;
     final gap = h < 110 ? 4.0 : 6.0;
-    final titleLines = h < 120 ? 2 : 3;
     final showExcerpt = h >= 115;
     final titleSize = h < 120 ? 13.0 : 14.0;
     final previewSize = 11.5;
@@ -142,25 +141,14 @@ class _FillBody extends StatelessWidget {
       ],
     );
 
-    final title = Text(
-      activity.title,
-      style: AppTypography.titleLarge().copyWith(
-        fontSize: titleSize,
-        fontWeight: FontWeight.w700,
-        height: 1.2,
-      ),
-      maxLines: titleLines,
-      overflow: TextOverflow.ellipsis,
+    final titleStyle = AppTypography.titleLarge().copyWith(
+      fontSize: titleSize,
+      fontWeight: FontWeight.w700,
+      height: 1.2,
     );
-
-    final excerpt = Text(
-      excerptText,
-      style: AppTypography.bodyMedium(
-        color: AppColors.textSecondary,
-      ).copyWith(fontSize: previewSize, height: 1.25),
-      maxLines: h < 140 ? 2 : 3,
-      overflow: TextOverflow.ellipsis,
-    );
+    final excerptStyle = AppTypography.bodyMedium(
+      color: AppColors.textSecondary,
+    ).copyWith(fontSize: previewSize, height: 1.25);
 
     final stats = _ActivityStats(
       viewCount: activity.viewCount,
@@ -184,20 +172,16 @@ class _FillBody extends StatelessWidget {
                 children: [
                   meta,
                   SizedBox(height: gap),
-                  Flexible(
-                    fit: FlexFit.loose,
-                    child: title,
-                  ),
-                  if (showExcerpt) ...[
-                    SizedBox(height: gap * 0.6),
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.topLeft,
-                        child: excerpt,
-                      ),
+                  Expanded(
+                    child: _TitleAndExcerpt(
+                      title: activity.title,
+                      excerpt: excerptText,
+                      titleStyle: titleStyle,
+                      excerptStyle: excerptStyle,
+                      gap: gap * 0.6,
+                      allowExcerpt: showExcerpt,
                     ),
-                  ] else
-                    const Spacer(),
+                  ),
                   SizedBox(height: gap),
                   stats,
                 ],
@@ -228,12 +212,16 @@ class _FillBody extends StatelessWidget {
         children: [
           meta,
           SizedBox(height: gap),
-          Flexible(fit: FlexFit.loose, child: title),
-          if (showExcerpt) ...[
-            SizedBox(height: gap * 0.5),
-            Expanded(child: Align(alignment: Alignment.topLeft, child: excerpt)),
-          ] else
-            const Spacer(),
+          Expanded(
+            child: _TitleAndExcerpt(
+              title: activity.title,
+              excerpt: excerptText,
+              titleStyle: titleStyle,
+              excerptStyle: excerptStyle,
+              gap: gap * 0.5,
+              allowExcerpt: showExcerpt,
+            ),
+          ),
           SizedBox(height: gap),
           stats,
         ],
@@ -307,7 +295,7 @@ class _IntrinsicBody extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     height: 1.2,
                   ),
-                  maxLines: 2,
+                  maxLines: 4,
                   overflow: TextOverflow.ellipsis,
                 ),
                 SizedBox(height: dense ? 4 : 6),
@@ -348,6 +336,79 @@ class _IntrinsicBody extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// El título ocupa el hueco. El extracto solo entra si el título ya cabe entero.
+class _TitleAndExcerpt extends StatelessWidget {
+  const _TitleAndExcerpt({
+    required this.title,
+    required this.excerpt,
+    required this.titleStyle,
+    required this.excerptStyle,
+    required this.gap,
+    required this.allowExcerpt,
+  });
+
+  final String title;
+  final String excerpt;
+  final TextStyle titleStyle;
+  final TextStyle excerptStyle;
+  final double gap;
+  final bool allowExcerpt;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final maxHeight = constraints.maxHeight;
+        final painter = TextPainter(
+          text: TextSpan(text: title, style: titleStyle),
+          textDirection: Directionality.of(context),
+        )..layout(maxWidth: maxWidth);
+        final titleHeight = painter.height;
+        final lineHeight = painter.preferredLineHeight;
+        painter.dispose();
+        final excerptLine = excerptStyle.fontSize == null
+            ? lineHeight
+            : excerptStyle.fontSize! * (excerptStyle.height ?? 1.25);
+        final fitsWithExcerpt = allowExcerpt &&
+            excerpt.trim().isNotEmpty &&
+            maxHeight - titleHeight - gap >= excerptLine;
+        final titleBudget = fitsWithExcerpt ? titleHeight : maxHeight;
+        final titleLines = lineHeight <= 0
+            ? 1
+            : (titleBudget / lineHeight).floor().clamp(1, 12);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: titleStyle,
+              maxLines: fitsWithExcerpt ? null : titleLines,
+              overflow: fitsWithExcerpt
+                  ? TextOverflow.visible
+                  : TextOverflow.ellipsis,
+            ),
+            if (fitsWithExcerpt) ...[
+              SizedBox(height: gap),
+              Text(
+                excerpt,
+                style: excerptStyle,
+                maxLines: (excerptLine <= 0
+                        ? 1
+                        : ((maxHeight - titleHeight - gap) / excerptLine)
+                            .floor())
+                    .clamp(1, 3),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

@@ -66,7 +66,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Foros').last);
+    await tester.tap(find.text('Comunidad').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Círculo Cofrade'));
@@ -146,7 +146,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Foros').last);
+    await tester.tap(find.text('Comunidad').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.notifications_outlined).first);
@@ -158,7 +158,7 @@ void main() {
     // Al abrir Notificaciones se marcan como leídas (desaparece el punto rojo).
     await tester.tap(find.text('Calendario').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Foros').last);
+    await tester.tap(find.text('Comunidad').last);
     await tester.pumpAndSettle();
 
     final dotFinder = find.byWidgetPredicate(
@@ -193,7 +193,7 @@ void main() {
 
     expect(find.text('CALENDARIO'), findsWidgets);
 
-    await tester.tap(find.text('Foros').last);
+    await tester.tap(find.text('Comunidad').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Círculo Cofrade'));
     await tester.pumpAndSettle();
