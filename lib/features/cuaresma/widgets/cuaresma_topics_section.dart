@@ -4,9 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
+import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/forum.dart';
 import '../../forums/data/mock_forums.dart';
+import '../../forums/data/topic_icon_assets.dart';
 import '../../forums/forum_topics_typography.dart';
 import '../../forums/forums_provider.dart';
 import '../../forums/topic_detail_typography.dart';
@@ -141,6 +145,7 @@ class _CuaresmaHubTopicRow extends StatelessWidget {
     final handle = topic.authorHandle.startsWith('@')
         ? topic.authorHandle
         : '@${topic.authorHandle}';
+    final cover = topic.coverImageUrl?.trim();
 
     return InkWell(
       onTap: onTap,
@@ -197,9 +202,40 @@ class _CuaresmaHubTopicRow extends StatelessWidget {
                 ],
               ),
             ),
+            if (cover != null && cover.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              _TopicCoverThumb(source: cover),
+            ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TopicCoverThumb extends StatelessWidget {
+  const _TopicCoverThumb({required this.source});
+
+  final String source;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = topicCoverIsAsset(source)
+        ? CofradeoAssetImage(
+            assetPath: source,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+            cacheWidth: ImageDecodeCache.px(context, 128),
+          )
+        : CofradeoNetworkImage(
+            url: source,
+            fit: BoxFit.cover,
+            cacheSize: 128,
+          );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(width: 58, height: 58, child: image),
     );
   }
 }

@@ -354,6 +354,108 @@ class ProfileRepository {
     }
   }
 
+  /// Lo más reciente que ha publicado una cuenta: un tema o una respuesta.
+  Future<DatedProfileActivity?> fetchLatestPublicActivity(String userId) async {
+    if (_client == null) return null;
+
+    try {
+      final topicRows = await _client!
+          .from('forum_topics')
+          .select(
+            'id, forum_id, title, excerpt, created_at, status, season_key, '
+            'view_count, comment_count, cover_image_url',
+          )
+          .eq('author_id', userId)
+          .order('created_at', ascending: false)
+          .limit(5);
+
+      final replyRows = await _client!
+          .from('forum_replies')
+          .select(
+            'id, topic_id, content, created_at, like_count, '
+            'forum_topics(forum_id, title, season_key, view_count, comment_count, cover_image_url)',
+          )
+          .eq('author_id', userId)
+          .isFilter('deleted_at', null)
+          .order('created_at', ascending: false)
+          .limit(1);
+
+      final forumMeta = await _fetchForumMeta([
+        for (final row in topicRows) row['forum_id'] as String,
+        for (final row in replyRows)
+          (row['forum_topics'] as Map<String, dynamic>?)?['forum_id']
+              as String?,
+      ]);
+
+      DatedProfileActivity? newest;
+
+      for (final row in topicRows) {
+        final status = _topicStatusFromRow(row['status'] as String?);
+        if (status != TopicStatus.published) continue;
+        final createdAt = DateTime.parse(row['created_at'] as String);
+        final forumId = row['forum_id'] as String;
+        final meta = forumMeta[forumId];
+        final candidate = DatedProfileActivity(
+          at: createdAt,
+          activity: ProfileActivity(
+            id: row['id'] as String,
+            type: ProfileActivityType.topic,
+            forumId: forumId,
+            forumName: meta?.name ?? forumId,
+            forumIconKey: meta?.iconKey,
+            topicId: row['id'] as String,
+            title: row['title'] as String,
+            preview: row['excerpt'] as String? ?? '',
+            timeAgo: formatTimeAgo(createdAt),
+            topicStatus: status,
+            coverImageUrl: row['cover_image_url'] as String?,
+            viewCount: row['view_count'] as int? ?? 0,
+            commentCount: row['comment_count'] as int? ?? 0,
+            seasonKey: row['season_key'] as String?,
+          ),
+        );
+        if (newest == null || candidate.at.isAfter(newest.at)) newest = candidate;
+        break;
+      }
+
+      if (replyRows.isNotEmpty) {
+        final row = replyRows.first;
+        final topic = row['forum_topics'] as Map<String, dynamic>?;
+        if (topic != null) {
+          final createdAt = DateTime.parse(row['created_at'] as String);
+          if (newest == null || createdAt.isAfter(newest.at)) {
+            final content = row['content'] as String? ?? '';
+            final forumId = topic['forum_id'] as String;
+            final meta = forumMeta[forumId];
+            newest = DatedProfileActivity(
+              at: createdAt,
+              activity: ProfileActivity(
+                id: row['id'].toString(),
+                type: ProfileActivityType.reply,
+                forumId: forumId,
+                forumName: meta?.name ?? forumId,
+                forumIconKey: meta?.iconKey,
+                topicId: row['topic_id'] as String,
+                title: topic['title'] as String? ?? 'Hilo',
+                preview: content,
+                timeAgo: formatTimeAgo(createdAt),
+                coverImageUrl: topic['cover_image_url'] as String?,
+                viewCount: topic['view_count'] as int? ?? 0,
+                commentCount: topic['comment_count'] as int? ?? 0,
+                reactionCount: row['like_count'] as int? ?? 0,
+                seasonKey: topic['season_key'] as String?,
+              ),
+            );
+          }
+        }
+      }
+
+      return newest;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Map<String, _ForumMeta>> _fetchForumMeta(Iterable<String?> forumIds) async {
     if (_client == null) return {};
 

@@ -1241,7 +1241,7 @@ class _IdleState extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
           sliver: SliverFillRemaining(
             hasScrollBody: false,
             child: Column(

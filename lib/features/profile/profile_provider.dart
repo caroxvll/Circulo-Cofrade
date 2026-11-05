@@ -37,6 +37,34 @@ final userActivityProvider =
   return repo.fetchUserActivity(userId);
 });
 
+/// Petición para abrir Perfil → Siguiendo en el directorio de hermandades.
+class ProfileFollowingIntent {
+  const ProfileFollowingIntent({
+    required this.token,
+    required this.openDiscover,
+  });
+
+  final int token;
+  final bool openDiscover;
+}
+
+class ProfileFollowingIntentNotifier extends Notifier<ProfileFollowingIntent?> {
+  var _token = 0;
+
+  @override
+  ProfileFollowingIntent? build() => null;
+
+  void open({bool discover = true}) {
+    _token += 1;
+    state = ProfileFollowingIntent(token: _token, openDiscover: discover);
+  }
+}
+
+final profileFollowingIntentProvider =
+    NotifierProvider<ProfileFollowingIntentNotifier, ProfileFollowingIntent?>(
+  ProfileFollowingIntentNotifier.new,
+);
+
 final isCurrentUserSuspendedProvider = Provider<bool>((ref) {
   final profile = ref.watch(currentUserProfileProvider).asData?.value;
   return profile?.isSuspended ?? false;

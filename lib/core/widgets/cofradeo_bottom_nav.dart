@@ -36,6 +36,16 @@ double cofradeoShellBottomInset(BuildContext context) {
   return MediaQuery.paddingOf(context).bottom + cofradeoBottomNavContentHeight;
 }
 
+/// Alto máximo de un bottom sheet. Deja la barra de estado y un hueco
+/// arriba para poder cerrarlo tocando fuera.
+double cofradeoSheetMaxHeight(BuildContext context) {
+  final media = MediaQuery.of(context);
+  final topGap = media.padding.top + 56;
+  final available = media.size.height - topGap - media.viewInsets.bottom;
+  if (available < 280) return 280;
+  return available;
+}
+
 /// Padding inferior de bottom sheets: margen + teclado + barra del shell.
 double cofradeoSheetBottomPadding(
   BuildContext context, {
@@ -65,7 +75,7 @@ class CofradeoBottomNav extends StatelessWidget {
   static const _items = [
     _NavItem(Icons.calendar_month_outlined, Icons.calendar_month, 'Calendario'),
     _NavItem(Icons.newspaper_outlined, Icons.newspaper, 'Noticias'),
-    _NavItem(Icons.chat_bubble_outline, Icons.chat_bubble, 'Foros'),
+    _NavItem(Icons.groups_outlined, Icons.groups, 'Comunidad'),
     _NavItem(
       Icons.notifications_outlined,
       Icons.notifications,

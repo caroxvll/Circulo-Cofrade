@@ -27,6 +27,36 @@ final todayEnsayosProvider =
   return calendarRepo.fetchTodayEnsayos();
 });
 
+const cuaresmaAgendaTypes = {
+  EventType.ensayo,
+  EventType.iguala,
+  EventType.concierto,
+};
+
+/// Ensayos, igualás y conciertos publicados de hoy.
+final todayCuaresmaAgendaProvider =
+    FutureProvider.autoDispose<List<CalendarEvent>>((ref) async {
+  ref.watch(calendarEventsEpochProvider);
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final events = await ref.watch(calendarRepositoryProvider).fetchBetween(
+        today,
+        today.add(const Duration(days: 1)),
+      );
+  return [
+    for (final event in events)
+      if (cuaresmaAgendaTypes.contains(event.type)) event,
+  ];
+});
+
+/// Los de hoy que aún se pueden seguir, para la banda de Para ti.
+final todayParaTiLiveEventsProvider =
+    FutureProvider.autoDispose<List<CalendarEvent>>((ref) async {
+  final events = await ref.watch(todayCuaresmaAgendaProvider.future);
+  final groups = groupTodayEnsayos(events);
+  return [...groups.live, ...groups.soon, ...groups.upcoming];
+});
+
 /// Feed del ensayo con parches Realtime (sin refetch total por cada aviso).
 final eventLiveUpdatesProvider = AsyncNotifierProvider.autoDispose
     .family<EventLiveUpdatesNotifier, List<EventLiveUpdate>, String>(

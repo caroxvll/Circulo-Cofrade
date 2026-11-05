@@ -84,20 +84,31 @@ Future<void> showEventComposeSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppColors.background,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    backgroundColor: Colors.transparent,
+    builder: (_) => DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.74,
+      minChildSize: 0.42,
+      maxChildSize: 0.88,
+      builder: (context, scrollController) => _EventComposeSheet(
+        initialDate: initialDate,
+        existing: existing,
+        scrollController: scrollController,
+      ),
     ),
-    builder: (_) =>
-        _EventComposeSheet(initialDate: initialDate, existing: existing),
   );
 }
 
 class _EventComposeSheet extends ConsumerStatefulWidget {
-  const _EventComposeSheet({this.initialDate, this.existing});
+  const _EventComposeSheet({
+    this.initialDate,
+    this.existing,
+    required this.scrollController,
+  });
 
   final DateTime? initialDate;
   final CalendarEvent? existing;
+  final ScrollController scrollController;
 
   @override
   ConsumerState<_EventComposeSheet> createState() => _EventComposeSheetState();
@@ -735,13 +746,25 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     final dateLabel = DateFormat('d MMMM yyyy', 'es').format(_date);
     final timeLabel = _time.format(context);
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, cofradeoSheetBottomPadding(context)),
-      child: SingleChildScrollView(
+    return Material(
+      color: AppColors.background,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
             Row(
               children: [
                 Expanded(
@@ -756,7 +779,16 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: widget.scrollController,
+                padding: EdgeInsets.only(
+                  right: 8,
+                  bottom: cofradeoSheetBottomPadding(context),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
             DropdownButtonFormField<EventType>(
               initialValue: _type,
               decoration: const InputDecoration(labelText: 'Tipo'),
@@ -983,6 +1015,10 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Text(_isEditing ? 'Guardar cambios' : 'Publicar evento'),
+            ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
