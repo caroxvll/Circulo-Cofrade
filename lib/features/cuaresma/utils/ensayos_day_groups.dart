@@ -133,5 +133,5 @@ String ensayoCompactSubtitle(CalendarEvent event) {
   if (event.location != null && event.location!.isNotEmpty) {
     return event.location!;
   }
-  return 'Ensayo';
+  return event.type.cellLabel;
 }

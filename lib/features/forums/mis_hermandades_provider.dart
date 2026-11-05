@@ -5,6 +5,7 @@ import '../../shared/models/forum.dart';
 import '../search/follows_provider.dart';
 import 'forums_provider.dart';
 import 'utils/hermandad_board_display.dart';
+import 'utils/official_post_categories.dart';
 
 /// Tablones de hermandad que el usuario sigue.
 final followedHermandadBoardsProvider =
@@ -27,31 +28,78 @@ class HermandadFeedItem {
   final String? processionDay;
 }
 
-/// Feed cronológico de publicaciones oficiales de las hermandades seguidas.
-final followedHermandadFeedProvider =
-    FutureProvider.autoDispose<List<HermandadFeedItem>>((ref) async {
+class HermandadDigest {
+  const HermandadDigest({
+    required this.board,
+    required this.hermandadName,
+    required this.sections,
+    this.processionDay,
+  });
+
+  final FollowedTopic board;
+  final String hermandadName;
+  final String? processionDay;
+  final List<HermandadFeedItem> sections;
+}
+
+/// Lo último de cada sección, agrupado por hermandad seguida.
+final followedHermandadDigestsProvider =
+    FutureProvider.autoDispose<List<HermandadDigest>>((ref) async {
   ref.keepAlive();
   final boards = await ref.watch(followedHermandadBoardsProvider.future);
   if (boards.isEmpty) return [];
 
-  final byTopic = {for (final b in boards) b.topicId: b};
+  final order = {
+    for (var i = 0; i < officialPostCategories.length; i++)
+      officialPostCategories[i].value: i,
+  };
   final replies = await ref
       .watch(forumsRepositoryProvider)
-      .fetchOfficialRepliesForTopics(byTopic.keys.toList());
-
-  final items = <HermandadFeedItem>[];
+      .fetchLatestOfficialBySection([
+        for (final board in boards) board.topicId,
+      ]);
+  final byTopic = <String, List<ForumReply>>{};
   for (final reply in replies) {
-    final board = byTopic[reply.topicId];
-    if (board == null) continue;
-    final parsed = parseHermandadTopicTitle(board.title);
-    items.add(
+    byTopic.putIfAbsent(reply.topicId, () => []).add(reply);
+  }
+
+  return [
+    for (final board in boards)
+      HermandadDigest(
+        board: board,
+        hermandadName: parseHermandadTopicTitle(board.title).hermandadName,
+        processionDay: parseHermandadTopicTitle(board.title).processionDay,
+        sections: _sectionsFor(board, byTopic[board.topicId] ?? const [], order),
+      ),
+  ];
+});
+
+List<HermandadFeedItem> _sectionsFor(
+  FollowedTopic board,
+  List<ForumReply> replies,
+  Map<String, int> order,
+) {
+  final sorted = [...replies]..sort((a, b) {
+    final aOrder = order[a.officialCategory] ?? 9;
+    final bOrder = order[b.officialCategory] ?? 9;
+    return aOrder.compareTo(bOrder);
+  });
+  final parsed = parseHermandadTopicTitle(board.title);
+  return [
+    for (final reply in sorted)
       HermandadFeedItem(
         reply: reply,
         board: board,
         hermandadName: parsed.hermandadName,
         processionDay: parsed.processionDay,
       ),
-    );
-  }
-  return items;
+  ];
+}
+
+/// Feed cronológico de publicaciones oficiales de las hermandades seguidas.
+final followedHermandadFeedProvider =
+    FutureProvider.autoDispose<List<HermandadFeedItem>>((ref) async {
+  ref.keepAlive();
+  final digests = await ref.watch(followedHermandadDigestsProvider.future);
+  return [for (final digest in digests) ...digest.sections];
 });

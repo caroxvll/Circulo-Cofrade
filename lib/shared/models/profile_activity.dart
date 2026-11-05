@@ -66,3 +66,10 @@ class ProfileActivity {
 
   bool get isTopic => type == ProfileActivityType.topic;
 }
+
+class DatedProfileActivity {
+  const DatedProfileActivity({required this.at, required this.activity});
+
+  final DateTime at;
+  final ProfileActivity activity;
+}

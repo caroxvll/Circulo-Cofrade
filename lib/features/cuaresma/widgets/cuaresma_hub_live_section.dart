@@ -20,13 +20,61 @@ String cuaresmaHubEnsayoTimingLabel(CalendarEvent event, {DateTime? now}) {
 
   return switch (timing.kind) {
     CalendarEventTimingKind.inProgress => 'En curso',
-    CalendarEventTimingKind.startsSoon => timing.label.replaceFirst(
-        'Empieza',
-        'Sale',
-      ),
+    CalendarEventTimingKind.startsSoon => event.type == EventType.ensayo
+        ? timing.label.replaceFirst('Empieza', 'Sale')
+        : timing.label,
     CalendarEventTimingKind.scheduled => timing.label,
     CalendarEventTimingKind.finished => 'Finalizado',
   };
+}
+
+String cuaresmaHubAgendaLabel(
+  List<CalendarEvent> events, {
+  required int liveCount,
+}) {
+  if (events.isEmpty) return 'Sin citas hoy';
+  if (events.every((event) => event.type == EventType.ensayo)) {
+    if (liveCount > 0) {
+      return liveCount == 1
+          ? '1 ensayo en directo'
+          : '$liveCount ensayos en directo';
+    }
+    return events.length == 1
+        ? '1 ensayo hoy'
+        : '${events.length} ensayos hoy';
+  }
+
+  final types = events.map((event) => event.type).toSet();
+  if (types.length == 1) {
+    final type = types.single;
+    final count = liveCount > 0 ? liveCount : events.length;
+    final noun = switch (type) {
+      EventType.iguala => count == 1 ? 'igualá' : 'igualás',
+      EventType.concierto => count == 1 ? 'concierto' : 'conciertos',
+      _ => count == 1 ? 'cita' : 'citas',
+    };
+    if (liveCount > 0) {
+      return count == 1 ? '1 $noun en directo' : '$count $noun en directo';
+    }
+    return count == 1 ? '1 $noun hoy' : '$count $noun hoy';
+  }
+  if (liveCount > 0) {
+    return liveCount == 1 ? '1 en directo' : '$liveCount en directo';
+  }
+  return events.length == 1 ? '1 cita hoy' : '${events.length} citas hoy';
+}
+
+CalendarEvent? agendaEventById(EnsayosDayGroups groups, String? eventId) {
+  if (eventId == null || eventId.isEmpty) return null;
+  for (final event in [
+    ...groups.live,
+    ...groups.soon,
+    ...groups.upcoming,
+    ...groups.finished,
+  ]) {
+    if (event.id == eventId) return event;
+  }
+  return null;
 }
 
 CalendarEvent? pickFeaturedEnsayo(EnsayosDayGroups groups) {
@@ -67,6 +115,40 @@ List<CalendarEvent> pickFinishedEnsayos(
       .toList();
 }
 
+bool _onlyEnsayos(List<CalendarEvent> events) {
+  return events.every((event) => event.type == EventType.ensayo);
+}
+
+String _activeTitle(List<CalendarEvent> events) {
+  if (_onlyEnsayos(events)) return proximosEnsayosCardTitle(events);
+  return 'También hoy';
+}
+
+String _finishedTitle(
+  List<CalendarEvent> events, {
+  required bool alongsideFeatured,
+}) {
+  if (_onlyEnsayos(events)) {
+    if (!alongsideFeatured) {
+      return events.length == 1 ? 'Ensayo de hoy' : 'Ensayos de hoy';
+    }
+    return events.length == 1 ? 'Ensayo finalizado' : 'Ensayos finalizados';
+  }
+  if (!alongsideFeatured) {
+    return events.length == 1 ? 'Cita de hoy' : 'Citas de hoy';
+  }
+  return events.length == 1 ? 'Cita finalizada' : 'Citas finalizadas';
+}
+
+String _agendaTypeLabel(EventType type) {
+  return switch (type) {
+    EventType.ensayo => 'ENSAYO',
+    EventType.iguala => 'IGUALÁ',
+    EventType.concierto => 'CONCIERTO',
+    _ => type.cellLabel.toUpperCase(),
+  };
+}
+
 String proximosEnsayosCardTitle(List<CalendarEvent> events) {
   if (events.isEmpty) return 'Ensayos';
   final allFinished = events.every(
@@ -83,24 +165,28 @@ class CuaresmaHubLiveSection extends ConsumerWidget {
     super.key,
     required this.forumId,
     required this.topicId,
+    this.focusEventId,
   });
 
   final String forumId;
   final String topicId;
+  final String? focusEventId;
 
-  void _openEnsayo(BuildContext context, CalendarEvent event) {
+  void _openEvent(BuildContext context, CalendarEvent event) {
     final eventId = event.id;
-    if (eventId == null) return;
-    context.push(
-      '/foros/$forumId/tema/$topicId/ensayo/$eventId',
-    );
+    if (eventId == null || eventId.isEmpty) return;
+    if (event.type == EventType.ensayo) {
+      context.push('/foros/$forumId/tema/$topicId/ensayo/$eventId');
+      return;
+    }
+    context.replace('/foros/$forumId/tema/$topicId?cita=$eventId');
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ensayosAsync = ref.watch(todayEnsayosProvider);
+    final agendaAsync = ref.watch(todayCuaresmaAgendaProvider);
 
-    return ensayosAsync.when(
+    return agendaAsync.when(
       skipLoadingOnReload: true,
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
@@ -108,18 +194,19 @@ class CuaresmaHubLiveSection extends ConsumerWidget {
       ),
       error: (_, _) => CuaresmaHubElevatedCard(
         child: Text(
-          'No se pudieron cargar los ensayos de hoy.',
+          'No se pudieron cargar las citas de hoy.',
           style: TopicDetailTypography.meta(color: AppColors.textSecondary),
         ),
       ),
-      data: (ensayos) {
-        final groups = groupTodayEnsayos(ensayos);
-        final featured = pickFeaturedEnsayo(groups);
+      data: (agenda) {
+        final groups = groupTodayEnsayos(agenda);
+        final featured =
+            agendaEventById(groups, focusEventId) ?? pickFeaturedEnsayo(groups);
         final activeOthers =
             pickOtherActiveEnsayos(groups, featured: featured);
         final finishedToday =
             pickFinishedEnsayos(groups, featured: featured);
-        final hasTodayEnsayos = groups.total > 0;
+        final hasToday = groups.total > 0;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,37 +214,41 @@ class CuaresmaHubLiveSection extends ConsumerWidget {
             if (featured != null)
               _CuaresmaFeaturedLiveCard(
                 event: featured,
-                forumId: forumId,
-                topicId: topicId,
-                onOpen: () => _openEnsayo(context, featured),
+                onOpen: featured.type == EventType.ensayo
+                    ? () => _openEvent(context, featured)
+                    : null,
               )
-            else if (!hasTodayEnsayos)
+            else if (!hasToday)
               const _CuaresmaNoLiveHint()
             else if (finishedToday.isNotEmpty)
               _CuaresmaEnsayosListCard(
-                title: finishedToday.length == 1
-                    ? 'Ensayo de hoy'
-                    : 'Ensayos de hoy',
+                title: _finishedTitle(
+                  finishedToday,
+                  alongsideFeatured: false,
+                ),
                 events: finishedToday,
-                onTap: (event) => _openEnsayo(context, event),
-                initiallyExpanded: finishedToday.length == 1,
+                onTap: (event) => _openEvent(context, event),
+                initiallyExpanded: finishedToday.length <= 3,
               ),
             if (activeOthers.isNotEmpty) ...[
               const SizedBox(height: 12),
               _CuaresmaEnsayosListCard(
-                title: proximosEnsayosCardTitle(activeOthers),
+                title: _activeTitle(activeOthers),
                 events: activeOthers,
-                onTap: (event) => _openEnsayo(context, event),
+                onTap: (event) => _openEvent(context, event),
+                initiallyExpanded: activeOthers.length <= 3,
               ),
             ],
             if (featured != null && finishedToday.isNotEmpty) ...[
               const SizedBox(height: 12),
               _CuaresmaEnsayosListCard(
-                title: finishedToday.length == 1
-                    ? 'Ensayo finalizado'
-                    : 'Ensayos finalizados',
+                title: _finishedTitle(
+                  finishedToday,
+                  alongsideFeatured: true,
+                ),
                 events: finishedToday,
-                onTap: (event) => _openEnsayo(context, event),
+                onTap: (event) => _openEvent(context, event),
+                initiallyExpanded: finishedToday.length <= 3,
               ),
             ],
           ],
@@ -170,28 +261,24 @@ class CuaresmaHubLiveSection extends ConsumerWidget {
 class _CuaresmaFeaturedLiveCard extends ConsumerWidget {
   const _CuaresmaFeaturedLiveCard({
     required this.event,
-    required this.forumId,
-    required this.topicId,
     required this.onOpen,
   });
 
   final CalendarEvent event;
-  final String forumId;
-  final String topicId;
-  final VoidCallback onOpen;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final timing = calendarEventTiming(event);
     final isLive = timing?.kind == CalendarEventTimingKind.inProgress;
+    final isEnsayo = event.type == EventType.ensayo;
     final logos = ref.watch(organizerLogosMapProvider).asData?.value;
     final shieldUrl = resolvedOrganizerShieldUrl(logos, event);
-    final updatesAsync = event.id == null
+    final updatesAsync = !isEnsayo || event.id == null
         ? null
         : ref.watch(eventLiveUpdatesProvider(event.id!));
-
     final followers = updatesAsync?.asData?.value
-            .map((u) => u.userId)
+            .map((update) => update.userId)
             .toSet()
             .length ??
         0;
@@ -224,6 +311,16 @@ class _CuaresmaFeaturedLiveCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (!isEnsayo) ...[
+                      Text(
+                        _agendaTypeLabel(event.type),
+                        style: TopicDetailTypography.meta(
+                          color: AppColors.burgundy,
+                          fontWeight: FontWeight.w800,
+                        ).copyWith(fontSize: 10, letterSpacing: 0.8),
+                      ),
+                      const SizedBox(height: 2),
+                    ],
                     Text(
                       subtitle,
                       style: TopicDetailTypography.body().copyWith(
@@ -264,12 +361,14 @@ class _CuaresmaFeaturedLiveCard extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        CuaresmaHubPrimaryPillButton(
-                          label: 'Seguir recorrido',
-                          compact: true,
-                          onPressed: onOpen,
-                        ),
+                        if (onOpen != null) ...[
+                          const SizedBox(width: 8),
+                          CuaresmaHubPrimaryPillButton(
+                            label: 'Seguir recorrido',
+                            compact: true,
+                            onPressed: onOpen!,
+                          ),
+                        ],
                       ],
                     ),
                     if (followers > 0) ...[
@@ -332,7 +431,7 @@ class _CuaresmaNoLiveHint extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ENSAYOS',
+                  'HOY',
                   style: TopicDetailTypography.meta(
                     color: AppColors.burgundy,
                     fontWeight: FontWeight.w800,
@@ -340,7 +439,7 @@ class _CuaresmaNoLiveHint extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Hoy no hay ensayos en directo. Cuando empiecen, aparecerán aquí.',
+                  'Hoy no hay ensayos, igualás ni conciertos. Cuando salgan, aparecerán aquí.',
                   style: TopicDetailTypography.meta(
                     color: AppColors.textSecondary,
                   ).copyWith(fontSize: 12.5, height: 1.3),
@@ -424,6 +523,7 @@ class _CuaresmaEnsayosListCardState extends State<_CuaresmaEnsayosListCard> {
               (event) => EnsayoPremiumRow(
                 event: event,
                 muted: ensayoStatusLabel(event) == 'Finalizado',
+                showChevron: true,
                 onTap: () => widget.onTap(event),
               ),
             ),

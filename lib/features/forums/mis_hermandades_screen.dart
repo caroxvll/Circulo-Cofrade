@@ -10,6 +10,7 @@ import '../../core/widgets/cofradeo_asset_image.dart';
 import '../../core/widgets/cofradeo_network_image.dart';
 import '../../shared/models/followed_topic.dart';
 import '../search/follows_provider.dart';
+import '../profile/open_hermandad_picker.dart';
 import 'mis_hermandades_provider.dart';
 import 'utils/forum_navigation.dart';
 import 'utils/hermandad_board_display.dart';
@@ -450,11 +451,11 @@ class _FeedCard extends ConsumerWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _EmptyState extends ConsumerWidget {
   const _EmptyState();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),

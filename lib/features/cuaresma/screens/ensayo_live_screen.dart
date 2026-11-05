@@ -117,6 +117,7 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
           );
       ref.invalidate(calendarEventByIdProvider(widget.eventId));
       ref.invalidate(todayEnsayosProvider);
+      ref.invalidate(todayCuaresmaAgendaProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
