@@ -1,7 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { AuthService } from '../auth/auth.service';
 import { CalendarTimeSlot } from '../events/events.models';
-import { CalendarTimeSlot } from '../events/events.models';
 import {
   HermandadBoard,
   HermandadOfficialPost,
