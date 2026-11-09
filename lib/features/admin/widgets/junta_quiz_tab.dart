@@ -15,6 +15,7 @@ import '../../quiz/utils/quiz_audio_limits.dart';
 import '../admin_provider.dart';
 import '../junta_ui.dart';
 import 'junta_quiz_create_sheet.dart';
+import 'junta_quiz_prize_panel.dart';
 
 class JuntaQuizTab extends ConsumerStatefulWidget {
   const JuntaQuizTab({super.key});
@@ -26,6 +27,7 @@ class JuntaQuizTab extends ConsumerStatefulWidget {
 class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
   var _busy = false;
   var _filter = _QuizListFilter.ready;
+  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
   var _authorsExpanded = false;
   Timer? _roundClock;
 
@@ -56,6 +58,7 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
   Future<void> _refresh() async {
     ref.invalidate(juntaQuizQuestionsProvider);
     ref.invalidate(juntaQuizLaunchedIdsProvider);
+    ref.invalidate(juntaQuizScheduleProvider);
     ref.invalidate(quizLivePayloadProvider);
     ref.invalidate(quizAuthorIdsProvider);
     ref.invalidate(canCreateQuizQuestionsAsyncProvider);
@@ -168,9 +171,79 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'No se pudo borrar. ¿Ejecutaste quiz_season_cleanup.sql? ($e)',
+              'No se pudo borrar. Ejecuta quiz_schedule_and_delete.sql en Supabase. ($e)',
             ),
           ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _schedule(QuizQuestion q) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: today,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 180)),
+      helpText: 'Día de la pregunta',
+      cancelText: 'Cancelar',
+      confirmText: 'Programar',
+    );
+    if (picked == null) return;
+
+    setState(() => _busy = true);
+    try {
+      await ref.read(quizRepositoryProvider).scheduleRound(
+            questionId: q.id,
+            day: picked,
+          );
+      await _refresh();
+      if (!mounted) return;
+      final sameDay = picked.year == today.year &&
+          picked.month == today.month &&
+          picked.day == today.day;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            sameDay
+                ? 'Lanzada hoy'
+                : 'Programada para el ${picked.day}/${picked.month}/${picked.year}',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'No se pudo programar. Ejecuta quiz_schedule_and_delete.sql. ($e)',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _cancelSchedule(QuizQuestion q) async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(quizRepositoryProvider).cancelScheduledRound(q.id);
+      await _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Programación quitada')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo quitar la fecha. ($e)')),
         );
       }
     } finally {
@@ -753,6 +826,8 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
     final questionsAsync = ref.watch(juntaQuizQuestionsProvider);
     final launchedIds =
         ref.watch(juntaQuizLaunchedIdsProvider).asData?.value ?? const <String>{};
+    final scheduled =
+        ref.watch(juntaQuizScheduleProvider).asData?.value ?? const <String, DateTime>{};
     final assignmentsAsync = ref.watch(forumModeratorAssignmentsProvider);
     final authorIdsAsync = ref.watch(quizAuthorIdsProvider);
     final live = ref.watch(quizLivePayloadProvider).asData?.value;
@@ -839,13 +914,54 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
               onCleanupMonth: _cleanupMonth,
             ),
           ),
+          if (isAdmin) ...[
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: JuntaQuizPrizePanel(),
+            ),
+          ],
         ],
         const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: () => setState(() {
+                  _month = DateTime(_month.year, _month.month - 1);
+                }),
+                icon: const Icon(Icons.chevron_left),
+              ),
+              Expanded(
+                child: Text(
+                  _monthTitle,
+                  textAlign: TextAlign.center,
+                  style: JuntaUi.sectionTitle(),
+                ),
+              ),
+              IconButton(
+                onPressed: () => setState(() {
+                  _month = DateTime(_month.year, _month.month + 1);
+                }),
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
+          ),
+        ),
         questionsAsync.when(
           loading: () => const SizedBox.shrink(),
           error: (_, _) => const SizedBox.shrink(),
           data: (questions) {
-            final counts = _QuizFilterCounts.from(questions, launchedIds);
+            final monthQuestions = [
+              for (final q in questions)
+                if (_questionInMonth(q, scheduled)) q,
+            ];
+            final counts = _QuizFilterCounts.from(
+              monthQuestions,
+              launchedIds,
+              scheduled,
+            );
             return Padding(
               padding: const EdgeInsets.only(left: 12, right: 4),
               child: SingleChildScrollView(
@@ -893,7 +1009,11 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
               ),
             ),
             data: (questions) {
-              final filtered = _filterQuestions(questions, launchedIds);
+              final filtered = _filterQuestions(
+                questions,
+                launchedIds,
+                scheduled,
+              );
               if (filtered.isEmpty) {
                 return Center(
                   child: Padding(
@@ -919,10 +1039,12 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
                   final q = filtered[index];
                   final used = launchedIds.contains(q.id);
                   final isCurrentLive = liveQuestionId == q.id;
+                  final scheduledOn = scheduled[q.id];
                   return _QuizQuestionCard(
                     question: q,
                     used: used,
                     isCurrentLive: isCurrentLive,
+                    scheduledOn: scheduledOn,
                     isAdmin: isAdmin,
                     canCreate: canCreate,
                     busy: _busy,
@@ -931,6 +1053,8 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
                     onApprove: () => _approve(q),
                     onReject: () => _reject(q),
                     onLaunch: () => _launch(q),
+                    onSchedule: () => _schedule(q),
+                    onCancelSchedule: () => _cancelSchedule(q),
                     onDelete: () => _deleteQuestion(q, isLive: isCurrentLive),
                   );
                 },
@@ -943,11 +1067,48 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
     );
   }
 
+  bool _questionInMonth(
+    QuizQuestion q,
+    Map<String, DateTime> scheduled,
+  ) {
+    final created = q.createdAt;
+    final createdHere = created != null &&
+        created.year == _month.year &&
+        created.month == _month.month;
+    final play = scheduled[q.id];
+    final scheduledHere = play != null &&
+        play.year == _month.year &&
+        play.month == _month.month;
+    return createdHere || scheduledHere;
+  }
+
+  String get _monthTitle {
+    const names = [
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ];
+    return '${names[_month.month - 1]} ${_month.year}';
+  }
+
   List<QuizQuestion> _filterQuestions(
     List<QuizQuestion> questions,
     Set<String> launchedIds,
+    Map<String, DateTime> scheduled,
   ) {
-    Iterable<QuizQuestion> list = questions;
+    Iterable<QuizQuestion> list = [
+      for (final q in questions)
+        if (_questionInMonth(q, scheduled)) q,
+    ];
     list = switch (_filter) {
       _QuizListFilter.all => list,
       _QuizListFilter.pending =>
@@ -955,8 +1116,11 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
       _QuizListFilter.ready => list.where(
           (q) =>
               q.status == QuizQuestionStatus.approved &&
-              !launchedIds.contains(q.id),
+              !launchedIds.contains(q.id) &&
+              !scheduled.containsKey(q.id),
         ),
+      _QuizListFilter.scheduled =>
+        list.where((q) => scheduled.containsKey(q.id)),
       _QuizListFilter.used => list.where((q) => launchedIds.contains(q.id)),
       _QuizListFilter.rejected =>
         list.where((q) => q.status == QuizQuestionStatus.rejected),
@@ -984,13 +1148,14 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
   }
 }
 
-enum _QuizListFilter { all, pending, ready, used, rejected }
+enum _QuizListFilter { all, pending, ready, scheduled, used, rejected }
 
 extension on _QuizListFilter {
   String get label => switch (this) {
         _QuizListFilter.all => 'Todas',
         _QuizListFilter.pending => 'Revisión',
         _QuizListFilter.ready => 'Listas',
+        _QuizListFilter.scheduled => 'Programadas',
         _QuizListFilter.used => 'Ya lanzadas',
         _QuizListFilter.rejected => 'Rechazadas',
       };
@@ -1001,6 +1166,7 @@ class _QuizFilterCounts {
     required this.all,
     required this.pending,
     required this.ready,
+    required this.scheduled,
     required this.used,
     required this.rejected,
   });
@@ -1008,15 +1174,19 @@ class _QuizFilterCounts {
   factory _QuizFilterCounts.from(
     List<QuizQuestion> questions,
     Set<String> launchedIds,
+    Map<String, DateTime> scheduled,
   ) {
     var pending = 0;
     var ready = 0;
+    var planned = 0;
     var used = 0;
     var rejected = 0;
     for (final q in questions) {
       if (q.status == QuizQuestionStatus.pendingReview) pending++;
       if (q.status == QuizQuestionStatus.rejected) rejected++;
-      if (launchedIds.contains(q.id)) {
+      if (scheduled.containsKey(q.id)) {
+        planned++;
+      } else if (launchedIds.contains(q.id)) {
         used++;
       } else if (q.status == QuizQuestionStatus.approved) {
         ready++;
@@ -1026,6 +1196,7 @@ class _QuizFilterCounts {
       all: questions.length,
       pending: pending,
       ready: ready,
+      scheduled: planned,
       used: used,
       rejected: rejected,
     );
@@ -1034,6 +1205,7 @@ class _QuizFilterCounts {
   final int all;
   final int pending;
   final int ready;
+  final int scheduled;
   final int used;
   final int rejected;
 
@@ -1041,6 +1213,7 @@ class _QuizFilterCounts {
         _QuizListFilter.all => all,
         _QuizListFilter.pending => pending,
         _QuizListFilter.ready => ready,
+        _QuizListFilter.scheduled => scheduled,
         _QuizListFilter.used => used,
         _QuizListFilter.rejected => rejected,
       };
@@ -1381,6 +1554,7 @@ class _QuizQuestionCard extends StatelessWidget {
     required this.question,
     required this.used,
     required this.isCurrentLive,
+    required this.scheduledOn,
     required this.isAdmin,
     required this.canCreate,
     required this.busy,
@@ -1389,12 +1563,15 @@ class _QuizQuestionCard extends StatelessWidget {
     required this.onApprove,
     required this.onReject,
     required this.onLaunch,
+    required this.onSchedule,
+    required this.onCancelSchedule,
     required this.onDelete,
   });
 
   final QuizQuestion question;
   final bool used;
   final bool isCurrentLive;
+  final DateTime? scheduledOn;
   final bool isAdmin;
   final bool canCreate;
   final bool busy;
@@ -1403,6 +1580,8 @@ class _QuizQuestionCard extends StatelessWidget {
   final VoidCallback onApprove;
   final VoidCallback onReject;
   final VoidCallback onLaunch;
+  final VoidCallback onSchedule;
+  final VoidCallback onCancelSchedule;
   final VoidCallback onDelete;
 
   @override
@@ -1417,11 +1596,16 @@ class _QuizQuestionCard extends StatelessWidget {
     ];
     final mediaLabel =
         mediaBits.isEmpty ? 'sin media' : 'con ${mediaBits.join(' · ')}';
+    final planned = scheduledOn != null;
     final statusLabel = switch (q.status) {
       QuizQuestionStatus.pendingReview => 'Revisión',
-      QuizQuestionStatus.approved => used
-          ? (isCurrentLive ? 'En vivo' : 'Ya lanzada')
-          : 'Lista',
+      QuizQuestionStatus.approved => isCurrentLive
+          ? 'En vivo'
+          : planned
+              ? 'Programada ${_shortDay(scheduledOn!)}'
+              : used
+                  ? 'Ya lanzada'
+                  : 'Lista',
       QuizQuestionStatus.rejected => 'Rechazada',
       QuizQuestionStatus.draft => 'Borrador',
     };
@@ -1544,7 +1728,23 @@ class _QuizQuestionCard extends StatelessWidget {
                 ],
                 if (isAdmin &&
                     q.status == QuizQuestionStatus.approved &&
-                    !used)
+                    !used &&
+                    !planned)
+                  _MiniAction(
+                    icon: Icons.event_outlined,
+                    label: 'Programar',
+                    onPressed: busy ? null : onSchedule,
+                  ),
+                if (isAdmin && planned)
+                  _MiniAction(
+                    icon: Icons.event_busy_outlined,
+                    label: 'Quitar fecha',
+                    onPressed: busy ? null : onCancelSchedule,
+                  ),
+                if (isAdmin &&
+                    q.status == QuizQuestionStatus.approved &&
+                    !used &&
+                    !planned)
                   _MiniAction(
                     icon: Icons.campaign_outlined,
                     label: 'Lanzar',
@@ -1573,6 +1773,24 @@ class _QuizQuestionCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _shortDay(DateTime day) {
+  const months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
+  return '${day.day} ${months[day.month - 1]}';
 }
 
 class _MiniAction extends StatelessWidget {

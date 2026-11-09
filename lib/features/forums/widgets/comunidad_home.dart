@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/forum_text_format.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/utils/local_day.dart';
 import '../../../core/utils/time_ago.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
@@ -19,6 +20,8 @@ import '../../../shared/models/followed_topic.dart';
 import '../../../shared/models/user_profile.dart';
 import '../../../shared/models/forum.dart';
 import '../../auth/auth_provider.dart';
+import '../../cuaresma/models/event_live_update.dart';
+import '../../cuaresma/utils/cuaresma_topic.dart';
 import '../../notifications/widgets/notifications_bell_button.dart';
 import '../../semana_santa/models/ss_live_update.dart';
 import '../../semana_santa/widgets/ss_forums_live_chip.dart';
@@ -102,9 +105,16 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
       for (final item in cards)
         if (item.kind.matches(_forYouFilter)) item,
     ];
-    final pulse = _forYouFilter == _ForYouFilter.todo
-        ? ref.watch(paraTiPulseProvider)
-        : null;
+    final river = _forYouFilter == _ForYouFilter.todo
+        ? ref.watch(paraTiRiverProvider)
+        : const ParaTiRiver.empty();
+    final room = paraTiRiverLimit - river.entries.length;
+    final fill = _forYouFilter == _ForYouFilter.todo &&
+            river.settled &&
+            room > 0 &&
+            ref.watch(currentUserProvider) != null
+        ? _followedRiverFill(room)
+        : const <Widget>[];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -124,16 +134,13 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
             physics: _scrollPhysics,
             padding: const EdgeInsets.only(bottom: 24),
             children: [
-              if (pulse != null) ...[
-                for (final update in pulse.lives)
-                  _ParaTiLiveUpdate(update: update),
-                if (pulse.topic != null) _SeasonPulseCard(pulse: pulse),
-              ],
-              if (cards.isEmpty)
+              for (final entry in river.entries) _riverEntry(entry),
+              ...fill,
+              if (cards.isEmpty && river.entries.isEmpty && fill.isEmpty)
                 const _EmptyNote(
                   text: 'Cuando haya temas nuevos, aparecerán aquí.',
                 )
-              else if (visible.isEmpty)
+              else if (visible.isEmpty && river.entries.isEmpty)
                 _EmptyNote(text: _forYouFilter.emptyLabel)
               else
                 for (final item in visible)
@@ -146,6 +153,55 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
         ),
       ],
     );
+  }
+
+  Widget _riverEntry(ParaTiRiverEntry entry) {
+    return switch (entry) {
+      ParaTiCuaresmaTweet(:final update) => _ParaTiEventTweet(update: update),
+      ParaTiSsLive(:final update) => _ParaTiLiveUpdate(update: update),
+      ParaTiHotTopic(:final topic, :final activityAt) => _SeasonPulseCard(
+          topic: topic,
+          activityAt: activityAt,
+        ),
+    };
+  }
+
+  /// Cuando el directo no llena las 12 plazas, entra lo que ya sigues.
+  List<Widget> _followedRiverFill(int room) {
+    final posts = ref.watch(followedPeoplePostsProvider).asData?.value ??
+        const <FollowedPersonPost>[];
+    final digests = ref.watch(followedHermandadDigestsProvider).asData?.value ??
+        const <HermandadDigest>[];
+
+    final ranked = <({DateTime at, Widget child})>[
+      for (final post in posts)
+        (
+          at: post.at,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+            child: _PersonPostCard(post: post),
+          ),
+        ),
+      for (final group in digests)
+        for (final section in group.sections)
+          (
+            at: section.reply.createdAt ??
+                DateTime.fromMillisecondsSinceEpoch(0),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              child: _HermandadLatestCard(
+                group: HermandadDigest(
+                  board: group.board,
+                  hermandadName: group.hermandadName,
+                  processionDay: group.processionDay,
+                  sections: [section],
+                ),
+              ),
+            ),
+          ),
+    ]..sort((a, b) => b.at.compareTo(a.at));
+
+    return [for (final item in ranked.take(room)) item.child];
   }
 
   List<Widget> _followingSlivers(BuildContext context) {
@@ -631,6 +687,84 @@ class _ComunidadTabs extends StatelessWidget {
 
 const _hotCommentCount = 6;
 
+class _ParaTiEventTweet extends StatelessWidget {
+  const _ParaTiEventTweet({required this.update});
+
+  final EventLiveUpdate update;
+
+  @override
+  Widget build(BuildContext context) {
+    final handle = update.authorHandle.startsWith('@')
+        ? update.authorHandle
+        : '@${update.authorHandle}';
+    final place = update.placeLabel?.trim() ?? '';
+
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: InkWell(
+        onTap: () => context.push(
+          '/foros/foro-cofradiero/tema/$cuaresmaTopicId/ensayo/${update.calendarEventId}',
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'EN DIRECTO',
+                    style: AppTypography.labelSmall(
+                      color: const Color(0xFF2E7D32),
+                    ).copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 10,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    formatTimeAgo(update.createdAt),
+                    style: AppTypography.labelSmall().copyWith(fontSize: 12),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                handle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.hermandadName().copyWith(
+                  fontSize: 15,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                update.message,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.bodyMedium(),
+              ),
+              if (place.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  place,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.labelSmall(),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ParaTiLiveUpdate extends StatelessWidget {
   const _ParaTiLiveUpdate({required this.update});
 
@@ -653,15 +787,13 @@ class _ParaTiLiveUpdate extends StatelessWidget {
 }
 
 class _SeasonPulseCard extends ConsumerWidget {
-  const _SeasonPulseCard({required this.pulse});
+  const _SeasonPulseCard({required this.topic, required this.activityAt});
 
-  final ParaTiPulse pulse;
+  final ForumTopic topic;
+  final DateTime activityAt;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final topic = pulse.topic;
-    if (topic == null) return const SizedBox.shrink();
-
     final topicExcerpt = plainTextForExcerpt(topic.excerpt, maxLength: 180);
     final title = topic.title;
     final showBody = topicExcerpt.isNotEmpty && topicExcerpt != title;
@@ -670,7 +802,7 @@ class _SeasonPulseCard extends ConsumerWidget {
     final atHandle = handle.isEmpty
         ? ''
         : (handle.startsWith('@') ? handle : '@$handle');
-    final when = pulse.topicActivityAt ?? topic.createdAt ?? DateTime.now();
+    final when = activityAt;
     final meta = atHandle.isEmpty
         ? formatTimeAgo(when)
         : '$atHandle · ${formatTimeAgo(when)}';
@@ -762,8 +894,6 @@ class _SeasonPulseCard extends ConsumerWidget {
   }
 
   void _open(BuildContext context, WidgetRef ref) {
-    final topic = pulse.topic;
-    if (topic == null) return;
     pushForumTopic(
       context,
       ref,
@@ -772,10 +902,10 @@ class _SeasonPulseCard extends ConsumerWidget {
     );
   }
 
-  String _prettyAuthor(ForumTopic? topic) {
-    final display = topic?.authorDisplayName?.trim();
+  String _prettyAuthor(ForumTopic topic) {
+    final display = topic.authorDisplayName?.trim();
     if (display != null && display.isNotEmpty) return display;
-    return _prettyHandle(topic?.authorHandle ?? '');
+    return _prettyHandle(topic.authorHandle);
   }
 
   String _prettyHandle(String raw) {

@@ -64,9 +64,74 @@
       </article>
     </div>
 
+    <article class="panel prize-panel">
+      <h3>Premio del mes</h3>
+      <p class="hint">
+        Actívalo para que se vea en la pregunta y en el ranking. Si lo desactivas,
+        desaparece también para quien haya ganado.
+      </p>
+      <label class="check big">
+        <input type="checkbox" [(ngModel)]="prizeActive" [disabled]="saving()" />
+        Premio activo
+      </label>
+      <div class="prize-grid">
+        <label>
+          Mes
+          <input
+            type="month"
+            [ngModel]="prizeMonth"
+            (ngModelChange)="onPrizeMonth($event)"
+            [disabled]="saving()"
+          />
+        </label>
+        <label>
+          Local
+          <input [(ngModel)]="prizeSponsor" placeholder="Inciensos Sevilla" />
+        </label>
+        <label>
+          Premio
+          <input [(ngModel)]="prizeTitle" placeholder="Lote de incienso" />
+        </label>
+        <label>
+          Recoger hasta
+          <input type="date" [(ngModel)]="prizeClaimUntil" />
+        </label>
+      </div>
+      <label>
+        Detalle
+        <textarea rows="2" [(ngModel)]="prizeDescription"></textarea>
+      </label>
+      <label>
+        Dónde recogerlo
+        <input [(ngModel)]="prizeAddress" />
+      </label>
+      <div class="prize-photo">
+        @if (prizeImageUrl) {
+          <img [src]="prizeImageUrl" alt="Foto del local" />
+        }
+        <label>
+          Foto del local
+          <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onPrizePhoto($event)" />
+        </label>
+      </div>
+      <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="savePrize()">
+        Guardar premio
+      </button>
+      @if (prizeNotice) {
+        <p class="hint">{{ prizeNotice }}</p>
+      }
+    </article>
+
     <div class="filters">
+      <label class="month-pick">
+        Mes
+        <input type="month" [ngModel]="month()" (ngModelChange)="month.set($event)" />
+      </label>
       <button type="button" class="chip" [class.active]="filter() === 'ready'" (click)="filter.set('ready')">
         Listas para lanzar
+      </button>
+      <button type="button" class="chip" [class.active]="filter() === 'scheduled'" (click)="filter.set('scheduled')">
+        Programadas
       </button>
       <button type="button" class="chip" [class.active]="filter() === 'pending'" (click)="filter.set('pending')">
         Pendientes
@@ -98,6 +163,9 @@
                 @if (launchedIds().has(q.id)) {
                   <span class="pill muted">Ya lanzada</span>
                 }
+                @if (playOnLabel(q.id)) {
+                  <span class="pill ok">Programada {{ playOnLabel(q.id) }}</span>
+                }
                 <h3>{{ q.prompt }}</h3>
                 <ul class="options">
                   <li [class.correct]="q.correctOption === 'a'">A · {{ q.optionA }}</li>
@@ -116,9 +184,23 @@
                   Rechazar
                 </button>
               }
-              @if (q.status === 'approved' && !launchedIds().has(q.id)) {
+              @if (q.status === 'approved' && !launchedIds().has(q.id) && !playOnLabel(q.id)) {
                 <button type="button" class="btn btn-primary" [disabled]="busyId() === q.id" (click)="launch(q)">
                   Lanzar en vivo
+                </button>
+                <button type="button" class="btn btn-soft" [disabled]="busyId() === q.id" (click)="openSchedule(q)">
+                  Programar
+                </button>
+              }
+              @if (playOnLabel(q.id) && isAdmin()) {
+                <button type="button" class="btn btn-ghost" [disabled]="busyId() === q.id" (click)="cancelSchedule(q)">
+                  Quitar fecha
+                </button>
+              }
+              @if (scheduleForId() === q.id) {
+                <input type="date" [(ngModel)]="scheduleDay" />
+                <button type="button" class="btn btn-primary" [disabled]="busyId() === q.id" (click)="schedule(q)">
+                  Guardar día
                 </button>
               }
               @if (isAdmin()) {

@@ -45,7 +45,7 @@ class SemanaSantaHubSummaryCard extends StatelessWidget {
             if (liveOpen) ...[
               const SizedBox(width: 8),
               Text(
-                'últimas 12 h',
+                'hoy',
                 style: TopicDetailTypography.meta(
                   color: AppColors.textMuted,
                 ).copyWith(fontSize: 12),

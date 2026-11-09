@@ -14,6 +14,10 @@ export type CalendarEventType =
   | 'triduo'
   | 'pregon'
   | 'traslado'
+  | 'muda'
+  | 'retranqueo'
+  | 'via_crucis'
+  | 'via_crucis_consejo'
   | 'evento';
 
 export interface CalendarEventRow {
@@ -77,6 +81,14 @@ export const CALENDAR_EVENT_TYPES: { value: CalendarEventType; label: string; ce
     { value: 'triduo', label: 'Triduos', cellLabel: 'Triduo' },
     { value: 'pregon', label: 'Pregones', cellLabel: 'Pregón' },
     { value: 'traslado', label: 'Traslados', cellLabel: 'Traslado' },
+    { value: 'muda', label: 'Mudas', cellLabel: 'Muda' },
+    { value: 'retranqueo', label: 'Retranqueos', cellLabel: 'Retranqueo' },
+    { value: 'via_crucis', label: 'Vía crucis', cellLabel: 'Vía crucis' },
+    {
+      value: 'via_crucis_consejo',
+      label: 'Vía crucis del Consejo',
+      cellLabel: 'Vía crucis del Consejo',
+    },
     { value: 'evento', label: 'Eventos', cellLabel: 'Evento' },
   ];
 

@@ -21,8 +21,8 @@ abstract final class CalendarDesign {
   static const heroRadius = 16.0;
   static const heroBadgeWidth = 38.0;
   static const heroBadgeRadius = 6.0;
-  static const heroTitleSize = 15.0;
-  static const heroMetaSize = 10.0;
+  static const heroTitleSize = 16.0;
+  static const heroMetaSize = 12.0;
   static const heroArrowSize = 30.0;
   static const heroArrowIconSize = 16.0;
 
@@ -56,7 +56,7 @@ abstract final class CalendarDesign {
   static const eventThumbWidth = 74.0;
   static const eventThumbHeight = 92.0;
   static const eventThumbRadius = 10.0;
-  static const eventTitleSize = 16.5;
+  static const eventTitleSize = 15.5;
   static const eventMetaSize = 12.0;
   static const eventTimeFontSize = 13.0;
   static const eventBookmarkSize = 18.0;
@@ -72,7 +72,7 @@ abstract final class CalendarDesign {
       AppTypography.displaySmall(color: color).copyWith(
         fontSize: eventTitleSize,
         fontWeight: FontWeight.w600,
-        height: 1.16,
+        height: 1.2,
         letterSpacing: -0.15,
       );
 }

@@ -23,6 +23,14 @@ enum EventType {
 
   traslado('Traslados'),
 
+  muda('Mudas'),
+
+  retranqueo('Retranqueos'),
+
+  viaCrucis('Vía crucis'),
+
+  viaCrucisConsejo('Vía crucis del Consejo'),
+
   evento('Eventos');
 
   const EventType(this.label);
@@ -53,6 +61,14 @@ enum EventType {
 
       'traslado' => EventType.traslado,
 
+      'muda' => EventType.muda,
+
+      'retranqueo' => EventType.retranqueo,
+
+      'via_crucis' => EventType.viaCrucis,
+
+      'via_crucis_consejo' => EventType.viaCrucisConsejo,
+
       _ => EventType.evento,
     };
   }
@@ -80,6 +96,14 @@ enum EventType {
 
     EventType.traslado => 'traslado',
 
+    EventType.muda => 'muda',
+
+    EventType.retranqueo => 'retranqueo',
+
+    EventType.viaCrucis => 'via_crucis',
+
+    EventType.viaCrucisConsejo => 'via_crucis_consejo',
+
     EventType.evento => 'evento',
   };
 
@@ -96,7 +120,22 @@ enum EventType {
     EventType.triduo => 'Triduo',
     EventType.pregon => 'Pregón',
     EventType.traslado => 'Traslado',
+    EventType.muda => 'Muda',
+    EventType.retranqueo => 'Retranqueo',
+    EventType.viaCrucis => 'Vía crucis',
+    EventType.viaCrucisConsejo => 'Vía crucis del Consejo',
     EventType.evento => 'Evento',
+  };
+
+  /// Ensayo y citas de Cuaresma que tienen hilo de avisos en directo.
+  bool get opensCuaresmaLive => switch (this) {
+    EventType.ensayo ||
+    EventType.traslado ||
+    EventType.muda ||
+    EventType.retranqueo ||
+    EventType.viaCrucis ||
+    EventType.viaCrucisConsejo => true,
+    _ => false,
   };
 }
 
@@ -353,6 +392,14 @@ enum EventFilter {
 
   traslados('Traslados'),
 
+  mudas('Mudas'),
+
+  retranqueos('Retranqueos'),
+
+  viaCrucis('Vía crucis'),
+
+  viaCrucisConsejo('Vía crucis Consejo'),
+
   eventos('Eventos'),
 
   guardados('Guardados');
@@ -386,6 +433,14 @@ enum EventFilter {
     EventFilter.pregones => EventType.pregon,
 
     EventFilter.traslados => EventType.traslado,
+
+    EventFilter.mudas => EventType.muda,
+
+    EventFilter.retranqueos => EventType.retranqueo,
+
+    EventFilter.viaCrucis => EventType.viaCrucis,
+
+    EventFilter.viaCrucisConsejo => EventType.viaCrucisConsejo,
 
     EventFilter.eventos => EventType.evento,
   };

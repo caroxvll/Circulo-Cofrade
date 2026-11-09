@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/local_day.dart';
 import '../../shared/models/forum.dart';
+import '../cuaresma/cuaresma_ensayos_provider.dart';
+import '../cuaresma/models/event_live_update.dart';
 import '../cuaresma/utils/cuaresma_topic.dart';
 import '../semana_santa/models/ss_live_update.dart';
 import '../semana_santa/semana_santa_provider.dart';
@@ -8,23 +11,50 @@ import 'forums_provider.dart';
 
 const _circuloForumId = 'foro-cofradiero';
 
-const _paraTiLiveLimit = 5;
+/// Una pieza del río de Para ti. Como mucho [paraTiRiverLimit], de más nuevo a más viejo.
+sealed class ParaTiRiverEntry {
+  const ParaTiRiverEntry();
 
-/// Lo más vivo de la temporada en Para ti.
-/// Con Semana Santa abierta: las últimas publicaciones del directo.
-/// Cuaresma sigue con su tema más reciente.
-class ParaTiPulse {
-  const ParaTiPulse._({
-    this.topic,
-    this.topicActivityAt,
-    this.lives = const [],
-  });
+  DateTime get at;
+}
 
-  final ForumTopic? topic;
-  final DateTime? topicActivityAt;
-  final List<SsLiveUpdate> lives;
+class ParaTiCuaresmaTweet extends ParaTiRiverEntry {
+  const ParaTiCuaresmaTweet(this.update);
 
-  bool get hasLive => lives.isNotEmpty;
+  final EventLiveUpdate update;
+
+  @override
+  DateTime get at => update.createdAt;
+}
+
+class ParaTiSsLive extends ParaTiRiverEntry {
+  const ParaTiSsLive(this.update);
+
+  final SsLiveUpdate update;
+
+  @override
+  DateTime get at => update.createdAt;
+}
+
+class ParaTiHotTopic extends ParaTiRiverEntry {
+  const ParaTiHotTopic({required this.topic, required this.activityAt});
+
+  final ForumTopic topic;
+  final DateTime activityAt;
+
+  @override
+  DateTime get at => activityAt;
+}
+
+class ParaTiRiver {
+  const ParaTiRiver({required this.entries, required this.settled});
+
+  const ParaTiRiver.empty() : entries = const [], settled = false;
+
+  final List<ParaTiRiverEntry> entries;
+
+  /// Las fuentes ya respondieron, aunque el río esté vacío.
+  final bool settled;
 }
 
 final _hottestCuaresmaTopicProvider =
@@ -32,7 +62,6 @@ final _hottestCuaresmaTopicProvider =
       ref,
     ) async {
       ref.keepAlive();
-      // La misma lista que el hub: al crear un tema, Para ti se entera.
       final topics = await ref.watch(
         forumTopicsProvider(_circuloForumId).future,
       );
@@ -41,23 +70,34 @@ final _hottestCuaresmaTopicProvider =
       );
     });
 
-/// Directo de Semana Santa (hasta 5) y, si lo hay, el tema caliente de Cuaresma.
-final paraTiPulseProvider = Provider<ParaTiPulse?>((ref) {
+/// Río de Para ti: avisos de hoy, directo de Semana Santa y el tema que se mueve.
+final paraTiRiverProvider = Provider<ParaTiRiver>((ref) {
   ref.watch(ssLiveRealtimeProvider);
 
-  final gate = ref.watch(ssLiveGateProvider).asData?.value;
-  final feed = ref.watch(ssLiveRawFeedProvider).asData?.value;
-  final hot = ref.watch(_hottestCuaresmaTopicProvider).value;
+  final tweets = ref.watch(todayCuaresmaLiveTweetsProvider);
+  final gate = ref.watch(ssLiveGateProvider);
+  final feed = ref.watch(ssLiveRawFeedProvider);
+  final hot = ref.watch(_hottestCuaresmaTopicProvider);
 
-  final lives = gate?.isOpen == true && feed != null
-      ? feed.take(_paraTiLiveLimit).toList(growable: false)
-      : const <SsLiveUpdate>[];
+  final gateOpen = gate.asData?.value.isOpen == true;
+  final settled = (tweets.hasValue || tweets.hasError) &&
+      (gate.hasValue || gate.hasError) &&
+      (!gateOpen || feed.hasValue || feed.hasError) &&
+      (hot.hasValue || hot.hasError);
 
-  if (lives.isEmpty && hot == null) return null;
-  return ParaTiPulse._(
-    topic: hot?.topic,
-    topicActivityAt: hot?.activityAt,
-    lives: lives,
+  final entries = <ParaTiRiverEntry>[
+    for (final update in tweets.asData?.value ?? const <EventLiveUpdate>[])
+      ParaTiCuaresmaTweet(update),
+    if (gateOpen)
+      for (final update in feed.asData?.value ?? const <SsLiveUpdate>[])
+        ParaTiSsLive(update),
+    if (hot.asData?.value case final topic?)
+      ParaTiHotTopic(topic: topic.topic, activityAt: topic.activityAt),
+  ]..sort((a, b) => b.at.compareTo(a.at));
+
+  return ParaTiRiver(
+    entries: entries.take(paraTiRiverLimit).toList(growable: false),
+    settled: settled,
   );
 });
 

@@ -11,6 +11,7 @@ import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../auth/auth_provider.dart';
 import '../models/quiz_models.dart';
 import '../quiz_provider.dart';
+import '../widgets/quiz_prize_banner.dart';
 
 /// Ranking mensual estilo marcador, con el mismo fondo atmosférico del login.
 class QuizRankingScreen extends ConsumerWidget {
@@ -165,6 +166,7 @@ class QuizRankingScreen extends ConsumerWidget {
                 backgroundColor: AppColors.burgundyDark,
                 onRefresh: () async {
                   ref.invalidate(quizMonthlyRankingBundleProvider);
+                  ref.invalidate(quizPrizeShowcaseProvider);
                   await ref.read(quizMonthlyRankingBundleProvider.future);
                 },
                 child: CustomScrollView(
@@ -213,6 +215,7 @@ class QuizRankingScreen extends ConsumerWidget {
                                   ),
                                 ],
                               ),
+                              const QuizPrizeBanner(),
                               const SizedBox(height: 14),
                               if (me != null)
                                 _PlayerHud(

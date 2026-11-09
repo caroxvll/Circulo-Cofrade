@@ -175,34 +175,35 @@ class _HeroSlide extends StatelessWidget {
                     children: [
                       _TypeTag(label: event.type.cellLabel.toUpperCase()),
                       const Spacer(),
+                      Text(
+                        event.title,
+                        style: AppTypography.displaySmall(
+                          color: AppColors.textOnDark,
+                        ).copyWith(
+                          fontSize: CalendarDesign.heroTitleSize,
+                          fontWeight: FontWeight.w600,
+                          height: 1.15,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           _DateBadge(day: event.date.day, month: monthLabel),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  event.title,
-                                  style: AppTypography.displaySmall(
-                                    color: AppColors.textOnDark,
-                                  ).copyWith(
-                                    fontSize: CalendarDesign.heroTitleSize,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.15,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 5),
                                 _HeroMeta(
                                   icon: Icons.location_on_outlined,
                                   text: location,
                                 ),
                                 if (event.time != null) ...[
-                                  const SizedBox(height: 2),
+                                  const SizedBox(height: 3),
                                   _HeroMeta(
                                     icon: Icons.schedule_outlined,
                                     text: event.time!,

@@ -175,7 +175,7 @@ class CuaresmaHubLiveSection extends ConsumerWidget {
   void _openEvent(BuildContext context, CalendarEvent event) {
     final eventId = event.id;
     if (eventId == null || eventId.isEmpty) return;
-    if (event.type == EventType.ensayo) {
+    if (event.type.opensCuaresmaLive) {
       context.push('/foros/$forumId/tema/$topicId/ensayo/$eventId');
       return;
     }
@@ -214,7 +214,7 @@ class CuaresmaHubLiveSection extends ConsumerWidget {
             if (featured != null)
               _CuaresmaFeaturedLiveCard(
                 event: featured,
-                onOpen: featured.type == EventType.ensayo
+                onOpen: featured.type.opensCuaresmaLive
                     ? () => _openEvent(context, featured)
                     : null,
               )
@@ -271,10 +271,10 @@ class _CuaresmaFeaturedLiveCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final timing = calendarEventTiming(event);
     final isLive = timing?.kind == CalendarEventTimingKind.inProgress;
-    final isEnsayo = event.type == EventType.ensayo;
+    final opensLive = event.type.opensCuaresmaLive;
     final logos = ref.watch(organizerLogosMapProvider).asData?.value;
     final shieldUrl = resolvedOrganizerShieldUrl(logos, event);
-    final updatesAsync = !isEnsayo || event.id == null
+    final updatesAsync = !opensLive || event.id == null
         ? null
         : ref.watch(eventLiveUpdatesProvider(event.id!));
     final followers = updatesAsync?.asData?.value
@@ -311,7 +311,7 @@ class _CuaresmaFeaturedLiveCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (!isEnsayo) ...[
+                    if (event.type != EventType.ensayo) ...[
                       Text(
                         _agendaTypeLabel(event.type),
                         style: TopicDetailTypography.meta(

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_bootstrap.dart';
+import '../../../core/utils/local_day.dart';
 import '../../../core/utils/image_upload_compress.dart';
 import '../models/ss_live_update.dart';
 import 'mock_ss_live_updates.dart';
@@ -23,20 +24,19 @@ class SsLiveUpdatesRepository {
   final SupabaseClient? _client;
 
   static const _minSecondsBetweenPosts = 45;
-  static const _feedWindow = Duration(hours: 12);
   static const _imagesBucket = 'ss-live-images';
   static const maxImageBytes = 3 * 1024 * 1024;
 
   Future<List<SsLiveUpdate>> fetchFeed({
     SsLiveUpdateKind? kind,
-    int limit = 80,
+    int limit = liveJornadaCap,
   }) async {
     final client = _client;
     if (client == null) {
       return mockSsLiveUpdates(kind: kind);
     }
 
-    final since = DateTime.now().toUtc().subtract(_feedWindow);
+    final since = startOfLocalDay().toUtc();
     var query = client
         .from('ss_live_updates')
         .select('*, profiles!user_id(handle, avatar_url)')

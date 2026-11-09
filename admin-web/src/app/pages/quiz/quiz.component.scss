@@ -5,6 +5,36 @@
   margin-bottom: 16px;
 }
 
+.prize-panel {
+  margin-bottom: 16px;
+}
+
+.prize-panel .hint {
+  margin: 0 0 12px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.prize-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.prize-photo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.prize-photo img {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -80,6 +110,21 @@
   font-weight: 700;
   font-size: 0.85rem;
   cursor: pointer;
+}
+
+.month-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.month-pick input {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 8px;
+  font: inherit;
 }
 
 .chip.active {

@@ -40,12 +40,9 @@ security definer
 set search_path = public, storage
 as $$
 begin
-  delete from storage.objects
-  where bucket_id in ('quiz-images', 'quiz-audio')
-    and (
-      name like (p_question_id::text || '/%')
-      or name = p_question_id::text
-    );
+  -- Supabase rechaza DELETE directo sobre storage.objects.
+  -- La app y la web borran la media con la Storage API.
+  return;
 end;
 $$;
 

@@ -172,7 +172,7 @@ class _LiveEventChip extends StatelessWidget {
   void _open(BuildContext context) {
     final id = event.id;
     if (id == null || id.isEmpty) return;
-    if (event.type == EventType.ensayo) {
+    if (event.type.opensCuaresmaLive) {
       context.push(
         '/foros/$_circuloForumId/tema/$cuaresmaTopicId/ensayo/$id',
       );

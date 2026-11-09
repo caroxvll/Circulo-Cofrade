@@ -1,7 +1,15 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_bootstrap.dart';
+
+class AppleSignInCancelled implements Exception {
+  const AppleSignInCancelled();
+}
 
 class AuthUnavailableException implements Exception {
   const AuthUnavailableException([
@@ -18,6 +26,10 @@ class AuthRepository {
   AuthRepository({SupabaseClient? client}) : _client = client;
 
   final SupabaseClient? _client;
+
+  /// Se ejecuta con la sesión todavía abierta. PushScope lo usa para
+  /// borrar el token FCM de este dispositivo antes de invalidar el JWT.
+  Future<void> Function(String? userId)? beforeSignOut;
 
   bool get isAvailable => _client != null;
 
@@ -82,19 +94,71 @@ class AuthRepository {
     );
   }
 
+  /// Hoja nativa de Apple. La sesión queda en la app, sin pasar por el navegador.
   Future<void> signInWithApple() async {
     _ensureAvailable();
-    await _client!.auth.signInWithOAuth(
-      OAuthProvider.apple,
-      redirectTo: _oauthRedirectUrl,
-      authScreenLaunchMode: kIsWeb
-          ? LaunchMode.platformDefault
-          : LaunchMode.externalApplication,
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
+      throw const AuthUnavailableException(
+        'Continuar con Apple solo está disponible en el iPhone.',
+      );
+    }
+
+    final rawNonce = _client!.auth.generateRawNonce();
+    final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+
+    final AuthorizationCredentialAppleID credential;
+    try {
+      credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+    } on SignInWithAppleAuthorizationException catch (error) {
+      if (error.code == AuthorizationErrorCode.canceled) {
+        throw const AppleSignInCancelled();
+      }
+      throw AuthException('No se pudo continuar con Apple.');
+    }
+
+    final idToken = credential.identityToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw const AuthException('Apple no devolvió la sesión.');
+    }
+
+    await _client!.auth.signInWithIdToken(
+      provider: OAuthProvider.apple,
+      idToken: idToken,
+      nonce: rawNonce,
     );
+
+    final given = credential.givenName?.trim() ?? '';
+    final family = credential.familyName?.trim() ?? '';
+    final fullName = [given, family].where((part) => part.isNotEmpty).join(' ');
+    if (fullName.length >= 2) {
+      final display = fullName.length > 40 ? fullName.substring(0, 40) : fullName;
+      try {
+        await _client!.auth.updateUser(
+          UserAttributes(data: {'display_name': display}),
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> signOut() async {
     if (_client == null) return;
+    final userId = _client.auth.currentUser?.id;
+    final hook = beforeSignOut;
+    if (hook != null) {
+      try {
+        await hook(userId);
+      } catch (error, stack) {
+        debugPrint(
+          'No se pudo desvincular el dispositivo antes de salir: $error\n$stack',
+        );
+      }
+    }
     await _client.auth.signOut();
   }
 

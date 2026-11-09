@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_upload_compress.dart';
+import '../../../core/utils/pick_gallery_image.dart';
 import '../../../core/widgets/cofradeo_bottom_nav.dart';
 import '../../../core/widgets/event_type_icon.dart';
 import '../../auth/auth_provider.dart';
@@ -65,34 +65,15 @@ class _OrganizerLogoEditSheetState extends ConsumerState<_OrganizerLogoEditSheet
     super.dispose();
   }
 
-  String? _contentTypeForExtension(String extension) {
-    return switch (extension) {
-      'svg' => 'image/svg+xml',
-      'png' => 'image/png',
-      'webp' => 'image/webp',
-      'jpg' || 'jpeg' => 'image/jpeg',
-      _ => null,
-    };
-  }
-
   Future<void> _pickLogo() async {
     if (_processingPick || _saving) return;
 
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['svg', 'png', 'webp', 'jpg', 'jpeg'],
-      withData: true,
-    );
-    final file = result?.files.single;
-    final bytes = file?.bytes;
-    if (file == null || bytes == null) return;
+    final file = await pickGalleryImage(maxWidth: 1200);
+    if (file == null || !mounted) return;
 
-    final extension = (file.extension ?? '').toLowerCase();
-    final contentType = _contentTypeForExtension(extension);
-    if (contentType == null) {
-      setState(() => _error = 'El escudo debe ser SVG, PNG, WebP o JPG.');
-      return;
-    }
+    final bytes = file.bytes;
+    final extension = file.extension;
+    final contentType = file.contentType;
     if (bytes.length > ImageUploadLimits.eventIconPickMaxBytes) {
       setState(
         () => _error = 'El escudo es demasiado grande. Prueba con otra imagen.',

@@ -56,7 +56,7 @@ class _SemanaSantaRadarSectionState
     final dayLabel = rawDayLabel?.trim();
     final hasActiveDay = dayLabel != null && dayLabel.isNotEmpty;
     final sectionSubtitle = hasActiveDay
-        ? 'Jornada: $dayLabel · últimas 12 h'
+        ? 'Jornada: $dayLabel · hoy'
         : 'Sin jornada activa · el directo está en pausa';
 
     if (!hasActiveDay) {

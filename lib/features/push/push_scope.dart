@@ -18,9 +18,16 @@ class PushScope extends ConsumerStatefulWidget {
 }
 
 class _PushScopeState extends ConsumerState<PushScope> {
+  /// Usuario cuya preferencia de avisos ya vimos en esta sesión de la app.
+  /// Sirve para no pedir el permiso del sistema al entrar, solo al activar el toggle.
+  String? _seenPrefsUserId;
+
   @override
   void initState() {
     super.initState();
+    ref.read(authRepositoryProvider).beforeSignOut = (userId) {
+      return ref.read(pushMessagingServiceProvider).detachForSignOut(userId);
+    };
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
   }
 
@@ -38,29 +45,40 @@ class _PushScopeState extends ConsumerState<PushScope> {
       ref.listen(authStateChangesProvider, (previous, next) {
         final prevId = previous?.asData?.value.session?.user?.id;
         final nextId = next.asData?.value.session?.user?.id;
-        final push = ref.read(pushMessagingServiceProvider);
-
         if (prevId != null && nextId == null) {
-          push.unregister();
+          _seenPrefsUserId = null;
         }
-        // No registrar push al iniciar sesión: solo si el usuario activó el toggle.
       });
 
       ref.listen(notificationPreferencesProvider, (previous, next) {
-        if (ref.read(currentUserProvider) == null) return;
+        final user = ref.read(currentUserProvider);
+        if (user == null) {
+          _seenPrefsUserId = null;
+          return;
+        }
         if (!ref.read(isEmailVerifiedProvider)) return;
 
         final prevPush = previous?.asData?.value.pushEnabled;
         final nextPush = next.asData?.value.pushEnabled;
+        if (nextPush == null) return;
 
         final push = ref.read(pushMessagingServiceProvider);
+        final firstSnapshotForUser = _seenPrefsUserId != user.id;
+        _seenPrefsUserId = user.id;
 
-        if (nextPush == false && prevPush == true) {
+        if (nextPush == false && prevPush == true && !firstSnapshotForUser) {
           push.unregister();
           return;
         }
 
         if (nextPush != true) return;
+
+        // Al entrar o al abrir la app: si los avisos siguen activos, se registra
+        // el token nuevo. No se muestra el diálogo de permiso.
+        if (firstSnapshotForUser) {
+          push.syncRegistration();
+          return;
+        }
 
         // Solo al activar el toggle manualmente en Avisos.
         if (prevPush == false) {

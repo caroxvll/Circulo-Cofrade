@@ -66,7 +66,7 @@ class EventCard extends ConsumerWidget {
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _Thumbnail(event: event, time: time),
           const SizedBox(width: 12),
@@ -76,7 +76,6 @@ class EventCard extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: _Kicker(
@@ -86,27 +85,13 @@ class EventCard extends ConsumerWidget {
                       ),
                     ),
                     if (showBookmark)
-                      IconButton(
+                      _BookmarkButton(
+                        saved: isBookmarked,
                         onPressed: onBookmarkToggle,
-                        icon: Icon(
-                          isBookmarked
-                              ? Icons.bookmark
-                              : Icons.bookmark_border,
-                          color: isBookmarked
-                              ? AppColors.burgundy
-                              : AppColors.textMuted,
-                          size: CalendarDesign.eventBookmarkSize,
-                        ),
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 24,
-                          minHeight: 24,
-                        ),
                       ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   event.title,
                   style: CalendarDesign.eventTitle(),
@@ -114,7 +99,7 @@ class EventCard extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (schedule != null) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     schedule,
                     style: AppTypography.bodyMedium(
@@ -122,44 +107,33 @@ class EventCard extends ConsumerWidget {
                     ).copyWith(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      height: 1.25,
+                      height: 1.2,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
-                if (organizer != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _OrganizerShield(
+                if (organizer != null || showPlace) ...[
+                  const SizedBox(height: 6),
+                  if (organizer != null)
+                    _MetaLine(
+                      leading: _OrganizerShield(
                         shieldUrl: shieldUrl,
                         type: event.type,
                       ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          organizer,
-                          style: AppTypography.bodyMedium(
-                            color: AppColors.textSecondary,
-                          ).copyWith(
-                            fontSize: CalendarDesign.eventMetaSize,
-                            fontWeight: FontWeight.w600,
-                            height: 1.15,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      text: organizer,
+                      strong: true,
+                    ),
+                  if (organizer != null && showPlace) const SizedBox(height: 2),
+                  if (showPlace)
+                    _MetaLine(
+                      leading: const Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: AppColors.goldDark,
                       ),
-                    ],
-                  ),
-                ],
-                if (showPlace) ...[
-                  SizedBox(height: organizer != null ? 3 : 8),
-                  _MetaLine(
-                    icon: Icons.location_on_outlined,
-                    text: location,
-                  ),
+                      text: location,
+                    ),
                 ],
               ],
             ),
@@ -233,11 +207,9 @@ class _Kicker extends StatelessWidget {
         ),
       );
     }
-    if (pieces.isEmpty) return const SizedBox(height: 14);
+    if (pieces.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Wrap(
+    return Wrap(
         spacing: 7,
         runSpacing: 4,
         crossAxisAlignment: WrapCrossAlignment.center,
@@ -252,7 +224,6 @@ class _Kicker extends StatelessWidget {
             pieces[i],
           ],
         ],
-      ),
     );
   }
 }
@@ -392,18 +363,48 @@ class _OrganizerShield extends StatelessWidget {
   }
 }
 
-class _MetaLine extends StatelessWidget {
-  const _MetaLine({required this.icon, required this.text});
+class _BookmarkButton extends StatelessWidget {
+  const _BookmarkButton({required this.saved, required this.onPressed});
 
-  final IconData icon;
+  final bool saved;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(
+        saved ? Icons.bookmark : Icons.bookmark_border,
+        color: saved ? AppColors.burgundy : AppColors.textMuted,
+        size: CalendarDesign.eventBookmarkSize,
+      ),
+      style: IconButton.styleFrom(
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        minimumSize: const Size(28, 28),
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+  }
+}
+
+class _MetaLine extends StatelessWidget {
+  const _MetaLine({
+    required this.leading,
+    required this.text,
+    this.strong = false,
+  });
+
+  final Widget leading;
   final String text;
+  final bool strong;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 14, color: AppColors.goldDark),
-        const SizedBox(width: 4),
+        SizedBox(width: 16, height: 16, child: Center(child: leading)),
+        const SizedBox(width: 6),
         Expanded(
           child: Text(
             text,
@@ -411,7 +412,8 @@ class _MetaLine extends StatelessWidget {
               color: AppColors.textSecondary,
             ).copyWith(
               fontSize: CalendarDesign.eventMetaSize,
-              height: 1.1,
+              fontWeight: strong ? FontWeight.w600 : FontWeight.w500,
+              height: 1.15,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

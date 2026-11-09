@@ -72,12 +72,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await goAfterAuthenticated(context, ref, redirect: widget.redirect);
   }
 
-  bool get _showApple {
-    if (kIsWeb) return false;
-    return defaultTargetPlatform == TargetPlatform.iOS ||
-        defaultTargetPlatform == TargetPlatform.macOS;
-  }
-
   Future<void> _runOAuth(Future<void> Function() action) async {
     ref.read(pendingAuthRedirectProvider.notifier).set(widget.redirect);
     setState(() {
@@ -109,10 +103,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
+  bool get _showApple {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
   Future<void> _signInWithApple() async {
-    await _runOAuth(
-      () => ref.read(authRepositoryProvider).signInWithApple(),
-    );
+    ref.read(pendingAuthRedirectProvider.notifier).set(widget.redirect);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authRepositoryProvider).signInWithApple();
+    } on AppleSignInCancelled {
+      // Cerró la hoja de Apple.
+    } on AuthException catch (e) {
+      setState(() => _error = friendlyAuthErrorMessage(e));
+    } on AuthUnavailableException catch (e) {
+      setState(() => _error = e.message);
+    } catch (_) {
+      setState(() => _error = 'No se pudo continuar con Apple.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _signInWithEmail() async {

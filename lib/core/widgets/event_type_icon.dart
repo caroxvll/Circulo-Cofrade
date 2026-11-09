@@ -65,6 +65,10 @@ class EventTypeIcon extends StatelessWidget {
       EventType.triduo => Icons.church_outlined,
       EventType.pregon => Icons.campaign_outlined,
       EventType.traslado => Icons.directions_walk_outlined,
+      EventType.muda => Icons.swap_horiz_outlined,
+      EventType.retranqueo => Icons.redo_outlined,
+      EventType.viaCrucis => Icons.route_outlined,
+      EventType.viaCrucisConsejo => Icons.account_balance_outlined,
       EventType.evento => Icons.event_outlined,
     };
   }

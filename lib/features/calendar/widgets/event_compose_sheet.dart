@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_upload_compress.dart';
+import '../../../core/utils/pick_gallery_image.dart';
 import '../../../core/widgets/cofradeo_bottom_nav.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/event_type_icon.dart';
@@ -406,21 +406,12 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   Future<void> _pickCover() async {
     if (_processingImagePick) return;
 
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['png', 'webp', 'jpg', 'jpeg'],
-      withData: true,
-    );
-    final file = result?.files.single;
-    final bytes = file?.bytes;
-    if (file == null || bytes == null) return;
+    final file = await pickGalleryImage();
+    if (file == null || !mounted) return;
 
-    final extension = (file.extension ?? '').toLowerCase();
-    final contentType = _contentTypeForExtension(extension);
-    if (contentType == null || extension == 'svg') {
-      setState(() => _error = 'La portada debe ser PNG, WebP o JPG.');
-      return;
-    }
+    final bytes = file.bytes;
+    final extension = file.extension;
+    final contentType = file.contentType;
     if (bytes.length > ImageUploadLimits.eventCoverPickMaxBytes) {
       setState(
         () => _error = 'La portada es demasiado grande. Prueba con otra foto.',
@@ -488,21 +479,12 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   Future<void> _pickIcon() async {
     if (_processingImagePick) return;
 
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['svg', 'png', 'webp', 'jpg', 'jpeg'],
-      withData: true,
-    );
-    final file = result?.files.single;
-    final bytes = file?.bytes;
-    if (file == null || bytes == null) return;
+    final file = await pickGalleryImage(maxWidth: 1200);
+    if (file == null || !mounted) return;
 
-    final extension = (file.extension ?? '').toLowerCase();
-    final contentType = _contentTypeForExtension(extension);
-    if (contentType == null) {
-      setState(() => _error = 'El icono debe ser SVG, PNG, WebP o JPG.');
-      return;
-    }
+    final bytes = file.bytes;
+    final extension = file.extension;
+    final contentType = file.contentType;
     if (bytes.length > ImageUploadLimits.eventIconPickMaxBytes) {
       setState(
         () => _error = 'El escudo es demasiado grande. Prueba con otra imagen.',
@@ -583,16 +565,6 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       _shieldFromLibrary = false;
       if (key.length >= 3) _shieldSkipAutoLoadKey = key;
     });
-  }
-
-  String? _contentTypeForExtension(String extension) {
-    return switch (extension) {
-      'svg' => 'image/svg+xml',
-      'png' => 'image/png',
-      'webp' => 'image/webp',
-      'jpg' || 'jpeg' => 'image/jpeg',
-      _ => null,
-    };
   }
 
   Future<void> _submit() async {
