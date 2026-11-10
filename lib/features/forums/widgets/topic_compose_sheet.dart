@@ -103,6 +103,7 @@ Future<void> showTopicComposeSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     isDismissible: true,
     enableDrag: true,
     backgroundColor: AppColors.background,

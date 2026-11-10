@@ -15,6 +15,7 @@ export type CalendarEventType =
   | 'pregon'
   | 'traslado'
   | 'muda'
+  | 'desarma'
   | 'retranqueo'
   | 'via_crucis'
   | 'via_crucis_consejo'
@@ -82,6 +83,7 @@ export const CALENDAR_EVENT_TYPES: { value: CalendarEventType; label: string; ce
     { value: 'pregon', label: 'Pregones', cellLabel: 'Pregón' },
     { value: 'traslado', label: 'Traslados', cellLabel: 'Traslado' },
     { value: 'muda', label: 'Mudas', cellLabel: 'Muda' },
+    { value: 'desarma', label: 'Desarmas', cellLabel: 'Desarma' },
     { value: 'retranqueo', label: 'Retranqueos', cellLabel: 'Retranqueo' },
     { value: 'via_crucis', label: 'Vía crucis', cellLabel: 'Vía crucis' },
     {

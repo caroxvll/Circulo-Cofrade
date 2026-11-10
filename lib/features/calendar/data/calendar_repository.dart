@@ -155,6 +155,8 @@ class CalendarRepository {
     String? coverImageUrl,
     String? admissionLabel,
     List<EventTimeSlot>? timeSlots,
+    String? sourceReplyId,
+    String? status,
   }) async {
     if (_client == null) throw CalendarRemoteUnavailableException();
 
@@ -174,6 +176,8 @@ class CalendarRepository {
           'admission_label': _admissionOrNull(admissionLabel),
           'time_slots': _slotsPayload(timeSlots),
           'created_by': userId,
+          'source_reply_id': ?sourceReplyId,
+          'status': ?status,
         })
         .select('*, profiles!created_by(handle, display_name)')
         .single();

@@ -1,5 +1,9 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../core/supabase/supabase_bootstrap.dart';
 import '../../core/utils/local_day.dart';
 import '../../shared/models/forum.dart';
 import '../cuaresma/cuaresma_ensayos_provider.dart';
@@ -102,15 +106,51 @@ final paraTiRiverProvider = Provider<ParaTiRiver>((ref) {
 });
 
 /// Última respuesta de un tema, para el deslizamiento del feed.
-final latestTopicReplyProvider = FutureProvider.autoDispose
-    .family<ForumReply?, String>((ref, topicId) async {
-      ref.keepAlive();
-      final replies = await ref
-          .watch(forumsRepositoryProvider)
-          .fetchReplies(topicId, limit: 1);
-      if (replies.isEmpty || replies.first.isDeleted) return null;
-      final text = replies.first.content.trim();
-      final image = replies.first.imageUrl?.trim() ?? '';
-      if (text.isEmpty && image.isEmpty) return null;
-      return replies.first;
+///
+/// Incluye respuestas a un comentario: se queda la más nueva y se refresca
+/// en cuanto entra otra en ese hilo.
+final latestTopicReplyProvider = StreamProvider.autoDispose
+    .family<ForumReply?, String>((ref, topicId) async* {
+      final repo = ref.watch(forumsRepositoryProvider);
+
+      Future<ForumReply?> load() async {
+        final replies = await repo.fetchReplies(topicId, limit: 1);
+        if (replies.isEmpty || replies.first.isDeleted) return null;
+        final text = replies.first.content.trim();
+        final image = replies.first.imageUrl?.trim() ?? '';
+        if (text.isEmpty && image.isEmpty) return null;
+        return replies.first;
+      }
+
+      yield await load();
+
+      final client = SupabaseBootstrap.client;
+      if (client == null) return;
+
+      final updates = StreamController<ForumReply?>();
+      final channel = client
+          .channel('para-ti-reply-$topicId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'forum_replies',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'topic_id',
+              value: topicId,
+            ),
+            callback: (_) async {
+              if (updates.isClosed) return;
+              updates.add(await load());
+              ref.invalidate(forumPillarsProvider);
+            },
+          )
+          .subscribe();
+
+      ref.onDispose(() {
+        updates.close();
+        client.removeChannel(channel);
+      });
+
+      yield* updates.stream;
     });

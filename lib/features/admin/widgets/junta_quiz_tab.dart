@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cofradeo_bottom_nav.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../permissions/data/permissions_repository.dart';
 import '../../quiz/data/quiz_repository.dart';
@@ -834,7 +835,12 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
     final hasLive = live?.isLive == true || live?.isAnswered == true;
     final liveQuestionId = live?.round?.questionId;
 
-    return Column(
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(
+        bottom: cofradeoBottomScrollPadding(context, extra: 16),
+      ),
+      child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -995,75 +1001,74 @@ class _JuntaQuizTabState extends ConsumerState<JuntaQuizTab> {
             );
           },
         ),
-        Expanded(
-          child: questionsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => Center(
-              child: Padding(
+        questionsAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.all(32),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (_, _) => Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Error al cargar. ¿Ejecutaste quiz_daily.sql y quiz_authors.sql?',
+              style: JuntaUi.body(),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          data: (questions) {
+            final filtered = _filterQuestions(
+              questions,
+              launchedIds,
+              scheduled,
+            );
+            if (filtered.isEmpty) {
+              return Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Error al cargar. ¿Ejecutaste quiz_daily.sql y quiz_authors.sql?',
-                  style: JuntaUi.body(),
+                  questions.isEmpty
+                      ? (canCreate
+                          ? 'Aún no hay preguntas. Crea la primera.'
+                          : 'No tienes permiso para proponer preguntas.')
+                      : 'No hay preguntas en «${_filter.label}».',
+                  style: JuntaUi.emptyTitle(),
                   textAlign: TextAlign.center,
                 ),
-              ),
-            ),
-            data: (questions) {
-              final filtered = _filterQuestions(
-                questions,
-                launchedIds,
-                scheduled,
               );
-              if (filtered.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      questions.isEmpty
-                          ? (canCreate
-                              ? 'Aún no hay preguntas. Crea la primera.'
-                              : 'No tienes permiso para proponer preguntas.')
-                          : 'No hay preguntas en «${_filter.label}».',
-                      style: JuntaUi.emptyTitle(),
-                      textAlign: TextAlign.center,
+            }
+            return Padding(
+              padding: JuntaUi.listPadding,
+              child: Column(
+                children: [
+                  for (var index = 0; index < filtered.length; index++) ...[
+                    if (index > 0) const SizedBox(height: JuntaUi.itemGap),
+                    _QuizQuestionCard(
+                      question: filtered[index],
+                      used: launchedIds.contains(filtered[index].id),
+                      isCurrentLive: liveQuestionId == filtered[index].id,
+                      scheduledOn: scheduled[filtered[index].id],
+                      isAdmin: isAdmin,
+                      canCreate: canCreate,
+                      busy: _busy,
+                      onAttachImage: () => _attachImage(filtered[index]),
+                      onAttachAudio: () => _attachAudio(filtered[index]),
+                      onApprove: () => _approve(filtered[index]),
+                      onReject: () => _reject(filtered[index]),
+                      onLaunch: () => _launch(filtered[index]),
+                      onSchedule: () => _schedule(filtered[index]),
+                      onCancelSchedule: () => _cancelSchedule(filtered[index]),
+                      onDelete: () => _deleteQuestion(
+                        filtered[index],
+                        isLive: liveQuestionId == filtered[index].id,
+                      ),
                     ),
-                  ),
-                );
-              }
-              return ListView.separated(
-                padding: JuntaUi.listPadding,
-                itemCount: filtered.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: JuntaUi.itemGap),
-                itemBuilder: (context, index) {
-                  final q = filtered[index];
-                  final used = launchedIds.contains(q.id);
-                  final isCurrentLive = liveQuestionId == q.id;
-                  final scheduledOn = scheduled[q.id];
-                  return _QuizQuestionCard(
-                    question: q,
-                    used: used,
-                    isCurrentLive: isCurrentLive,
-                    scheduledOn: scheduledOn,
-                    isAdmin: isAdmin,
-                    canCreate: canCreate,
-                    busy: _busy,
-                    onAttachImage: () => _attachImage(q),
-                    onAttachAudio: () => _attachAudio(q),
-                    onApprove: () => _approve(q),
-                    onReject: () => _reject(q),
-                    onLaunch: () => _launch(q),
-                    onSchedule: () => _schedule(q),
-                    onCancelSchedule: () => _cancelSchedule(q),
-                    onDelete: () => _deleteQuestion(q, isLive: isCurrentLive),
-                  );
-                },
-              );
-            },
-          ),
+                  ],
+                ],
+              ),
+            );
+          },
         ),
         if (_busy) const LinearProgressIndicator(minHeight: 2),
       ],
+      ),
     );
   }
 

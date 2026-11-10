@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/cofradeo_error_panel.dart';
 import '../../core/widgets/cofradeo_skeleton.dart';
+import '../permissions/permissions_provider.dart';
+import '../profile/profile_provider.dart';
 import 'forums_provider.dart';
 import 'utils/forum_pillar_image_cache.dart';
 import 'utils/hermandad_local_assets.dart';
 import 'utils/topic_list_order.dart';
+import 'topic_detail_screen.dart';
 import 'widgets/comunidad_home.dart';
 import 'widgets/forums_beige_background.dart';
 import '../quiz/quiz_provider.dart';
@@ -47,6 +50,27 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
         });
       });
     });
+
+    final profile = ref.watch(currentUserProfileProvider).asData?.value;
+    final topicIds = ref.watch(hermandadTopicIdsProvider).asData?.value;
+    final officialHermandad =
+        profile?.accountType.isBrotherhood == true && profile?.isSuspended != true;
+    if (officialHermandad && topicIds == null) {
+      return const Stack(
+        fit: StackFit.expand,
+        children: [
+          ForumsBeigeBackground(),
+          Center(child: CircularProgressIndicator()),
+        ],
+      );
+    }
+    if (officialHermandad && topicIds!.isNotEmpty) {
+      return TopicDetailScreen(
+        forumId: 'hermandades',
+        topicId: topicIds.first,
+        embedded: true,
+      );
+    }
 
     final pillarsAsync = ref.watch(forumPillarsProvider);
 

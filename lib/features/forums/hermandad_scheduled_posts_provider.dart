@@ -61,6 +61,7 @@ class HermandadScheduledPostController {
     required String officialCategory,
     required DateTime scheduledAt,
     String? imageUrl,
+    HermandadScheduledCalendar? calendar,
   }) async {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
@@ -74,6 +75,7 @@ class HermandadScheduledPostController {
           officialCategory: officialCategory,
           scheduledAt: scheduledAt,
           imageUrl: imageUrl,
+          calendar: calendar,
         );
 
     await _refresh(forumId);
@@ -85,6 +87,7 @@ class HermandadScheduledPostController {
     required String content,
     required String officialCategory,
     String? imageUrl,
+    HermandadScheduledCalendar? calendar,
   }) async {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
@@ -97,6 +100,7 @@ class HermandadScheduledPostController {
           content: content,
           officialCategory: officialCategory,
           imageUrl: imageUrl,
+          calendar: calendar,
         );
 
     await _refresh(forumId);

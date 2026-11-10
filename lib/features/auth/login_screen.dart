@@ -9,6 +9,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/image_decode_cache.dart';
+import 'auth_layout.dart';
 import 'auth_provider.dart';
 import 'auth_navigation.dart';
 import 'auth_error_messages.dart';
@@ -168,9 +169,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         title: Text(
           'INICIAR SESIÓN',
           style: AppTypography.displaySmall(color: AppColors.goldPale).copyWith(
-            fontSize: 22,
+            fontSize: authAppBarTitleSize(context),
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.8,
+            letterSpacing: 0.6,
           ),
         ),
         centerTitle: true,
@@ -195,134 +196,219 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final contentWidth = (constraints.maxWidth * 0.88).clamp(
-                  320.0,
-                  520.0,
-                );
-                final logoWidth = (constraints.maxWidth * 0.78).clamp(
-                  280.0,
-                  400.0,
+                final metrics = AuthLayoutMetrics.of(context, constraints);
+                final height = metrics.height;
+                final width = metrics.width;
+                final textScale = metrics.textScale;
+                final keyboardOpen = metrics.keyboardOpen;
+                final tight = metrics.tight;
+                final compact = metrics.compact;
+                final side = metrics.side;
+                final contentWidth = metrics.contentWidth;
+                final logoWidth =
+                    (width * (tight ? 0.50 : compact ? 0.62 : 0.70)).clamp(
+                      tight ? 128.0 : 160.0,
+                      340.0,
+                    );
+                final topPad = keyboardOpen ? 8.0 : (tight ? 40.0 : 48.0);
+                final bottomPad = tight ? 4.0 : (compact ? 8.0 : 16.0);
+                final logoHeight = keyboardOpen
+                    ? 88.0
+                    : (height < 640
+                              ? 96.0
+                              : height < 720
+                              ? 132.0
+                              : height < 820
+                              ? 176.0
+                              : height < 960
+                              ? 210.0
+                              : 250.0) /
+                          (textScale > 1.2 ? 1.25 : 1);
+
+                final form = ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: contentWidth),
+                  child: _LoginForm(
+                    supabaseReady: supabaseReady,
+                    showApple: _showApple,
+                    tight: tight,
+                    compact: compact,
+                    loading: _loading,
+                    error: _error,
+                    emailController: _emailController,
+                    passwordController: _passwordController,
+                    onGoogle: _signInWithGoogle,
+                    onApple: _signInWithApple,
+                    onSubmit: _signInWithEmail,
+                    onForgot: () => context.push('/recuperar-contrasena'),
+                    onRegister: () => context.push(
+                      '/registro${widget.redirect != null ? '?redirect=${Uri.encodeComponent(widget.redirect!)}' : ''}',
+                    ),
+                  ),
                 );
 
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 42, 24, 18),
-                  children: [
-                    Center(
-                      child: Image.asset(
-                        AppAssets.logoLogin,
-                        width: logoWidth,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.medium,
-                        cacheWidth: ImageDecodeCache.px(context, logoWidth),
-                        gaplessPlayback: true,
+                final logo = SizedBox(
+                  width: logoWidth,
+                  height: logoHeight,
+                  child: Image.asset(
+                    AppAssets.logoLogin,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.medium,
+                    cacheWidth: ImageDecodeCache.px(context, logoWidth),
+                    gaplessPlayback: true,
+                  ),
+                );
+
+                return SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(side, topPad, side, bottomPad),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: (height - topPad - bottomPad).clamp(
+                        0.0,
+                        double.infinity,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: contentWidth),
-                        child: Column(
-                          children: [
-                            if (!supabaseReady) ...[
-                              _AuthNotice(),
-                              const SizedBox(height: 20),
-                            ],
-                            _SocialButton(
-                              label: 'Continuar con Google',
-                              backgroundColor: Colors.white,
-                              icon: SizedBox.square(
-                                dimension: 22,
-                                child: SvgPicture.asset(
-                                  AppAssets.googleLogo,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                              onPressed: _loading ? null : _signInWithGoogle,
-                            ),
-                            if (_showApple) ...[
-                              const SizedBox(height: 10),
-                              _SocialButton(
-                                label: 'Continuar con Apple',
-                                icon: const Icon(
-                                  Icons.apple,
-                                  color: Color(0xFF2A0710),
-                                  size: 24,
-                                ),
-                                onPressed: _loading ? null : _signInWithApple,
-                              ),
-                            ],
-                            const SizedBox(height: 26),
-                            const _EmailDivider(),
-                            const SizedBox(height: 18),
-                            _LoginEmailForm(
-                              emailController: _emailController,
-                              passwordController: _passwordController,
-                              loading: _loading,
-                              onSubmit: _signInWithEmail,
-                            ),
-                            const SizedBox(height: 4),
-                            TextButton(
-                              style: TextButton.styleFrom(
-                                minimumSize: Size.zero,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 6,
-                                ),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              onPressed: _loading
-                                  ? null
-                                  : () => context.push('/recuperar-contrasena'),
-                              child: Text(
-                                '¿Olvidaste tu contraseña?',
-                                style: AppTypography.displaySmall(
-                                  color: AppColors.goldPale,
-                                ).copyWith(fontSize: 18),
-                              ),
-                            ),
-                            if (_error != null) ...[
-                              const SizedBox(height: 10),
-                              Text(
-                                _error!,
-                                style: AppTypography.bodyMedium(
-                                  color: AppColors.accentRed,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                            const SizedBox(height: 8),
-                            TextButton(
-                              style: TextButton.styleFrom(
-                                minimumSize: Size.zero,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 6,
-                                ),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              onPressed: _loading
-                                  ? null
-                                  : () => context.push(
-                                      '/registro${widget.redirect != null ? '?redirect=${Uri.encodeComponent(widget.redirect!)}' : ''}',
-                                    ),
-                              child: Text(
-                                '¿No tienes cuenta? Regístrate',
-                                style: AppTypography.displaySmall(
-                                  color: AppColors.goldPale,
-                                ).copyWith(fontSize: 18),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Center(child: logo),
+                        Center(child: form),
+                      ],
                     ),
-                  ],
+                  ),
                 );
               },
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LoginForm extends StatelessWidget {
+  const _LoginForm({
+    required this.supabaseReady,
+    required this.showApple,
+    required this.tight,
+    required this.compact,
+    required this.loading,
+    required this.error,
+    required this.emailController,
+    required this.passwordController,
+    required this.onGoogle,
+    required this.onApple,
+    required this.onSubmit,
+    required this.onForgot,
+    required this.onRegister,
+  });
+
+  final bool supabaseReady;
+  final bool showApple;
+  final bool tight;
+  final bool compact;
+  final bool loading;
+  final String? error;
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final VoidCallback onGoogle;
+  final VoidCallback onApple;
+  final VoidCallback onSubmit;
+  final VoidCallback onForgot;
+  final VoidCallback onRegister;
+
+  @override
+  Widget build(BuildContext context) {
+    final gap = tight ? 8.0 : (compact ? 10.0 : 12.0);
+    final linkSize = tight ? 15.0 : (compact ? 16.5 : 18.0);
+    final buttonHeight = tight ? 44.0 : (compact ? 48.0 : 50.0);
+    final linkPad = tight ? 2.0 : (compact ? 4.0 : 6.0);
+
+    return Column(
+      children: [
+        if (!supabaseReady) ...[
+          _AuthNotice(),
+          SizedBox(height: tight ? 8 : (compact ? 10 : 20)),
+        ],
+        _SocialButton(
+          label: 'Continuar con Google',
+          height: buttonHeight,
+          backgroundColor: Colors.white,
+          icon: SizedBox.square(
+            dimension: 22,
+            child: SvgPicture.asset(
+              AppAssets.googleLogo,
+              fit: BoxFit.contain,
+            ),
+          ),
+          onPressed: loading ? null : onGoogle,
+        ),
+        if (showApple) ...[
+          SizedBox(height: gap),
+          _SocialButton(
+            label: 'Continuar con Apple',
+            height: buttonHeight,
+            icon: const Icon(
+              Icons.apple,
+              color: Color(0xFF2A0710),
+              size: 24,
+            ),
+            onPressed: loading ? null : onApple,
+          ),
+        ],
+        SizedBox(height: tight ? 12 : (compact ? 16 : 26)),
+        const _EmailDivider(),
+        SizedBox(height: tight ? 8 : (compact ? 12 : 18)),
+        _LoginEmailForm(
+          emailController: emailController,
+          passwordController: passwordController,
+          loading: loading,
+          tight: tight,
+          compact: compact,
+          onSubmit: onSubmit,
+        ),
+        TextButton(
+          style: TextButton.styleFrom(
+            minimumSize: Size.zero,
+            padding: EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: linkPad,
+            ),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: loading ? null : onForgot,
+          child: Text(
+            '¿Olvidaste tu contraseña?',
+            style: AppTypography.displaySmall(
+              color: AppColors.goldPale,
+            ).copyWith(fontSize: linkSize, height: 1.15),
+          ),
+        ),
+        if (error != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            error!,
+            style: AppTypography.bodyMedium(color: AppColors.accentRed),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        TextButton(
+          style: TextButton.styleFrom(
+            minimumSize: Size.zero,
+            padding: EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: linkPad,
+            ),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: loading ? null : onRegister,
+          child: Text(
+            '¿No tienes cuenta? Regístrate',
+            style: AppTypography.displaySmall(
+              color: AppColors.goldPale,
+            ).copyWith(fontSize: linkSize, height: 1.15),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -354,19 +440,21 @@ class _SocialButton extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.backgroundColor,
+    this.height = 50,
   });
 
   final String label;
   final Widget icon;
   final VoidCallback? onPressed;
   final Color? backgroundColor;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     final bg = backgroundColor ?? AppColors.gold;
     return SizedBox(
       width: double.infinity,
-      height: 50,
+      height: height,
       child: FilledButton.icon(
         onPressed: onPressed,
         icon: icon,
@@ -421,16 +509,24 @@ class _LoginEmailForm extends StatelessWidget {
     required this.emailController,
     required this.passwordController,
     required this.loading,
+    required this.tight,
+    required this.compact,
     required this.onSubmit,
   });
 
   final TextEditingController emailController;
   final TextEditingController passwordController;
   final bool loading;
+  final bool tight;
+  final bool compact;
   final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
+    final fieldSize = tight ? 16.0 : (compact ? 18.0 : 21.0);
+    final fieldGap = tight ? 8.0 : (compact ? 10.0 : 14.0);
+    final buttonGap = tight ? 10.0 : (compact ? 14.0 : 22.0);
+    final buttonHeight = tight ? 44.0 : (compact ? 48.0 : 50.0);
     return Column(
       children: [
         TextField(
@@ -440,26 +536,26 @@ class _LoginEmailForm extends StatelessWidget {
           cursorColor: AppColors.gold,
           style: AppTypography.displaySmall(
             color: AppColors.goldPale,
-          ).copyWith(fontSize: 21),
+          ).copyWith(fontSize: fieldSize, height: 1.15),
           textInputAction: TextInputAction.next,
-          decoration: _fieldDecoration('Email'),
+          decoration: _fieldDecoration('Email', fieldSize),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: fieldGap),
         TextField(
           controller: passwordController,
           obscureText: true,
           cursorColor: AppColors.gold,
           style: AppTypography.displaySmall(
             color: AppColors.goldPale,
-          ).copyWith(fontSize: 21),
+          ).copyWith(fontSize: fieldSize, height: 1.15),
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => onSubmit(),
-          decoration: _fieldDecoration('Contraseña'),
+          decoration: _fieldDecoration('Contraseña', fieldSize),
         ),
-        const SizedBox(height: 22),
+        SizedBox(height: buttonGap),
         SizedBox(
           width: double.infinity,
-          height: 50,
+          height: buttonHeight,
           child: FilledButton(
             onPressed: loading ? null : onSubmit,
             style: FilledButton.styleFrom(
@@ -492,17 +588,20 @@ class _LoginEmailForm extends StatelessWidget {
     );
   }
 
-  InputDecoration _fieldDecoration(String label) {
+  InputDecoration _fieldDecoration(String label, double fieldSize) {
     final borderRadius = BorderRadius.circular(16);
     return InputDecoration(
       labelText: label,
       labelStyle: AppTypography.displaySmall(
         color: AppColors.goldPale,
-      ).copyWith(fontSize: 21),
+      ).copyWith(fontSize: fieldSize, height: 1.15),
       floatingLabelStyle: AppTypography.titleLarge(color: AppColors.gold),
       filled: true,
       fillColor: Colors.black.withValues(alpha: 0.08),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: tight ? 8 : (compact ? 10 : 14),
+      ),
       border: OutlineInputBorder(
         borderRadius: borderRadius,
         borderSide: const BorderSide(color: AppColors.gold, width: 1.3),

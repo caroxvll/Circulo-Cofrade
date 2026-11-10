@@ -31,6 +31,7 @@ class ForumCategory {
     required this.topicCount,
     required this.messageCount,
     required this.lastMessageAgo,
+    this.lastActivityAt,
     this.lastTopicId,
     this.lastTopicTitle,
     this.lastTopicExcerpt,
@@ -59,6 +60,9 @@ class ForumCategory {
 
   /// Texto relativo de la última actividad (tema o respuesta).
   final String lastMessageAgo;
+
+  /// Momento real de esa actividad, para ordenar el feed.
+  final DateTime? lastActivityAt;
 
   /// Hilo con actividad más reciente en este foro.
   final String? lastTopicId;

@@ -155,6 +155,7 @@ Duration _defaultEventDuration(EventType type) => switch (type) {
       EventType.pregon => const Duration(hours: 2),
       EventType.traslado => const Duration(hours: 2),
       EventType.muda => const Duration(hours: 2),
+      EventType.desarma => const Duration(hours: 2),
       EventType.retranqueo => const Duration(hours: 2),
       EventType.viaCrucis => const Duration(hours: 2),
       EventType.viaCrucisConsejo => const Duration(hours: 2),

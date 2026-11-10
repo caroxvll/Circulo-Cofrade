@@ -15,6 +15,7 @@ import '../forums/widgets/forums_shell_ad_bar.dart';
 import '../forums/widgets/noticias_shell_ad_bar.dart';
 import '../notifications/notifications_provider.dart';
 import '../permissions/permissions_provider.dart';
+import '../profile/profile_provider.dart';
 import '../quiz/quiz_provider.dart';
 import '../semana_santa/semana_santa_provider.dart';
 
@@ -92,6 +93,14 @@ class _CofradeoShellState extends ConsumerState<CofradeoShell> {
 
     final showCalendarDot = ref.watch(calendarHasEventTodayProvider);
     final showNotificationsDot = ref.watch(hasUnreadNotificationsProvider);
+    final profile = ref.watch(currentUserProfileProvider).asData?.value;
+    final ownsBoard =
+        ref.watch(hermandadTopicIdsProvider).asData?.value.isNotEmpty ??
+            false;
+    final hermandadHome = profile != null &&
+        profile.accountType.isBrotherhood &&
+        !profile.isSuspended &&
+        ownsBoard;
 
     final path = GoRouterState.of(context).uri.path;
     final branchIndex = widget.navigationShell.currentIndex;
@@ -120,6 +129,12 @@ class _CofradeoShellState extends ConsumerState<CofradeoShell> {
             onTap: (index) => _onTap(context, index),
             showCalendarDot: showCalendarDot,
             showNotificationsDot: showNotificationsDot,
+            communityLabel: hermandadHome ? 'Tu hermandad' : 'Comunidad',
+            communityIcon: hermandadHome
+                ? Icons.church_outlined
+                : Icons.groups_outlined,
+            communitySelectedIcon:
+                hermandadHome ? Icons.church : Icons.groups,
           ),
         ],
       ),

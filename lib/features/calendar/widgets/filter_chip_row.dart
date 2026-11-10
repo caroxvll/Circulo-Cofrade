@@ -35,6 +35,7 @@ class FilterChipRow extends StatelessWidget {
     EventFilter.triduos,
     EventFilter.traslados,
     EventFilter.mudas,
+    EventFilter.desarmas,
     EventFilter.retranqueos,
     EventFilter.viaCrucis,
     EventFilter.viaCrucisConsejo,

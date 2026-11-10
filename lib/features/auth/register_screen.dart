@@ -15,6 +15,7 @@ import 'auth_navigation.dart';
 import 'auth_error_messages.dart';
 import 'data/auth_repository.dart';
 import 'pending_auth_redirect.dart';
+import 'auth_layout.dart';
 import 'widgets/auth_email_form.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -166,9 +167,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         title: Text(
           'CREAR CUENTA',
           style: AppTypography.displaySmall(color: AppColors.goldPale).copyWith(
-            fontSize: 22,
+            fontSize: authAppBarTitleSize(context),
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.8,
+            letterSpacing: 0.6,
           ),
         ),
         centerTitle: true,
@@ -193,17 +194,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final contentWidth = (constraints.maxWidth * 0.88).clamp(
-                  320.0,
-                  520.0,
-                );
+                final metrics = AuthLayoutMetrics.of(context, constraints);
+                final blockGap = metrics.tight
+                    ? 14.0
+                    : (metrics.compact ? 18.0 : 22.0);
 
                 return ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 76, 24, 28),
+                  padding: EdgeInsets.fromLTRB(
+                    metrics.side,
+                    metrics.belowAppBar,
+                    metrics.side,
+                    metrics.bottomPad,
+                  ),
                   children: [
                     Center(
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: contentWidth),
+                        constraints: BoxConstraints(
+                          maxWidth: metrics.contentWidth,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -211,12 +219,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               AppBranding.joinCta,
                               style: AppTypography.displaySmall(
                                 color: AppColors.goldPale,
-                              ).copyWith(fontSize: 28),
+                              ).copyWith(fontSize: metrics.titleSize),
                               textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 22),
+                            SizedBox(height: blockGap),
                             _SocialButton(
                               label: 'Continuar con Google',
+                              height: metrics.buttonHeight,
                               backgroundColor: Colors.white,
                               icon: SizedBox.square(
                                 dimension: 22,
@@ -228,9 +237,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               onPressed: _loading ? null : _signInWithGoogle,
                             ),
                             if (_showApple) ...[
-                              const SizedBox(height: 10),
+                              SizedBox(height: metrics.tight ? 8 : 10),
                               _SocialButton(
                                 label: 'Continuar con Apple',
+                                height: metrics.buttonHeight,
                                 icon: const Icon(
                                   Icons.apple,
                                   color: Color(0xFF2A0710),
@@ -239,9 +249,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 onPressed: _loading ? null : _signInWithApple,
                               ),
                             ],
-                            const SizedBox(height: 22),
+                            SizedBox(height: blockGap),
                             const _EmailDivider(),
-                            const SizedBox(height: 18),
+                            SizedBox(height: metrics.tight ? 10 : 16),
                             AuthEmailForm(
                               displayNameController: _displayNameController,
                               handleController: _handleController,
@@ -251,6 +261,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               loading: _loading,
                               onSubmit: _register,
                               dark: true,
+                              fieldSize: metrics.fieldSize,
+                              fieldPadding: metrics.fieldPad,
+                              buttonHeight: metrics.buttonHeight,
                             ),
                             if (_error != null) ...[
                               const SizedBox(height: 12),
@@ -291,7 +304,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 '¿Ya tienes cuenta? Inicia sesión',
                                 style: AppTypography.displaySmall(
                                   color: AppColors.goldPale,
-                                ).copyWith(fontSize: 18),
+                                ).copyWith(fontSize: metrics.linkSize),
                               ),
                             ),
                           ],
@@ -314,12 +327,14 @@ class _SocialButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onPressed,
+    required this.height,
     this.backgroundColor,
   });
 
   final String label;
   final Widget icon;
   final VoidCallback? onPressed;
+  final double height;
   final Color? backgroundColor;
 
   @override
@@ -327,7 +342,7 @@ class _SocialButton extends StatelessWidget {
     final bg = backgroundColor ?? AppColors.gold;
     return SizedBox(
       width: double.infinity,
-      height: 50,
+      height: height,
       child: FilledButton.icon(
         onPressed: onPressed,
         icon: icon,

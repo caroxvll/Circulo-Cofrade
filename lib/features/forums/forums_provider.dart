@@ -827,14 +827,14 @@ class ReplySubmitController {
   final Ref _ref;
   final ReplyTarget target;
 
-  Future<void> submit(String content, {String? imageUrl}) async {
+  Future<ForumReply?> submit(String content, {String? imageUrl}) async {
     final user = _ref.read(currentUserProvider);
-    if (user == null) return;
+    if (user == null) return null;
 
     final repo = _ref.read(forumsRepositoryProvider);
     final handle = _ref.read(userHandleProvider);
 
-    await repo.createReply(
+    final reply = await repo.createReply(
       topicId: target.topicId,
       authorId: user.id,
       authorHandle: handle,
@@ -856,6 +856,7 @@ class ReplySubmitController {
     );
     _ref.invalidate(forumTopicsProvider(target.forumId));
     _ref.read(notificationsProvider.notifier).refresh();
+    return reply;
   }
 }
 

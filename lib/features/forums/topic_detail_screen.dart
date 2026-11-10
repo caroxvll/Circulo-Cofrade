@@ -40,6 +40,7 @@ import 'utils/reply_permissions.dart';
 import 'utils/topic_permissions.dart';
 import 'viewer_id_provider.dart';
 import 'widgets/hermandad_board_tabs_header.dart';
+import 'widgets/hermandad_owner_season_strips.dart';
 import 'widgets/hermandad_board_category_tabs.dart';
 import 'widgets/hermandad_official_edit_sheet.dart';
 import 'widgets/hermandad_official_confirm_dialogs.dart';
@@ -77,6 +78,8 @@ class TopicDetailScreen extends ConsumerStatefulWidget {
     required this.topicId,
 
     this.highlightReplyId,
+
+    this.embedded = false,
   });
 
   final String forumId;
@@ -84,6 +87,9 @@ class TopicDetailScreen extends ConsumerStatefulWidget {
   final String topicId;
 
   final String? highlightReplyId;
+
+  /// Tablón como inicio de la hermandad: sin flecha de volver.
+  final bool embedded;
 
   @override
   ConsumerState<TopicDetailScreen> createState() => _TopicDetailScreenState();
@@ -1088,11 +1094,13 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
       backgroundColor: AppColors.background,
 
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: _onBack,
-
-          icon: const Icon(Icons.chevron_left, color: AppColors.burgundy),
-        ),
+        automaticallyImplyLeading: !widget.embedded,
+        leading: widget.embedded
+            ? const SizedBox(width: 8)
+            : IconButton(
+                onPressed: _onBack,
+                icon: const Icon(Icons.chevron_left, color: AppColors.burgundy),
+              ),
 
         title: _TopicDetailAppBarTitle(
           isHermandadBoard: isHermandadBoard,
@@ -1250,6 +1258,11 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                               displayTotalReactions: boardTotalReactions,
                               reactionBreakdown: boardReactionBreakdown,
                             ),
+                            if (canPublishOfficial)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                                child: HermandadOwnerSeasonStrips(topic: topic),
+                              ),
                             const SizedBox(height: 8),
                           ],
                         ),

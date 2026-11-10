@@ -66,6 +66,7 @@ class EventTypeIcon extends StatelessWidget {
       EventType.pregon => Icons.campaign_outlined,
       EventType.traslado => Icons.directions_walk_outlined,
       EventType.muda => Icons.swap_horiz_outlined,
+      EventType.desarma => Icons.inventory_2_outlined,
       EventType.retranqueo => Icons.redo_outlined,
       EventType.viaCrucis => Icons.route_outlined,
       EventType.viaCrucisConsejo => Icons.account_balance_outlined,

@@ -490,6 +490,7 @@ class ForumsRepository {
       topicCount: row['topic_count'] as int? ?? 0,
       messageCount: row['message_count'] as int? ?? 0,
       lastMessageAgo: _formatLastActivity(lastActivity, enabled),
+      lastActivityAt: lastActivity,
       lastTopicId: row['last_topic_id'] as String?,
       lastTopicTitle: row['last_topic_title'] as String?,
       lastTopicExcerpt: row['last_topic_excerpt'] as String?,

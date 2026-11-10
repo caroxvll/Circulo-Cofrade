@@ -25,6 +25,8 @@ enum EventType {
 
   muda('Mudas'),
 
+  desarma('Desarmas'),
+
   retranqueo('Retranqueos'),
 
   viaCrucis('Vía crucis'),
@@ -63,6 +65,8 @@ enum EventType {
 
       'muda' => EventType.muda,
 
+      'desarma' => EventType.desarma,
+
       'retranqueo' => EventType.retranqueo,
 
       'via_crucis' => EventType.viaCrucis,
@@ -98,6 +102,8 @@ enum EventType {
 
     EventType.muda => 'muda',
 
+    EventType.desarma => 'desarma',
+
     EventType.retranqueo => 'retranqueo',
 
     EventType.viaCrucis => 'via_crucis',
@@ -121,6 +127,7 @@ enum EventType {
     EventType.pregon => 'Pregón',
     EventType.traslado => 'Traslado',
     EventType.muda => 'Muda',
+    EventType.desarma => 'Desarma',
     EventType.retranqueo => 'Retranqueo',
     EventType.viaCrucis => 'Vía crucis',
     EventType.viaCrucisConsejo => 'Vía crucis del Consejo',
@@ -132,6 +139,7 @@ enum EventType {
     EventType.ensayo ||
     EventType.traslado ||
     EventType.muda ||
+    EventType.desarma ||
     EventType.retranqueo ||
     EventType.viaCrucis ||
     EventType.viaCrucisConsejo => true,
@@ -394,6 +402,8 @@ enum EventFilter {
 
   mudas('Mudas'),
 
+  desarmas('Desarmas'),
+
   retranqueos('Retranqueos'),
 
   viaCrucis('Vía crucis'),
@@ -435,6 +445,8 @@ enum EventFilter {
     EventFilter.traslados => EventType.traslado,
 
     EventFilter.mudas => EventType.muda,
+
+    EventFilter.desarmas => EventType.desarma,
 
     EventFilter.retranqueos => EventType.retranqueo,
 

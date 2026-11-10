@@ -34,6 +34,7 @@ const cuaresmaAgendaTypes = {
   EventType.concierto,
   EventType.traslado,
   EventType.muda,
+  EventType.desarma,
   EventType.retranqueo,
   EventType.viaCrucis,
   EventType.viaCrucisConsejo,

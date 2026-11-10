@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/cofradeo_badge.dart';
@@ -190,12 +189,6 @@ class _JuntaHeader extends ConsumerWidget {
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               ),
-            IconButton(
-              icon: const Icon(Icons.arrow_back, size: 22),
-              color: AppColors.burgundy,
-              tooltip: 'Volver al perfil',
-              onPressed: () => context.go('/perfil'),
-            ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(top: 8),

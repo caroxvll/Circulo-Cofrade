@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../auth_layout.dart';
 
 class AuthEmailForm extends StatelessWidget {
   const AuthEmailForm({
@@ -14,6 +15,9 @@ class AuthEmailForm extends StatelessWidget {
     this.displayNameController,
     this.handleController,
     this.dark = false,
+    this.fieldSize = 20,
+    this.fieldPadding = 14,
+    this.buttonHeight = 50,
   });
 
   final TextEditingController emailController;
@@ -24,6 +28,9 @@ class AuthEmailForm extends StatelessWidget {
   final VoidCallback onSubmit;
   final bool loading;
   final bool dark;
+  final double fieldSize;
+  final double fieldPadding;
+  final double buttonHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -68,9 +75,10 @@ class AuthEmailForm extends StatelessWidget {
           onSubmitted: (_) => onSubmit(),
           decoration: _decoration('Contraseña'),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: fieldPadding + 8),
         SizedBox(
           width: double.infinity,
+          height: buttonHeight,
           child: FilledButton(
             onPressed: loading ? null : onSubmit,
             style: FilledButton.styleFrom(
@@ -113,36 +121,15 @@ class AuthEmailForm extends StatelessWidget {
     if (!dark) return null;
     return AppTypography.displaySmall(
       color: AppColors.goldPale,
-    ).copyWith(fontSize: 20);
+    ).copyWith(fontSize: fieldSize, height: 1.15);
   }
 
   InputDecoration _decoration(String label) {
     if (dark) {
-      final borderRadius = BorderRadius.circular(16);
-      return InputDecoration(
-        labelText: label,
-        labelStyle: AppTypography.displaySmall(
-          color: AppColors.goldPale,
-        ).copyWith(fontSize: 20),
-        floatingLabelStyle: AppTypography.titleLarge(color: AppColors.gold),
-        filled: true,
-        fillColor: Colors.black.withValues(alpha: 0.08),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 14,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: const BorderSide(color: AppColors.gold, width: 1.3),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: const BorderSide(color: AppColors.gold, width: 1.3),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: borderRadius,
-          borderSide: const BorderSide(color: AppColors.gold, width: 1.8),
-        ),
+      return authDarkFieldDecoration(
+        label: label,
+        fieldSize: fieldSize,
+        verticalPadding: fieldPadding,
       );
     }
 

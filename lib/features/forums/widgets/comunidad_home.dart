@@ -8,7 +8,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/forum_text_format.dart';
 import '../../../core/utils/image_decode_cache.dart';
-import '../../../core/utils/local_day.dart';
 import '../../../core/utils/time_ago.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
@@ -108,13 +107,7 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
     final river = _forYouFilter == _ForYouFilter.todo
         ? ref.watch(paraTiRiverProvider)
         : const ParaTiRiver.empty();
-    final room = paraTiRiverLimit - river.entries.length;
-    final fill = _forYouFilter == _ForYouFilter.todo &&
-            river.settled &&
-            room > 0 &&
-            ref.watch(currentUserProvider) != null
-        ? _followedRiverFill(room)
-        : const <Widget>[];
+    final feed = _forYouPieces(visible, river);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -134,25 +127,89 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
             physics: _scrollPhysics,
             padding: const EdgeInsets.only(bottom: 24),
             children: [
-              for (final entry in river.entries) _riverEntry(entry),
-              ...fill,
-              if (cards.isEmpty && river.entries.isEmpty && fill.isEmpty)
-                const _EmptyNote(
-                  text: 'Cuando haya temas nuevos, aparecerán aquí.',
+              if (feed.isEmpty)
+                _EmptyNote(
+                  text: cards.isEmpty && river.entries.isEmpty
+                      ? 'Cuando haya temas nuevos, aparecerán aquí.'
+                      : _forYouFilter.emptyLabel,
                 )
-              else if (visible.isEmpty && river.entries.isEmpty)
-                _EmptyNote(text: _forYouFilter.emptyLabel)
               else
-                for (final item in visible)
-                  _TopicActivityCard(
-                    item: item,
-                    onTap: () => _openTopic(context, item),
-                  ),
+                for (final piece in feed) piece,
             ],
           ),
         ),
       ],
     );
+  }
+
+  /// Para ti, de más nuevo a más viejo. Una noticia o una respuesta reciente
+  /// pasa por delante de un comunicado de hermandad más antiguo.
+  List<Widget> _forYouPieces(List<_Activity> visible, ParaTiRiver river) {
+    if (_forYouFilter != _ForYouFilter.todo) {
+      final sorted = [...visible]..sort((a, b) {
+        final aAt = a.forum.lastActivityAt?.millisecondsSinceEpoch ?? 0;
+        final bAt = b.forum.lastActivityAt?.millisecondsSinceEpoch ?? 0;
+        return bAt.compareTo(aAt);
+      });
+      return [
+        for (final item in sorted)
+          _TopicActivityCard(
+            item: item,
+            onTap: () => _openTopic(context, item),
+          ),
+      ];
+    }
+
+    final signedIn = ref.watch(currentUserProvider) != null;
+    final posts = signedIn
+        ? ref.watch(followedPeoplePostsProvider).asData?.value ??
+            const <FollowedPersonPost>[]
+        : const <FollowedPersonPost>[];
+    final digests = signedIn
+        ? ref.watch(followedHermandadDigestsProvider).asData?.value ??
+            const <HermandadDigest>[]
+        : const <HermandadDigest>[];
+    final coveredTopics = {for (final post in posts) post.activity.topicId};
+    final coveredReplies = {for (final post in posts) post.activity.id};
+
+    final ranked = <({int at, Widget child})>[
+      for (final entry in river.entries)
+        (at: entry.at.millisecondsSinceEpoch, child: _riverEntry(entry)),
+      for (final post in posts)
+        (
+          at: post.at.millisecondsSinceEpoch,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+            child: _PersonPostCard(post: post),
+          ),
+        ),
+      for (final group in digests)
+        for (final section in group.sections)
+          if (!coveredReplies.contains(section.reply.id))
+            (
+              at: section.reply.createdAt?.millisecondsSinceEpoch ?? 0,
+              child: _HermandadLatestCard(
+                group: HermandadDigest(
+                  board: group.board,
+                  hermandadName: group.hermandadName,
+                  processionDay: group.processionDay,
+                  sections: [section],
+                ),
+              ),
+            ),
+      for (final item in visible)
+        if (item.kind != _ForYouKind.hermandad &&
+            !coveredTopics.contains(item.topicId))
+          (
+            at: item.forum.lastActivityAt?.millisecondsSinceEpoch ?? 0,
+            child: _TopicActivityCard(
+              item: item,
+              onTap: () => _openTopic(context, item),
+            ),
+          ),
+    ]..sort((a, b) => b.at.compareTo(a.at));
+
+    return [for (final piece in ranked.take(24)) piece.child];
   }
 
   Widget _riverEntry(ParaTiRiverEntry entry) {
@@ -164,44 +221,6 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
           activityAt: activityAt,
         ),
     };
-  }
-
-  /// Cuando el directo no llena las 12 plazas, entra lo que ya sigues.
-  List<Widget> _followedRiverFill(int room) {
-    final posts = ref.watch(followedPeoplePostsProvider).asData?.value ??
-        const <FollowedPersonPost>[];
-    final digests = ref.watch(followedHermandadDigestsProvider).asData?.value ??
-        const <HermandadDigest>[];
-
-    final ranked = <({DateTime at, Widget child})>[
-      for (final post in posts)
-        (
-          at: post.at,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-            child: _PersonPostCard(post: post),
-          ),
-        ),
-      for (final group in digests)
-        for (final section in group.sections)
-          (
-            at: section.reply.createdAt ??
-                DateTime.fromMillisecondsSinceEpoch(0),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-              child: _HermandadLatestCard(
-                group: HermandadDigest(
-                  board: group.board,
-                  hermandadName: group.hermandadName,
-                  processionDay: group.processionDay,
-                  sections: [section],
-                ),
-              ),
-            ),
-          ),
-    ]..sort((a, b) => b.at.compareTo(a.at));
-
-    return [for (final item in ranked.take(room)) item.child];
   }
 
   List<Widget> _followingSlivers(BuildContext context) {
@@ -255,6 +274,7 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
       for (final post in personPosts)
         if (_personPostMatches(post, filter)) post,
     ];
+    final activity = _followingActivity(visibleDigests, visiblePosts);
     final waiting = (digests.isLoading && published.isEmpty) ||
         (posts.isLoading && personPosts.isEmpty);
     final hasFeed = visibleBoards.isNotEmpty ||
@@ -323,39 +343,52 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
         SliverToBoxAdapter(
           child: _EmptyNote(text: filter.emptyLabel),
         )
-      else if (visibleDigests.isNotEmpty || visiblePosts.isNotEmpty) ...[
+      else if (activity.isNotEmpty) ...[
         const SliverToBoxAdapter(
           child: _SectionTitle(title: 'Actividad reciente', top: 18),
         ),
-        if (visibleDigests.isNotEmpty)
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-            sliver: SliverList.separated(
-              itemCount: visibleDigests.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                return _HermandadLatestCard(group: visibleDigests[index]);
-              },
-            ),
+        SliverPadding(
+          padding: const EdgeInsets.only(top: 2),
+          sliver: SliverList.separated(
+            itemCount: activity.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) => activity[index],
           ),
-        if (visiblePosts.isNotEmpty)
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(
-              14,
-              visibleDigests.isEmpty ? 0 : 12,
-              14,
-              0,
-            ),
-            sliver: SliverList.separated(
-              itemCount: visiblePosts.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                return _PersonPostCard(post: visiblePosts[index]);
-              },
-            ),
-          ),
+        ),
       ],
     ];
+  }
+
+  List<Widget> _followingActivity(
+    List<HermandadDigest> digests,
+    List<FollowedPersonPost> posts,
+  ) {
+    final coveredReplies = {for (final post in posts) post.activity.id};
+    final ranked = <({int at, Widget child})>[
+      for (final post in posts)
+        (
+          at: post.at.millisecondsSinceEpoch,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: _PersonPostCard(post: post),
+          ),
+        ),
+      for (final group in digests)
+        for (final section in group.sections)
+          if (!coveredReplies.contains(section.reply.id))
+            (
+              at: section.reply.createdAt?.millisecondsSinceEpoch ?? 0,
+              child: _HermandadLatestCard(
+                group: HermandadDigest(
+                  board: group.board,
+                  hermandadName: group.hermandadName,
+                  processionDay: group.processionDay,
+                  sections: [section],
+                ),
+              ),
+            ),
+    ]..sort((a, b) => b.at.compareTo(a.at));
+    return [for (final piece in ranked) piece.child];
   }
 
   bool _followedTopicMatches(FollowedTopic topic, _FollowingFilter filter) {
@@ -1051,6 +1084,15 @@ class _ConversationSlideState extends ConsumerState<_ConversationSlide> {
   @override
   Widget build(BuildContext context) {
     final reduce = MediaQuery.disableAnimationsOf(context);
+    ref.listen(latestTopicReplyProvider(widget.topicId), (previous, next) {
+      final before = previous?.asData?.value?.id;
+      final after = next.asData?.value?.id;
+      if (after == null || after == before || !mounted) return;
+      setState(() {
+        _showReply = true;
+        _introduced = true;
+      });
+    });
     final reply = ref
         .watch(latestTopicReplyProvider(widget.topicId))
         .asData
@@ -1104,7 +1146,7 @@ class _ConversationSlideState extends ConsumerState<_ConversationSlide> {
               },
               child: showReply
                   ? KeyedSubtree(
-                      key: const ValueKey('reply'),
+                      key: ValueKey('reply-${reply.id}'),
                       child: _replyFace(reply),
                     )
                   : KeyedSubtree(
@@ -1890,14 +1932,29 @@ class _HermandadLatestCard extends ConsumerWidget {
     final lead = group.sections.isEmpty ? null : group.sections.first;
     final image = lead?.reply.imageUrl?.trim();
     final hasImage = image != null && image.isNotEmpty;
-    final rest = group.sections.skip(hasImage ? 1 : 0).toList();
+    final rest = group.sections.skip(1).toList();
     final leadCopy = lead == null ? null : _officialCopy(lead.reply.content);
 
-    return _SurfaceCard(
-      padding: EdgeInsets.zero,
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const ColoredBox(
+                  color: AppColors.gold,
+                  child: SizedBox(width: 3),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
           InkWell(
             onTap: () => pushForumTopic(
               context,
@@ -1906,7 +1963,7 @@ class _HermandadLatestCard extends ConsumerWidget {
               topicId: group.board.topicId,
             ),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
               child: Row(
                 children: [
                   _HermandadCrest(
@@ -1924,7 +1981,7 @@ class _HermandadLatestCard extends ConsumerWidget {
                           group.hermandadName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.hermandadName().copyWith(fontSize: 18),
+                          style: AppTypography.hermandadName().copyWith(fontSize: 17, height: 1.05),
                         ),
                         Text(
                           'Hermandad · ${lead?.reply.timeAgo ?? group.processionDay ?? ''}',
@@ -1932,7 +1989,7 @@ class _HermandadLatestCard extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                           style: AppTypography.labelSmall(
                             color: AppColors.goldDark,
-                          ).copyWith(fontWeight: FontWeight.w700),
+                          ).copyWith(fontWeight: FontWeight.w700, fontSize: 12),
                         ),
                       ],
                     ),
@@ -1941,47 +1998,59 @@ class _HermandadLatestCard extends ConsumerWidget {
               ),
             ),
           ),
-          if (hasImage && lead != null)
+          if (lead != null)
             InkWell(
               onTap: () => _openSection(context, ref, lead),
-              child: SizedBox(
-                height: 176,
-                child: Stack(
-                  fit: StackFit.expand,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CofradeoNetworkImage(url: image, fit: BoxFit.cover, cacheSize: 520),
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0x22000000), Color(0x99000000)],
+                    _Chip(
+                      label: officialCategoryLabel(
+                        lead.reply.officialCategory ?? 'noticia',
+                      ),
+                      gold: true,
+                    ),
+                    if (leadCopy != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        leadCopy.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.newsHeadline().copyWith(
+                          fontSize: 20,
+                          height: 1.15,
                         ),
                       ),
-                    ),
-                    Positioned(
-                      left: 12,
-                      top: 12,
-                      child: _Chip(
-                        label: officialCategoryLabel(lead.reply.officialCategory ?? 'noticia'),
-                        gold: true,
-                      ),
-                    ),
-                    if (leadCopy != null)
-                      Positioned(
-                        left: 12,
-                        right: 12,
-                        bottom: 12,
-                        child: Text(
-                          leadCopy.title,
-                          maxLines: 2,
+                      if (leadCopy.body.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          leadCopy.body,
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.newsHeadline(color: Colors.white)
-                              .copyWith(fontSize: 22, height: 1.05),
+                          style: AppTypography.bodyMedium().copyWith(height: 1.4),
                         ),
-                      ),
+                      ],
+                    ],
                   ],
                 ),
+              ),
+            ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasImage)
+            SizedBox(
+              height: 210,
+              width: double.infinity,
+              child: CofradeoNetworkImage(
+                url: image,
+                fit: BoxFit.cover,
+                cacheSize: 720,
               ),
             ),
           for (var i = 0; i < rest.length; i++) ...[
