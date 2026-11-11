@@ -99,9 +99,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _signInWithGoogle() async {
-    await _runOAuth(
-      () => ref.read(authRepositoryProvider).signInWithGoogle(),
-    );
+    await _runOAuth(() => ref.read(authRepositoryProvider).signInWithGoogle());
   }
 
   bool get _showApple {
@@ -206,10 +204,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 final side = metrics.side;
                 final contentWidth = metrics.contentWidth;
                 final logoWidth =
-                    (width * (tight ? 0.50 : compact ? 0.62 : 0.70)).clamp(
-                      tight ? 128.0 : 160.0,
-                      340.0,
-                    );
+                    (width *
+                            (tight
+                                ? 0.50
+                                : compact
+                                ? 0.62
+                                : 0.70))
+                        .clamp(tight ? 128.0 : 160.0, 340.0);
                 final topPad = keyboardOpen ? 8.0 : (tight ? 40.0 : 48.0);
                 final bottomPad = tight ? 4.0 : (compact ? 8.0 : 16.0);
                 final logoHeight = keyboardOpen
@@ -246,16 +247,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 );
 
-                final logo = SizedBox(
+                final logo = AuthBrandLogo(
                   width: logoWidth,
                   height: logoHeight,
-                  child: Image.asset(
-                    AppAssets.logoLogin,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.medium,
-                    cacheWidth: ImageDecodeCache.px(context, logoWidth),
-                    gaplessPlayback: true,
-                  ),
                 );
 
                 return SingleChildScrollView(
@@ -335,10 +329,7 @@ class _LoginForm extends StatelessWidget {
           backgroundColor: Colors.white,
           icon: SizedBox.square(
             dimension: 22,
-            child: SvgPicture.asset(
-              AppAssets.googleLogo,
-              fit: BoxFit.contain,
-            ),
+            child: SvgPicture.asset(AppAssets.googleLogo, fit: BoxFit.contain),
           ),
           onPressed: loading ? null : onGoogle,
         ),
@@ -347,11 +338,7 @@ class _LoginForm extends StatelessWidget {
           _SocialButton(
             label: 'Continuar con Apple',
             height: buttonHeight,
-            icon: const Icon(
-              Icons.apple,
-              color: Color(0xFF2A0710),
-              size: 24,
-            ),
+            icon: const Icon(Icons.apple, color: Color(0xFF2A0710), size: 24),
             onPressed: loading ? null : onApple,
           ),
         ],
@@ -369,10 +356,7 @@ class _LoginForm extends StatelessWidget {
         TextButton(
           style: TextButton.styleFrom(
             minimumSize: Size.zero,
-            padding: EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: linkPad,
-            ),
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: linkPad),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed: loading ? null : onForgot,
@@ -394,10 +378,7 @@ class _LoginForm extends StatelessWidget {
         TextButton(
           style: TextButton.styleFrom(
             minimumSize: Size.zero,
-            padding: EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: linkPad,
-            ),
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: linkPad),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed: loading ? null : onRegister,

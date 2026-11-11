@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/models/forum.dart';
-import '../../calendar/utils/holy_week_countdown.dart';
 import '../../cuaresma/utils/cuaresma_topic.dart';
 import '../../semana_santa/semana_santa_provider.dart';
 import '../../semana_santa/utils/semana_santa_topic.dart';
+import '../season_hub_settings_provider.dart';
 import '../utils/hermandad_board_display.dart';
 
 const _seasonForumId = 'foro-cofradiero';
@@ -22,36 +22,47 @@ class HermandadOwnerSeasonStrips extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strips = <Widget>[];
-    if (_cuaresmaIsOpen(DateTime.now())) {
+    final settings =
+        ref.watch(seasonHubSettingsProvider).asData?.value ??
+        const SeasonHubSettings();
+    if (settings.isCuaresmaOpen(DateTime.now())) {
       strips.add(
         _SeasonStrip(
           kicker: 'CUARESMA',
           title: 'Ensayos abiertos',
           subtitle: 'Publica el aviso del ensayo de hoy.',
-          onTap: () => context.push(
-            '/foros/$_seasonForumId/tema/$cuaresmaTopicId',
-          ),
+          onTap: () =>
+              context.push('/foros/$_seasonForumId/tema/$cuaresmaTopicId'),
         ),
       );
     }
 
     final gate = ref.watch(ssLiveGateProvider).asData?.value;
     final day = gate?.activeDay;
+    final effectiveDay = settings.effectiveSemanaSantaDay(day?.label)?.trim();
     final ownDay = parseHermandadTopicTitle(topic.title).processionDay?.trim();
-    final ssOpen = gate?.isOpen == true &&
-        day != null &&
-        day.isOpen &&
+    final ownProcessionIsLive =
+        gate?.isOpen == true &&
+        effectiveDay != null &&
+        effectiveDay.isNotEmpty &&
         ownDay != null &&
         ownDay.isNotEmpty &&
-        ownDay == day.label.trim();
-    if (ssOpen) {
+        ownDay == effectiveDay;
+    final semanaSantaOpen = settings.isSemanaSantaOpen(
+      automaticValue: gate?.isOpen == true,
+    );
+    if (semanaSantaOpen) {
       strips.add(
         _SeasonStrip(
           kicker: 'SEMANA SANTA',
-          title: 'Hoy sales',
-          subtitle: 'Es ${day.label}. Publica el directo de la hermandad.',
+          title: ownProcessionIsLive ? 'Hoy sales' : 'Semana Santa abierta',
+          subtitle: ownProcessionIsLive
+              ? 'Es $effectiveDay. Publica el directo de la hermandad.'
+              : 'Consulta el directo, los avisos y la conversación.',
           onTap: () => context.push(
-            '/foros/$_seasonForumId/tema/$semanaSantaTopicId/informar',
+            ownProcessionIsLive
+                ? '/foros/$_seasonForumId/tema/$semanaSantaTopicId/informar'
+                : '/foros/$_seasonForumId/tema/$semanaSantaTopicId',
           ),
         ),
       );
@@ -71,17 +82,6 @@ class HermandadOwnerSeasonStrips extends ConsumerWidget {
       ),
     );
   }
-}
-
-bool _cuaresmaIsOpen(DateTime now) {
-  final today = DateTime(now.year, now.month, now.day);
-  var palm = palmSunday(today.year);
-  final easter = easterSunday(today.year);
-  if (today.isAfter(easter)) {
-    palm = palmSunday(today.year + 1);
-  }
-  final ash = addCalendarDays(palm, -39);
-  return !today.isBefore(ash) && today.isBefore(palm);
 }
 
 class _SeasonStrip extends StatelessWidget {
@@ -120,17 +120,21 @@ class _SeasonStrip extends StatelessWidget {
                     children: [
                       Text(
                         kicker,
-                        style: AppTypography.labelSmall(color: AppColors.goldDark)
-                            .copyWith(
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.7,
-                          fontSize: 10,
-                        ),
+                        style:
+                            AppTypography.labelSmall(
+                              color: AppColors.goldDark,
+                            ).copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.7,
+                              fontSize: 10,
+                            ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         title,
-                        style: AppTypography.hermandadName().copyWith(fontSize: 17),
+                        style: AppTypography.hermandadName().copyWith(
+                          fontSize: 17,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(

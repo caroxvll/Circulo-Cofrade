@@ -1,7 +1,44 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/utils/image_decode_cache.dart';
+
+/// Compensa el margen transparente del PNG para que la marca tenga el tamaño
+/// visual esperado sin ocupar más espacio en el layout responsive.
+class AuthBrandLogo extends StatelessWidget {
+  const AuthBrandLogo({
+    super.key,
+    required this.width,
+    required this.height,
+    this.zoom = 1.8,
+  });
+
+  final double width;
+  final double height;
+  final double zoom;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRect(
+        child: Transform.scale(
+          scale: zoom,
+          child: Image.asset(
+            AppAssets.logoLogin,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+            cacheWidth: ImageDecodeCache.px(context, width * zoom),
+            gaplessPlayback: true,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Medidas compartidas de las pantallas de entrada.
 ///

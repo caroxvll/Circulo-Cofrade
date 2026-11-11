@@ -56,15 +56,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     );
                 final logoHeight =
                     (metrics.height < 640
-                            ? 150.0
-                            : metrics.height < 720
-                            ? 190.0
-                            : metrics.height < 820
-                            ? 240.0
-                            : metrics.height < 960
-                            ? 280.0
-                            : 320.0) /
-                        (metrics.textScale > 1.2 ? 1.25 : 1);
+                        ? 150.0
+                        : metrics.height < 720
+                        ? 190.0
+                        : metrics.height < 820
+                        ? 240.0
+                        : metrics.height < 960
+                        ? 280.0
+                        : 320.0) /
+                    (metrics.textScale > 1.2 ? 1.25 : 1);
                 final buttonText = AppTypography.displaySmall().copyWith(
                   fontSize: metrics.tight ? 17 : (metrics.compact ? 19 : 21),
                   fontWeight: FontWeight.w700,
@@ -88,19 +88,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         Center(
-                          child: SizedBox(
+                          child: AuthBrandLogo(
                             width: logoWidth,
                             height: logoHeight,
-                            child: Image.asset(
-                              AppAssets.logoLogin,
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.medium,
-                              cacheWidth: ImageDecodeCache.px(
-                                context,
-                                logoWidth,
-                              ),
-                              gaplessPlayback: true,
-                            ),
+                            zoom: 1.3,
                           ),
                         ),
                         Center(

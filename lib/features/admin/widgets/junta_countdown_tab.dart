@@ -7,7 +7,10 @@ import '../../../core/widgets/cofrade_countdown_banner.dart';
 import '../../../shared/models/liturgical_countdown_settings.dart';
 import '../../calendar/liturgical_countdown_provider.dart';
 import '../../calendar/utils/holy_week_countdown.dart';
+import '../../forums/season_hub_settings_provider.dart';
+import '../../forums/utils/hermandad_board_display.dart';
 import '../../semana_santa/data/ss_live_gate_repository.dart';
+import '../admin_provider.dart';
 import '../junta_ui.dart';
 
 class JuntaCountdownTab extends ConsumerStatefulWidget {
@@ -26,6 +29,7 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
   var _saving = false;
   bool? _liveEnabled;
   var _savingLive = false;
+  String? _savingSeasonKey;
 
   @override
   void dispose() {
@@ -45,7 +49,8 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
   Future<void> _pickDate({required bool palm}) async {
     final initial = palm
         ? (_palmOverride ?? computedLiturgicalDates(_loadedYear).palmSunday)
-        : (_easterOverride ?? computedLiturgicalDates(_loadedYear).easterSunday);
+        : (_easterOverride ??
+              computedLiturgicalDates(_loadedYear).easterSunday);
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -69,8 +74,7 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
       year: _loadedYear,
       palmSundayOverride: _palmOverride,
       easterSundayOverride: _easterOverride,
-      visibleDaysBefore:
-          int.tryParse(_visibleDaysController.text.trim()) ?? 60,
+      visibleDaysBefore: int.tryParse(_visibleDaysController.text.trim()) ?? 60,
       isEnabled: _enabled,
       usesManualDates: _palmOverride != null || _easterOverride != null,
     );
@@ -94,18 +98,22 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
 
     setState(() => _saving = true);
     try {
-      await ref.read(liturgicalCountdownRepositoryProvider).upsert(_draftSettings());
+      await ref
+          .read(liturgicalCountdownRepositoryProvider)
+          .upsert(_draftSettings());
       invalidateLiturgicalCountdown(ref, year: _loadedYear);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Configuración guardada')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Configuración guardada')));
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No se pudo guardar. ¿Ejecutaste liturgical_countdown.sql?'),
+            content: Text(
+              'No se pudo guardar. ¿Ejecutaste liturgical_countdown.sql?',
+            ),
           ),
         );
       }
@@ -129,7 +137,9 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
       await ref
           .read(liturgicalCountdownRepositoryProvider)
           .clearOverrides(_loadedYear);
-      await ref.read(liturgicalCountdownRepositoryProvider).upsert(
+      await ref
+          .read(liturgicalCountdownRepositoryProvider)
+          .upsert(
             LiturgicalCountdownSettings(
               year: _loadedYear,
               visibleDaysBefore:
@@ -149,9 +159,9 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo restaurar')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No se pudo restaurar')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -182,13 +192,61 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
       if (mounted) {
         setState(() => _liveEnabled = !enabled);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo cambiar el en directo'),
-          ),
+          const SnackBar(content: Text('No se pudo cambiar el en directo')),
         );
       }
     } finally {
       if (mounted) setState(() => _savingLive = false);
+    }
+  }
+
+  Future<void> _setSeasonMode(String configKey, SeasonHubMode mode) async {
+    setState(() => _savingSeasonKey = configKey);
+    try {
+      await ref
+          .read(adminRepositoryProvider)
+          .setAppConfig(configKey, mode.dbValue);
+      ref.invalidate(seasonHubSettingsProvider);
+      if (configKey == semanaSantaHubModeConfigKey) {
+        ref.invalidate(ssLiveGateProvider);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Apertura de temporada actualizada')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo actualizar la temporada')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _savingSeasonKey = null);
+    }
+  }
+
+  Future<void> _setSemanaSantaManualDay(String day) async {
+    setState(() => _savingSeasonKey = semanaSantaManualDayConfigKey);
+    try {
+      await ref
+          .read(adminRepositoryProvider)
+          .setAppConfig(semanaSantaManualDayConfigKey, day);
+      ref.invalidate(seasonHubSettingsProvider);
+      ref.invalidate(ssLiveGateProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Jornada manual: $day')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo cambiar la jornada')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _savingSeasonKey = null);
     }
   }
 
@@ -197,6 +255,7 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
     final year = DateTime.now().year;
     final settingsAsync = ref.watch(liturgicalCountdownSettingsProvider(year));
     final liveAsync = ref.watch(ssLiveMasterEnabledProvider);
+    final seasonModesAsync = ref.watch(seasonHubSettingsProvider);
     final liveOn = _liveEnabled ?? liveAsync.asData?.value ?? false;
     final dateFormat = DateFormat("EEEE d 'de' MMMM", 'es');
     final computed = computedLiturgicalDates(year);
@@ -213,7 +272,8 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
             palmSundayOverride: _palmOverride,
             easterSundayOverride: _easterOverride,
             visibleDaysBefore:
-                int.tryParse(_visibleDaysController.text) ?? settings.visibleDaysBefore,
+                int.tryParse(_visibleDaysController.text) ??
+                settings.visibleDaysBefore,
             isEnabled: _enabled,
             usesManualDates: _palmOverride != null || _easterOverride != null,
           ),
@@ -226,6 +286,46 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
               text:
                   'Por defecto la app calcula Ramos y Pascua sola. Aquí puedes '
                   'ajustar fechas, visibilidad o desactivar el banner.',
+            ),
+            const SizedBox(height: JuntaUi.sectionGap),
+            Text('Apartados de temporada', style: JuntaUi.sectionTitle()),
+            const SizedBox(height: 8),
+            seasonModesAsync.when(
+              loading: () => const LinearProgressIndicator(minHeight: 2),
+              error: (_, _) => const _InfoCard(
+                title: 'Apertura de temporadas',
+                body: 'No se pudo cargar la configuración.',
+              ),
+              data: (modes) => Column(
+                children: [
+                  _SeasonModeCard(
+                    title: 'Cuaresma',
+                    subtitle:
+                        'Controla la tarjeta «Ensayos abiertos» de las hermandades.',
+                    value: modes.cuaresma,
+                    busy: _savingSeasonKey == cuaresmaHubModeConfigKey,
+                    onChanged: (mode) =>
+                        _setSeasonMode(cuaresmaHubModeConfigKey, mode),
+                  ),
+                  const SizedBox(height: 10),
+                  _SeasonModeCard(
+                    title: 'Semana Santa',
+                    subtitle:
+                        'En automático usa la jornada real. En manual puedes simular el día elegido.',
+                    value: modes.semanaSanta,
+                    busy:
+                        _savingSeasonKey == semanaSantaHubModeConfigKey ||
+                        _savingSeasonKey == semanaSantaManualDayConfigKey,
+                    onChanged: (mode) =>
+                        _setSeasonMode(semanaSantaHubModeConfigKey, mode),
+                    manualDay: modes.semanaSantaManualDay,
+                    manualDayOptions: hermandadDirectoryDays
+                        .where((day) => day != hermandadGloriasCategory)
+                        .toList(),
+                    onManualDayChanged: _setSemanaSantaManualDay,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: JuntaUi.sectionGap),
             SwitchListTile(
@@ -308,7 +408,10 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
               contentPadding: EdgeInsets.zero,
               dense: true,
               visualDensity: VisualDensity.compact,
-              title: Text('Domingo de Resurrección', style: JuntaUi.cardTitle()),
+              title: Text(
+                'Domingo de Resurrección',
+                style: JuntaUi.cardTitle(),
+              ),
               subtitle: Text(
                 _easterOverride == null
                     ? 'Automático: ${dateFormat.format(computed.easterSunday)}'
@@ -366,6 +469,111 @@ class _JuntaCountdownTabState extends ConsumerState<JuntaCountdownTab> {
     );
   }
 }
+
+class _SeasonModeCard extends StatelessWidget {
+  const _SeasonModeCard({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.busy,
+    required this.onChanged,
+    this.manualDay,
+    this.manualDayOptions = const [],
+    this.onManualDayChanged,
+  });
+
+  final String title;
+  final String subtitle;
+  final SeasonHubMode value;
+  final bool busy;
+  final ValueChanged<SeasonHubMode> onChanged;
+  final String? manualDay;
+  final List<String> manualDayOptions;
+  final ValueChanged<String>? onManualDayChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: JuntaUi.cardPadding,
+      decoration: JuntaUi.cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: JuntaUi.cardTitle()),
+          const SizedBox(height: 4),
+          Text(subtitle, style: JuntaUi.caption()),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<SeasonHubMode>(
+            key: ValueKey('$title-${value.dbValue}'),
+            initialValue: value,
+            decoration: JuntaUi.inputDecoration(
+              labelText: 'Estado',
+              helperText: _seasonModeHelp(value),
+            ),
+            items: SeasonHubMode.values
+                .map(
+                  (mode) => DropdownMenuItem(
+                    value: mode,
+                    child: Text(_seasonModeLabel(mode)),
+                  ),
+                )
+                .toList(),
+            onChanged: busy
+                ? null
+                : (mode) {
+                    if (mode != null && mode != value) onChanged(mode);
+                  },
+          ),
+          if (value == SeasonHubMode.open &&
+              manualDay != null &&
+              manualDayOptions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              key: ValueKey('$title-$manualDay'),
+              initialValue: manualDayOptions.contains(manualDay)
+                  ? manualDay
+                  : manualDayOptions.first,
+              isExpanded: true,
+              decoration: JuntaUi.inputDecoration(
+                labelText: 'Jornada manual',
+                helperText:
+                    'Con el directo activado, las hermandades de este día verán «Hoy sales».',
+              ),
+              items: [
+                for (final day in manualDayOptions)
+                  DropdownMenuItem(value: day, child: Text(day)),
+              ],
+              onChanged: busy
+                  ? null
+                  : (day) {
+                      if (day != null && day != manualDay) {
+                        onManualDayChanged?.call(day);
+                      }
+                    },
+            ),
+          ],
+          if (busy) ...[
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+String _seasonModeLabel(SeasonHubMode mode) => switch (mode) {
+  SeasonHubMode.automatic => 'Automático',
+  SeasonHubMode.open => 'Abierto manualmente',
+  SeasonHubMode.closed => 'Cerrado manualmente',
+};
+
+String _seasonModeHelp(SeasonHubMode mode) => switch (mode) {
+  SeasonHubMode.automatic => 'Se abre cuando corresponde por fecha.',
+  SeasonHubMode.open => 'Visible ahora, aunque esté fuera de fecha.',
+  SeasonHubMode.closed => 'Oculto aunque la fecha automática corresponda.',
+};
 
 class _InfoCard extends StatelessWidget {
   const _InfoCard({required this.title, required this.body});
