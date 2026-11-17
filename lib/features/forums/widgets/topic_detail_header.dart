@@ -228,6 +228,10 @@ class _TopicEditorialBody extends StatelessWidget {
         ? EditorialVideoPlayer(
             videoUrl: topic.videoUrl!,
             posterUrl: topic.editorialPosterUrl,
+            autoPlay: true,
+            muted: false,
+            pauseWhenOffscreen: true,
+            openFullscreenOnTap: true,
           )
         : ForumPostImage(
             imageUrl: coverUrl!,
@@ -414,7 +418,7 @@ class _TopicAuthorRow extends StatelessWidget {
       final via = editorialViaLabel(topic);
       return Row(
         children: [
-          const AppLogo(size: 32, useIconVariant: true),
+          const AppLogo(size: 32, useIconVariant: true, circular: true),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

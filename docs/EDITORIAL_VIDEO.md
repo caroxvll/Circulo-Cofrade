@@ -37,5 +37,5 @@ CORS del bucket: permitir `PUT` desde la app / orígenes necesarios.
 
 ## Límites 2a
 
-- Máx. **80 MB**
+- Máx. **150 MB**
 - MIME: `video/mp4`, `video/quicktime`, `video/webm`

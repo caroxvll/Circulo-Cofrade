@@ -7,6 +7,10 @@ import '../../../core/widgets/cofradeo_network_image.dart';
 import '../utils/published_media_ratio.dart';
 
 /// Reproductor inline para publicaciones oficiales (MP4 en R2).
+///
+/// En el feed conviene usar [EditorialVideoPoster] (sin inicializar el MP4).
+/// Aquí el vídeo se carga una sola vez; la pantalla completa reutiliza el
+/// mismo [VideoPlayerController] para no parar y volver a bufferizar.
 class EditorialVideoPlayer extends StatefulWidget {
   const EditorialVideoPlayer({
     super.key,
@@ -43,12 +47,16 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
   var _userPaused = false;
   var _completed = false;
   var _wasPlaying = false;
+  var _inFullscreen = false;
 
   @override
   void initState() {
     super.initState();
     _muted = widget.muted;
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+    _controller = VideoPlayerController.networkUrl(
+      Uri.parse(widget.videoUrl),
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    )
       ..setLooping(false)
       ..addListener(_onVideoChanged)
       ..initialize().then((_) {
@@ -70,7 +78,7 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
   }
 
   void _onVideoChanged() {
-    if (!mounted || !_ready) return;
+    if (!mounted || !_ready || _inFullscreen) return;
     final value = _controller.value;
     final duration = value.duration;
     final reachedEnd = duration > Duration.zero &&
@@ -88,6 +96,7 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
 
   void _playAutomaticallyIfAllowed() {
     if (!_ready ||
+        _inFullscreen ||
         !widget.autoPlay ||
         _userPaused ||
         _completed ||
@@ -115,9 +124,9 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
     await _controller.play();
     if (!mounted) return;
     setState(() {
-        _completed = false;
-        _userPaused = false;
-        _showControls = false;
+      _completed = false;
+      _userPaused = false;
+      _showControls = false;
     });
   }
 
@@ -128,23 +137,49 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
       return;
     }
 
-    await _controller.pause();
+    final wasPlaying = _controller.value.isPlaying;
+    // Solo un VideoPlayer por controller: quitar el inline antes del fullscreen.
+    setState(() => _inFullscreen = true);
+    await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-    final position = await Navigator.of(context).push<Duration>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => _EditorialFullscreenVideo(
-          videoUrl: widget.videoUrl,
-          initialPosition: _controller.value.position,
-        ),
+
+    await Navigator.of(context).push<void>(
+      PageRouteBuilder(
+        opaque: true,
+        barrierColor: Colors.black,
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return FadeTransition(
+            opacity: animation,
+            child: _EditorialFullscreenVideo(
+              controller: _controller,
+              muted: _muted,
+              onMuteChanged: (muted) {
+                _muted = muted;
+                _controller.setVolume(muted ? 0 : 1);
+              },
+            ),
+          );
+        },
       ),
     );
+
     if (!mounted) return;
-    if (position != null) {
-      await _controller.seekTo(position);
-      _completed = false;
+    setState(() {
+      _inFullscreen = false;
+      _wasPlaying = _controller.value.isPlaying;
+      final duration = _controller.value.duration;
+      _completed = duration > Duration.zero &&
+          _controller.value.position >=
+              duration - const Duration(milliseconds: 250) &&
+          !_controller.value.isPlaying;
+      _showControls = !_controller.value.isPlaying;
+    });
+
+    // Continuar desde donde quedó, sin reinicializar.
+    if (wasPlaying && !_userPaused && !_completed) {
+      await _controller.play();
+      if (mounted) setState(() => _showControls = false);
     }
-    _playAutomaticallyIfAllowed();
   }
 
   void _toggleMute() {
@@ -154,6 +189,7 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
   }
 
   void _onVisibilityChanged(VisibilityInfo info) {
+    if (_inFullscreen) return;
     final visible = info.visibleFraction >= 0.6;
     if (_visible == visible) return;
     _visible = visible;
@@ -180,7 +216,16 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (_ready)
+              // Poster siempre debajo: se ve al instante mientras carga el MP4.
+              if (poster != null && poster.isNotEmpty)
+                CofradeoNetworkImage(
+                  url: poster,
+                  fit: BoxFit.cover,
+                  cacheSize: 720,
+                )
+              else
+                const ColoredBox(color: AppColors.backgroundElevated),
+              if (_ready && !_inFullscreen)
                 FittedBox(
                   fit: BoxFit.contain,
                   child: SizedBox(
@@ -188,15 +233,7 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
                     height: _controller.value.size.height,
                     child: VideoPlayer(_controller),
                   ),
-                )
-              else if (poster != null && poster.isNotEmpty)
-                CofradeoNetworkImage(
-                  url: poster,
-                  fit: BoxFit.contain,
-                  cacheSize: 720,
-                )
-              else
-                const ColoredBox(color: AppColors.backgroundElevated),
+                ),
               if (_failed)
                 const Center(
                   child: Icon(
@@ -212,7 +249,7 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 )
-              else
+              else if (!_inFullscreen)
                 Positioned.fill(
                   child: Material(
                     color: Colors.transparent,
@@ -232,11 +269,14 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
                             child: Padding(
                               padding: const EdgeInsets.all(12),
                               child: Icon(
-                                _completed
-                                    ? Icons.replay_rounded
-                                    : _controller.value.isPlaying
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded,
+                                widget.openFullscreenOnTap &&
+                                        _controller.value.isPlaying
+                                    ? Icons.fullscreen_rounded
+                                    : _completed
+                                        ? Icons.replay_rounded
+                                        : _controller.value.isPlaying
+                                            ? Icons.pause_rounded
+                                            : Icons.play_arrow_rounded,
                                 color: Colors.white,
                                 size: 36,
                               ),
@@ -251,9 +291,13 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
                 Positioned(
                   left: 10,
                   top: 10,
-                  child: _VideoBadge(playing: _ready && _controller.value.isPlaying),
+                  child: _VideoBadge(
+                    playing: _ready &&
+                        !_inFullscreen &&
+                        _controller.value.isPlaying,
+                  ),
                 ),
-              if (_ready)
+              if (_ready && !_inFullscreen)
                 Positioned(
                   right: 10,
                   bottom: 10,
@@ -293,130 +337,125 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
 
 class _EditorialFullscreenVideo extends StatefulWidget {
   const _EditorialFullscreenVideo({
-    required this.videoUrl,
-    required this.initialPosition,
+    required this.controller,
+    required this.muted,
+    required this.onMuteChanged,
   });
 
-  final String videoUrl;
-  final Duration initialPosition;
+  final VideoPlayerController controller;
+  final bool muted;
+  final ValueChanged<bool> onMuteChanged;
 
   @override
   State<_EditorialFullscreenVideo> createState() =>
       _EditorialFullscreenVideoState();
 }
 
-class _EditorialFullscreenVideoState
-    extends State<_EditorialFullscreenVideo> {
-  late final VideoPlayerController _controller;
-  var _ready = false;
-  var _failed = false;
+class _EditorialFullscreenVideoState extends State<_EditorialFullscreenVideo> {
   var _showControls = true;
+  late var _muted = widget.muted;
 
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
-      ..setLooping(false)
-      ..addListener(_onVideoChanged)
-      ..initialize().then((_) async {
-        final duration = _controller.value.duration;
-        final startsAtEnd = duration > Duration.zero &&
-            widget.initialPosition >=
-                duration - const Duration(milliseconds: 250);
-        await _controller.seekTo(
-          startsAtEnd ? Duration.zero : widget.initialPosition,
-        );
-        await _controller.setVolume(1);
-        await _controller.play();
-        if (!mounted) return;
-        setState(() => _ready = true);
-      }).catchError((_) {
-        if (!mounted) return;
-        setState(() => _failed = true);
-      });
+    widget.controller.addListener(_onVideoChanged);
+    // Misma instancia: sigue desde la posición actual sin rebufferizar.
+    if (!widget.controller.value.isPlaying) {
+      final value = widget.controller.value;
+      final atEnd = value.duration > Duration.zero &&
+          value.position >=
+              value.duration - const Duration(milliseconds: 250);
+      () async {
+        if (atEnd) await widget.controller.seekTo(Duration.zero);
+        await widget.controller.play();
+        if (mounted) setState(() {});
+      }();
+    }
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_onVideoChanged);
-    _controller.dispose();
+    widget.controller.removeListener(_onVideoChanged);
     super.dispose();
   }
 
   void _onVideoChanged() {
-    if (!mounted || !_ready) return;
-    final value = _controller.value;
+    if (!mounted) return;
+    final value = widget.controller.value;
     if (value.duration > Duration.zero &&
         value.position >=
             value.duration - const Duration(milliseconds: 250) &&
         !value.isPlaying &&
         !_showControls) {
       setState(() => _showControls = true);
+    } else {
+      setState(() {});
     }
   }
 
   Future<void> _togglePlayback() async {
-    if (!_ready) return;
-    if (_controller.value.isPlaying) {
-      await _controller.pause();
+    final controller = widget.controller;
+    if (controller.value.isPlaying) {
+      await controller.pause();
     } else {
-      final value = _controller.value;
+      final value = controller.value;
       if (value.duration > Duration.zero &&
           value.position >=
               value.duration - const Duration(milliseconds: 250)) {
-        await _controller.seekTo(Duration.zero);
+        await controller.seekTo(Duration.zero);
       }
-      await _controller.play();
+      await controller.play();
     }
     if (mounted) setState(() {});
   }
 
   Future<void> _skip(Duration delta) async {
-    if (!_ready) return;
-    final value = _controller.value;
+    final value = widget.controller.value;
     final target = value.position + delta;
     final clamped = target < Duration.zero
         ? Duration.zero
         : target > value.duration
             ? value.duration
             : target;
-    await _controller.seekTo(clamped);
+    await widget.controller.seekTo(clamped);
     if (mounted) setState(() {});
   }
 
+  void _toggleMute() {
+    setState(() => _muted = !_muted);
+    widget.controller.setVolume(_muted ? 0 : 1);
+    widget.onMuteChanged(_muted);
+  }
+
   void _close() {
-    Navigator.of(context).pop(_controller.value.position);
+    Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final ready = controller.value.isInitialized;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (_ready)
+            if (ready)
               Center(
                 child: AspectRatio(
-                  aspectRatio: _controller.value.aspectRatio > 0
-                      ? _controller.value.aspectRatio
+                  aspectRatio: controller.value.aspectRatio > 0
+                      ? controller.value.aspectRatio
                       : 16 / 9,
-                  child: VideoPlayer(_controller),
-                ),
-              )
-            else if (_failed)
-              const Center(
-                child: Text(
-                  'No se pudo reproducir el vídeo',
-                  style: TextStyle(color: Colors.white70),
+                  child: VideoPlayer(controller),
                 ),
               )
             else
               const Center(
                 child: CircularProgressIndicator(color: Colors.white),
               ),
-            if (_ready)
+            if (ready)
               Positioned.fill(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
@@ -437,7 +476,22 @@ class _EditorialFullscreenVideoState
                   ),
                 ),
               ),
-            if (_ready && _showControls)
+            if (_showControls)
+              Positioned(
+                right: 12,
+                top: 8,
+                child: IconButton.filledTonal(
+                  onPressed: _toggleMute,
+                  icon: Icon(
+                    _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black.withValues(alpha: 0.5),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            if (ready && _showControls)
               Center(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -452,7 +506,7 @@ class _EditorialFullscreenVideoState
                     IconButton.filled(
                       onPressed: _togglePlayback,
                       icon: Icon(
-                        _controller.value.isPlaying
+                        controller.value.isPlaying
                             ? Icons.pause_rounded
                             : Icons.play_arrow_rounded,
                       ),
@@ -472,7 +526,7 @@ class _EditorialFullscreenVideoState
                   ],
                 ),
               ),
-            if (_ready && _showControls)
+            if (ready && _showControls)
               Positioned(
                 left: 20,
                 right: 20,
@@ -485,13 +539,13 @@ class _EditorialFullscreenVideoState
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
                     child: ValueListenableBuilder<VideoPlayerValue>(
-                      valueListenable: _controller,
+                      valueListenable: controller,
                       builder: (context, value, _) {
                         return Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             VideoProgressIndicator(
-                              _controller,
+                              controller,
                               allowScrubbing: true,
                               colors: const VideoProgressColors(
                                 playedColor: AppColors.burgundy,
@@ -579,7 +633,7 @@ class _VideoBadge extends StatelessWidget {
   }
 }
 
-/// Poster con badge de play para cards del feed (sin autoplay).
+/// Poster con badge de play para cards del feed (sin autoplay / sin MP4).
 class EditorialVideoPoster extends StatelessWidget {
   const EditorialVideoPoster({
     super.key,
@@ -623,6 +677,11 @@ class EditorialVideoPoster extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
+            const Positioned(
+              left: 10,
+              top: 10,
+              child: _VideoBadge(playing: false),
             ),
           ],
         ),
