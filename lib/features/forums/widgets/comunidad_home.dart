@@ -9,6 +9,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/forum_text_format.dart';
 import '../../../core/utils/image_decode_cache.dart';
 import '../../../core/utils/time_ago.dart';
+import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
@@ -32,6 +33,8 @@ import '../forums_provider.dart';
 import '../para_ti_pulse_provider.dart';
 import '../data/mock_forums.dart';
 import '../mis_hermandades_provider.dart';
+import '../utils/editorial_post.dart';
+import 'editorial_video_player.dart';
 import '../utils/forum_navigation.dart';
 import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
@@ -171,6 +174,10 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
         : const <HermandadDigest>[];
     final coveredTopics = {for (final post in posts) post.activity.topicId};
     final coveredReplies = {for (final post in posts) post.activity.id};
+    final editorialIds = {
+      for (final entry in river.entries)
+        if (entry is ParaTiEditorial) entry.topic.id,
+    };
 
     final ranked = <({int at, Widget child})>[
       for (final entry in river.entries)
@@ -199,7 +206,8 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
             ),
       for (final item in visible)
         if (item.kind != _ForYouKind.hermandad &&
-            !coveredTopics.contains(item.topicId))
+            !coveredTopics.contains(item.topicId) &&
+            !editorialIds.contains(item.topicId))
           (
             at: item.forum.lastActivityAt?.millisecondsSinceEpoch ?? 0,
             child: _TopicActivityCard(
@@ -220,6 +228,7 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
           topic: topic,
           activityAt: activityAt,
         ),
+      ParaTiEditorial(:final topic) => _ParaTiEditorialCard(topic: topic),
     };
   }
 
@@ -814,6 +823,118 @@ class _ParaTiLiveUpdate extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14),
         child: SsLiveHubCompactTile(update: update),
+      ),
+    );
+  }
+}
+
+class _ParaTiEditorialCard extends StatelessWidget {
+  const _ParaTiEditorialCard({required this.topic});
+
+  final ForumTopic topic;
+
+  @override
+  Widget build(BuildContext context) {
+    final via = editorialViaLabel(topic);
+    final excerpt = plainTextForExcerpt(
+      topic.excerpt.trim().isNotEmpty ? topic.excerpt : topic.body,
+      maxLength: 180,
+    );
+    final cover = topic.coverImageUrl?.trim();
+    final poster = topic.editorialPosterUrl;
+    final isVideo = topic.hasReadyEditorialVideo;
+    // Vídeo: nunca rota «último comentario» (_ConversationSlide).
+    final Widget? media = isVideo
+        ? EditorialVideoPoster(posterUrl: poster)
+        : (cover == null || cover.isEmpty)
+            ? null
+            : _TimelineMedia(
+                source: cover,
+                image: CofradeoNetworkImage(
+                  url: cover,
+                  fit: BoxFit.cover,
+                  cacheSize: 176,
+                ),
+              );
+
+    return _TimelinePost(
+      onTap: () => context.push('/foros/${topic.forumId}/tema/${topic.id}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const AppLogo(size: 40, useIconVariant: true),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            editorialPublicName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.hermandadName().copyWith(
+                              fontSize: 17,
+                              height: 1.05,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const VerifiedAccountIcon(size: 15),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (via.isNotEmpty) via,
+                        topic.timeAgo,
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.labelSmall().copyWith(
+                        fontSize: 12,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _OpenPostButton(
+                label: 'Ver',
+                onTap: () =>
+                    context.push('/foros/${topic.forumId}/tema/${topic.id}'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _Chip(label: isVideo ? 'Vídeo · Círculo Cofrade' : 'Círculo Cofrade'),
+          const SizedBox(height: 8),
+          _PulsePostFace(
+            title: topic.title,
+            excerpt: excerpt,
+            media: media,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _FeedMetric(
+                icon: Icons.chat_bubble_outline,
+                value: formatCount(topic.commentCount),
+                heat: topic.commentCount >= _hotCommentCount,
+              ),
+              const SizedBox(width: 16),
+              _FeedMetric(
+                icon: Icons.visibility_outlined,
+                value: formatCount(topic.viewCount),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

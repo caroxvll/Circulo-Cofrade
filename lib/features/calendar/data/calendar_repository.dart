@@ -84,6 +84,41 @@ class CalendarRepository {
       ..sort(compareCalendarEventsByStart);
   }
 
+  /// Igualás, ensayos, mudas y desarmás publicados en el año civil [year].
+  Future<List<CalendarEvent>> fetchSeasonActs({required int year}) async {
+    final start = DateTime(year, 1, 1);
+    final end = DateTime(year + 1, 1, 1);
+    const types = {
+      EventType.iguala,
+      EventType.ensayo,
+      EventType.muda,
+      EventType.desarma,
+    };
+
+    if (_client == null) {
+      return mockCalendarEvents
+          .where(
+            (e) =>
+                types.contains(e.type) &&
+                !e.date.isBefore(start) &&
+                e.date.isBefore(end),
+          )
+          .toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
+    }
+
+    final rows = await _client
+        .from('calendar_events')
+        .select('*, profiles!created_by(handle, display_name)')
+        .eq('status', 'published')
+        .inFilter('event_type', const ['iguala', 'ensayo', 'muda', 'desarma'])
+        .gte('starts_at', start.toUtc().toIso8601String())
+        .lt('starts_at', end.toUtc().toIso8601String())
+        .order('starts_at', ascending: true);
+
+    return rows.map(_fromRow).toList();
+  }
+
   Future<CalendarEvent?> fetchEventById(String eventId) async {
     if (_client == null) {
       for (final event in mockCalendarEvents) {

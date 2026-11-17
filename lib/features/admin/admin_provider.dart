@@ -228,6 +228,11 @@ final pinnedSystemTopicsProvider = FutureProvider<List<ForumTopic>>((ref) async 
   return ref.watch(forumsRepositoryProvider).fetchPinnedSystemTopics();
 });
 
+final editorialPostsProvider = FutureProvider<List<ForumTopic>>((ref) async {
+  if (!ref.watch(isJuntaMemberProvider)) return [];
+  return ref.watch(adminRepositoryProvider).fetchEditorialPosts();
+});
+
 class JuntaSelectedModule extends Notifier<JuntaModule> {
   @override
   JuntaModule build() => JuntaModule.overview;

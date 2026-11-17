@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/text_normalize.dart';
+import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/forum_post_content.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/verified_account_badge.dart';
@@ -11,8 +12,10 @@ import '../../../shared/models/forum.dart';
 import '../data/mock_forums.dart';
 import '../topic_detail_typography.dart';
 import '../utils/cofrade_gamification.dart';
+import '../utils/editorial_post.dart';
 import '../utils/reply_reactions.dart';
 import 'cofrade_rank_label.dart';
+import 'editorial_video_player.dart';
 import 'forum_post_image.dart';
 import 'hermandad_board_header.dart';
 import 'noticias_article_header.dart';
@@ -74,7 +77,7 @@ class TopicDetailHeader extends StatelessWidget {
       );
     }
 
-    final hasCover = _remoteCoverUrl(topic) != null;
+    final hasCover = _remoteCoverUrl(topic) != null || topic.hasReadyEditorialVideo;
     final hasBody = topic.body.trim().isNotEmpty;
     final replyReactions = sortedReactionCounts(reactionBreakdown);
 
@@ -201,12 +204,13 @@ class _TopicEditorialBody extends StatelessWidget {
     final coverUrl = _remoteCoverUrl(topic);
     final body = topic.body.trim();
     final hasBody = body.isNotEmpty;
+    final hasVideo = topic.hasReadyEditorialVideo;
 
-    if (coverUrl == null && !hasBody) {
+    if (coverUrl == null && !hasBody && !hasVideo) {
       return const SizedBox.shrink();
     }
 
-    if (coverUrl == null) {
+    if (!hasVideo && coverUrl == null) {
       return ForumPostContent(
         text: normalizeStoredText(body),
         style: TopicDetailTypography.body(),
@@ -220,14 +224,19 @@ class _TopicEditorialBody extends StatelessWidget {
     final stack = isNoticiasForum(topic.forumId) || width < _stackBelowWidth;
     final compact = width < 520;
 
-    final image = ForumPostImage(
-      imageUrl: coverUrl,
-      shareText: topic.title,
-      borderRadius: const BorderRadius.all(Radius.circular(10)),
-      maxPreviewHeight: stack ? 420 : 480,
-    );
+    final media = hasVideo
+        ? EditorialVideoPlayer(
+            videoUrl: topic.videoUrl!,
+            posterUrl: topic.editorialPosterUrl,
+          )
+        : ForumPostImage(
+            imageUrl: coverUrl!,
+            shareText: topic.title,
+            borderRadius: const BorderRadius.all(Radius.circular(10)),
+            maxPreviewHeight: stack ? 420 : 480,
+          );
 
-    if (!hasBody) return image;
+    if (!hasBody) return media;
 
     final caption = _EditorialCaptionColumn(
       text: normalizeStoredText(body),
@@ -238,7 +247,7 @@ class _TopicEditorialBody extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          image,
+          media,
           const SizedBox(height: 16),
           caption,
         ],
@@ -250,7 +259,7 @@ class _TopicEditorialBody extends StatelessWidget {
       children: [
         Expanded(
           flex: compact ? 4 : 5,
-          child: image,
+          child: media,
         ),
         SizedBox(width: compact ? 14 : 20),
         Expanded(
@@ -397,6 +406,54 @@ class _TopicAuthorRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (topic.isEditorial) {
+      final via = editorialViaLabel(topic);
+      return Row(
+        children: [
+          const AppLogo(size: 32, useIconVariant: true),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        editorialPublicName,
+                        overflow: TextOverflow.ellipsis,
+                        style: TopicDetailTypography.meta(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const VerifiedAccountIcon(size: 13),
+                  ],
+                ),
+                if (via.isNotEmpty) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    via,
+                    style: TopicDetailTypography.meta(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+                Text(
+                  topic.timeAgo,
+                  style: TopicDetailTypography.meta(
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
     final handle = topic.authorHandle.startsWith('@')
         ? topic.authorHandle
         : '@${topic.authorHandle}';

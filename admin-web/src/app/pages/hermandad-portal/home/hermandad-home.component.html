@@ -158,6 +158,54 @@
         </article>
       </div>
 
+      <section class="block season-acts">
+        <div class="block-head">
+          <div>
+            <p class="season-eyebrow">Temporada {{ seasonActs().year }}</p>
+            <h2>Igualá, ensayos, muda y desarmá</h2>
+          </div>
+          <span
+            class="season-ring"
+            [attr.data-complete]="seasonActs().isComplete"
+          >
+            {{ seasonActs().filledCount }}/{{ seasonActs().totalCount }}
+          </span>
+        </div>
+        <p class="season-lead">
+          @if (seasonActs().isComplete) {
+            Temporada completa: ya tienes los cuatro actos publicados.
+          } @else if (seasonActs().isEmpty) {
+            Aún no hay actos publicados este año. Complétalos para que se vean
+            en tu tablón.
+          } @else {
+            {{ seasonActs().filledCount }} de {{ seasonActs().totalCount }} actos
+            publicados.
+          }
+        </p>
+        <div class="season-track" role="list">
+          @for (m of seasonActs().milestones; track m.kind) {
+            <article class="season-node" [attr.data-status]="m.status" role="listitem">
+              <span class="season-dot" aria-hidden="true"></span>
+              <strong>{{ m.label }}</strong>
+              <span>{{ m.statusLabel }}</span>
+            </article>
+          }
+        </div>
+        @if (missingSeasonActs().length) {
+          <div class="season-actions">
+            @for (m of missingSeasonActs(); track m.kind) {
+              <a
+                class="btn-ico ghost season-cta"
+                [routerLink]="['/hermandad/publicar']"
+                [queryParams]="{ kind: publishKindForMissing(m.kind) }"
+              >
+                <span>Publicar {{ m.label.toLowerCase() }}</span>
+              </a>
+            }
+          </div>
+        }
+      </section>
+
       @if (store.upcomingEvents().length > 0) {
         <section class="block">
           <div class="block-head">

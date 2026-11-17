@@ -164,6 +164,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'actos-temporada',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./pages/season-acts/season-acts.component').then(
+            (m) => m.SeasonActsPageComponent,
+          ),
+      },
+      {
         path: 'foros',
         canActivate: [adminGuard],
         loadComponent: () =>

@@ -184,10 +184,16 @@ class ForumTopic {
     this.isPinned = false,
     this.pinSortOrder = 0,
     this.isSystem = false,
+    this.isEditorial = false,
+    this.viaAuthorId,
+    this.viaAuthorHandle,
     this.seasonKey,
     this.iconKey,
     this.iconImageUrl,
     this.coverImageUrl,
+    this.videoUrl,
+    this.videoPosterUrl,
+    this.videoStatus,
     this.showHubTitle = true,
     this.isListed = true,
     this.createdAt,
@@ -221,6 +227,13 @@ class ForumTopic {
   final int pinSortOrder;
   final bool isSystem;
 
+  /// Publicación oficial de Círculo Cofrade (Para ti).
+  final bool isEditorial;
+
+  /// Redactor humano; la marca pública es Círculo Cofrade.
+  final String? viaAuthorId;
+  final String? viaAuthorHandle;
+
   /// `cuaresma`, `semana_santa` o `glorias` para reorden estacional.
   final String? seasonKey;
   final String? iconKey;
@@ -228,6 +241,13 @@ class ForumTopic {
   /// Escudo / icono remoto (p. ej. tablones de hermandad).
   final String? iconImageUrl;
   final String? coverImageUrl;
+
+  /// Vídeo editorial (R2). Solo publicaciones oficiales.
+  final String? videoUrl;
+  final String? videoPosterUrl;
+
+  /// `uploading` | `processing` | `ready` | `failed`.
+  final String? videoStatus;
 
   /// En hubs estacionales: mostrar icono + título sobre la portada.
   final bool showHubTitle;
@@ -249,6 +269,23 @@ class ForumTopic {
   bool get isPending => status == TopicStatus.pending;
   bool get isRejected => status == TopicStatus.rejected;
   bool get isCloseRequested => closeStatus == TopicCloseStatus.closeRequested;
+
+  /// Vídeo listo para reproducir (no rota «último comentario» en Para ti).
+  bool get hasReadyEditorialVideo {
+    final url = videoUrl?.trim();
+    return isEditorial &&
+        videoStatus == 'ready' &&
+        url != null &&
+        url.isNotEmpty;
+  }
+
+  String? get editorialPosterUrl {
+    final poster = videoPosterUrl?.trim();
+    if (poster != null && poster.isNotEmpty) return poster;
+    final cover = coverImageUrl?.trim();
+    if (cover != null && cover.isNotEmpty) return cover;
+    return null;
+  }
   /// Noticias es solo lectura editorial: sin comentarios.
   bool get acceptsReplies =>
       isPublished && !isClosed && forumId != 'noticias';
@@ -276,10 +313,16 @@ class ForumTopic {
     bool? isPinned,
     int? pinSortOrder,
     bool? isSystem,
+    bool? isEditorial,
+    String? viaAuthorId,
+    String? viaAuthorHandle,
     String? seasonKey,
     String? iconKey,
     String? iconImageUrl,
     String? coverImageUrl,
+    String? videoUrl,
+    String? videoPosterUrl,
+    String? videoStatus,
     bool? showHubTitle,
     bool? isListed,
     DateTime? createdAt,
@@ -312,10 +355,16 @@ class ForumTopic {
       isPinned: isPinned ?? this.isPinned,
       pinSortOrder: pinSortOrder ?? this.pinSortOrder,
       isSystem: isSystem ?? this.isSystem,
+      isEditorial: isEditorial ?? this.isEditorial,
+      viaAuthorId: viaAuthorId ?? this.viaAuthorId,
+      viaAuthorHandle: viaAuthorHandle ?? this.viaAuthorHandle,
       seasonKey: seasonKey ?? this.seasonKey,
       iconKey: iconKey ?? this.iconKey,
       iconImageUrl: iconImageUrl ?? this.iconImageUrl,
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      videoUrl: videoUrl ?? this.videoUrl,
+      videoPosterUrl: videoPosterUrl ?? this.videoPosterUrl,
+      videoStatus: videoStatus ?? this.videoStatus,
       showHubTitle: showHubTitle ?? this.showHubTitle,
       isListed: isListed ?? this.isListed,
       createdAt: createdAt ?? this.createdAt,

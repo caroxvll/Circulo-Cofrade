@@ -305,7 +305,7 @@ class _NoticiasArticleBody extends StatelessWidget {
     var usedDropCap = false;
 
     for (var i = 0; i < blocks.length; i++) {
-      if (i > 0) children.add(const SizedBox(height: 16));
+      if (i > 0) children.add(const SizedBox(height: 18));
       final block = blocks[i];
       if (!usedDropCap &&
           block.kind == ForumMarkdownBlockKind.paragraph &&

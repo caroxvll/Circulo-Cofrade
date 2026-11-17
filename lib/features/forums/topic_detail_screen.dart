@@ -41,6 +41,7 @@ import 'utils/topic_permissions.dart';
 import 'viewer_id_provider.dart';
 import 'widgets/hermandad_board_tabs_header.dart';
 import 'widgets/hermandad_owner_season_strips.dart';
+import 'widgets/hermandad_season_acts_card.dart';
 import 'widgets/hermandad_board_category_tabs.dart';
 import 'widgets/hermandad_official_edit_sheet.dart';
 import 'widgets/hermandad_official_confirm_dialogs.dart';
@@ -67,6 +68,7 @@ import 'topic_detail_typography.dart';
 import 'widgets/noticias_story_header.dart';
 import 'widgets/topic_detail_header.dart';
 import 'widgets/topic_poll_card.dart';
+import 'widgets/topic_reactions_section.dart';
 import 'widgets/topic_status_badge.dart';
 
 class TopicDetailScreen extends ConsumerStatefulWidget {
@@ -1258,6 +1260,16 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                               displayTotalReactions: boardTotalReactions,
                               reactionBreakdown: boardReactionBreakdown,
                             ),
+                            if (isHermandadBoard)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                                child: HermandadSeasonActsCard(
+                                  topicId: widget.topicId,
+                                  topicTitle: topic.title,
+                                  forumId: widget.forumId,
+                                  canPublish: canPublishOfficial,
+                                ),
+                              ),
                             if (canPublishOfficial)
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -1330,6 +1342,15 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                       child: TopicPollCard(
                         forumId: widget.forumId,
                         topicId: widget.topicId,
+                      ),
+                    ),
+                  if (!isHermandadBoard &&
+                      !isNoticias &&
+                      topic.isPublished)
+                    SliverToBoxAdapter(
+                      child: TopicReactionsSection(
+                        topicId: widget.topicId,
+                        enabled: !topic.isClosed,
                       ),
                     ),
                   if (!isHermandadBoard && topicAcceptsFeaturedAds(topic))

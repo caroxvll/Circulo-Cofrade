@@ -11,6 +11,11 @@ import {
   CALENDAR_EVENT_TYPES,
   eventTypeLabel,
 } from '../../../core/events/events.models';
+import {
+  SEASON_ACT_KINDS,
+  buildSeasonActsSnapshot,
+  currentSeasonActsYear,
+} from '../../../core/hermandad/season-acts';
 import { formatTimeAgo } from '../../../core/utils/date';
 import { ConfirmDialogService } from '../../../shared/confirm-dialog/confirm-dialog.service';
 
@@ -117,6 +122,27 @@ export class HermandadHomePageComponent implements OnInit {
   readonly featuredPost = computed(() => this.filteredRecentPosts()[0] ?? null);
 
   readonly olderPosts = computed(() => this.filteredRecentPosts().slice(1));
+
+  readonly seasonActs = computed(() =>
+    buildSeasonActsSnapshot({
+      year: currentSeasonActsYear(),
+      hermandadName: this.displayName(),
+      events: this.store.seasonActEvents(),
+      topicId: this.board()?.topicId,
+      profileId: this.profile()?.id ?? null,
+      hasAccount: true,
+    }),
+  );
+
+  readonly missingSeasonActs = computed(() =>
+    this.seasonActs().milestones.filter((m) => m.status === 'empty'),
+  );
+
+  publishKindForMissing(kind: string): string {
+    return (
+      SEASON_ACT_KINDS.find((k) => k.kind === kind)?.publishKindId ?? 'ensayo'
+    );
+  }
 
   ngOnInit(): void {
     // Cache 60s en el store: evita re-fetch masivo al volver a Inicio.

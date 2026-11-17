@@ -116,6 +116,9 @@ const ORDERED = [
   'forum_moderators_realtime.sql',
   'calendar_events_realtime.sql',
   'liturgical_countdown_realtime.sql',
+  'season_hub_modes.sql',
+  'editorial_posts.sql',
+  'editorial_video.sql',
 ];
 
 /** Opcional: puede fallar sin extensiones / Edge Functions. */

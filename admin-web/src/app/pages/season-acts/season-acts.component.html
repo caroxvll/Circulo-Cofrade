@@ -1,0 +1,66 @@
+<section class="queue-page">
+  <header>
+    <div>
+      <p class="eyebrow">Comunidad · solo admin</p>
+      <h1>Actos de temporada {{ year }}</h1>
+      <p class="lead">
+        Cobertura de igualá, ensayos, muda y desarmá por hermandad. Sirve para
+        ver a quién falta meter datos.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  <div class="summary">
+    <span class="chip muted">{{ missingAccount().length }} sin cuenta</span>
+    <span class="chip danger">{{ emptyActs().length }} vacías</span>
+    <span class="chip warn">{{ partial().length }} parciales</span>
+    <span class="chip ok">{{ complete().length }} completas</span>
+  </div>
+
+  @if (loading()) {
+    <div class="empty-box">Cargando cobertura…</div>
+  } @else if (!rows().length) {
+    <div class="empty-box">No hay tablones de hermandad todavía.</div>
+  } @else {
+    <div class="coverage-list">
+      @for (row of rows(); track row.topicId) {
+        <article class="coverage-card">
+          <header>
+            <div>
+              <h3>{{ row.hermandadName }}</h3>
+              @if (row.topicId) {
+                <a [routerLink]="['/app/hermandades']" class="sub-link">Ver en hermandades</a>
+              }
+            </div>
+            <span
+              class="badge"
+              [class.muted]="!row.hasAccount"
+              [class.danger]="row.hasAccount && row.isEmpty"
+              [class.warn]="row.hasAccount && !row.isEmpty && !row.isComplete"
+              [class.ok]="row.hasAccount && row.isComplete"
+            >
+              {{ row.coverageLabel }}
+            </span>
+          </header>
+          <div class="milestones">
+            @for (m of row.milestones; track m.kind) {
+              <div class="milestone" [attr.data-status]="m.status">
+                <strong>{{ m.label }}</strong>
+                <span>{{ m.status === 'empty' ? '—' : m.statusLabel }}</span>
+              </div>
+            }
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>
