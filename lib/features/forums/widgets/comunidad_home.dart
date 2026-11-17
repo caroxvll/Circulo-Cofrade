@@ -19,10 +19,13 @@ import '../../../core/widgets/verified_account_badge.dart';
 import '../../../shared/models/followed_topic.dart';
 import '../../../shared/models/user_profile.dart';
 import '../../../shared/models/forum.dart';
+import '../../admin/widgets/junta_editorial_tab.dart';
 import '../../auth/auth_provider.dart';
 import '../../cuaresma/models/event_live_update.dart';
 import '../../cuaresma/utils/cuaresma_topic.dart';
 import '../../notifications/widgets/notifications_bell_button.dart';
+import '../../permissions/permissions_provider.dart';
+import '../../quiz/quiz_provider.dart';
 import '../../semana_santa/models/ss_live_update.dart';
 import '../../semana_santa/widgets/ss_forums_live_chip.dart';
 import '../../semana_santa/widgets/ss_radar_section.dart';
@@ -35,11 +38,13 @@ import '../data/mock_forums.dart';
 import '../mis_hermandades_provider.dart';
 import '../utils/editorial_post.dart';
 import 'editorial_video_player.dart';
+import 'forum_post_image.dart';
 import '../utils/forum_navigation.dart';
 import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
 import '../utils/noticias_forum.dart';
 import '../utils/official_post_categories.dart';
+import '../../profile/hermandad_following_provider.dart';
 import '../../profile/open_hermandad_picker.dart';
 import '../../search/follows_provider.dart';
 import 'forum_pillar_icon_mark.dart';
@@ -99,6 +104,10 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
   }
 
   Widget _forYouBody(BuildContext context) {
+    final canPublishEditorial = ref.watch(isJuntaMemberProvider);
+    final isAdmin = ref.watch(isAdminProvider);
+    final quizVisible =
+        ref.watch(quizLiveVisibleProvider).asData?.value == true;
     final cards = <_Activity>[
       if (widget.noticias != null) _Activity.fromForum(widget.noticias!),
       for (final forum in widget.forums) _Activity.fromForum(forum),
@@ -126,23 +135,51 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
         const Divider(height: 1, thickness: 1, color: AppColors.border),
         if (_forYouFilter == _ForYouFilter.todo) const ParaTiLiveEventsBand(),
         Expanded(
-          child: ListView(
-            physics: _scrollPhysics,
-            padding: const EdgeInsets.only(bottom: 24),
+          child: Stack(
             children: [
-              if (feed.isEmpty)
-                _EmptyNote(
-                  text: cards.isEmpty && river.entries.isEmpty
-                      ? 'Cuando haya temas nuevos, aparecerán aquí.'
-                      : _forYouFilter.emptyLabel,
-                )
-              else
-                for (final piece in feed) piece,
+              Positioned.fill(
+                child: ListView(
+                  physics: _scrollPhysics,
+                  padding: EdgeInsets.only(
+                    bottom: canPublishEditorial ? 104 : 24,
+                  ),
+                  children: [
+                    if (feed.isEmpty)
+                      _EmptyNote(
+                        text: cards.isEmpty && river.entries.isEmpty
+                            ? 'Cuando haya temas nuevos, aparecerán aquí.'
+                            : _forYouFilter.emptyLabel,
+                      )
+                    else
+                      for (final piece in feed) piece,
+                  ],
+                ),
+              ),
+              if (canPublishEditorial)
+                Positioned(
+                  right: 16,
+                  bottom: quizVisible ? 104 : 16,
+                  child: FloatingActionButton.extended(
+                    heroTag: 'para-ti-editorial-compose',
+                    onPressed: () => _openEditorialCompose(context),
+                    backgroundColor: AppColors.burgundy,
+                    foregroundColor: AppColors.textOnDark,
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(isAdmin ? 'Publicar' : 'Proponer'),
+                  ),
+                ),
             ],
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _openEditorialCompose(BuildContext context) async {
+    final created = await showEditorialComposeSheet(context);
+    if (!created || !mounted) return;
+    ref.invalidate(publishedEditorialPostsProvider);
+    ref.invalidate(paraTiRiverProvider);
   }
 
   /// Para ti, de más nuevo a más viejo. Una noticia o una respuesta reciente
@@ -261,6 +298,8 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
     final people = (profiles.asData?.value ?? const <UserProfile>[])
         .where((profile) => !profile.isSuspended)
         .toList();
+    final hermandadFollowingEnabled =
+        ref.watch(hermandadFollowingEnabledProvider).asData?.value ?? false;
     final boards = topics.asData?.value
             .where((topic) => !topic.isHermandadBoard)
             .toList() ??
@@ -305,14 +344,23 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
         SliverToBoxAdapter(
           child: _ShelfHint(
             title: 'Cuentas que sigues',
-            text: 'Sigue una hermandad o un cofrade y aparecerá aquí.',
-            actionLabel: 'Elegir',
-            onAction: () => openHermandadPicker(context, ref),
+            text: hermandadFollowingEnabled
+                ? 'Sigue una hermandad o un cofrade y aparecerá aquí.'
+                : 'Sigue a un cofrade y aparecerá aquí. '
+                    'Elegir hermandad llega en breve.',
+            actionLabel: hermandadFollowingEnabled ? 'Elegir' : null,
+            onAction: hermandadFollowingEnabled
+                ? () => openHermandadPicker(context, ref)
+                : null,
           ),
         )
       else if (people.isNotEmpty || hermandades.isNotEmpty)
         SliverToBoxAdapter(
-          child: _AccountsRail(hermandades: hermandades, people: people),
+          child: _AccountsRail(
+            hermandades: hermandades,
+            people: people,
+            allowAddHermandad: hermandadFollowingEnabled,
+          ),
         ),
       if (hashtags.isNotEmpty)
         SliverToBoxAdapter(child: _HashtagShelf(tags: hashtags)),
@@ -845,16 +893,23 @@ class _ParaTiEditorialCard extends StatelessWidget {
     final isVideo = topic.hasReadyEditorialVideo;
     // Vídeo: nunca rota «último comentario» (_ConversationSlide).
     final Widget? media = isVideo
-        ? EditorialVideoPoster(posterUrl: poster)
+        ? EditorialVideoPlayer(
+            videoUrl: topic.videoUrl!,
+            posterUrl: poster,
+            autoPlay: true,
+            muted: true,
+            pauseWhenOffscreen: true,
+            showVideoLabel: true,
+            openFullscreenOnTap: true,
+          )
         : (cover == null || cover.isEmpty)
             ? null
-            : _TimelineMedia(
-                source: cover,
-                image: CofradeoNetworkImage(
-                  url: cover,
-                  fit: BoxFit.cover,
-                  cacheSize: 176,
-                ),
+            : ForumPostImage(
+                imageUrl: cover,
+                shareText: topic.title,
+                adaptiveOrientation: true,
+                maxPreviewHeight: 560,
+                showExpandHint: false,
               );
 
     return _TimelinePost(
@@ -1786,14 +1841,17 @@ class _AccountsRail extends ConsumerWidget {
   const _AccountsRail({
     required this.hermandades,
     required this.people,
+    required this.allowAddHermandad,
   });
 
   final List<FollowedTopic> hermandades;
   final List<UserProfile> people;
+  final bool allowAddHermandad;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final count = hermandades.length + people.length + 1;
+    final count =
+        hermandades.length + people.length + (allowAddHermandad ? 1 : 0);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2001,9 +2059,12 @@ class _PersonPostCard extends StatelessWidget {
             ),
           ),
           if (hasCover)
-            SizedBox(
-              height: 168,
-              child: CofradeoNetworkImage(url: cover, fit: BoxFit.cover, cacheSize: 480),
+            ForumPostImage(
+              imageUrl: cover,
+              adaptiveOrientation: true,
+              maxPreviewHeight: 560,
+              showExpandHint: false,
+              borderRadius: BorderRadius.zero,
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),

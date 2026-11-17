@@ -78,6 +78,7 @@ begin
   end if;
 
   insert into public.forum_topics (
+    id,
     forum_id,
     author_id,
     author_handle,
@@ -92,6 +93,7 @@ begin
     is_pinned,
     is_listed
   ) values (
+    'editorial-' || replace(gen_random_uuid()::text, '-', ''),
     'foro-cofradiero',
     v_uid,
     '@cofradeo',

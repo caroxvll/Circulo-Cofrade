@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../permissions/data/permissions_repository.dart';
 import '../../permissions/permissions_provider.dart';
+import '../../profile/hermandad_following_provider.dart';
 import '../admin_provider.dart';
 import '../junta_ui.dart';
 import 'junta_handle_search_field.dart';
@@ -31,6 +32,7 @@ class _JuntaHermandadesTabState extends ConsumerState<JuntaHermandadesTab> {
   var _creating = false;
   var _assigning = false;
   var _autoPassword = true;
+  var _savingFollowing = false;
 
   @override
   void dispose() {
@@ -217,6 +219,21 @@ class _JuntaHermandadesTabState extends ConsumerState<JuntaHermandadesTab> {
     );
   }
 
+  Future<void> _setHermandadFollowing(bool enabled) async {
+    setState(() => _savingFollowing = true);
+    try {
+      await ref.read(adminRepositoryProvider).setAppConfig(
+            profileHermandadFollowingConfigKey,
+            enabled ? 'on' : 'off',
+          );
+      ref.invalidate(hermandadFollowingEnabledProvider);
+    } catch (_) {
+      _snack('No se pudo guardar. Revisa que app_config exista.');
+    } finally {
+      if (mounted) setState(() => _savingFollowing = false);
+    }
+  }
+
   void _snack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -279,10 +296,38 @@ class _JuntaHermandadesTabState extends ConsumerState<JuntaHermandadesTab> {
   Widget build(BuildContext context) {
     final topicsAsync = ref.watch(hermandadBoardTopicsProvider);
     final assignmentsAsync = ref.watch(hermandadAssignmentsProvider);
+    final followingAsync = ref.watch(hermandadFollowingEnabledProvider);
+    final followingEnabled = followingAsync.asData?.value ?? false;
 
     return ListView(
       padding: JuntaUi.listPadding,
       children: [
+        const JuntaSectionHeader(
+          title: 'Tu hermandad en el perfil',
+          subtitle:
+              'Perfil → Siguiendo. Apagado, la gente ve «Próximamente» '
+              'y no puede elegir hermandad.',
+        ),
+        const SizedBox(height: 4),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            followingEnabled ? 'Visible' : 'Próximamente',
+            style: JuntaUi.body(color: AppColors.textPrimary),
+          ),
+          subtitle: Text(
+            followingEnabled
+                ? 'Se puede elegir y seguir una hermandad.'
+                : 'El apartado sigue ahí, sin el directorio.',
+            style: JuntaUi.body(color: AppColors.textMuted),
+          ),
+          value: followingEnabled,
+          activeThumbColor: AppColors.burgundy,
+          onChanged: _savingFollowing || followingAsync.isLoading
+              ? null
+              : _setHermandadFollowing,
+        ),
+        const SizedBox(height: 18),
         const JuntaSectionHeader(
           title: 'Crear cuenta oficial',
           subtitle:
