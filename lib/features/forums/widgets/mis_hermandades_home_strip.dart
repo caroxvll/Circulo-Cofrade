@@ -11,6 +11,7 @@ import '../mis_hermandades_provider.dart';
 import '../utils/forum_navigation.dart';
 import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
+import '../../profile/hermandad_following_provider.dart';
 import '../../profile/open_hermandad_picker.dart';
 import 'hermandad_crest_hero.dart';
 
@@ -33,28 +34,40 @@ class MisHermandadesHomeStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final boardsAsync = ref.watch(followedHermandadBoardsProvider);
+    final followingEnabled =
+        ref.watch(hermandadFollowingEnabledProvider).asData?.value ?? false;
 
     return boardsAsync.when(
       loading: () => const SizedBox(height: heightEmpty),
-      error: (_, _) => _EmptyStrip(
-        onExplore: () => openHermandadPicker(context, ref),
-      ),
+      error: (_, _) => followingEnabled
+          ? _EmptyStrip(
+              onExplore: () => openHermandadPicker(context, ref),
+            )
+          : const _SoonStrip(),
       data: (boards) {
+        if (!followingEnabled && boards.isEmpty) return const _SoonStrip();
         if (boards.isEmpty) {
           return _EmptyStrip(
             onExplore: () => openHermandadPicker(context, ref),
           );
         }
-        return _FollowingStrip(boards: boards);
+        return _FollowingStrip(
+          boards: boards,
+          allowAdd: followingEnabled,
+        );
       },
     );
   }
 }
 
 class _FollowingStrip extends ConsumerWidget {
-  const _FollowingStrip({required this.boards});
+  const _FollowingStrip({
+    required this.boards,
+    required this.allowAdd,
+  });
 
   final List<FollowedTopic> boards;
+  final bool allowAdd;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -108,10 +121,10 @@ class _FollowingStrip extends ConsumerWidget {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.only(right: 20),
-              itemCount: boards.length + 1,
+              itemCount: boards.length + (allowAdd ? 1 : 0),
               separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
-                if (index == boards.length) {
+                if (allowAdd && index == boards.length) {
                   return _AddChip(
                     onTap: () => openHermandadPicker(context, ref),
                   );
@@ -204,6 +217,71 @@ class _EmptyStrip extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SoonStrip extends StatelessWidget {
+  const _SoonStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppColors.gold.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.burgundy.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.church_outlined,
+                  color: AppColors.burgundy,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tus Hermandades',
+                      style: AppTypography.titleLarge().copyWith(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Próximamente podrás seguir la tuya desde aquí.',
+                      style: AppTypography.bodyMedium(
+                        color: AppColors.textSecondary,
+                      ).copyWith(fontSize: 12, height: 1.3),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

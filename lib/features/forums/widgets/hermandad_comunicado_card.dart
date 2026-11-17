@@ -5,6 +5,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/forum.dart';
 import '../utils/hermandad_board_display.dart';
+import 'forum_post_image.dart';
 import 'forum_post_image_viewer.dart';
 import 'reply_card.dart';
 import 'topic_card.dart';
@@ -398,44 +399,47 @@ class _Cover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 168,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          CofradeoNetworkImage(
-            url: imageUrl,
-            fit: BoxFit.cover,
-            borderRadius: BorderRadius.zero,
-          ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0x00000000), Color(0x66000000)],
-                stops: [0.55, 1],
+    return Stack(
+      children: [
+        ForumPostImage(
+          imageUrl: imageUrl,
+          shareText: shareText,
+          adaptiveOrientation: true,
+          maxPreviewHeight: 560,
+          showExpandHint: false,
+          borderRadius: BorderRadius.zero,
+        ),
+        const Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x00000000), Color(0x66000000)],
+                  stops: [0.55, 1],
+                ),
               ),
             ),
           ),
-          Positioned(
-            left: 10,
-            bottom: 10,
-            child: _CategoryPill(meta: meta, onDark: true),
-          ),
-          Positioned(
-            right: 8,
-            bottom: 8,
-            child: _ZoomBadgeButton(
-              onTap: () => showForumPostImageViewer(
-                context,
-                imageUrl: imageUrl,
-                shareText: shareText,
-              ),
+        ),
+        Positioned(
+          left: 10,
+          bottom: 10,
+          child: _CategoryPill(meta: meta, onDark: true),
+        ),
+        Positioned(
+          right: 8,
+          bottom: 8,
+          child: _ZoomBadgeButton(
+            onTap: () => showForumPostImageViewer(
+              context,
+              imageUrl: imageUrl,
+              shareText: shareText,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

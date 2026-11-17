@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
+import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../forums/data/topic_icon_assets.dart';
 import '../../forums/topic_detail_typography.dart';
 import 'cuaresma_hub_design.dart';
 
@@ -12,8 +16,10 @@ class CuaresmaHubHeroStack extends StatelessWidget {
     required this.agendaLive,
     required this.topicsCount,
     required this.onNewTopic,
+    this.imageSource,
   });
 
+  final String? imageSource;
   final String agendaLabel;
   final bool agendaLive;
   final int topicsCount;
@@ -26,6 +32,9 @@ class CuaresmaHubHeroStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final image = imageSource?.trim();
+    final hasImage = image != null && image.isNotEmpty;
+
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -50,96 +59,81 @@ class CuaresmaHubHeroStack extends StatelessWidget {
         ),
       ),
       child: ClipRect(
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Positioned(
-              right: -34,
-              top: -48,
-              child: IgnorePointer(
-                child: Container(
-                  width: 126,
-                  height: 126,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.burgundy.withValues(alpha: 0.055),
-                    border: Border.all(
-                      color: AppColors.gold.withValues(alpha: 0.14),
+            if (hasImage)
+              SizedBox(
+                height: 176,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _CuaresmaHeaderImage(source: image),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0x14000000),
+                            Color(0x00000000),
+                            Color(0xCC2A090C),
+                          ],
+                          stops: [0, 0.42, 1],
+                        ),
+                      ),
                     ),
-                  ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 12, 14),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const _HeaderEyebrow(onImage: true),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Hoy en Cuaresma',
+                                  style: AppTypography.newsHeadline(
+                                    color: AppColors.textOnDark,
+                                  ).copyWith(fontSize: 26, height: 1),
+                                ),
+                              ),
+                              CuaresmaHubNewTopicButton(onPressed: onNewTopic),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            Positioned(
-              right: 54,
-              bottom: -42,
-              child: IgnorePointer(
-                child: Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.gold.withValues(alpha: 0.07),
-                  ),
-                ),
-              ),
-            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 18,
-                        height: 2,
-                        decoration: BoxDecoration(
-                          color: AppColors.goldDark,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Text(
-                        'AGENDA Y COMUNIDAD',
-                        style: TopicDetailTypography.meta(
-                          color: AppColors.goldDark,
-                          fontWeight: FontWeight.w800,
-                        ).copyWith(fontSize: 9.5, letterSpacing: 1.1),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: AppColors.burgundy.withValues(alpha: 0.09),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.burgundy.withValues(alpha: 0.13),
+                  if (!hasImage) ...[
+                    const _HeaderEyebrow(),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Hoy en Cuaresma',
+                            style: AppTypography.newsHeadline(
+                              color: AppColors.burgundyDark,
+                            ).copyWith(fontSize: 26, height: 1),
                           ),
                         ),
-                        child: const Icon(
-                          Icons.church_outlined,
-                          size: 18,
-                          color: AppColors.burgundy,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Hoy en Cuaresma',
-                          style: AppTypography.newsHeadline(
-                            color: AppColors.burgundyDark,
-                          ).copyWith(fontSize: 26, height: 1),
-                        ),
-                      ),
-                      CuaresmaHubNewTopicButton(onPressed: onNewTopic),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                        CuaresmaHubNewTopicButton(onPressed: onNewTopic),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   Wrap(
                     spacing: 8,
                     runSpacing: 6,
@@ -163,6 +157,65 @@ class CuaresmaHubHeroStack extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _HeaderEyebrow extends StatelessWidget {
+  const _HeaderEyebrow({this.onImage = false});
+
+  final bool onImage;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = onImage ? AppColors.goldPale : AppColors.goldDark;
+    return Row(
+      children: [
+        Container(
+          width: 18,
+          height: 2,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        const SizedBox(width: 7),
+        Text(
+          'AGENDA Y COMUNIDAD',
+          style: TopicDetailTypography.meta(
+            color: color,
+            fontWeight: FontWeight.w800,
+          ).copyWith(fontSize: 9.5, letterSpacing: 1.1),
+        ),
+      ],
+    );
+  }
+}
+
+class _CuaresmaHeaderImage extends StatelessWidget {
+  const _CuaresmaHeaderImage({required this.source});
+
+  final String source;
+
+  @override
+  Widget build(BuildContext context) {
+    if (topicCoverIsAsset(source)) {
+      return CofradeoAssetImage(
+        assetPath: source,
+        fit: BoxFit.cover,
+        cacheWidth: ImageDecodeCache.px(
+          context,
+          MediaQuery.sizeOf(context).width,
+        ),
+        cacheHeight: ImageDecodeCache.px(context, 176),
+      );
+    }
+    return CofradeoNetworkImage(
+      url: source,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: 176,
+      cacheSize: 900,
     );
   }
 }

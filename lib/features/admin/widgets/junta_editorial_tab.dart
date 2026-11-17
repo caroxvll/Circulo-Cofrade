@@ -18,6 +18,17 @@ import '../../forums/widgets/forum_compose_field.dart';
 import '../admin_provider.dart';
 import '../junta_ui.dart';
 
+Future<bool> showEditorialComposeSheet(BuildContext context) async {
+  return await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: AppColors.surface,
+        builder: (context) => const _EditorialComposeSheet(),
+      ) ??
+      false;
+}
+
 class JuntaEditorialTab extends ConsumerStatefulWidget {
   const JuntaEditorialTab({super.key});
 
@@ -32,14 +43,8 @@ class _JuntaEditorialTabState extends ConsumerState<JuntaEditorialTab> {
   }
 
   Future<void> _compose() async {
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      builder: (context) => const _EditorialComposeSheet(),
-    );
-    if (created == true && mounted) {
+    final created = await showEditorialComposeSheet(context);
+    if (created && mounted) {
       await _reload();
       ref.invalidate(pendingTopicsProvider);
       ref.invalidate(forumTopicsProvider(editorialForumId));
@@ -250,6 +255,8 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
   String? _videoMime;
   String? _videoName;
   var _saving = false;
+  double? _uploadProgress;
+  var _uploadAttempt = 0;
 
   @override
   void dispose() {
@@ -314,6 +321,56 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
     });
   }
 
+  Future<bool> _uploadVideoWithRetries({
+    required String uploadUrl,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    const maxAttempts = 3;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (!mounted) return false;
+      setState(() {
+        _uploadAttempt = attempt;
+        _uploadProgress = 0;
+      });
+      try {
+        final request = http.StreamedRequest('PUT', Uri.parse(uploadUrl))
+          ..headers['Content-Type'] = contentType
+          ..contentLength = bytes.length;
+        final responseFuture = request.send().timeout(
+              const Duration(minutes: 4),
+            );
+        const chunkSize = 256 * 1024;
+        for (var offset = 0; offset < bytes.length; offset += chunkSize) {
+          final end = (offset + chunkSize < bytes.length)
+              ? offset + chunkSize
+              : bytes.length;
+          request.sink.add(Uint8List.sublistView(bytes, offset, end));
+          if (mounted) {
+            setState(() => _uploadProgress = end / bytes.length);
+          }
+          await Future<void>.delayed(Duration.zero);
+        }
+        await request.sink.close();
+        final response = await responseFuture;
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return true;
+        }
+        if (response.statusCode < 500 &&
+            response.statusCode != 408 &&
+            response.statusCode != 429) {
+          return false;
+        }
+      } catch (_) {
+        // Un corte breve se reintenta automáticamente.
+      }
+      if (attempt < maxAttempts) {
+        await Future<void>.delayed(Duration(seconds: attempt * 2));
+      }
+    }
+    return false;
+  }
+
   Future<void> _submit() async {
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
@@ -362,6 +419,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
       }
 
       if (_videoBytes != null && _videoBytes!.isNotEmpty) {
+        final contentType = _videoMime ?? 'video/mp4';
         await repo.setEditorialVideo(
           topicId: topic.id,
           videoStatus: 'uploading',
@@ -369,24 +427,21 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
         );
         final upload = await repo.requestEditorialVideoUpload(
           topicId: topic.id,
-          contentType: _videoMime ?? 'video/mp4',
+          contentType: contentType,
           byteLength: _videoBytes!.length,
         );
-        final put = await http.put(
-          Uri.parse(upload.uploadUrl),
-          headers: {
-            'Content-Type': _videoMime ?? 'video/mp4',
-            'Content-Length': '${_videoBytes!.length}',
-          },
-          body: _videoBytes,
+        final uploaded = await _uploadVideoWithRetries(
+          uploadUrl: upload.uploadUrl,
+          bytes: _videoBytes!,
+          contentType: contentType,
         );
-        if (put.statusCode < 200 || put.statusCode >= 300) {
+        if (!uploaded) {
           await repo.setEditorialVideo(
             topicId: topic.id,
             videoStatus: 'failed',
             videoPosterUrl: coverUrl,
           );
-          throw StateError('upload failed ${put.statusCode}');
+          throw StateError('video upload failed');
         }
         await repo.setEditorialVideo(
           topicId: topic.id,
@@ -411,14 +466,22 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'No se pudo publicar. ¿SQL + Edge Function R2 listos?',
+            _uploadAttempt > 0
+                ? 'No se pudo subir el vídeo tras $_uploadAttempt intentos.'
+                : 'No se pudo publicar. Revisa la conexión y la configuración.',
           ),
         ),
       );
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _uploadProgress = null;
+          _uploadAttempt = 0;
+        });
+      }
     }
   }
 
@@ -538,6 +601,21 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
                 icon: const Icon(Icons.videocam_outlined),
                 label: const Text('Añadir vídeo (R2, máx. 80 MB)'),
               ),
+            if (_saving && _uploadProgress != null) ...[
+              const SizedBox(height: 14),
+              LinearProgressIndicator(
+                value: _uploadProgress,
+                color: AppColors.burgundy,
+                backgroundColor: AppColors.backgroundElevated,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Subiendo vídeo · ${(_uploadProgress! * 100).round()}%'
+                '${_uploadAttempt > 1 ? ' · intento $_uploadAttempt de 3' : ''}',
+                textAlign: TextAlign.center,
+                style: JuntaUi.caption(),
+              ),
+            ],
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _saving ? null : _submit,

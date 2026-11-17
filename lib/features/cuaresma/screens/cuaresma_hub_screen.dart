@@ -10,6 +10,7 @@ import '../../ads/widgets/sponsored_ad_card.dart';
 import '../../ads/widgets/sponsored_placement_slot.dart';
 import '../../auth/auth_provider.dart';
 import '../../forums/data/mock_forums.dart';
+import '../../forums/data/topic_icon_assets.dart';
 import '../../forums/forums_provider.dart';
 import '../../forums/utils/forum_navigation.dart';
 import '../../forums/widgets/forum_editorial_title.dart';
@@ -88,6 +89,7 @@ class CuaresmaHubScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               CuaresmaHubHeroStack(
+                imageSource: topicCoverImageSource(topic),
                 agendaLabel: cuaresmaHubAgendaLabel(
                   agenda,
                   liveCount: groups.live.length,

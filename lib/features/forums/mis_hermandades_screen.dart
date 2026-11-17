@@ -10,7 +10,7 @@ import '../../core/widgets/cofradeo_asset_image.dart';
 import '../../core/widgets/cofradeo_network_image.dart';
 import '../../shared/models/followed_topic.dart';
 import '../search/follows_provider.dart';
-import '../profile/open_hermandad_picker.dart';
+import '../profile/hermandad_following_provider.dart';
 import 'mis_hermandades_provider.dart';
 import 'utils/forum_navigation.dart';
 import 'utils/hermandad_board_display.dart';
@@ -456,6 +456,9 @@ class _EmptyState extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final followingEnabled =
+        ref.watch(hermandadFollowingEnabledProvider).asData?.value ?? false;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -480,7 +483,7 @@ class _EmptyState extends ConsumerWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              'Aún no sigues ninguna',
+              followingEnabled ? 'Aún no sigues ninguna' : 'Próximamente',
               textAlign: TextAlign.center,
               style: AppTypography.displaySmall(
                 color: AppColors.textPrimary,
@@ -488,26 +491,31 @@ class _EmptyState extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Elige la tuya en el directorio y tendrás aquí '
-              'cultos, igualás y avisos sin salir de Cofradeo.',
+              followingEnabled
+                  ? 'Elige la tuya en el directorio y tendrás aquí '
+                      'cultos, igualás y avisos sin salir de Cofradeo.'
+                  : 'Podrás elegir tu hermandad y tener aquí '
+                      'cultos, igualás y avisos. Lo abriremos en breve.',
               textAlign: TextAlign.center,
               style: AppTypography.bodyMedium(
                 color: AppColors.textSecondary,
               ).copyWith(fontSize: 14, height: 1.4),
             ),
-            const SizedBox(height: 22),
-            FilledButton(
-              onPressed: () => context.push('/foros/hermandades'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.burgundy,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 22,
-                  vertical: 12,
+            if (followingEnabled) ...[
+              const SizedBox(height: 22),
+              FilledButton(
+                onPressed: () => context.push('/foros/hermandades'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.burgundy,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 22,
+                    vertical: 12,
+                  ),
                 ),
+                child: const Text('Elegir mi hermandad'),
               ),
-              child: const Text('Elegir mi hermandad'),
-            ),
+            ],
           ],
         ),
       ),
