@@ -11,6 +11,12 @@ import {
   PublishKindId,
   publishKindById,
 } from './hermandad-portal.service';
+import {
+  SEASON_ACT_DB_TYPES,
+  SeasonActEvent,
+  currentSeasonActsYear,
+  seasonActsRange,
+} from './season-acts';
 
 export interface HermandadUpcomingEvent {
   id: string;
@@ -34,6 +40,8 @@ export class HermandadPortalStore {
   readonly deletedPosts = signal<HermandadOfficialPost[]>([]);
   readonly scheduledPosts = signal<HermandadScheduledPost[]>([]);
   readonly upcomingEvents = signal<HermandadUpcomingEvent[]>([]);
+  /** Igualá / ensayos / muda / desarmá del año (propios). */
+  readonly seasonActEvents = signal<SeasonActEvent[]>([]);
   readonly followerCount = signal(0);
   /** Primera carga (sin caché): la UI puede mostrar “Cargando…”. */
   readonly loading = signal(false);
@@ -196,6 +204,7 @@ export class HermandadPortalStore {
       this.deletedPosts.set([]);
       this.scheduledPosts.set([]);
       this.upcomingEvents.set([]);
+      this.seasonActEvents.set([]);
       this.followerCount.set(0);
       this.lastLoadedAt = 0;
       return;
@@ -229,17 +238,37 @@ export class HermandadPortalStore {
       // Ya hay datos útiles: quitar “Cargando…” aunque siga el resto.
       this.loading.set(false);
 
-      const [deleted, scheduled, events, followers] = await Promise.all([
-        this.api.fetchDeletedOfficialPosts(profile.id, topicIds).catch(() => []),
-        this.api.fetchScheduledPosts(profile.id, topicIds).catch(() => []),
-        this.api.fetchUpcomingOwnEvents(profile.id, 30).catch(() => []),
-        primaryId
-          ? this.api.countTopicFollowers(primaryId).catch(() => 0)
-          : Promise.resolve(0),
-      ]);
+      const year = currentSeasonActsYear();
+      const range = seasonActsRange(year);
+      const [deleted, scheduled, events, seasonActs, followers] =
+        await Promise.all([
+          this.api.fetchDeletedOfficialPosts(profile.id, topicIds).catch(() => []),
+          this.api.fetchScheduledPosts(profile.id, topicIds).catch(() => []),
+          this.api.fetchUpcomingOwnEvents(profile.id, 30).catch(() => []),
+          this.api
+            .fetchOwnEventsInRange(profile.id, range.fromIso, range.toIso)
+            .catch(() => []),
+          primaryId
+            ? this.api.countTopicFollowers(primaryId).catch(() => 0)
+            : Promise.resolve(0),
+        ]);
       this.deletedPosts.set(deleted);
       this.scheduledPosts.set(scheduled);
       this.upcomingEvents.set(events);
+      this.seasonActEvents.set(
+        seasonActs
+          .filter((e) =>
+            (SEASON_ACT_DB_TYPES as readonly string[]).includes(e.eventType),
+          )
+          .map((e) => ({
+            id: e.id,
+            title: e.title,
+            startsAt: e.startsAt,
+            eventType: e.eventType,
+            createdBy: profile.id,
+            organizerLabel: null,
+          })),
+      );
       this.followerCount.set(followers);
       this.lastLoadedAt = Date.now();
     } catch (err) {

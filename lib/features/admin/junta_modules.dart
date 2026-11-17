@@ -9,8 +9,10 @@ enum JuntaModule {
   reports,
   events,
   closeRequests,
+  editorial,
   moderators,
   hermandades,
+  seasonActs,
   forums,
   season,
   ads,
@@ -25,8 +27,10 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.reports => 'Reportes',
     JuntaModule.events => 'Eventos',
     JuntaModule.closeRequests => 'Cierres solicitados',
+    JuntaModule.editorial => 'Publicaciones oficiales',
     JuntaModule.moderators => 'Moderadores',
     JuntaModule.hermandades => 'Hermandades',
+    JuntaModule.seasonActs => 'Actos de temporada',
     JuntaModule.forums => 'Foros y apariencia',
     JuntaModule.season => 'Temporada',
     JuntaModule.ads => 'Patrocinios',
@@ -40,8 +44,10 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.reports => 'Reportes',
     JuntaModule.events => 'Eventos',
     JuntaModule.closeRequests => 'Cierres',
+    JuntaModule.editorial => 'Oficiales',
     JuntaModule.moderators => 'Moderadores',
     JuntaModule.hermandades => 'Hermandades',
+    JuntaModule.seasonActs => 'Actos',
     JuntaModule.forums => 'Foros',
     JuntaModule.season => 'Temporada',
     JuntaModule.ads => 'Patrocinios',
@@ -55,8 +61,10 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.reports => Icons.flag_outlined,
     JuntaModule.events => Icons.event_outlined,
     JuntaModule.closeRequests => Icons.lock_clock_outlined,
+    JuntaModule.editorial => Icons.newspaper_outlined,
     JuntaModule.moderators => Icons.admin_panel_settings_outlined,
     JuntaModule.hermandades => Icons.church_outlined,
+    JuntaModule.seasonActs => Icons.timeline_outlined,
     JuntaModule.forums => Icons.forum_outlined,
     JuntaModule.season => Icons.calendar_month_outlined,
     JuntaModule.ads => Icons.campaign_outlined,
@@ -71,8 +79,10 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.events ||
     JuntaModule.closeRequests =>
       JuntaNavSection.moderation,
+    JuntaModule.editorial ||
     JuntaModule.moderators ||
     JuntaModule.hermandades ||
+    JuntaModule.seasonActs ||
     JuntaModule.forums =>
       JuntaNavSection.community,
     JuntaModule.season || JuntaModule.ads || JuntaModule.quiz =>
@@ -83,6 +93,7 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.events ||
     JuntaModule.moderators ||
     JuntaModule.hermandades ||
+    JuntaModule.seasonActs ||
     JuntaModule.forums ||
     JuntaModule.season ||
     JuntaModule.ads =>
@@ -107,6 +118,7 @@ List<JuntaModule> visibleJuntaModules({
 }) {
   return JuntaModule.values.where((module) {
     if (module == JuntaModule.overview) return true;
+    if (module == JuntaModule.editorial) return true;
     if (module == JuntaModule.quiz) return isAdmin || canCreateQuiz;
     if (module.adminOnly && !isAdmin) return false;
     return true;

@@ -50,6 +50,15 @@ class ParaTiHotTopic extends ParaTiRiverEntry {
   DateTime get at => activityAt;
 }
 
+class ParaTiEditorial extends ParaTiRiverEntry {
+  const ParaTiEditorial(this.topic);
+
+  final ForumTopic topic;
+
+  @override
+  DateTime get at => topic.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+}
+
 class ParaTiRiver {
   const ParaTiRiver({required this.entries, required this.settled});
 
@@ -74,6 +83,12 @@ final _hottestCuaresmaTopicProvider =
       );
     });
 
+final publishedEditorialPostsProvider =
+    FutureProvider.autoDispose<List<ForumTopic>>((ref) async {
+  ref.keepAlive();
+  return ref.watch(forumsRepositoryProvider).fetchPublishedEditorialPosts();
+});
+
 /// Río de Para ti: avisos de hoy, directo de Semana Santa y el tema que se mueve.
 final paraTiRiverProvider = Provider<ParaTiRiver>((ref) {
   ref.watch(ssLiveRealtimeProvider);
@@ -82,12 +97,14 @@ final paraTiRiverProvider = Provider<ParaTiRiver>((ref) {
   final gate = ref.watch(ssLiveGateProvider);
   final feed = ref.watch(ssLiveRawFeedProvider);
   final hot = ref.watch(_hottestCuaresmaTopicProvider);
+  final editorials = ref.watch(publishedEditorialPostsProvider);
 
   final gateOpen = gate.asData?.value.isOpen == true;
   final settled = (tweets.hasValue || tweets.hasError) &&
       (gate.hasValue || gate.hasError) &&
       (!gateOpen || feed.hasValue || feed.hasError) &&
-      (hot.hasValue || hot.hasError);
+      (hot.hasValue || hot.hasError) &&
+      (editorials.hasValue || editorials.hasError);
 
   final entries = <ParaTiRiverEntry>[
     for (final update in tweets.asData?.value ?? const <EventLiveUpdate>[])
@@ -97,6 +114,8 @@ final paraTiRiverProvider = Provider<ParaTiRiver>((ref) {
         ParaTiSsLive(update),
     if (hot.asData?.value case final topic?)
       ParaTiHotTopic(topic: topic.topic, activityAt: topic.activityAt),
+    for (final topic in editorials.asData?.value ?? const <ForumTopic>[])
+      ParaTiEditorial(topic),
   ]..sort((a, b) => b.at.compareTo(a.at));
 
   return ParaTiRiver(

@@ -28,48 +28,137 @@ class CuaresmaHubHeroStack extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: _fill,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.alphaBlend(
+              AppColors.burgundy.withValues(alpha: 0.08),
+              _fill,
+            ),
+            _fill,
+            Color.alphaBlend(
+              AppColors.gold.withValues(alpha: 0.12),
+              AppColors.background,
+            ),
+          ],
+        ),
         border: Border(
           bottom: BorderSide(
             color: AppColors.gold.withValues(alpha: 0.45),
           ),
         ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: ClipRect(
+        child: Stack(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Hoy en Cuaresma',
-                    style: AppTypography.newsHeadline(
-                      color: AppColors.burgundyDark,
-                    ).copyWith(fontSize: 26, height: 1),
+            Positioned(
+              right: -34,
+              top: -48,
+              child: IgnorePointer(
+                child: Container(
+                  width: 126,
+                  height: 126,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.burgundy.withValues(alpha: 0.055),
+                    border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.14),
+                    ),
                   ),
                 ),
-                CuaresmaHubNewTopicButton(onPressed: onNewTopic),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                _HubCountPill(
-                  icon: Icons.campaign_outlined,
-                  label: agendaLabel,
-                  live: agendaLive,
+            Positioned(
+              right: 54,
+              bottom: -42,
+              child: IgnorePointer(
+                child: Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.gold.withValues(alpha: 0.07),
+                  ),
                 ),
-                _HubCountPill(
-                  icon: Icons.forum_outlined,
-                  label: topicsCount == 1
-                      ? '1 tema abierto'
-                      : '$topicsCount temas abiertos',
-                ),
-              ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 18,
+                        height: 2,
+                        decoration: BoxDecoration(
+                          color: AppColors.goldDark,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Text(
+                        'AGENDA Y COMUNIDAD',
+                        style: TopicDetailTypography.meta(
+                          color: AppColors.goldDark,
+                          fontWeight: FontWeight.w800,
+                        ).copyWith(fontSize: 9.5, letterSpacing: 1.1),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: AppColors.burgundy.withValues(alpha: 0.09),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.burgundy.withValues(alpha: 0.13),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.church_outlined,
+                          size: 18,
+                          color: AppColors.burgundy,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Hoy en Cuaresma',
+                          style: AppTypography.newsHeadline(
+                            color: AppColors.burgundyDark,
+                          ).copyWith(fontSize: 26, height: 1),
+                        ),
+                      ),
+                      CuaresmaHubNewTopicButton(onPressed: onNewTopic),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _HubCountPill(
+                        icon: Icons.campaign_outlined,
+                        label: agendaLabel,
+                        live: agendaLive,
+                      ),
+                      _HubCountPill(
+                        icon: Icons.forum_outlined,
+                        label: topicsCount == 1
+                            ? '1 tema abierto'
+                            : '$topicsCount temas abiertos',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),

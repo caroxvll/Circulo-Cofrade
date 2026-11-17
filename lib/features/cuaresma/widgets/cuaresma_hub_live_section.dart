@@ -271,6 +271,7 @@ class _CuaresmaFeaturedLiveCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final timing = calendarEventTiming(event);
     final isLive = timing?.kind == CalendarEventTimingKind.inProgress;
+    final timingColor = isLive ? AppColors.liveGreen : AppColors.burgundy;
     final opensLive = event.type.opensCuaresmaLive;
     final logos = ref.watch(organizerLogosMapProvider).asData?.value;
     final shieldUrl = resolvedOrganizerShieldUrl(logos, event);
@@ -347,14 +348,14 @@ class _CuaresmaFeaturedLiveCard extends ConsumerWidget {
                         Icon(
                           Icons.schedule_rounded,
                           size: 13,
-                          color: AppColors.burgundy.withValues(alpha: 0.9),
+                          color: timingColor.withValues(alpha: 0.9),
                         ),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
                             cuaresmaHubEnsayoTimingLabel(event),
                             style: TopicDetailTypography.meta(
-                              color: AppColors.burgundy,
+                              color: timingColor,
                               fontWeight: FontWeight.w600,
                             ),
                             maxLines: 1,

@@ -141,12 +141,127 @@ class AdminRepository {
 
     final rows = await _client!
         .from('forum_topics')
-        .select('*, profiles!author_id(avatar_url, verified)')
+        .select(
+          '*, profiles!author_id(avatar_url, display_name, handle, verified)',
+        )
         .eq('status', 'pending')
         .order('created_at', ascending: false)
         .limit(50);
 
     return rows.map(_topicFromRow).toList();
+  }
+
+  /// Publicaciones oficiales recientes (Junta).
+  Future<List<ForumTopic>> fetchEditorialPosts({int limit = 40}) async {
+    if (_client == null) return [];
+
+    final rows = await _client!
+        .from('forum_topics')
+        .select(
+          '*, profiles!author_id(avatar_url, display_name, handle, verified)',
+        )
+        .eq('is_editorial', true)
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return rows.map(_topicFromRow).toList();
+  }
+
+  /// Crea una publicación oficial. Admin → publicada; moderador → pendiente.
+  Future<ForumTopic> createEditorialPost({
+    required String title,
+    required String body,
+    String? excerpt,
+    String? coverImageUrl,
+  }) async {
+    if (_client == null) throw const AdminUnavailableException();
+
+    final row = await _client!.rpc(
+      'create_editorial_post',
+      params: {
+        'p_title': title.trim(),
+        'p_body': body.trim(),
+        'p_excerpt': excerpt?.trim(),
+        'p_cover_image_url': coverImageUrl?.trim(),
+      },
+    );
+
+    if (row is! Map<String, dynamic>) {
+      throw const AdminUnavailableException();
+    }
+    return _topicFromRow(row);
+  }
+
+  Future<void> setEditorialCover({
+    required String topicId,
+    required String coverImageUrl,
+  }) async {
+    if (_client == null) throw const AdminUnavailableException();
+    await _client!.rpc(
+      'set_editorial_cover',
+      params: {
+        'p_topic_id': topicId,
+        'p_cover_image_url': coverImageUrl,
+      },
+    );
+  }
+
+  /// Presign PUT a R2 + metadatos públicos. Requiere Edge Function desplegada.
+  Future<({String uploadUrl, String publicUrl, String objectKey})>
+      requestEditorialVideoUpload({
+    required String topicId,
+    required String contentType,
+    required int byteLength,
+  }) async {
+    if (_client == null) throw const AdminUnavailableException();
+
+    final response = await _client!.functions.invoke(
+      'editorial-video-upload',
+      body: {
+        'topicId': topicId,
+        'contentType': contentType,
+        'byteLength': byteLength,
+      },
+    );
+
+    final data = response.data;
+    if (data is! Map) {
+      throw const AdminUnavailableException();
+    }
+    final uploadUrl = data['uploadUrl']?.toString();
+    final publicUrl = data['publicUrl']?.toString();
+    final objectKey = data['objectKey']?.toString();
+    if (uploadUrl == null ||
+        uploadUrl.isEmpty ||
+        publicUrl == null ||
+        publicUrl.isEmpty ||
+        objectKey == null ||
+        objectKey.isEmpty) {
+      throw const AdminUnavailableException();
+    }
+    return (
+      uploadUrl: uploadUrl,
+      publicUrl: publicUrl,
+      objectKey: objectKey,
+    );
+  }
+
+  Future<void> setEditorialVideo({
+    required String topicId,
+    String? videoUrl,
+    String? videoPosterUrl,
+    String videoStatus = 'ready',
+  }) async {
+    if (_client == null) throw const AdminUnavailableException();
+    await _client!.rpc(
+      'set_editorial_video',
+      params: {
+        'p_topic_id': topicId,
+        'p_video_url': videoUrl,
+        'p_video_poster_url': videoPosterUrl,
+        'p_video_status': videoStatus,
+      },
+    );
   }
 
   Future<List<ModerationReport>> fetchPendingReports() async {
@@ -459,10 +574,16 @@ class AdminRepository {
       isPinned: row['is_pinned'] as bool? ?? false,
       pinSortOrder: row['pin_sort_order'] as int? ?? 0,
       isSystem: row['is_system'] as bool? ?? false,
+      isEditorial: row['is_editorial'] as bool? ?? false,
+      viaAuthorId: row['via_author_id'] as String?,
+      viaAuthorHandle: _viaAuthorHandleFromRow(row),
       seasonKey: row['season_key'] as String?,
       iconKey: row['icon_key'] as String?,
       iconImageUrl: row['icon_image_url'] as String?,
       coverImageUrl: row['cover_image_url'] as String?,
+      videoUrl: row['video_url'] as String?,
+      videoPosterUrl: row['video_poster_url'] as String?,
+      videoStatus: row['video_status'] as String?,
       isListed: row['is_listed'] as bool? ?? true,
       createdAt: createdAt,
       closeStatus: TopicCloseStatusX.fromDb(row['close_status'] as String?),
@@ -473,6 +594,16 @@ class AdminRepository {
       rejectionReason: (row['rejection_reason'] as String?)?.trim(),
       rejectedAt: rejectedAt,
     );
+  }
+
+  String? _viaAuthorHandleFromRow(Map<String, dynamic> row) {
+    if (row['is_editorial'] != true) return null;
+    final profile = row['profiles'];
+    if (profile is Map<String, dynamic>) {
+      final handle = (profile['handle'] as String?)?.trim();
+      if (handle != null && handle.isNotEmpty) return handle;
+    }
+    return null;
   }
 
   ModerationReport _reportFromRow(Map<String, dynamic> row) {
@@ -532,7 +663,9 @@ class AdminRepository {
 
     var query = _client!
         .from('forum_topics')
-        .select('*, profiles!author_id(avatar_url, verified)')
+        .select(
+          '*, profiles!author_id(avatar_url, display_name, handle, verified)',
+        )
         .eq('status', 'rejected');
 
     if (forumIds != null) {

@@ -913,6 +913,104 @@
   }
 }
 
+.season-acts {
+  display: grid;
+  gap: 10px;
+}
+
+.season-eyebrow {
+  margin: 0 0 2px;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-dark, #9b7424);
+  font-weight: 700;
+}
+
+.season-lead {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.season-ring {
+  display: inline-grid;
+  place-items: center;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--gold) 55%, var(--border));
+  color: var(--burgundy-dark);
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.season-ring[data-complete='true'] {
+  border-color: #2e7d32;
+  color: #2e7d32;
+}
+
+.season-track {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.season-node {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-alt, #f5efe8) 70%, #fff);
+}
+
+.season-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--text-muted, #9a9288);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--border) 80%, #fff);
+}
+
+.season-node[data-status='upcoming'] .season-dot {
+  background: var(--gold-dark, #9b7424);
+}
+
+.season-node[data-status='done'] .season-dot {
+  background: #2e7d32;
+}
+
+.season-node[data-status='mixed'] .season-dot {
+  background: var(--burgundy);
+}
+
+.season-node strong {
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.season-node span {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.25;
+}
+
+.season-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.season-cta {
+  font-size: 0.82rem;
+}
+
 @media (max-width: 720px) {
   .stats {
     grid-template-columns: 1fr 1fr;
@@ -933,5 +1031,9 @@
 
   .hero-copy {
     padding: 14px 14px 13px;
+  }
+
+  .season-track {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

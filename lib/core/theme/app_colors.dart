@@ -21,6 +21,7 @@ abstract final class AppColors {
   static const burgundyDark = Color(0xFF4D0008);
 
   static const brandPurple = Color(0xFF4A148C);
+  static const liveGreen = Color(0xFF2E7D32);
 
   // ── Texto sobre fondo claro ─────────────────────────────────────────────
   static const textPrimary = Color(0xFF241F1C);

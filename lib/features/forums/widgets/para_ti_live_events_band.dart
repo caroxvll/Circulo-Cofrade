@@ -10,7 +10,6 @@ import '../../calendar/utils/calendar_event_utils.dart';
 import '../../cuaresma/cuaresma_ensayos_provider.dart';
 import '../../cuaresma/utils/cuaresma_topic.dart';
 
-const _liveGreen = Color(0xFF2E7D32);
 const _circuloForumId = 'foro-cofradiero';
 
 /// Banda fija de Para ti: lo de hoy que está en curso, sale pronto o es el próximo.
@@ -40,7 +39,7 @@ class ParaTiLiveEventsBand extends ConsumerWidget {
               Text(
                 anyLive ? 'EN VIVO' : 'HOY',
                 style: AppTypography.labelSmall(
-                  color: anyLive ? _liveGreen : AppColors.goldDark,
+                  color: anyLive ? AppColors.liveGreen : AppColors.goldDark,
                 ).copyWith(
                   fontWeight: FontWeight.w800,
                   fontSize: 10,
@@ -97,7 +96,7 @@ class _LiveEventChip extends StatelessWidget {
     final live = _isLive(event);
     final name = _eventName(event);
     final timing = _timingLabel(event);
-    final accent = live ? _liveGreen : AppColors.burgundy;
+    final accent = live ? AppColors.liveGreen : AppColors.burgundy;
 
     return Material(
       color: _fill,
@@ -111,7 +110,7 @@ class _LiveEventChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: live
-                  ? _liveGreen.withValues(alpha: 0.4)
+                  ? AppColors.liveGreen.withValues(alpha: 0.4)
                   : AppColors.gold.withValues(alpha: 0.45),
             ),
           ),
@@ -193,7 +192,7 @@ class _LiveDot extends StatelessWidget {
       width: 7,
       height: 7,
       decoration: const BoxDecoration(
-        color: _liveGreen,
+        color: AppColors.liveGreen,
         shape: BoxShape.circle,
       ),
     );
