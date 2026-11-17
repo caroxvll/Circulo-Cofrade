@@ -10,12 +10,15 @@ class AppLogo extends StatelessWidget {
     this.size = 120,
     this.useIconVariant = false,
     this.forLogin = false,
+    this.circular = false,
   });
 
   final double size;
   final bool useIconVariant;
   /// Variante con texto completo; solo para la pantalla de login.
   final bool forLogin;
+  /// Recorte circular (avatar en feed / cabeceras).
+  final bool circular;
 
   @override
   Widget build(BuildContext context) {
@@ -36,11 +39,11 @@ class AppLogo extends StatelessWidget {
 
     final asset = useIconVariant ? AppAssets.logoIcon : AppAssets.logo;
 
-    return Image.asset(
+    final image = Image.asset(
       asset,
       width: size,
       height: size,
-      fit: BoxFit.contain,
+      fit: circular ? BoxFit.cover : BoxFit.contain,
       filterQuality: FilterQuality.medium,
       cacheWidth: cache,
       cacheHeight: cache,
@@ -48,6 +51,14 @@ class AppLogo extends StatelessWidget {
       errorBuilder: (context, error, stackTrace) {
         return _FallbackLogo(size: size);
       },
+    );
+
+    if (!circular) return image;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: ClipOval(child: image),
     );
   }
 }

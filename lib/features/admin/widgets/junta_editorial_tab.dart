@@ -147,7 +147,7 @@ class _EditorialPostCard extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  const AppLogo(size: 36, useIconVariant: true),
+                  const AppLogo(size: 36, useIconVariant: true, circular: true),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -303,7 +303,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
     if (bytes.length > editorialVideoMaxBytes) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El vídeo supera 80 MB')),
+        const SnackBar(content: Text('El vídeo supera 150 MB')),
       );
       return;
     }
@@ -338,7 +338,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
           ..headers['Content-Type'] = contentType
           ..contentLength = bytes.length;
         final responseFuture = request.send().timeout(
-              const Duration(minutes: 4),
+              const Duration(minutes: 8),
             );
         const chunkSize = 256 * 1024;
         for (var offset = 0; offset < bytes.length; offset += chunkSize) {
@@ -599,7 +599,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
               OutlinedButton.icon(
                 onPressed: _saving ? null : _pickVideo,
                 icon: const Icon(Icons.videocam_outlined),
-                label: const Text('Añadir vídeo (R2, máx. 80 MB)'),
+                label: const Text('Añadir vídeo (R2, máx. 150 MB)'),
               ),
             if (_saving && _uploadProgress != null) ...[
               const SizedBox(height: 14),
