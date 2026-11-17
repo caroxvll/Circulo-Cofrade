@@ -35,6 +35,8 @@ const NAV_ICON_PATHS: Record<JuntaModuleId, string> = {
     'M12 3 4.5 6.2v4.6C4.5 15.8 7.7 19.7 12 21c4.3-1.3 7.5-5.2 7.5-10.2V6.2L12 3Zm0 6v4m0 3h.01',
   hermandades:
     'M4 20h16M6 20V9l6-4 6 4v11M10 20v-5h4v5',
+  'season-acts':
+    'M4 12h3l2-6 3 12 2-6h6M4 19h16',
   forums:
     'M8 6h13v10H8zm0 0H5a2 2 0 0 0-2 2v8l3-2h2m3-8v2m0 3h.01',
   season:

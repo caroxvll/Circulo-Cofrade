@@ -120,9 +120,9 @@ class CuaresmaHubLiveBadge extends StatelessWidget {
         vertical: compact ? 3 : 4,
       ),
       decoration: BoxDecoration(
-        color: AppColors.burgundy.withValues(alpha: 0.08),
+        color: AppColors.liveGreen.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.burgundy.withValues(alpha: 0.2)),
+        border: Border.all(color: AppColors.liveGreen.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -132,7 +132,7 @@ class CuaresmaHubLiveBadge extends StatelessWidget {
           Text(
             'EN DIRECTO',
             style: TopicDetailTypography.meta(
-              color: AppColors.burgundy,
+              color: AppColors.liveGreen,
               fontWeight: FontWeight.w800,
             ).copyWith(fontSize: compact ? 9.5 : 10, letterSpacing: 0.4),
           ),
@@ -153,7 +153,7 @@ class _LiveDot extends StatelessWidget {
       width: size,
       height: size,
       decoration: const BoxDecoration(
-        color: AppColors.burgundy,
+        color: AppColors.liveGreen,
         shape: BoxShape.circle,
       ),
     );

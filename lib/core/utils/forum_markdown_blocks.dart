@@ -93,15 +93,16 @@ List<ForumMarkdownBlock> parseForumMarkdownBlocks(String raw) {
       continue;
     }
 
-    final paragraphLines = <String>[];
+    // Cada línea no vacía es un párrafo propio: Enter en el editor se ve
+    // con aire editorial (no un muro de texto continuo).
     while (index < lines.length) {
       final current = lines[index];
       if (current.trim().isEmpty || _isStructuredLine(current)) break;
-      paragraphLines.add(current);
+      final trimmed = current.trim();
+      if (trimmed.isNotEmpty) {
+        blocks.add(ForumMarkdownBlock.paragraph(trimmed));
+      }
       index++;
-    }
-    if (paragraphLines.isNotEmpty) {
-      blocks.add(ForumMarkdownBlock.paragraph(paragraphLines.join('\n').trim()));
     }
   }
 

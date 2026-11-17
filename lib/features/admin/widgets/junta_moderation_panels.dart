@@ -230,6 +230,10 @@ class _PendingTopicCardState extends ConsumerState<_PendingTopicCard> {
               Row(
                 children: [
                   const CofradeoBadge(label: 'Pendiente'),
+                  if (widget.topic.isEditorial) ...[
+                    const SizedBox(width: 8),
+                    const CofradeoBadge(label: 'Oficial'),
+                  ],
                   if (coverUrl != null) ...[
                     const SizedBox(width: 8),
                     Container(

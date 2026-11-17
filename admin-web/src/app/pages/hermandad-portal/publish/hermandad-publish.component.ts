@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import {
   PUBLISH_KINDS,
@@ -21,6 +21,7 @@ export class HermandadPublishPageComponent implements OnInit {
   private readonly auth = inject(AuthService);
   readonly store = inject(HermandadPortalStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly kinds = PUBLISH_KINDS;
   readonly saving = signal(false);
@@ -52,6 +53,10 @@ export class HermandadPublishPageComponent implements OnInit {
   private async ensureLoaded(): Promise<void> {
     await this.store.ensureLoaded();
     this.topicId = this.store.activeTopicId() ?? '';
+    const kindParam = this.route.snapshot.queryParamMap.get('kind');
+    if (kindParam && PUBLISH_KINDS.some((k) => k.id === kindParam)) {
+      this.kindId = kindParam as PublishKindId;
+    }
     this.applyKindDefaults(this.kindId);
   }
 

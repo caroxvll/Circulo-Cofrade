@@ -4,11 +4,13 @@ Decisión de producto acordada (junio 2026). Complementa [`PERFIL.md`](PERFIL.md
 
 ## Principio
 
-**Solo imágenes. Sin vídeos** en MVP y beta.
+**Solo imágenes. Sin vídeos** en MVP y beta (usuarios / hermandades).
 
-Motivos: menor coste (storage + ancho de banda), moderación más simple, enfoque cofrade (texto + foto puntual, no red de vídeo).
+**Excepción:** publicaciones oficiales de Círculo Cofrade (Junta → Para ti) pueden llevar vídeo en R2. Ver [`EDITORIAL_VIDEO.md`](EDITORIAL_VIDEO.md).
 
-**Storage:** Supabase Storage (mismo proyecto). **No** Firebase Storage.
+Motivos del bloqueo general: menor coste (storage + ancho de banda), moderación más simple, enfoque cofrade (texto + foto puntual, no red de vídeo).
+
+**Storage imágenes:** Supabase Storage (mismo proyecto). **No** Firebase Storage. **Vídeo editorial:** Cloudflare R2.
 
 ---
 

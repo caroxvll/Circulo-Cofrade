@@ -10,6 +10,7 @@ import '../junta_ui.dart';
 import 'admin_ads_tab.dart';
 import 'junta_close_requests_tab.dart';
 import 'junta_countdown_tab.dart';
+import 'junta_editorial_tab.dart';
 import 'junta_hermandades_tab.dart';
 import 'junta_moderation_panels.dart';
 import 'junta_moderators_tab.dart';
@@ -17,6 +18,7 @@ import 'junta_pending_events_tab.dart';
 import 'junta_pillars_tab.dart';
 import 'junta_quiz_tab.dart';
 import 'junta_rejected_topics_panel.dart';
+import 'junta_season_acts_tab.dart';
 import '../../quiz/quiz_provider.dart';
 import '../../permissions/permissions_provider.dart';
 
@@ -471,8 +473,10 @@ class _JuntaModuleBody extends StatelessWidget {
       JuntaModule.reports => const JuntaPendingReportsPanel(),
       JuntaModule.events => const JuntaPendingEventsTab(),
       JuntaModule.closeRequests => const JuntaCloseRequestsTab(),
+      JuntaModule.editorial => const JuntaEditorialTab(),
       JuntaModule.moderators => const JuntaModeratorsTab(),
       JuntaModule.hermandades => const JuntaHermandadesTab(),
+      JuntaModule.seasonActs => const JuntaSeasonActsTab(),
       JuntaModule.forums => const JuntaPillarsTab(),
       JuntaModule.season => const JuntaCountdownTab(),
       JuntaModule.ads => const AdminAdsTab(),
@@ -515,7 +519,11 @@ class _JuntaOverviewPanel extends ConsumerWidget {
                 .read(juntaSelectedModuleProvider.notifier)
                 .select(module),
           ),
-          if (isAdmin) ...[
+          if (modulesInSection(
+            JuntaNavSection.community,
+            isAdmin: isAdmin,
+            canCreateQuiz: canCreateQuiz,
+          ).isNotEmpty) ...[
             const SizedBox(height: 20),
             _OverviewSection(
               title: JuntaNavSection.community.title,

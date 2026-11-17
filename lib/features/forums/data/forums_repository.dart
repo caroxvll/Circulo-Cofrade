@@ -33,7 +33,7 @@ class ForumsRepository {
 
   /// PostgREST exige el FK explícito tras añadir `parent_reply_id` en respuestas.
   static const _profileAuthorSelect =
-      'profiles!author_id(avatar_url, display_name, verified, suspended_at, trophy_points)';
+      'profiles!author_id(avatar_url, display_name, handle, verified, suspended_at, trophy_points)';
 
   bool get _useRemote => _client != null;
 
@@ -93,6 +93,29 @@ class ForumsRepository {
           .map(_topicFromRow)
           .toList(),
     );
+  }
+
+  /// Publicaciones oficiales de Círculo Cofrade para Para ti.
+  Future<List<ForumTopic>> fetchPublishedEditorialPosts({
+    int limit = 12,
+    Duration maxAge = const Duration(days: 14),
+  }) async {
+    if (!_useRemote) return const [];
+
+    final cutoff = DateTime.now().toUtc().subtract(maxAge).toIso8601String();
+    final rows = await _client!
+        .from('forum_topics')
+        .select('*, $_profileAuthorSelect')
+        .eq('is_editorial', true)
+        .eq('status', 'published')
+        .gte('created_at', cutoff)
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return rows
+        .where((row) => !_isAuthorSuspended(row))
+        .map(_topicFromRow)
+        .toList();
   }
 
   /// El tema con la actividad más reciente, si sigue caliente.
@@ -561,10 +584,16 @@ class ForumsRepository {
       isPinned: row['is_pinned'] as bool? ?? false,
       pinSortOrder: row['pin_sort_order'] as int? ?? 0,
       isSystem: row['is_system'] as bool? ?? false,
+      isEditorial: row['is_editorial'] as bool? ?? false,
+      viaAuthorId: row['via_author_id'] as String?,
+      viaAuthorHandle: _viaAuthorHandleFromRow(row),
       seasonKey: row['season_key'] as String?,
       iconKey: row['icon_key'] as String?,
       iconImageUrl: row['icon_image_url'] as String?,
       coverImageUrl: row['cover_image_url'] as String?,
+      videoUrl: row['video_url'] as String?,
+      videoPosterUrl: row['video_poster_url'] as String?,
+      videoStatus: row['video_status'] as String?,
       showHubTitle: row['show_hub_title'] as bool? ?? true,
       isListed: row['is_listed'] as bool? ?? true,
       createdAt: createdAt,
@@ -578,6 +607,16 @@ class ForumsRepository {
           ? null
           : (row['news_group_id'] as String).trim(),
     );
+  }
+
+  String? _viaAuthorHandleFromRow(Map<String, dynamic> row) {
+    if (row['is_editorial'] != true) return null;
+    final profile = row['profiles'];
+    if (profile is Map<String, dynamic>) {
+      final handle = (profile['handle'] as String?)?.trim();
+      if (handle != null && handle.isNotEmpty) return handle;
+    }
+    return null;
   }
 
   Future<void> updateTopicAsOwner({
@@ -991,10 +1030,16 @@ class ForumsRepository {
         isPinned: parsed.isPinned,
         pinSortOrder: parsed.pinSortOrder,
         isSystem: parsed.isSystem,
+        isEditorial: parsed.isEditorial,
+        viaAuthorId: parsed.viaAuthorId ?? previous.viaAuthorId,
+        viaAuthorHandle: parsed.viaAuthorHandle ?? previous.viaAuthorHandle,
         seasonKey: parsed.seasonKey ?? previous.seasonKey,
         iconKey: parsed.iconKey ?? previous.iconKey,
         iconImageUrl: parsed.iconImageUrl ?? previous.iconImageUrl,
         coverImageUrl: parsed.coverImageUrl ?? previous.coverImageUrl,
+        videoUrl: parsed.videoUrl ?? previous.videoUrl,
+        videoPosterUrl: parsed.videoPosterUrl ?? previous.videoPosterUrl,
+        videoStatus: parsed.videoStatus ?? previous.videoStatus,
         showHubTitle: parsed.showHubTitle,
         isListed: parsed.isListed,
         createdAt: parsed.createdAt ?? previous.createdAt,

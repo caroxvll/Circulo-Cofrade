@@ -233,7 +233,7 @@ CalendarEventTiming? calendarEventTiming(
       return const CalendarEventTiming(
         kind: CalendarEventTimingKind.inProgress,
         label: 'En curso',
-        color: AppColors.burgundy,
+        color: AppColors.liveGreen,
       );
     }
   }
@@ -243,7 +243,7 @@ CalendarEventTiming? calendarEventTiming(
       return const CalendarEventTiming(
         kind: CalendarEventTimingKind.inProgress,
         label: 'En curso',
-        color: AppColors.burgundy,
+        color: AppColors.liveGreen,
       );
     }
   }
