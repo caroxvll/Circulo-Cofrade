@@ -12,6 +12,7 @@ import {
   eventTypeLabel,
 } from '../../../core/events/events.models';
 import { formatTimeAgo } from '../../../core/utils/date';
+import { ConfirmDialogService } from '../../../shared/confirm-dialog/confirm-dialog.service';
 
 export type EventFilterValue = 'all' | (typeof CALENDAR_EVENT_TYPES)[number]['value'];
 export type PostCategoryFilter = 'all' | OfficialCategory;
@@ -27,6 +28,7 @@ export class HermandadHomePageComponent implements OnInit {
   private readonly auth = inject(AuthService);
   readonly store = inject(HermandadPortalStore);
   private readonly api = inject(HermandadPortalService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly profile = this.auth.profile;
   readonly timeAgo = formatTimeAgo;
@@ -117,9 +119,8 @@ export class HermandadHomePageComponent implements OnInit {
   readonly olderPosts = computed(() => this.filteredRecentPosts().slice(1));
 
   ngOnInit(): void {
-    if (!this.store.boards().length && !this.store.loading()) {
-      void this.store.reload();
-    }
+    // Cache 60s en el store: evita re-fetch masivo al volver a Inicio.
+    void this.store.ensureLoaded();
   }
 
   shiftEvents(delta: number): void {
@@ -138,15 +139,22 @@ export class HermandadHomePageComponent implements OnInit {
   }
 
   async deleteEvent(eventId: string, title: string): Promise<void> {
-    const ok = window.confirm(
-      `¿Quitar «${title}» del calendario?\nDejará de verse en la app.`,
-    );
+    const ok = await this.confirmDialog.confirm({
+      title: 'Quitar del calendario',
+      message: `Se eliminará «${title}» del calendario.\nDejará de verse en la app.`,
+      confirmLabel: 'Quitar',
+      cancelLabel: 'Cancelar',
+      tone: 'danger',
+    });
     if (!ok) return;
     try {
       await this.store.deleteUpcomingEvent(eventId);
     } catch (err) {
       console.error(err);
-      window.alert('No se pudo quitar el evento. Inténtalo de nuevo.');
+      await this.confirmDialog.alert({
+        title: 'No se pudo quitar',
+        message: 'No se pudo quitar el evento. Inténtalo de nuevo.',
+      });
     }
   }
 

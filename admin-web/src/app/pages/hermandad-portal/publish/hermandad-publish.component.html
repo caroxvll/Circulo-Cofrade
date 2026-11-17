@@ -7,7 +7,6 @@
     <div class="composer">
       <header class="composer-head">
         <div>
-          <p class="eyebrow">Canal oficial</p>
           <h1>Nueva publicación</h1>
         </div>
         <p class="board-pill">
@@ -104,9 +103,11 @@
             <input type="datetime-local" [(ngModel)]="startsAtLocal" />
           </label>
           <label class="field grow">
-            Lugar
+            Lugar *
             <input
               [(ngModel)]="location"
+              name="location"
+              required
               placeholder="Templo, casa de hermandad…"
             />
           </label>

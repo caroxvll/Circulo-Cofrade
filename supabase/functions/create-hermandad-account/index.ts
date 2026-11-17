@@ -12,6 +12,8 @@ type CreateBody = {
   handle?: string;
   displayName?: string;
   topicId?: string | null;
+  /** Si viene de una solicitud, se consume la clave elegida por la hermandad. */
+  accessRequestId?: string | null;
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -94,10 +96,39 @@ Deno.serve(async (req) => {
     const displayName = (body.displayName ?? "").trim();
     const handle = normalizeHandle(body.handle ?? "");
     const topicId = (body.topicId ?? "").trim() || null;
-    const password =
+    const accessRequestId = (body.accessRequestId ?? "").trim() || null;
+
+    let passwordFromRequest = false;
+    let password =
       (body.password ?? "").trim().length >= 8
         ? (body.password ?? "").trim()
-        : generatePassword();
+        : "";
+
+    if (accessRequestId) {
+      const { data: readPwd, error: readError } = await admin.rpc(
+        "read_hermandad_request_password",
+        { p_request_id: accessRequestId },
+      );
+      if (readError) {
+        return jsonResponse(
+          {
+            error:
+              `No se pudo leer la clave de la solicitud: ${readError.message}`,
+          },
+          400,
+        );
+      }
+      const takenPwd = typeof readPwd === "string" ? readPwd.trim() : "";
+      if (takenPwd.length >= 8) {
+        password = takenPwd;
+        passwordFromRequest = true;
+      }
+    }
+
+    if (password.length < 8) {
+      password = generatePassword();
+      passwordFromRequest = false;
+    }
 
     if (!email || !email.includes("@")) {
       return jsonResponse({ error: "Email no válido" }, 400);
@@ -129,6 +160,35 @@ Deno.serve(async (req) => {
       }
     }
 
+    // No reutilizar cuentas: un email = una cuenta (igual que el registro de la app).
+    const lookupRes = await fetch(
+      `${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+        },
+      },
+    );
+    if (lookupRes.ok) {
+      const lookupJson = (await lookupRes.json().catch(() => ({}))) as {
+        users?: Array<{ id: string; email?: string }>;
+        user?: { id: string; email?: string };
+      };
+      const emailTaken =
+        !!lookupJson.users?.some((u) => (u.email ?? "").toLowerCase() === email) ||
+        (lookupJson.user?.email ?? "").toLowerCase() === email;
+      if (emailTaken) {
+        return jsonResponse(
+          {
+            error:
+              "Ese email ya está en uso. Usa otro correo para la cuenta de la hermandad.",
+          },
+          409,
+        );
+      }
+    }
+
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email,
       password,
@@ -144,6 +204,21 @@ Deno.serve(async (req) => {
     });
 
     if (createError || !created.user) {
+      const msg = (createError?.message ?? "").toLowerCase();
+      if (
+        msg.includes("already been registered") ||
+        msg.includes("already registered") ||
+        msg.includes("already exists") ||
+        msg.includes("duplicate")
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "Ese email ya está en uso. Usa otro correo para la cuenta de la hermandad.",
+          },
+          409,
+        );
+      }
       return jsonResponse(
         { error: createError?.message ?? "No se pudo crear el usuario Auth" },
         400,
@@ -152,7 +227,6 @@ Deno.serve(async (req) => {
 
     const profileId = created.user.id;
 
-    // Asegura tipo/verificación aunque el trigger sea una versión antigua.
     const { error: profileError } = await admin
       .from("profiles")
       .update({
@@ -189,11 +263,18 @@ Deno.serve(async (req) => {
               `Cuenta creada, pero no se pudo vincular al tablón: ${assignError.message}`,
             profileId,
             handle,
-            temporaryPassword: password,
+            temporaryPassword: passwordFromRequest ? null : password,
+            passwordFromRequest,
           },
           500,
         );
       }
+    }
+
+    if (accessRequestId && passwordFromRequest) {
+      await admin.rpc("clear_hermandad_request_password", {
+        p_request_id: accessRequestId,
+      });
     }
 
     return jsonResponse({
@@ -202,7 +283,9 @@ Deno.serve(async (req) => {
       displayName,
       email,
       topicId,
-      temporaryPassword: password,
+      // Si la clave vino de la solicitud, la Junta no la ve.
+      temporaryPassword: passwordFromRequest ? null : password,
+      passwordFromRequest,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error inesperado";

@@ -60,5 +60,5 @@ abstract final class AppAssets {
     EventType.evento: 'assets/icons/evento.png',
   };
 
-  static String eventIconPath(EventType type) => _eventIcons[type]!;
+  static String eventIconPath(EventType type) => _eventIcons[type] ?? '';
 }

@@ -40,6 +40,8 @@ export class NewsPageComponent implements OnInit {
   readonly previewTick = signal(0);
 
   readonly relatedOptions = NOTICIAS_RELATED_OPTIONS;
+  unifyA = '';
+  unifyB = '';
   readonly dateTime = formatDateTime;
   readonly canManage = computed(() => this.api.canManageNoticias());
 
@@ -231,6 +233,48 @@ export class NewsPageComponent implements OnInit {
     this.resetForm();
     this.ok.set(null);
     this.error.set(null);
+  }
+
+  publishedForUnify(): NewsTopic[] {
+    return this.published().filter((item) => item.status === 'published');
+  }
+
+  async unifySelected(): Promise<void> {
+    if (!this.unifyA || !this.unifyB || this.unifyA === this.unifyB) {
+      this.error.set('Elige dos noticias distintas.');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    this.ok.set(null);
+    try {
+      await this.api.unifyNoticias(this.unifyA, this.unifyB);
+      this.unifyA = '';
+      this.unifyB = '';
+      this.ok.set('Noticias unidas en un carrusel. En la app se pasa con el dedo.');
+      await this.reload();
+    } catch (err) {
+      this.error.set(
+        this.errMsg(err, 'No se pudo unir. ¿Ejecutaste news_publishers.sql?'),
+      );
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async splitPublished(item: NewsTopic): Promise<void> {
+    if (!confirm(`¿Separar «${item.title}» del carrusel?`)) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.api.splitNoticia(item.id);
+      this.ok.set('Noticia separada. Vuelve a ser una ficha propia.');
+      await this.reload();
+    } catch (err) {
+      this.error.set(this.errMsg(err, 'No se pudo separar'));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   async deletePublished(item: NewsTopic): Promise<void> {

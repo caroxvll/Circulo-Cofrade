@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+const _keepNewsGroup = Object();
+
 enum TopicStatus { pending, published, rejected }
 
 enum TopicCloseStatus { open, closeRequested, closed }
@@ -29,8 +31,10 @@ class ForumCategory {
     required this.topicCount,
     required this.messageCount,
     required this.lastMessageAgo,
+    this.lastActivityAt,
     this.lastTopicId,
     this.lastTopicTitle,
+    this.lastTopicExcerpt,
     this.isEnabled = true,
     this.isActive = false,
     this.lockedLabel,
@@ -57,9 +61,15 @@ class ForumCategory {
   /// Texto relativo de la última actividad (tema o respuesta).
   final String lastMessageAgo;
 
+  /// Momento real de esa actividad, para ordenar el feed.
+  final DateTime? lastActivityAt;
+
   /// Hilo con actividad más reciente en este foro.
   final String? lastTopicId;
   final String? lastTopicTitle;
+
+  /// Extracto / descripción del hilo más reciente.
+  final String? lastTopicExcerpt;
 
   /// Si false, el pilar está oculto en FOROS (solo visible en Junta).
   final bool isEnabled;
@@ -160,6 +170,7 @@ class ForumTopic {
     required this.excerpt,
     required this.body,
     required this.authorHandle,
+    this.authorDisplayName,
     required this.timeAgo,
     required this.commentCount,
     required this.viewCount,
@@ -186,6 +197,7 @@ class ForumTopic {
     this.rejectionReason,
     this.rejectedAt,
     this.relatedForumId,
+    this.newsGroupId,
   });
 
   final String id;
@@ -194,6 +206,7 @@ class ForumTopic {
   final String excerpt;
   final String body;
   final String authorHandle;
+  final String? authorDisplayName;
   final String timeAgo;
   final int commentCount;
   final int viewCount;
@@ -229,11 +242,16 @@ class ForumTopic {
   /// Foro etiquetado en noticias (p. ej. `pentagrama-cofrade`). No duplica el tema.
   final String? relatedForumId;
 
+  /// Noticias unificadas a mano. Null = ficha suelta.
+  final String? newsGroupId;
+
   bool get isPublished => status == TopicStatus.published;
   bool get isPending => status == TopicStatus.pending;
   bool get isRejected => status == TopicStatus.rejected;
   bool get isCloseRequested => closeStatus == TopicCloseStatus.closeRequested;
-  bool get acceptsReplies => isPublished && !isClosed;
+  /// Noticias es solo lectura editorial: sin comentarios.
+  bool get acceptsReplies =>
+      isPublished && !isClosed && forumId != 'noticias';
 
   int get sortTimestamp => createdAt?.millisecondsSinceEpoch ?? 0;
 
@@ -244,6 +262,7 @@ class ForumTopic {
     String? excerpt,
     String? body,
     String? authorHandle,
+    String? authorDisplayName,
     String? timeAgo,
     int? commentCount,
     int? viewCount,
@@ -270,6 +289,7 @@ class ForumTopic {
     String? rejectionReason,
     DateTime? rejectedAt,
     String? relatedForumId,
+    Object? newsGroupId = _keepNewsGroup,
   }) {
     return ForumTopic(
       id: id ?? this.id,
@@ -278,6 +298,7 @@ class ForumTopic {
       excerpt: excerpt ?? this.excerpt,
       body: body ?? this.body,
       authorHandle: authorHandle ?? this.authorHandle,
+      authorDisplayName: authorDisplayName ?? this.authorDisplayName,
       timeAgo: timeAgo ?? this.timeAgo,
       commentCount: commentCount ?? this.commentCount,
       viewCount: viewCount ?? this.viewCount,
@@ -304,6 +325,9 @@ class ForumTopic {
       rejectionReason: rejectionReason ?? this.rejectionReason,
       rejectedAt: rejectedAt ?? this.rejectedAt,
       relatedForumId: relatedForumId ?? this.relatedForumId,
+      newsGroupId: identical(newsGroupId, _keepNewsGroup)
+          ? this.newsGroupId
+          : newsGroupId as String?,
     );
   }
 }
@@ -330,6 +354,7 @@ class ForumReply {
     this.deletedAt,
     this.isFeatured = false,
     this.imageUrl,
+    this.viewCount = 0,
   });
 
   final String id;
@@ -352,6 +377,8 @@ class ForumReply {
   final DateTime? deletedAt;
   final bool isFeatured;
   final String? imageUrl;
+  /// Visitas deduplicadas del comunicado oficial (1 por viewer/día).
+  final int viewCount;
 
   bool get isDeleted => deletedAt != null;
   bool get isEdited => editedAt != null && !isDeleted;
@@ -383,6 +410,7 @@ class ForumReply {
     bool? isFeatured,
     String? imageUrl,
     bool clearImageUrl = false,
+    int? viewCount,
   }) {
     return ForumReply(
       id: id ?? this.id,
@@ -407,6 +435,7 @@ class ForumReply {
       deletedAt: deletedAt ?? this.deletedAt,
       isFeatured: isFeatured ?? this.isFeatured,
       imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
+      viewCount: viewCount ?? this.viewCount,
     );
   }
 }

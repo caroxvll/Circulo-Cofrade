@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
 
-/** Panel Junta (/app): solo staff. Las hermandades van a /hermandad. */
+/** Panel Junta (/app): solo profiles.role = admin. Hermandades → /hermandad. */
 export const authGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);
@@ -11,10 +11,11 @@ export const authGuard: CanActivateFn = async () => {
   if (!auth.session()) {
     return router.createUrlTree(['/login']);
   }
-  if (auth.isHermandadAccount() && !auth.canAccess()) {
+  if (auth.isHermandadAccount() && !auth.isAdmin()) {
     return router.createUrlTree(['/hermandad']);
   }
-  if (!auth.canAccess()) {
+  if (!auth.isAdmin()) {
+    await auth.signOut();
     return router.createUrlTree(['/login'], {
       queryParams: { denied: '1' },
     });
@@ -22,7 +23,7 @@ export const authGuard: CanActivateFn = async () => {
   return true;
 };
 
-/** Portal hermandad: cuenta brotherhood (no Junta). */
+/** Portal hermandad: brotherhood verificada (admin va al panel Junta). */
 export const hermandadGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);
@@ -31,10 +32,11 @@ export const hermandadGuard: CanActivateFn = async () => {
   if (!auth.session()) {
     return router.createUrlTree(['/login']);
   }
-  if (auth.canAccess()) {
+  if (auth.isAdmin()) {
     return router.createUrlTree(['/app/resumen']);
   }
   if (!auth.isHermandadAccount()) {
+    await auth.signOut();
     return router.createUrlTree(['/login'], {
       queryParams: { denied: '1' },
     });
@@ -47,8 +49,15 @@ export const guestGuard: CanActivateFn = async () => {
   const router = inject(Router);
   await auth.init();
 
-  if (auth.session() && (auth.canAccess() || auth.isHermandadAccount())) {
+  if (!auth.session()) {
+    return true;
+  }
+
+  if (auth.isAdmin() || auth.isHermandadAccount()) {
     return router.createUrlTree([auth.homePath()]);
   }
+
+  // Sesión de cofrade (p. ej. misma de la app): no dejarla colgada en el panel.
+  await auth.signOut();
   return true;
 };

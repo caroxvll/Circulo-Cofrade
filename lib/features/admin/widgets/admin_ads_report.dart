@@ -21,6 +21,7 @@ const packAdPlacements = <AdPlacement>[
   AdPlacement.calendar,
   AdPlacement.search,
   AdPlacement.noticias,
+  AdPlacement.semanaSanta,
 ];
 
 String placementCommercialName(AdPlacement placement) {
@@ -33,6 +34,7 @@ String placementCommercialName(AdPlacement placement) {
     AdPlacement.calendar => 'Calendario · banner',
     AdPlacement.search => 'Buscar · banner',
     AdPlacement.noticias => 'Noticias · banner',
+    AdPlacement.semanaSanta => 'Semana Santa · banner',
     AdPlacement.profile => 'Perfil',
     AdPlacement.home => 'Inicio',
   };
@@ -41,11 +43,11 @@ String placementCommercialName(AdPlacement placement) {
 String placementWhereHint(AdPlacement placement) {
   return switch (placement) {
     AdPlacement.forumsTop =>
-      'Sale en la lista principal de foros (encima de la barra inferior).',
+      'Sale en la lista principal de Foros (encima de la barra inferior; sin Noticias).',
     AdPlacement.forumsEvent =>
       'Tarjeta de evento tras los temas fijados, dentro del foro elegido.',
     AdPlacement.forumsMiddle =>
-      'Banner «Publicidad» en el listado de temas (todos los foros).',
+      'Banner «Publicidad» en el listado de temas (Círculo, Pentagrama, Martillo…; no Noticias).',
     AdPlacement.featuredTopic =>
       'Banner en Cuaresma, Semana Santa y Glorias.',
     AdPlacement.hermandades =>
@@ -54,6 +56,8 @@ String placementWhereHint(AdPlacement placement) {
     AdPlacement.search => 'Banner en Buscar (pantalla inicial, sin resultados).',
     AdPlacement.noticias =>
       'Banner anclado en Noticias (encima de la barra inferior).',
+    AdPlacement.semanaSanta =>
+      'Banner fijo en el en directo de Semana Santa, encima de la barra inferior.',
     AdPlacement.profile => 'Reservado · perfil.',
     AdPlacement.home => 'Reservado · inicio.',
   };
@@ -110,6 +114,8 @@ String adTargetDetail(
       return 'Pantalla: Buscar (inicio)';
     case AdPlacement.noticias:
       return 'Pantalla: Noticias';
+    case AdPlacement.semanaSanta:
+      return 'Pantalla: en directo de Semana Santa';
     case AdPlacement.home:
       return 'Pantalla: Inicio';
     case AdPlacement.profile:

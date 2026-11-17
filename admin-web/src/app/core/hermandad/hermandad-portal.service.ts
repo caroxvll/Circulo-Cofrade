@@ -1,7 +1,11 @@
 import { Injectable } from '@angular/core';
 import { getSupabase } from '../supabase.client';
 import { parseHermandadTopicTitle } from '../community/community.service';
-import type { CalendarEventType } from '../events/events.models';
+import {
+  type CalendarEventType,
+  type CalendarTimeSlot,
+  parseTimeSlots,
+} from '../events/events.models';
 
 /** Categoría en tablón (BD / app). */
 export const OFFICIAL_CATEGORIES = [
@@ -78,6 +82,28 @@ export const PUBLISH_KINDS: readonly PublishKind[] = [
     needsDate: true,
   },
   {
+    id: 'muda',
+    label: 'Muda',
+    hint: 'Tablón y, si quieres, calendario.',
+    officialCategory: 'acto',
+    boardDefault: true,
+    calendarDefault: true,
+    calendarType: 'muda',
+    noticiasDefault: false,
+    needsDate: true,
+  },
+  {
+    id: 'desarma',
+    label: 'Desarma',
+    hint: 'Tablón y, si quieres, calendario.',
+    officialCategory: 'acto',
+    boardDefault: true,
+    calendarDefault: true,
+    calendarType: 'desarma',
+    noticiasDefault: false,
+    needsDate: true,
+  },
+  {
     id: 'procesion',
     label: 'Procesión / salida',
     hint: 'Tablón y, si quieres, calendario.',
@@ -148,6 +174,8 @@ export interface HermandadOfficialPost {
   imageUrl: string | null;
   createdAt: string;
   deletedAt: string | null;
+  /** Visitas deduplicadas (1 por viewer/día) al abrir el comunicado en la app. */
+  viewCount: number;
 }
 
 export interface TopicFollowerRow {
@@ -262,27 +290,185 @@ export class HermandadPortalService {
       location: string | null;
       coverImageUrl: string | null;
       eventType: string;
+      admissionLabel: string | null;
+      timeSlots: CalendarTimeSlot[];
+      viewCount: number;
     }>
   > {
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, starts_at, location, cover_image_url, event_type, status',
+        'id, title, starts_at, location, cover_image_url, event_type, admission_label, time_slots, status, view_count',
       )
       .eq('created_by', profileId)
       .eq('status', 'published')
       .gte('starts_at', new Date().toISOString())
       .order('starts_at', { ascending: true })
       .limit(limit);
-    if (error) throw error;
-    return (data ?? []).map((row) => ({
-      id: String(row.id),
-      title: String(row.title ?? ''),
-      startsAt: String(row.starts_at ?? ''),
-      location: (row.location as string | null) ?? null,
-      coverImageUrl: (row.cover_image_url as string | null) ?? null,
-      eventType: String(row.event_type ?? 'evento'),
-    }));
+    if (error) {
+      // Compat: columnas nuevas (entrada) o view_count aún no aplicadas.
+      const msg = String(error.message ?? '').toLowerCase();
+      if (
+        msg.includes('admission_label') ||
+        msg.includes('view_count') ||
+        msg.includes('time_slots')
+      ) {
+        const retry = await getSupabase()
+          .from('calendar_events')
+          .select(
+            'id, title, starts_at, location, cover_image_url, event_type, status',
+          )
+          .eq('created_by', profileId)
+          .eq('status', 'published')
+          .gte('starts_at', new Date().toISOString())
+          .order('starts_at', { ascending: true })
+          .limit(limit);
+        if (retry.error) throw retry.error;
+        return (retry.data ?? []).map((row) => this.mapCalendarEvent(row));
+      }
+      throw error;
+    }
+    return (data ?? []).map((row) => this.mapCalendarEvent(row));
+  }
+
+  /** Eventos propios en un rango (vista calendario mensual). */
+  async fetchOwnEventsInRange(
+    profileId: string,
+    fromIso: string,
+    toIso: string,
+  ): Promise<
+    Array<{
+      id: string;
+      title: string;
+      startsAt: string;
+      location: string | null;
+      coverImageUrl: string | null;
+      eventType: string;
+      admissionLabel: string | null;
+      timeSlots: CalendarTimeSlot[];
+      viewCount: number;
+    }>
+  > {
+    const { data, error } = await getSupabase()
+      .from('calendar_events')
+      .select(
+        'id, title, starts_at, location, cover_image_url, event_type, admission_label, time_slots, status, view_count',
+      )
+      .eq('created_by', profileId)
+      .eq('status', 'published')
+      .gte('starts_at', fromIso)
+      .lt('starts_at', toIso)
+      .order('starts_at', { ascending: true })
+      .limit(200);
+    if (error) {
+      const msg = String(error.message ?? '').toLowerCase();
+      if (
+        msg.includes('admission_label') ||
+        msg.includes('view_count') ||
+        msg.includes('time_slots')
+      ) {
+        const retry = await getSupabase()
+          .from('calendar_events')
+          .select(
+            'id, title, starts_at, location, cover_image_url, event_type, status',
+          )
+          .eq('created_by', profileId)
+          .eq('status', 'published')
+          .gte('starts_at', fromIso)
+          .lt('starts_at', toIso)
+          .order('starts_at', { ascending: true })
+          .limit(200);
+        if (retry.error) throw retry.error;
+        return (retry.data ?? []).map((row) => this.mapCalendarEvent(row));
+      }
+      throw error;
+    }
+    return (data ?? []).map((row) => this.mapCalendarEvent(row));
+  }
+
+  private mapCalendarEvent(row: Record<string, unknown>): {
+    id: string;
+    title: string;
+    startsAt: string;
+    location: string | null;
+    coverImageUrl: string | null;
+    eventType: string;
+      admissionLabel: string | null;
+      timeSlots: CalendarTimeSlot[];
+      viewCount: number;
+  } {
+    const admission = String(row['admission_label'] ?? '').trim();
+    return {
+      id: String(row['id']),
+      title: String(row['title'] ?? ''),
+      startsAt: String(row['starts_at'] ?? ''),
+      location: (row['location'] as string | null) ?? null,
+      coverImageUrl: (row['cover_image_url'] as string | null) ?? null,
+      eventType: String(row['event_type'] ?? 'evento'),
+      admissionLabel: admission || null,
+      timeSlots: parseTimeSlots(row['time_slots']),
+      viewCount: Number(row['view_count'] ?? 0),
+    };
+  }
+
+  private mapOfficialPost(row: Record<string, unknown>): HermandadOfficialPost {
+    return {
+      id: String(row['id']),
+      topicId: String(row['topic_id']),
+      body: String(row['content'] ?? ''),
+      category: (row['official_category'] as OfficialCategory) || 'noticia',
+      imageUrl: (row['image_url'] as string | null) ?? null,
+      createdAt: String(row['created_at'] ?? ''),
+      deletedAt: (row['deleted_at'] as string | null) ?? null,
+      viewCount: Number(row['view_count'] ?? 0),
+    };
+  }
+
+  private async selectOfficialPosts(
+    profileId: string,
+    topicIds: string[],
+    opts: { deleted: boolean },
+  ): Promise<HermandadOfficialPost[]> {
+    const colsWithViews =
+      'id, topic_id, content, official_category, image_url, created_at, deleted_at, view_count';
+    const colsBasic =
+      'id, topic_id, content, official_category, image_url, created_at, deleted_at';
+
+    const run = async (cols: string) => {
+      let q = getSupabase()
+        .from('forum_replies')
+        .select(cols)
+        .eq('author_id', profileId)
+        .eq('is_official', true)
+        .in('topic_id', topicIds);
+      if (opts.deleted) {
+        q = q
+          .not('deleted_at', 'is', null)
+          .order('deleted_at', { ascending: false })
+          .limit(80);
+      } else {
+        q = q
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .limit(80);
+      }
+      return q;
+    };
+
+    const first = await run(colsWithViews);
+    if (!first.error) {
+      return (first.data ?? []).map((row) =>
+        this.mapOfficialPost(row as unknown as Record<string, unknown>),
+      );
+    }
+    if (!String(first.error.message ?? '').toLowerCase().includes('view_count')) {
+      throw first.error;
+    }
+    const retry = await run(colsBasic);
+    if (retry.error) throw retry.error;
+    return (retry.data ?? []).map((row) =>
+      this.mapOfficialPost(row as unknown as Record<string, unknown>),
+    );
   }
 
   async fetchOfficialPosts(
@@ -290,27 +476,29 @@ export class HermandadPortalService {
     topicIds: string[],
   ): Promise<HermandadOfficialPost[]> {
     if (!topicIds.length) return [];
-    const { data, error } = await getSupabase()
-      .from('forum_replies')
-      .select(
-        'id, topic_id, content, official_category, image_url, created_at, deleted_at',
-      )
-      .eq('author_id', profileId)
-      .eq('is_official', true)
-      .in('topic_id', topicIds)
-      .order('created_at', { ascending: false })
-      .limit(80);
-    if (error) throw error;
+    return this.selectOfficialPosts(profileId, topicIds, { deleted: false });
+  }
 
-    return (data ?? []).map((row) => ({
-      id: String(row.id),
-      topicId: String(row.topic_id),
-      body: String(row.content ?? ''),
-      category: (row.official_category as OfficialCategory) || 'noticia',
-      imageUrl: (row.image_url as string | null) ?? null,
-      createdAt: String(row.created_at ?? ''),
-      deletedAt: (row.deleted_at as string | null) ?? null,
-    }));
+  async fetchDeletedOfficialPosts(
+    profileId: string,
+    topicIds: string[],
+  ): Promise<HermandadOfficialPost[]> {
+    if (!topicIds.length) return [];
+    return this.selectOfficialPosts(profileId, topicIds, { deleted: true });
+  }
+
+  async restoreOfficialPost(replyId: string): Promise<void> {
+    const { error } = await getSupabase().rpc('restore_forum_reply', {
+      p_reply_id: replyId,
+    });
+    if (error) throw error;
+  }
+
+  async hardDeleteOfficialPost(replyId: string): Promise<void> {
+    const { error } = await getSupabase().rpc('hard_delete_forum_reply', {
+      p_reply_id: replyId,
+    });
+    if (error) throw error;
   }
 
   async uploadPostImage(topicId: string, file: File): Promise<string> {
@@ -326,6 +514,70 @@ export class HermandadPortalService {
     if (error) throw error;
     return getSupabase().storage.from('forum-post-images').getPublicUrl(path)
       .data.publicUrl;
+  }
+
+  /** Portada (header) o escudo (logo) del tablón asignado. */
+  async uploadBoardAsset(
+    topicId: string,
+    kind: 'cover' | 'escudo',
+    file: File,
+  ): Promise<string> {
+    const maxBytes = kind === 'cover' ? 3 * 1024 * 1024 : 1 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      throw new Error(
+        kind === 'cover'
+          ? 'La portada no puede superar 3 MB.'
+          : 'El escudo no puede superar 1 MB.',
+      );
+    }
+    const ok = ['image/png', 'image/jpeg', 'image/webp'].includes(file.type);
+    if (file.type && !ok) {
+      throw new Error('Usa PNG, JPEG o WebP.');
+    }
+    const fromName = (file.name.split('.').pop() || '').toLowerCase();
+    let ext = 'jpg';
+    if (
+      fromName === 'png' ||
+      fromName === 'webp' ||
+      fromName === 'jpg' ||
+      fromName === 'jpeg'
+    ) {
+      ext = fromName === 'jpeg' ? 'jpg' : fromName;
+    } else if (file.type.includes('png')) {
+      ext = 'png';
+    } else if (file.type.includes('webp')) {
+      ext = 'webp';
+    }
+    const path = `${topicId}/${kind}.${ext}`;
+    const { error } = await getSupabase()
+      .storage.from('topic-covers')
+      .upload(path, file, {
+        upsert: true,
+        contentType: file.type || 'image/jpeg',
+      });
+    if (error) throw error;
+    const base = getSupabase().storage.from('topic-covers').getPublicUrl(path)
+      .data.publicUrl;
+    return `${base}?v=${Date.now()}`;
+  }
+
+  async updateBoardImages(
+    topicId: string,
+    input: {
+      coverImageUrl?: string | null;
+      setCover?: boolean;
+      iconImageUrl?: string | null;
+      setIcon?: boolean;
+    },
+  ): Promise<void> {
+    const { error } = await getSupabase().rpc('update_hermandad_board_images', {
+      p_topic_id: topicId,
+      p_cover_image_url: input.coverImageUrl ?? null,
+      p_set_cover: input.setCover === true,
+      p_icon_image_url: input.iconImageUrl ?? null,
+      p_set_icon: input.setIcon === true,
+    });
+    if (error) throw error;
   }
 
   async createOfficialPost(input: {
@@ -492,6 +744,36 @@ export class HermandadPortalService {
     if (error) throw error;
   }
 
+  async updateOwnCalendarEvent(
+    eventId: string,
+    input: {
+      title: string;
+      startsAtIso: string;
+      location?: string | null;
+      eventType: string;
+      admissionLabel?: string | null;
+      timeSlots?: { start: string; end?: string | null }[] | null;
+    },
+  ): Promise<void> {
+    const title = input.title.trim();
+    if (title.length < 2) {
+      throw new Error('El título debe tener al menos 2 caracteres.');
+    }
+    const { error } = await getSupabase()
+      .from('calendar_events')
+      .update({
+        title,
+        starts_at: input.startsAtIso,
+        location: input.location?.trim() || null,
+        event_type: input.eventType,
+        admission_label: input.admissionLabel?.trim() || null,
+        time_slots: normalizeHermandadSlots(input.timeSlots),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', eventId);
+    if (error) throw error;
+  }
+
   async createScheduledPost(input: {
     topicId: string;
     authorId: string;
@@ -593,4 +875,15 @@ export class HermandadPortalService {
   categoryLabel(value: string): string {
     return OFFICIAL_CATEGORIES.find((c) => c.value === value)?.label ?? value;
   }
+}
+
+function normalizeHermandadSlots(
+  slots: { start: string; end?: string | null }[] | null | undefined,
+): { start: string; end?: string }[] | null {
+  const list = parseTimeSlots(slots ?? []);
+  const hasRange = list.some((slot) => !!slot.end);
+  if (list.length < 2 && !hasRange) return null;
+  return list.map((slot) =>
+    slot.end ? { start: slot.start, end: slot.end } : { start: slot.start },
+  );
 }

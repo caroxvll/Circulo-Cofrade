@@ -38,9 +38,10 @@ final adsRepositoryProvider = Provider<AdsRepository>((ref) {
 final adForPlacementProvider =
     FutureProvider.autoDispose.family<SponsoredAd?, AdPlacementQuery>(
   (ref, query) {
-    // Calendario / Foros: no desechar al cambiar de pestaña (evita salto de layout).
+    // Barras del shell: no desechar al cambiar de pestaña (evita salto de layout).
     if (query.placement == AdPlacement.forumsTop ||
-        query.placement == AdPlacement.calendar) {
+        query.placement == AdPlacement.calendar ||
+        query.placement == AdPlacement.noticias) {
       ref.keepAlive();
     }
     return ref.watch(adsRepositoryProvider).fetchAd(

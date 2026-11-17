@@ -7,6 +7,7 @@ import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/image_decode_cache.dart';
+import 'auth_layout.dart';
 import 'auth_error_messages.dart';
 import 'auth_provider.dart';
 import 'data/auth_repository.dart';
@@ -96,9 +97,9 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         title: Text(
           'NUEVA CONTRASEÑA',
           style: AppTypography.displaySmall(color: AppColors.goldPale).copyWith(
-            fontSize: 22,
+            fontSize: authAppBarTitleSize(context),
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.8,
+            letterSpacing: 0.6,
           ),
         ),
         centerTitle: true,
@@ -123,17 +124,27 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final contentWidth = (constraints.maxWidth * 0.88).clamp(
-                  320.0,
-                  520.0,
-                );
+                final metrics = AuthLayoutMetrics.of(context, constraints);
+                final sectionGap = metrics.tight
+                    ? 16.0
+                    : (metrics.compact ? 22.0 : 28.0);
+                final fieldStyle = AppTypography.displaySmall(
+                  color: AppColors.goldPale,
+                ).copyWith(fontSize: metrics.fieldSize, height: 1.15);
 
                 return ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 84, 24, 28),
+                  padding: EdgeInsets.fromLTRB(
+                    metrics.side,
+                    metrics.belowAppBar,
+                    metrics.side,
+                    metrics.bottomPad,
+                  ),
                   children: [
                     Center(
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: contentWidth),
+                        constraints: BoxConstraints(
+                          maxWidth: metrics.contentWidth,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -142,20 +153,24 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                                 'Enlace no válido',
                                 style: AppTypography.displaySmall(
                                   color: AppColors.goldPale,
-                                ).copyWith(fontSize: 27),
+                                ).copyWith(
+                                  fontSize: metrics.titleSize,
+                                  height: 1.1,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 12),
+                              SizedBox(height: metrics.tight ? 8 : 12),
                               Text(
                                 'El enlace ha expirado o ya se usó. Solicita uno nuevo.',
                                 style: AppTypography.bodyMedium(
                                   color: Colors.white.withValues(alpha: 0.86),
-                                ).copyWith(fontSize: 15),
+                                ).copyWith(fontSize: metrics.bodySize),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 28),
+                              SizedBox(height: sectionGap),
                               _GoldButton(
                                 label: 'Solicitar nuevo enlace',
+                                height: metrics.buttonHeight,
                                 onPressed: () =>
                                     context.go('/recuperar-contrasena'),
                               ),
@@ -164,40 +179,47 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                                 'Elige una contraseña nueva',
                                 style: AppTypography.displaySmall(
                                   color: AppColors.goldPale,
-                                ).copyWith(fontSize: 27),
+                                ).copyWith(
+                                  fontSize: metrics.titleSize,
+                                  height: 1.1,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 12),
+                              SizedBox(height: metrics.tight ? 8 : 12),
                               Text(
                                 'Mínimo 8 caracteres. Tras guardar entrarás directamente.',
                                 style: AppTypography.bodyMedium(
                                   color: Colors.white.withValues(alpha: 0.86),
-                                ).copyWith(fontSize: 15),
+                                ).copyWith(fontSize: metrics.bodySize),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 28),
+                              SizedBox(height: sectionGap),
                               TextField(
                                 controller: _passwordController,
                                 obscureText: true,
                                 cursorColor: AppColors.gold,
-                                style: _fieldStyle(),
+                                style: fieldStyle,
                                 textInputAction: TextInputAction.next,
                                 enabled: !_loading && supabaseReady,
-                                decoration: _fieldDecoration(
-                                  'Nueva contraseña',
+                                decoration: authDarkFieldDecoration(
+                                  label: 'Nueva contraseña',
+                                  fieldSize: metrics.fieldSize,
+                                  verticalPadding: metrics.fieldPad,
                                 ),
                               ),
-                              const SizedBox(height: 14),
+                              SizedBox(height: metrics.tight ? 10 : 14),
                               TextField(
                                 controller: _confirmController,
                                 obscureText: true,
                                 cursorColor: AppColors.gold,
-                                style: _fieldStyle(),
+                                style: fieldStyle,
                                 textInputAction: TextInputAction.done,
                                 onSubmitted: (_) => _submit(),
                                 enabled: !_loading && supabaseReady,
-                                decoration: _fieldDecoration(
-                                  'Repetir contraseña',
+                                decoration: authDarkFieldDecoration(
+                                  label: 'Repetir contraseña',
+                                  fieldSize: metrics.fieldSize,
+                                  verticalPadding: metrics.fieldPad,
                                 ),
                               ),
                               if (_error != null) ...[
@@ -210,9 +232,10 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                                   textAlign: TextAlign.center,
                                 ),
                               ],
-                              const SizedBox(height: 22),
+                              SizedBox(height: metrics.tight ? 16 : 22),
                               _GoldButton(
                                 label: 'Guardar contraseña',
+                                height: metrics.buttonHeight,
                                 loading: _loading,
                                 onPressed: _loading || !supabaseReady
                                     ? null
@@ -232,60 +255,26 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       ),
     );
   }
-
-  TextStyle _fieldStyle() {
-    return AppTypography.displaySmall(
-      color: AppColors.goldPale,
-    ).copyWith(fontSize: 21);
-  }
-
-  InputDecoration _fieldDecoration(String label) {
-    final borderRadius = BorderRadius.circular(16);
-    return InputDecoration(
-      labelText: label,
-      labelStyle: AppTypography.displaySmall(
-        color: AppColors.goldPale,
-      ).copyWith(fontSize: 21),
-      floatingLabelStyle: AppTypography.titleLarge(color: AppColors.gold),
-      filled: true,
-      fillColor: Colors.black.withValues(alpha: 0.08),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: const BorderSide(color: AppColors.gold, width: 1.3),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: const BorderSide(color: AppColors.gold, width: 1.3),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: const BorderSide(color: AppColors.gold, width: 1.8),
-      ),
-      disabledBorder: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: BorderSide(color: AppColors.gold.withValues(alpha: 0.52)),
-      ),
-    );
-  }
 }
 
 class _GoldButton extends StatelessWidget {
   const _GoldButton({
     required this.label,
     required this.onPressed,
+    required this.height,
     this.loading = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
+  final double height;
   final bool loading;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 50,
+      height: height,
       child: FilledButton(
         onPressed: onPressed,
         style: FilledButton.styleFrom(

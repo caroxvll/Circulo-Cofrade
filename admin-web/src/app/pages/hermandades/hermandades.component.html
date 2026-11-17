@@ -4,8 +4,8 @@
       <p class="eyebrow">Comunidad · solo admin</p>
       <h1>Hermandades</h1>
       <p class="lead">
-        Gestiona el directorio (tablones por día), las cuentas oficiales y quién
-        publica en cada tablón. Es la base del área privada de cada hermandad.
+        Directorio de Sevilla: días de Semana Santa y categoría Glorias. Cuentas
+        oficiales y quién publica en cada tablón (área privada de cada hermandad).
       </p>
     </div>
     <div class="queue-toolbar">
@@ -25,7 +25,12 @@
   @if (created(); as account) {
     <div class="success-box">
       <strong>Cuenta creada:</strong> {{ '@' + account.handle }} · {{ account.email }}
-      @if (account.temporaryPassword) {
+      @if (account.passwordFromRequest) {
+        <p class="sub">
+          Usa la contraseña que eligió la hermandad en la solicitud. Ya pueden
+          entrar en el portal (no hace falta enviársela).
+        </p>
+      } @else if (account.temporaryPassword) {
         <div class="pwd-row">
           <code>{{ account.temporaryPassword }}</code>
           <button type="button" class="btn btn-ghost" (click)="copyPassword()">
@@ -33,6 +38,112 @@
           </button>
         </div>
         <p class="sub">Guárdala ahora: no se vuelve a mostrar.</p>
+      }
+    </div>
+  }
+
+  <!-- Solicitudes de acceso (portal) -->
+  <div class="section-head">
+    <h2 class="block-title">
+      Solicitudes de acceso
+      @if (accessRequests().length) {
+        <span class="req-count">{{ accessRequests().length }}</span>
+      }
+    </h2>
+  </div>
+  <p class="filter-hint">
+    Llegan desde el portal («Solicitar acceso»). Revisa, crea la cuenta abajo y
+    marca como aprobada. Nada entra sin tu visto bueno.
+  </p>
+
+  @if (!loading() && accessRequests().length === 0) {
+    <div class="empty-box">No hay solicitudes pendientes.</div>
+  }
+
+  @if (accessRequests().length) {
+    <div class="req-list">
+      @for (req of accessRequests(); track req.id) {
+        <article class="req-card">
+          <header class="req-head">
+            <div>
+              <h3>{{ req.hermandadName }}</h3>
+              <p>
+                {{ requestKindLabel(req) }}
+                @if (req.city) {
+                  · {{ req.city }}
+                }
+                · {{ req.contactName }}
+                · {{ timeAgo(req.createdAt) }}
+              </p>
+            </div>
+            <span class="req-badge">Pendiente</span>
+          </header>
+          <dl class="req-meta">
+            <div>
+              <dt>Tipo</dt>
+              <dd>{{ requestKindLabel(req) }}</dd>
+            </div>
+            <div>
+              <dt>Acceso</dt>
+              <dd>
+                @if (req.hasRequestedPassword) {
+                  Contraseña elegida por ellos
+                } @else {
+                  Sin contraseña en solicitud
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd>
+                <a [href]="'mailto:' + req.contactEmail">{{ req.contactEmail }}</a>
+              </dd>
+            </div>
+            @if (req.contactPhone) {
+              <div>
+                <dt>Teléfono</dt>
+                <dd>{{ req.contactPhone }}</dd>
+              </div>
+            }
+          </dl>
+          @if (req.message) {
+            <p class="req-msg">{{ req.message }}</p>
+          }
+          <div class="req-actions">
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="busyKey() === 'req:' + req.id"
+              (click)="prefillFromRequest(req)"
+            >
+              Preparar alta
+            </button>
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="busyKey() === 'req:' + req.id"
+              (click)="markRequestApproved(req)"
+            >
+              Marcar aprobada
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost"
+              [disabled]="busyKey() === 'req:' + req.id"
+              (click)="rejectAccessRequest(req)"
+            >
+              Rechazar
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost"
+              [disabled]="busyKey() === 'req:' + req.id"
+              (click)="rejectAccessRequest(req, true)"
+            >
+              Spam
+            </button>
+          </div>
+        </article>
       }
     </div>
   }
@@ -132,7 +243,7 @@
   }
 
   <!-- Cuentas -->
-  <h2 class="block-title">Cuentas oficiales</h2>
+  <h2 class="block-title" id="create-hermandad-account">Cuentas oficiales</h2>
   <div class="two-col">
     <div class="panel">
       <h2>Crear cuenta</h2>
@@ -148,9 +259,13 @@
         Email
         <input type="email" [(ngModel)]="email" />
       </label>
+      <p class="filter-hint">
+        Si la solicitud trae contraseña elegida por ellos, se usará esa (no la
+        veréis). Si no, genera temporal o pon una manual.
+      </p>
       <label class="check">
         <input type="checkbox" [(ngModel)]="autoPassword" />
-        Generar contraseña temporal
+        Generar contraseña temporal (solo si no hay clave en la solicitud)
       </label>
       @if (!autoPassword) {
         <label>
@@ -287,7 +402,7 @@
         </button>
       </header>
 
-      <p class="field-label">1. ¿Qué día sale?</p>
+      <p class="field-label">1. Día de estación o Glorias</p>
       <div class="day-picker">
         @for (day of stationDays; track day) {
           <button
@@ -306,7 +421,7 @@
         2. Nombre de la hermandad
         <input
           [(ngModel)]="boardName"
-          placeholder="Ej. La Borriquita, El Amor, San Gonzalo…"
+          placeholder="Ej. La Borriquita, Santa Lucía, San Gonzalo…"
           autofocus
         />
       </label>

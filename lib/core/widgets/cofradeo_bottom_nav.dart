@@ -36,6 +36,21 @@ double cofradeoShellBottomInset(BuildContext context) {
   return MediaQuery.paddingOf(context).bottom + cofradeoBottomNavContentHeight;
 }
 
+/// Alto máximo de un bottom sheet. Deja la barra de estado y un hueco
+/// arriba para poder cerrarlo tocando fuera.
+double cofradeoSheetMaxHeight(BuildContext context) {
+  final media = MediaQuery.of(context);
+  // Dentro del sheet, padding.top suele ser 0. viewPadding sigue siendo
+  // el hueco del notch, y hace falta otro tramo para ver el cierre y tocar fuera.
+  final topInset = media.viewPadding.top > media.padding.top
+      ? media.viewPadding.top
+      : media.padding.top;
+  final topGap = topInset + 88;
+  final available = media.size.height - topGap - media.viewInsets.bottom;
+  if (available < 280) return 280;
+  return available;
+}
+
 /// Padding inferior de bottom sheets: margen + teclado + barra del shell.
 double cofradeoSheetBottomPadding(
   BuildContext context, {
@@ -53,29 +68,38 @@ class CofradeoBottomNav extends StatelessWidget {
     required this.onTap,
     this.showCalendarDot = false,
     this.showNotificationsDot = false,
+    this.communityLabel = 'Comunidad',
+    this.communityIcon = Icons.groups_outlined,
+    this.communitySelectedIcon = Icons.groups,
   });
 
   final int currentIndex;
   final ValueChanged<int> onTap;
   final bool showCalendarDot;
   final bool showNotificationsDot;
+  final String communityLabel;
+  final IconData communityIcon;
+  final IconData communitySelectedIcon;
 
   static const _topRadius = 22.0;
 
-  static const _items = [
-    _NavItem(Icons.calendar_month_outlined, Icons.calendar_month, 'Calendario'),
-    _NavItem(Icons.chat_bubble_outline, Icons.chat_bubble, 'Foros'),
-    _NavItem(Icons.search, Icons.search, 'Buscar'),
-    _NavItem(
-      Icons.notifications_outlined,
-      Icons.notifications,
-      'Notificaciones',
-    ),
-    _NavItem(Icons.person_outline, Icons.person, 'Perfil'),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final items = [
+      const _NavItem(
+        Icons.calendar_month_outlined,
+        Icons.calendar_month,
+        'Calendario',
+      ),
+      const _NavItem(Icons.newspaper_outlined, Icons.newspaper, 'Noticias'),
+      _NavItem(communityIcon, communitySelectedIcon, communityLabel),
+      const _NavItem(
+        Icons.notifications_outlined,
+        Icons.notifications,
+        'Notificaciones',
+      ),
+      const _NavItem(Icons.person_outline, Icons.person, 'Perfil'),
+    ];
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.navBarBackground,
@@ -99,8 +123,8 @@ class CofradeoBottomNav extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
             child: Row(
-              children: List.generate(_items.length, (index) {
-                final item = _items[index];
+              children: List.generate(items.length, (index) {
+                final item = items[index];
                 final isSelected = index == currentIndex;
                 final showDot =
                     (index == 0 && showCalendarDot && !isSelected) ||

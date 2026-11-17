@@ -30,6 +30,8 @@ final mockForumCategories = <ForumCategory>[
     lastMessageAgo: 'hace 45 min',
     lastTopicId: 'nueva-ruta-viernes-santo',
     lastTopicTitle: 'Nueva ruta de la procesión del Viernes Santo',
+    lastTopicExcerpt:
+        'Os comunicamos que este año la procesión pasará por Plaza Mayor a las 18:30. ¿Qué os parece el nuevo itinerario?',
     isEnabled: true,
     isActive: true,
   ),

@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_bootstrap.dart';
+import '../../../core/utils/local_day.dart';
 import '../models/event_live_update.dart';
 import 'mock_event_live_updates.dart';
 
@@ -14,20 +15,43 @@ class EventLiveUpdatesRepository {
   final SupabaseClient? _client;
 
   static const _minSecondsBetweenPosts = 60;
-  static const _feedWindow = Duration(hours: 4);
 
+  /// Hilo de la cita. Sin ventana de horas: la ficha sigue legible al cerrar el directo.
   Future<List<EventLiveUpdate>> fetchForEvent(String eventId) async {
-    if (_client == null) {
+    final client = _client;
+    if (client == null) {
       return mockEventLiveUpdatesFor(eventId);
     }
 
-    final since = DateTime.now().toUtc().subtract(_feedWindow);
-    final rows = await _client!
+    final rows = await client
         .from('event_live_updates')
         .select('*, profiles!user_id(handle)')
         .eq('calendar_event_id', eventId)
+        .order('created_at', ascending: false)
+        .limit(liveJornadaCap);
+
+    return (rows as List)
+        .map((row) => updateFromRow(row as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Avisos de hoy de varias citas, para el río de Para ti.
+  Future<List<EventLiveUpdate>> fetchForEvents(
+    Iterable<String> eventIds, {
+    int limit = paraTiRiverLimit,
+  }) async {
+    final client = _client;
+    final ids = eventIds.where((id) => id.isNotEmpty).toSet().toList();
+    if (ids.isEmpty || client == null) return const [];
+
+    final since = startOfLocalDay().toUtc();
+    final rows = await client
+        .from('event_live_updates')
+        .select('*, profiles!user_id(handle)')
+        .inFilter('calendar_event_id', ids)
         .gte('created_at', since.toIso8601String())
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false)
+        .limit(limit);
 
     return (rows as List)
         .map((row) => updateFromRow(row as Map<String, dynamic>))

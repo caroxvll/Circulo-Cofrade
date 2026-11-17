@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -8,38 +7,18 @@ class SocialAuthButtons extends StatelessWidget {
   const SocialAuthButtons({
     super.key,
     required this.onGoogle,
-    required this.onApple,
     this.loading = false,
   });
 
   final VoidCallback onGoogle;
-  final VoidCallback onApple;
   final bool loading;
-
-  bool get _showApple {
-    if (kIsWeb) return false;
-    return defaultTargetPlatform == TargetPlatform.iOS ||
-        defaultTargetPlatform == TargetPlatform.macOS;
-  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _SocialButton(
-          label: 'Continuar con Google',
-          icon: Icons.g_mobiledata_rounded,
-          onPressed: loading ? null : onGoogle,
-        ),
-        if (_showApple) ...[
-          const SizedBox(height: 10),
-          _SocialButton(
-            label: 'Continuar con Apple',
-            icon: Icons.apple,
-            onPressed: loading ? null : onApple,
-          ),
-        ],
-      ],
+    return _SocialButton(
+      label: 'Continuar con Google',
+      icon: Icons.g_mobiledata_rounded,
+      onPressed: loading ? null : onGoogle,
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/forum.dart';
 
@@ -157,8 +158,8 @@ class ForumPillarCoverImage extends StatelessWidget {
       );
     }
 
-    return Image.asset(
-      cover.fallbackAsset,
+    return CofradeoAssetImage(
+      assetPath: cover.fallbackAsset,
       fit: fit,
       alignment: alignment,
       width: width,
@@ -167,9 +168,8 @@ class ForumPillarCoverImage extends StatelessWidget {
       color: color,
       colorBlendMode: colorBlendMode,
       cacheWidth: cachePx,
-      gaplessPlayback: true,
-      errorBuilder: (_, _, _) => Image.asset(
-        AppAssets.loginBackground,
+      errorBuilder: (_, _, _) => CofradeoAssetImage(
+        assetPath: AppAssets.loginBackground,
         fit: fit,
         alignment: alignment,
         width: width,

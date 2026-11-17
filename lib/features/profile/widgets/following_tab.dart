@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../../shared/models/followed_topic.dart';
@@ -12,8 +14,10 @@ import '../../../shared/models/forum.dart';
 import '../../forums/forums_provider.dart';
 import '../../forums/utils/hermandad_board_display.dart';
 import '../../forums/utils/hermandad_local_assets.dart';
+import '../../forums/widgets/hermandad_crest_hero.dart';
 import '../../forums/widgets/hermandad_follow_sections_sheet.dart';
 import '../../search/follows_provider.dart';
+import '../profile_provider.dart';
 import '../profile_design.dart';
 import 'profile_people_mode.dart';
 import 'profile_screen_header.dart';
@@ -22,19 +26,7 @@ const _pageSize = 5;
 /// Una fila de 2 cards a altura completa (sin scroll).
 const _discoverPageSize = 2;
 
-const _hermandadesDayOrder = [
-  'Viernes de Dolores',
-  'Sábado de Pasión',
-  'Domingo de Ramos',
-  'Lunes Santo',
-  'Martes Santo',
-  'Miércoles Santo',
-  'Jueves Santo',
-  'Madrugá',
-  'Viernes Santo',
-  'Sábado Santo',
-  'Domingo de Resurrección',
-];
+const _hermandadesDayOrder = hermandadDirectoryDays;
 
 enum _FollowKind { hermandad, hilo, hashtag }
 
@@ -90,7 +82,11 @@ class _FollowingTabState extends ConsumerState<FollowingTab> {
   @override
   void initState() {
     super.initState();
-    HermandadLocalAssets.ensureLoaded();
+    if (!HermandadLocalAssets.isReady) {
+      HermandadLocalAssets.ensureLoaded().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   @override
@@ -118,6 +114,18 @@ class _FollowingTabState extends ConsumerState<FollowingTab> {
   Widget build(BuildContext context) {
     final hashtagsAsync = ref.watch(followedHashtagsProvider);
     final topicsAsync = ref.watch(followedTopicsDetailsProvider);
+
+    ref.listen(profileFollowingIntentProvider, (previous, next) {
+      if (next == null || !mounted) return;
+      setState(() {
+        _filter = _FollowFilter.hermandad;
+        _exploreMoreHermandades = next.openDiscover;
+        _pageIndex = 0;
+        _discoverPageIndex = 0;
+        _query = '';
+        _searchCtrl.clear();
+      });
+    });
 
     return topicsAsync.when(
       skipLoadingOnReload: true,
@@ -583,11 +591,10 @@ class _HermandadFollowTile extends ConsumerWidget {
           fit: StackFit.expand,
           children: [
             Positioned.fill(
-              child: Image.asset(
-                AppAssets.hermandadCardBackground,
+              child: CofradeoAssetImage(
+                assetPath: AppAssets.hermandadCardBackground,
                 fit: BoxFit.cover,
                 filterQuality: FilterQuality.medium,
-                gaplessPlayback: true,
                 errorBuilder: (_, _, _) => const ColoredBox(
                   color: Color(0xFFF5F0E8),
                 ),
@@ -611,6 +618,13 @@ class _HermandadFollowTile extends ConsumerWidget {
                         width: logoSize,
                         height: logoSize,
                         cacheSize: logoSize,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
+                        placeholder: CofradeoSkeletonBone(
+                          width: logoSize,
+                          height: logoSize,
+                          borderRadius: logoSize / 2,
+                        ),
                         errorWidget: Icon(
                           Icons.church_outlined,
                           size: logoSize * 0.72,
@@ -619,10 +633,22 @@ class _HermandadFollowTile extends ConsumerWidget {
                       );
                     }
                     if (localLogo != null) {
-                      return Image.asset(
-                        localLogo,
+                      return CofradeoAssetImage(
+                        assetPath: localLogo,
                         fit: BoxFit.contain,
+                        width: logoSize,
+                        height: logoSize,
                         filterQuality: FilterQuality.medium,
+                        cacheWidth: ImageDecodeCache.px(context, logoSize),
+                        cacheHeight: ImageDecodeCache.px(context, logoSize),
+                        fadeDuration: Duration.zero,
+                      );
+                    }
+                    if (!HermandadLocalAssets.isReady) {
+                      return CofradeoSkeletonBone(
+                        width: logoSize,
+                        height: logoSize,
+                        borderRadius: logoSize / 2,
                       );
                     }
                     return Icon(
@@ -651,10 +677,13 @@ class _HermandadFollowTile extends ConsumerWidget {
                         ),
                         Expanded(
                           child: Center(
-                            child: SizedBox(
-                              width: logoSize,
-                              height: logoSize,
-                              child: logoWidget(),
+                            child: HermandadCrestHero(
+                              topicId: topic.topicId,
+                              child: SizedBox(
+                                width: logoSize,
+                                height: logoSize,
+                                child: logoWidget(),
+                              ),
                             ),
                           ),
                         ),
@@ -974,136 +1003,148 @@ class _HermandadDiscoverPane extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final boardsAsync = ref.watch(forumTopicsProvider('hermandades'));
+    final registeredAsync = ref.watch(registeredHermandadTopicIdsProvider);
 
-    return boardsAsync.when(
-      skipLoadingOnReload: true,
-      loading: () => const HermandadCardsSkeleton(showChrome: false),
-      error: (_, _) => Center(
+    if (boardsAsync.isLoading || registeredAsync.isLoading) {
+      return const HermandadCardsSkeleton(showChrome: false);
+    }
+    if (boardsAsync.hasError || registeredAsync.hasError) {
+      return Center(
         child: Text(
           'No se pudo cargar el directorio de hermandades.',
           style: AppTypography.bodyMedium(),
           textAlign: TextAlign.center,
         ),
-      ),
-      data: (raw) {
-        // Solo las que aún no sigues (para “Seguir otra”).
-        final ordered = _ordered([
-          for (final t in raw)
-            if (!followedTopicIds.contains(t.id)) t,
-        ]);
+      );
+    }
 
-        var list = ordered;
-        final q = query.trim().toLowerCase();
-        if (q.isNotEmpty) {
-          list = [
-            for (final t in list)
-              if (t.title.toLowerCase().contains(q)) t,
-          ];
-        }
+    final raw = boardsAsync.requireValue;
+    final registeredIds = registeredAsync.requireValue;
 
-        final pageCount = list.isEmpty
-            ? 0
-            : ((list.length + _discoverPageSize - 1) ~/ _discoverPageSize);
-        final safePage =
-            pageCount == 0 ? 0 : pageIndex.clamp(0, pageCount - 1);
-        final pageItems = list
-            .skip(safePage * _discoverPageSize)
-            .take(_discoverPageSize)
-            .toList();
+    // Solo hermandades con cuenta oficial activa y que aún no sigues.
+    final ordered = _ordered([
+      for (final t in raw)
+        if (registeredIds.contains(t.id) && !followedTopicIds.contains(t.id)) t,
+    ]);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (showBackToMine && onBackToMine != null) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: InkWell(
-                  onTap: onBackToMine,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.arrow_back_rounded,
-                          size: 16,
-                          color: AppColors.burgundy,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          followedTopicIds.length == 1
-                              ? 'Volver a tu hermandad'
-                              : 'Volver a tus hermandades',
-                          style: AppTypography.labelSmall(
-                            color: AppColors.burgundy,
-                          ).copyWith(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+    var list = ordered;
+    final q = query.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = [
+        for (final t in list)
+          if (t.title.toLowerCase().contains(q)) t,
+      ];
+    }
+
+    final pageCount = list.isEmpty
+        ? 0
+        : ((list.length + _discoverPageSize - 1) ~/ _discoverPageSize);
+    final safePage = pageCount == 0 ? 0 : pageIndex.clamp(0, pageCount - 1);
+    final pageItems = list
+        .skip(safePage * _discoverPageSize)
+        .take(_discoverPageSize)
+        .toList();
+
+    final emptyMessage = () {
+      if (q.isNotEmpty) {
+        return 'Ninguna hermandad para «${query.trim()}».';
+      }
+      if (registeredIds.isEmpty) {
+        return 'Aún no hay hermandades oficiales activas. '
+            'Iremos sumándolas según se den de alta.';
+      }
+      return 'No hay más hermandades para seguir.';
+    }();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showBackToMine && onBackToMine != null) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: InkWell(
+              onTap: onBackToMine,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.arrow_back_rounded,
+                      size: 16,
+                      color: AppColors.burgundy,
                     ),
-                  ),
+                    const SizedBox(width: 4),
+                    Text(
+                      followedTopicIds.length == 1
+                          ? 'Volver a tu hermandad'
+                          : 'Volver a tus hermandades',
+                      style: AppTypography.labelSmall(
+                        color: AppColors.burgundy,
+                      ).copyWith(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 6),
-            ],
-            ProfilePeopleSearchField(
-              controller: searchController,
-              hint: 'Buscar hermandad…',
-              onChanged: onQueryChanged,
             ),
-            const SizedBox(height: 6),
-            if (list.isEmpty)
-              Expanded(
-                child: Center(
-                  child: Text(
-                    q.isEmpty
-                        ? 'No hay más hermandades para seguir.'
-                        : 'Ninguna hermandad para «${query.trim()}».',
-                    style: AppTypography.bodyMedium(),
-                    textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+        ],
+        ProfilePeopleSearchField(
+          controller: searchController,
+          hint: 'Buscar hermandad…',
+          onChanged: onQueryChanged,
+        ),
+        const SizedBox(height: 6),
+        if (list.isEmpty)
+          Expanded(
+            child: Center(
+              child: Text(
+                emptyMessage,
+                style: AppTypography.bodyMedium(),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          )
+        else ...[
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final gap = 8.0;
+                final cardW = (constraints.maxWidth - gap) / 2;
+                final cardH = constraints.maxHeight;
+                final ratio = cardW / cardH.clamp(1.0, 10000.0);
+                return GridView.builder(
+                  padding: EdgeInsets.zero,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: gap,
+                    crossAxisSpacing: gap,
+                    childAspectRatio: ratio,
                   ),
-                ),
-              )
-            else ...[
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final gap = 8.0;
-                    final cardW = (constraints.maxWidth - gap) / 2;
-                    final cardH = constraints.maxHeight;
-                    final ratio = cardW / cardH.clamp(1.0, 10000.0);
-                    return GridView.builder(
-                      padding: EdgeInsets.zero,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: gap,
-                        crossAxisSpacing: gap,
-                        childAspectRatio: ratio,
-                      ),
-                      itemCount: pageItems.length,
-                      itemBuilder: (context, index) {
-                        return _HermandadDiscoverTile(
-                          topic: pageItems[index],
-                        );
-                      },
+                  itemCount: pageItems.length,
+                  itemBuilder: (context, index) {
+                    return _HermandadDiscoverTile(
+                      topic: pageItems[index],
                     );
                   },
-                ),
-              ),
-              if (pageCount > 1)
-                _FollowingPager(
-                  pageIndex: safePage,
-                  pageCount: pageCount,
-                  onPageChanged: onPageChanged,
-                ),
-            ],
-          ],
-        );
-      },
+                );
+              },
+            ),
+          ),
+          if (pageCount > 1)
+            _FollowingPager(
+              pageIndex: safePage,
+              pageCount: pageCount,
+              onPageChanged: onPageChanged,
+            ),
+        ],
+      ],
     );
   }
 }
@@ -1168,11 +1209,10 @@ class _HermandadDiscoverTile extends ConsumerWidget {
           fit: StackFit.expand,
           children: [
             Positioned.fill(
-              child: Image.asset(
-                AppAssets.hermandadCardBackground,
+              child: CofradeoAssetImage(
+                assetPath: AppAssets.hermandadCardBackground,
                 fit: BoxFit.cover,
                 filterQuality: FilterQuality.medium,
-                gaplessPlayback: true,
                 errorBuilder: (_, _, _) => const ColoredBox(
                   color: Color(0xFFF5F0E8),
                 ),
@@ -1196,6 +1236,13 @@ class _HermandadDiscoverTile extends ConsumerWidget {
                         width: logoSize,
                         height: logoSize,
                         cacheSize: logoSize,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
+                        placeholder: CofradeoSkeletonBone(
+                          width: logoSize,
+                          height: logoSize,
+                          borderRadius: logoSize / 2,
+                        ),
                         errorWidget: Icon(
                           Icons.church_outlined,
                           size: logoSize * 0.72,
@@ -1204,10 +1251,22 @@ class _HermandadDiscoverTile extends ConsumerWidget {
                       );
                     }
                     if (localLogo != null) {
-                      return Image.asset(
-                        localLogo,
+                      return CofradeoAssetImage(
+                        assetPath: localLogo,
                         fit: BoxFit.contain,
+                        width: logoSize,
+                        height: logoSize,
                         filterQuality: FilterQuality.medium,
+                        cacheWidth: ImageDecodeCache.px(context, logoSize),
+                        cacheHeight: ImageDecodeCache.px(context, logoSize),
+                        fadeDuration: Duration.zero,
+                      );
+                    }
+                    if (!HermandadLocalAssets.isReady) {
+                      return CofradeoSkeletonBone(
+                        width: logoSize,
+                        height: logoSize,
+                        borderRadius: logoSize / 2,
                       );
                     }
                     return Icon(
@@ -1236,10 +1295,13 @@ class _HermandadDiscoverTile extends ConsumerWidget {
                         ),
                         Expanded(
                           child: Center(
-                            child: SizedBox(
-                              width: logoSize,
-                              height: logoSize,
-                              child: logoWidget(),
+                            child: HermandadCrestHero(
+                              topicId: topic.id,
+                              child: SizedBox(
+                                width: logoSize,
+                                height: logoSize,
+                                child: logoWidget(),
+                              ),
                             ),
                           ),
                         ),

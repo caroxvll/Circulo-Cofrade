@@ -5,6 +5,7 @@ import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../calendar_design_tokens.dart';
 import 'calendar_event_image.dart';
@@ -174,34 +175,35 @@ class _HeroSlide extends StatelessWidget {
                     children: [
                       _TypeTag(label: event.type.cellLabel.toUpperCase()),
                       const Spacer(),
+                      Text(
+                        event.title,
+                        style: AppTypography.displaySmall(
+                          color: AppColors.textOnDark,
+                        ).copyWith(
+                          fontSize: CalendarDesign.heroTitleSize,
+                          fontWeight: FontWeight.w600,
+                          height: 1.15,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           _DateBadge(day: event.date.day, month: monthLabel),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  event.title,
-                                  style: AppTypography.displaySmall(
-                                    color: AppColors.textOnDark,
-                                  ).copyWith(
-                                    fontSize: CalendarDesign.heroTitleSize,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.15,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 5),
                                 _HeroMeta(
                                   icon: Icons.location_on_outlined,
                                   text: location,
                                 ),
                                 if (event.time != null) ...[
-                                  const SizedBox(height: 2),
+                                  const SizedBox(height: 3),
                                   _HeroMeta(
                                     icon: Icons.schedule_outlined,
                                     text: event.time!,
@@ -256,8 +258,8 @@ class _HeroPatternBackground extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(
-          AppAssets.loginBackground,
+        CofradeoAssetImage(
+          assetPath: AppAssets.loginBackground,
           fit: BoxFit.cover,
           alignment: Alignment.center,
           filterQuality: FilterQuality.medium,
@@ -265,7 +267,6 @@ class _HeroPatternBackground extends StatelessWidget {
             context,
             MediaQuery.sizeOf(context).width,
           ),
-          gaplessPlayback: true,
         ),
         DecoratedBox(
           decoration: BoxDecoration(

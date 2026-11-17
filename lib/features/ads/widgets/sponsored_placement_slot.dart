@@ -159,12 +159,19 @@ class SponsoredAdAsyncReveal extends StatelessWidget {
           child: _buildContent(ad),
         );
       },
-      loading: () => KeyedSubtree(
-        key: ValueKey('ad-loading-${style.name}-$compact'),
-        child: _wrapPadding(
-          SponsoredAdSkeleton(style: style, compact: compact),
-        ),
-      ),
+      // Shell docked: sin skeleton en frío → evita salto nav si no hay inventario.
+      // En reload, skipLoadingOnReload mantiene el anuncio anterior.
+      loading: () {
+        if (style == SponsoredAdCardStyle.forumsDocked) {
+          return const SizedBox.shrink(key: ValueKey('ad-loading-docked'));
+        }
+        return KeyedSubtree(
+          key: ValueKey('ad-loading-${style.name}-$compact'),
+          child: _wrapPadding(
+            SponsoredAdSkeleton(style: style, compact: compact),
+          ),
+        );
+      },
       error: (_, _) => const SizedBox.shrink(key: ValueKey('ad-error')),
     );
 

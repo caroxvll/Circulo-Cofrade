@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../constants/app_branding.dart';
 import 'forum_topic_query.dart';
+import '../../features/forums/utils/forum_navigation.dart';
 import '../../features/forums/utils/official_post_categories.dart';
 
 /// Enlace absoluto a un tema (o comentario) del foro.
@@ -14,7 +15,7 @@ String buildForumTopicShareUrl({
   String? replyId,
 }) {
   final query = buildForumTopicQuery(section: section, replyId: replyId);
-  final path = '/foros/$forumId/tema/$topicId$query';
+  final path = forumTopicLocation(forumId, topicId, querySuffix: query);
   if (kIsWeb) {
     return '${Uri.base.origin}$path';
   }

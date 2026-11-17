@@ -7,13 +7,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase/supabase_bootstrap.dart';
 import '../../shared/models/forum.dart';
 import '../auth/auth_provider.dart';
+import '../calendar/calendar_contributors_provider.dart';
 import '../notifications/notifications_provider.dart';
 import '../permissions/permissions_provider.dart';
 import '../profile/profile_provider.dart';
 import 'data/forums_repository.dart';
+import 'news_publishers_provider.dart';
 import 'data/forum_about_moderator.dart';
 import 'data/reply_likes_repository.dart';
+import 'data/topic_polls_repository.dart';
 import 'data/topic_reactions_repository.dart';
+import 'models/topic_poll.dart';
 import 'topic_replies_provider.dart';
 import 'utils/noticias_forum.dart';
 import 'utils/topic_list_order.dart';
@@ -100,6 +104,12 @@ final forumAboutModeratorsProvider =
   return ref.read(forumsRepositoryProvider).fetchForumModerators(forumId);
 });
 
+/// IDs de tablones con hermandad oficial registrada y activa (verificada).
+final registeredHermandadTopicIdsProvider =
+    FutureProvider<Set<String>>((ref) async {
+  return ref.watch(forumsRepositoryProvider).fetchRegisteredHermandadTopicIds();
+});
+
 final forumTopicsProvider = AsyncNotifierProvider.family<ForumTopicsNotifier,
     List<ForumTopic>, String>(
   ForumTopicsNotifier.new,
@@ -180,6 +190,8 @@ class ForumTopicsNotifier extends AsyncNotifier<List<ForumTopic>> {
 
 final forumTopicProvider = FutureProvider.autoDispose
     .family<ForumTopic?, ForumTopicKey>((ref, key) async {
+      // Mantener en sesión: atrás → delante no vuelve a skeleton + red.
+      ref.keepAlive();
       return ref
           .watch(forumsRepositoryProvider)
           .fetchTopic(key.forumId, key.topicId);
@@ -396,6 +408,17 @@ final topicReactionsRepositoryProvider = Provider<TopicReactionsRepository>((
   ref,
 ) {
   return createTopicReactionsRepository();
+});
+
+final topicPollsRepositoryProvider = Provider<TopicPollsRepository>((ref) {
+  return createTopicPollsRepository();
+});
+
+final topicPollProvider =
+    FutureProvider.family<TopicPoll?, String>((ref, topicId) async {
+  final repo = ref.watch(topicPollsRepositoryProvider);
+  if (!repo.isAvailable) return null;
+  return repo.fetchPollForTopic(topicId);
 });
 
 final topicUserReactionProvider =
@@ -804,14 +827,14 @@ class ReplySubmitController {
   final Ref _ref;
   final ReplyTarget target;
 
-  Future<void> submit(String content, {String? imageUrl}) async {
+  Future<ForumReply?> submit(String content, {String? imageUrl}) async {
     final user = _ref.read(currentUserProvider);
-    if (user == null) return;
+    if (user == null) return null;
 
     final repo = _ref.read(forumsRepositoryProvider);
     final handle = _ref.read(userHandleProvider);
 
-    await repo.createReply(
+    final reply = await repo.createReply(
       topicId: target.topicId,
       authorId: user.id,
       authorHandle: handle,
@@ -833,6 +856,7 @@ class ReplySubmitController {
     );
     _ref.invalidate(forumTopicsProvider(target.forumId));
     _ref.read(notificationsProvider.notifier).refresh();
+    return reply;
   }
 }
 
@@ -856,6 +880,7 @@ class TopicSubmitController {
     Uint8List? coverBytes,
     String? coverMimeType,
     String? relatedForumId,
+    TopicPollDraft? poll,
   }) async {
     if (forumId == 'hermandades') {
       throw const HermandadTopicsClosedException();
@@ -870,10 +895,16 @@ class TopicSubmitController {
       final isAdmin = _ref.read(isAdminProvider);
       final moderated =
           _ref.read(moderatedForumIdsProvider).asData?.value ?? const <String>{};
+      final isNewsPublisher =
+          await _ref.read(isNewsPublisherProvider(user.id).future);
+      final isCalendarContributor =
+          await _ref.read(isCalendarContributorProvider(user.id).future);
       if (!canCreateTopicInForum(
         forumId: forumId,
         isAdmin: isAdmin,
         moderatedForumIds: moderated,
+        isNewsPublisher: isNewsPublisher,
+        isCalendarContributor: isCalendarContributor,
       )) {
         throw const NoticiasStaffRequiredException();
       }
@@ -907,6 +938,19 @@ class TopicSubmitController {
         coverImageUrl: url,
       );
       topic = await repo.fetchTopic(forumId, topic.id) ?? topic;
+    }
+
+    if (poll != null) {
+      try {
+        await _ref.read(topicPollsRepositoryProvider).createPoll(
+              topicId: topic.id,
+              question: poll.question,
+              options: poll.options,
+            );
+        _ref.invalidate(topicPollProvider(topic.id));
+      } catch (_) {
+        // El tema ya existe; no bloqueamos el alta por un fallo de encuesta.
+      }
     }
 
     _ref.invalidate(forumTopicsProvider(forumId));

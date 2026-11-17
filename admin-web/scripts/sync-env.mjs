@@ -17,27 +17,40 @@ const envFileName =
         : 'env.json';
 const envJsonPath = resolve(repoRoot, envFileName);
 
-if (!existsSync(envJsonPath)) {
+// Vercel / CI: SUPABASE_URL + SUPABASE_ANON_KEY en variables de entorno.
+const fromEnvUrl = (process.env.SUPABASE_URL || '').trim();
+const fromEnvKey = (process.env.SUPABASE_ANON_KEY || '').trim();
+
+let url = '';
+let key = '';
+let label = 'PROD/local';
+
+if (fromEnvUrl && fromEnvKey) {
+  url = fromEnvUrl;
+  key = fromEnvKey;
+  label = 'CI/env';
+} else if (existsSync(envJsonPath)) {
+  const env = JSON.parse(readFileSync(envJsonPath, 'utf8'));
+  url = env.SUPABASE_URL ?? '';
+  key = env.SUPABASE_ANON_KEY ?? '';
+  label = envFileName === 'env.pre.json' ? 'PRE' : 'PROD/local';
+} else {
   console.error(
-    `No encuentro ${envFileName} en la raíz del repo Cofradeo.\n` +
+    `No encuentro ${envFileName} ni variables SUPABASE_URL / SUPABASE_ANON_KEY.\n` +
       'Usa: npm run sync-env        → env.json (prod)\n' +
       '     npm run sync-env:pre    → env.pre.json (pre)\n' +
+      '     Vercel: define SUPABASE_URL y SUPABASE_ANON_KEY\n' +
       'o rellena admin-web/src/environments/environment.local.ts',
   );
   process.exit(1);
 }
 
-const env = JSON.parse(readFileSync(envJsonPath, 'utf8'));
-const url = env.SUPABASE_URL ?? '';
-const key = env.SUPABASE_ANON_KEY ?? '';
-
 if (!url || !key) {
-  console.error(`${envFileName} no tiene SUPABASE_URL / SUPABASE_ANON_KEY.`);
+  console.error('Faltan SUPABASE_URL / SUPABASE_ANON_KEY.');
   process.exit(1);
 }
 
-const label = envFileName === 'env.pre.json' ? 'PRE' : 'PROD/local';
-const content = `// Generado por npm run sync-env desde ../../${envFileName} (${label})
+const content = `// Generado por npm run sync-env (${label})
 // No subir este archivo con claves reales a un repo público.
 export const environmentLocal = {
   supabaseUrl: ${JSON.stringify(url)},
@@ -46,5 +59,5 @@ export const environmentLocal = {
 `;
 
 writeFileSync(outPath, content, 'utf8');
-console.log(`OK → src/environments/environment.local.ts  [${label} · ${envFileName}]`);
+console.log(`OK → src/environments/environment.local.ts  [${label}]`);
 console.log(`URL: ${url}`);

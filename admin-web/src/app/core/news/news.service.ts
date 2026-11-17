@@ -22,7 +22,7 @@ export class NewsService {
     const { data, error } = await getSupabase()
       .from('forum_topics')
       .select(
-        'id, title, excerpt, body, author_handle, status, related_forum_id, cover_image_url, created_at, comment_count',
+        'id, title, excerpt, body, author_handle, status, related_forum_id, cover_image_url, created_at, comment_count, news_group_id',
       )
       .eq('forum_id', NOTICIAS_FORUM_ID)
       .order('created_at', { ascending: false })
@@ -276,14 +276,19 @@ export class NewsService {
   relatedLabel(id: string | null): string {
     if (!id) return 'Sin etiqueta';
     switch (id) {
+      case 'consejo':
       case 'foro-cofradiero':
-        return 'Círculo Cofrade';
-      case 'pentagrama-cofrade':
-        return 'Pentagrama';
-      case 'martillo-trabajadera':
-        return 'Martillo';
+        return 'Consejo / Institucional';
       case 'hermandades':
         return 'Hermandades';
+      case 'musica':
+      case 'pentagrama-cofrade':
+        return 'Música';
+      case 'costaleros':
+      case 'martillo-trabajadera':
+        return 'Costaleros';
+      case 'cultura':
+        return 'Cultura / Patrimonio';
       default:
         return id;
     }
@@ -313,7 +318,22 @@ export class NewsService {
       coverImageUrl: (row['cover_image_url'] as string | null) ?? null,
       createdAt: String(row['created_at'] ?? ''),
       commentCount: Number(row['comment_count'] ?? 0),
+      newsGroupId: (row['news_group_id'] as string | null) ?? null,
     };
+  }
+
+  async unifyNoticias(topicId: string, otherTopicId: string): Promise<void> {
+    const { error } = await getSupabase().rpc('unify_noticias', {
+      p_topic_ids: [topicId, otherTopicId],
+    });
+    if (error) throw error;
+  }
+
+  async splitNoticia(topicId: string): Promise<void> {
+    const { error } = await getSupabase().rpc('split_noticia', {
+      p_topic_id: topicId,
+    });
+    if (error) throw error;
   }
 
   private mapScheduled(row: Record<string, unknown>): ScheduledNews {

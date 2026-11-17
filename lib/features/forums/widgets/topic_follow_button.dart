@@ -8,6 +8,7 @@ import '../../auth/auth_provider.dart';
 import '../forum_topics_typography.dart';
 import '../../auth/email_verification_gate.dart';
 import '../../search/follows_provider.dart';
+import '../utils/forum_navigation.dart';
 import 'hermandad_follow_sections_sheet.dart';
 
 class TopicFollowButton extends ConsumerWidget {
@@ -150,7 +151,7 @@ class TopicFollowButton extends ConsumerWidget {
     } on FollowRequiresAuthException {
       if (context.mounted) {
         await context.push(
-          '/login?redirect=${Uri.encodeComponent('/foros/$forumId/tema/$topicId')}',
+          '/login?redirect=${Uri.encodeComponent(forumTopicLocation(forumId, topicId))}',
         );
       }
     } catch (_) {
@@ -209,7 +210,7 @@ class TopicFollowButton extends ConsumerWidget {
     } on FollowRequiresAuthException {
       if (context.mounted) {
         await context.push(
-          '/login?redirect=${Uri.encodeComponent('/foros/$forumId/tema/$topicId')}',
+          '/login?redirect=${Uri.encodeComponent(forumTopicLocation(forumId, topicId))}',
         );
       }
     } catch (_) {
@@ -221,7 +222,7 @@ class TopicFollowButton extends ConsumerWidget {
     final user = ref.read(currentUserProvider);
     if (user == null) {
       await context.push(
-        '/login?redirect=${Uri.encodeComponent('/foros/$forumId/tema/$topicId')}',
+        '/login?redirect=${Uri.encodeComponent(forumTopicLocation(forumId, topicId))}',
       );
       return false;
     }
@@ -518,8 +519,10 @@ class _TopicFollowChip extends StatelessWidget {
   final VoidCallback onTap;
   final bool compact;
 
-  String get _followLabel =>
-      isHermandadBoard ? 'Seguir hermandad' : 'Seguir hilo';
+  String get _followLabel {
+    if (isHermandadBoard) return 'Seguir hermandad';
+    return compact ? 'Seguir' : 'Seguir hilo';
+  }
 
   @override
   Widget build(BuildContext context) {

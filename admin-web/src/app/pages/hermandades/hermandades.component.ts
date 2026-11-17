@@ -4,8 +4,11 @@ import {
   AdminUserRow,
   CommunityService,
   CreatedHermandadAccount,
+  HERMANDAD_DIRECTORY_DAYS,
+  HERMANDAD_GLORIAS_CATEGORY,
   HERMANDAD_STATION_DAYS,
   HandleHit,
+  HermandadAccessRequest,
   HermandadAssignment,
   HermandadTopicOption,
   hermandadBoardTopicId,
@@ -28,6 +31,7 @@ export class HermandadesPageComponent implements OnInit {
   readonly assignments = signal<HermandadAssignment[]>([]);
   readonly topics = signal<HermandadTopicOption[]>([]);
   readonly brotherhoods = signal<AdminUserRow[]>([]);
+  readonly accessRequests = signal<HermandadAccessRequest[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly creating = signal(false);
@@ -43,7 +47,8 @@ export class HermandadesPageComponent implements OnInit {
   readonly credentialsSaving = signal(false);
   readonly credentialsSuccess = signal<string | null>(null);
 
-  readonly stationDays = HERMANDAD_STATION_DAYS;
+  /** Días SS + Glorias (filtro y alta de tablones). */
+  readonly stationDays = HERMANDAD_DIRECTORY_DAYS;
   readonly timeAgo = formatTimeAgo;
   /** `null` = todos los días. */
   readonly dayFilter = signal<string | null>(null);
@@ -118,14 +123,17 @@ export class HermandadesPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [assignments, topics, brotherhoods] = await Promise.all([
-        this.community.fetchHermandadAssignments(),
-        this.community.fetchHermandadBoardTopics(),
-        this.community.fetchBrotherhoodAccounts(80),
-      ]);
+      const [assignments, topics, brotherhoods, accessRequests] =
+        await Promise.all([
+          this.community.fetchHermandadAssignments(),
+          this.community.fetchHermandadBoardTopics(),
+          this.community.fetchBrotherhoodAccounts(80),
+          this.community.fetchHermandadAccessRequests('pending', 40),
+        ]);
       this.assignments.set(assignments);
       this.topics.set(topics);
       this.brotherhoods.set(brotherhoods);
+      this.accessRequests.set(accessRequests);
       if (!this.linkTopicId && topics.length) this.linkTopicId = topics[0].id;
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo cargar');
@@ -134,9 +142,94 @@ export class HermandadesPageComponent implements OnInit {
     }
   }
 
+  prefillFromRequest(req: HermandadAccessRequest): void {
+    this.displayName = req.hermandadName;
+    this.email = req.contactEmail;
+    const slug = req.hermandadName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 24);
+    this.handle = slug || this.handle;
+    this.autoPassword = true;
+    this.password = '';
+
+    const day =
+      req.boardKind === 'glorias'
+        ? HERMANDAD_GLORIAS_CATEGORY
+        : req.processionDay || HERMANDAD_STATION_DAYS[2];
+    this.boardDay = day;
+    this.boardName = req.hermandadName;
+
+    const match = this.topics().find(
+      (t) =>
+        t.processionDay === day &&
+        t.hermandadName.toLowerCase() === req.hermandadName.toLowerCase(),
+    );
+    if (match) this.linkTopicId = match.id;
+
+    document
+      .getElementById('create-hermandad-account')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  requestKindLabel(req: HermandadAccessRequest): string {
+    if (req.boardKind === 'glorias') return 'Gloria';
+    return req.processionDay
+      ? `SS Sevilla · ${req.processionDay}`
+      : 'SS Sevilla';
+  }
+
+  async rejectAccessRequest(
+    req: HermandadAccessRequest,
+    asSpam = false,
+  ): Promise<void> {
+    const label = asSpam ? 'marcar como spam' : 'rechazar';
+    if (!confirm(`¿${label} la solicitud de «${req.hermandadName}»?`)) return;
+    this.busyKey.set(`req:${req.id}`);
+    this.error.set(null);
+    try {
+      await this.community.reviewHermandadAccessRequest({
+        requestId: req.id,
+        status: asSpam ? 'spam' : 'rejected',
+      });
+      this.accessRequests.update((list) => list.filter((r) => r.id !== req.id));
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo actualizar la solicitud',
+      );
+    } finally {
+      this.busyKey.set(null);
+    }
+  }
+
+  async markRequestApproved(
+    req: HermandadAccessRequest,
+    profileId?: string | null,
+  ): Promise<void> {
+    this.busyKey.set(`req:${req.id}`);
+    this.error.set(null);
+    try {
+      await this.community.reviewHermandadAccessRequest({
+        requestId: req.id,
+        status: 'approved',
+        createdProfileId: profileId ?? null,
+      });
+      this.accessRequests.update((list) => list.filter((r) => r.id !== req.id));
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo marcar como aprobada',
+      );
+    } finally {
+      this.busyKey.set(null);
+    }
+  }
+
   openCreateBoard(): void {
     this.editingBoard.set(null);
-    this.boardDay = this.dayFilter() ?? HERMANDAD_STATION_DAYS[2];
+    this.boardDay = this.dayFilter() ?? HERMANDAD_DIRECTORY_DAYS[2];
     this.boardName = '';
     this.boardCoverUrl = '';
     this.boardIconUrl = '';
@@ -148,9 +241,11 @@ export class HermandadesPageComponent implements OnInit {
     this.editingBoard.set(board);
     this.boardDay =
       board.processionDay &&
-      (HERMANDAD_STATION_DAYS as readonly string[]).includes(board.processionDay)
+      (HERMANDAD_DIRECTORY_DAYS as readonly string[]).includes(
+        board.processionDay,
+      )
         ? board.processionDay
-        : HERMANDAD_STATION_DAYS[2];
+        : HERMANDAD_DIRECTORY_DAYS[2];
     this.boardName = board.hermandadName;
     this.boardCoverUrl = board.coverImageUrl ?? '';
     this.boardIconUrl = board.iconImageUrl ?? '';
@@ -271,15 +366,33 @@ export class HermandadesPageComponent implements OnInit {
     this.creating.set(true);
     this.error.set(null);
     this.created.set(null);
+    const emailNorm = this.email.trim().toLowerCase();
+    const matchingRequest = this.accessRequests().find(
+      (r) => r.contactEmail.toLowerCase() === emailNorm,
+    );
     try {
+      const useRequestPassword = !!matchingRequest?.hasRequestedPassword;
       const result = await this.community.createHermandadAccount({
         email: this.email,
         handle: this.handle,
         displayName: this.displayName,
-        password: this.autoPassword ? null : this.password,
+        password:
+          useRequestPassword || this.autoPassword ? null : this.password,
         topicId: this.createTopicId || null,
+        accessRequestId: useRequestPassword ? matchingRequest!.id : null,
       });
       this.created.set(result);
+      if (matchingRequest) {
+        try {
+          await this.community.reviewHermandadAccessRequest({
+            requestId: matchingRequest.id,
+            status: 'approved',
+            createdProfileId: result.profileId || null,
+          });
+        } catch {
+          /* la cuenta ya está creada; la solicitud se puede marcar a mano */
+        }
+      }
       this.displayName = '';
       this.handle = '';
       this.email = '';

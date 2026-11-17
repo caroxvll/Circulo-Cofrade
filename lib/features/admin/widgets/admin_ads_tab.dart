@@ -1,4 +1,3 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/pick_gallery_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../../ads/ads_provider.dart';
@@ -1092,21 +1092,12 @@ class _AdFormSheetState extends ConsumerState<_AdFormSheet> {
   Future<void> _pickLogo() async => _pickAsset(isLogo: true);
 
   Future<void> _pickAsset({required bool isLogo}) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['png', 'webp', 'jpg', 'jpeg'],
-      withData: true,
-    );
-    final file = result?.files.single;
-    final bytes = file?.bytes;
-    if (file == null || bytes == null) return;
+    final file = await pickGalleryImage();
+    if (file == null || !mounted) return;
 
-    final extension = (file.extension ?? '').toLowerCase();
-    final contentType = _contentTypeForExtension(extension);
-    if (contentType == null) {
-      setState(() => _error = 'La imagen debe ser PNG, WebP o JPG.');
-      return;
-    }
+    final bytes = file.bytes;
+    final extension = file.extension;
+    final contentType = file.contentType;
     if (bytes.length > 4 * 1024 * 1024) {
       setState(() => _error = 'La imagen no puede superar 4 MB.');
       return;
@@ -1146,15 +1137,6 @@ class _AdFormSheetState extends ConsumerState<_AdFormSheet> {
       _selectedLogoExtension = null;
       _selectedLogoContentType = null;
     });
-  }
-
-  String? _contentTypeForExtension(String extension) {
-    return switch (extension) {
-      'png' => 'image/png',
-      'webp' => 'image/webp',
-      'jpg' || 'jpeg' => 'image/jpeg',
-      _ => null,
-    };
   }
 
   String _eventPickerLabel(CalendarEvent event) {
@@ -1656,6 +1638,7 @@ const _adminAdPlacements = [
   AdPlacement.calendar,
   AdPlacement.search,
   AdPlacement.noticias,
+  AdPlacement.semanaSanta,
 ];
 
 const _adTargetForumIds = [
@@ -1685,6 +1668,7 @@ String _placementCommercialName(AdPlacement placement) {
     AdPlacement.calendar => 'Calendario · banner',
     AdPlacement.search => 'Buscar · banner',
     AdPlacement.noticias => 'Noticias · banner',
+    AdPlacement.semanaSanta => 'Semana Santa · banner',
     AdPlacement.profile => 'Perfil',
     AdPlacement.home => 'Inicio',
   };
@@ -1697,15 +1681,18 @@ String _placementWhereHint(AdPlacement placement) {
     AdPlacement.forumsEvent =>
       'Tarjeta de evento tras los temas fijados, dentro del foro elegido.',
     AdPlacement.forumsMiddle =>
-      'Banner «Publicidad» en el listado de temas del foro.',
+      'Banner «Publicidad» en el listado de temas (Círculo, Pentagrama, Martillo…; no Noticias).',
     AdPlacement.featuredTopic =>
       'Banner dentro de Cuaresma, Semana Santa o Glorias (tema destacado).',
     AdPlacement.hermandades =>
       'Banner en el canal Hermandades (listado por días).',
     AdPlacement.calendar => 'Banner fijo encima de la bottom nav en Calendario.',
-    AdPlacement.search => 'Banner en Buscar (pantalla inicial, sin resultados).',
+    AdPlacement.search =>
+      'Banner en Buscar (pantalla modal, sin resultados).',
     AdPlacement.noticias =>
-      'Banner anclado en Noticias (encima de la barra inferior).',
+      'Banner anclado en el tab Noticias (encima de la barra inferior).',
+    AdPlacement.semanaSanta =>
+      'Banner fijo en el en directo de Semana Santa, encima de la barra inferior.',
     AdPlacement.profile => 'Reservado · perfil.',
     AdPlacement.home => 'Reservado · inicio.',
   };
@@ -1716,7 +1703,9 @@ String _placementLabel(AdPlacement placement) =>
 
 String _imageHelperForPlacement(AdPlacement placement) {
   return switch (placement) {
-    AdPlacement.forumsTop || AdPlacement.noticias =>
+    AdPlacement.forumsTop ||
+    AdPlacement.noticias ||
+    AdPlacement.semanaSanta =>
       'Banner 1200×276 px. Deja libre la esquina inferior derecha para el botón.',
     AdPlacement.calendar ||
     AdPlacement.search ||

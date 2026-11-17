@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/supabase/supabase_bootstrap.dart';
+import '../../core/utils/local_day.dart';
 import '../auth/auth_provider.dart';
 import 'data/ss_live_engagement_repository.dart';
 import 'data/ss_live_gate_repository.dart';
@@ -103,11 +104,12 @@ final ssLiveRawFeedProvider =
 );
 
 class SsLiveFeedNotifier extends AsyncNotifier<List<SsLiveUpdate>> {
-  static const _maxItems = 80;
-  static const _window = Duration(hours: 12);
+  static const _maxItems = liveJornadaCap;
 
   @override
   Future<List<SsLiveUpdate>> build() {
+    // keepAlive: reentrar al hub no refetcha en frío en la misma sesión.
+    ref.keepAlive();
     return ref.watch(ssLiveUpdatesRepositoryProvider).fetchFeed();
   }
 
@@ -122,9 +124,9 @@ class SsLiveFeedNotifier extends AsyncNotifier<List<SsLiveUpdate>> {
     final current = state.asData?.value;
     if (current == null) return;
     final without = current.where((u) => u.id != update.id);
+    final cutoff = startOfLocalDay();
     final merged = [update, ...without]
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final cutoff = DateTime.now().subtract(_window);
     state = AsyncData(
       merged
           .where((u) => !u.createdAt.isBefore(cutoff))
@@ -224,6 +226,7 @@ class SsLiveEngagementNotifier
 
   @override
   Future<SsLiveEngagementSnapshot> build() async {
+    ref.keepAlive();
     final repo = ref.watch(ssLiveEngagementRepositoryProvider);
     final userId = ref.watch(currentUserProvider)?.id;
     // Espera la primera carga del feed sin re-suscribirse a cada parche.

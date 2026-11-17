@@ -6,23 +6,25 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../admin/admin_provider.dart';
+import '../../calendar/calendar_contributors_provider.dart';
 import '../../auth/auth_provider.dart';
 import '../../auth/email_verification_gate.dart';
 import '../../permissions/permissions_provider.dart';
 import '../../profile/profile_provider.dart';
 import '../constants/topic_moderation_copy.dart';
 import '../data/forums_repository.dart';
-import '../data/mock_forums.dart';
 import '../forums_provider.dart';
 import '../topic_detail_typography.dart';
+import '../utils/forum_navigation.dart';
+import '../news_publishers_provider.dart';
 import '../utils/noticias_forum.dart';
-import '../utils/topic_list_order.dart';
 import '../utils/topic_permissions.dart';
-import '../../../shared/models/forum.dart';
 import 'forum_compose_field.dart';
 import 'forum_compose_sheet_header.dart';
 import 'forum_compose_sheet_layout.dart';
 import 'hermandad_post_image_picker.dart';
+import 'topic_poll_compose_section.dart';
 
 Future<void> showTopicComposeSheet(
   BuildContext context,
@@ -32,7 +34,7 @@ Future<void> showTopicComposeSheet(
 }) async {
   final isAuth = ref.read(isAuthenticatedProvider);
   if (!isAuth) {
-    final redirect = '/foros/$forumId';
+    final redirect = forumListLocation(forumId);
     if (context.mounted) {
       await context.push('/login?redirect=${Uri.encodeComponent(redirect)}');
     }
@@ -55,17 +57,26 @@ Future<void> showTopicComposeSheet(
   final isAdmin = ref.read(isAdminProvider);
   final moderatedForumIds =
       ref.read(moderatedForumIdsProvider).asData?.value ?? const <String>{};
+  final userId = ref.read(currentUserProvider)?.id;
+  final isNewsPublisher = userId == null
+      ? false
+      : await ref.read(isNewsPublisherProvider(userId).future);
+  final isCalendarContributor = userId == null
+      ? false
+      : await ref.read(isCalendarContributorProvider(userId).future);
   if (!canCreateTopicInForum(
     forumId: forumId,
     isAdmin: isAdmin,
     moderatedForumIds: moderatedForumIds,
+    isNewsPublisher: isNewsPublisher,
+    isCalendarContributor: isCalendarContributor,
   )) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             isNoticiasForum(forumId)
-                ? 'Solo la Junta puede publicar noticias.'
+                ? 'Solo moderadores, o cuentas con acceso a noticias o al calendario, pueden publicar noticias.'
                 : 'No puedes crear temas en este foro.',
           ),
         ),
@@ -92,6 +103,7 @@ Future<void> showTopicComposeSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     isDismissible: true,
     enableDrag: true,
     backgroundColor: AppColors.background,
@@ -120,19 +132,30 @@ class _TopicComposeSheet extends ConsumerStatefulWidget {
 class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
+  final _pollQuestionController = TextEditingController();
+  final List<TextEditingController> _pollOptionControllers = [
+    TextEditingController(),
+    TextEditingController(),
+  ];
   Uint8List? _coverBytes;
   String? _coverMimeType;
   String? _relatedForumId;
+  bool _pollEnabled = false;
   bool _submitting = false;
   String? _error;
 
   bool get _isHermandades => widget.forumId == 'hermandades';
   bool get _isNoticias => isNoticiasForum(widget.forumId);
+  bool get _supportsPoll => !_isHermandades && !_isNoticias;
 
   @override
   void dispose() {
     _titleController.dispose();
     _bodyController.dispose();
+    _pollQuestionController.dispose();
+    for (final c in _pollOptionControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -146,6 +169,16 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
     }
     if (body.length < 10) {
       setState(() => _error = 'El mensaje debe tener al menos 10 caracteres.');
+      return;
+    }
+
+    final pollCheck = TopicPollComposeSection.validate(
+      active: _supportsPoll && _pollEnabled,
+      question: _pollQuestionController.text,
+      options: _pollOptionControllers.map((c) => c.text).toList(),
+    );
+    if (pollCheck.error != null) {
+      setState(() => _error = pollCheck.error);
       return;
     }
 
@@ -164,20 +197,26 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
             coverBytes: _coverBytes,
             coverMimeType: _coverMimeType,
             relatedForumId: _relatedForumId,
+            poll: pollCheck.draft,
           );
 
       if (mounted) {
         Navigator.pop(context);
         final isAdmin = ref.read(isAdminProvider);
         final publishedNow = _isNoticias && isAdmin && topic.isPublished;
-        ScaffoldMessenger.of(context).showSnackBar(
+        ref.invalidate(pendingTopicsProvider);
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
           SnackBar(
             content: Text(
               publishedNow
                   ? 'Noticia publicada. Los cofrades ya pueden leerla y opinar.'
                   : TopicModerationCopy.submitSuccess,
             ),
-            duration: const Duration(seconds: 6),
+            duration: const Duration(seconds: 5),
+            persist: false,
+            showCloseIcon: !publishedNow,
             action: publishedNow
                 ? null
                 : SnackBarAction(
@@ -186,7 +225,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
                   ),
           ),
         );
-        context.push('/foros/${widget.forumId}/tema/${topic.id}');
+        context.push(forumTopicLocation(widget.forumId, topic.id));
       }
     } on ForumsRemoteUnavailableException {
       setState(() => _error = 'Supabase no disponible.');
@@ -215,37 +254,28 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
     }
   }
 
-  List<ForumCategory> _relatedForumOptions() {
-    final pillars = ref.watch(forumPillarsProvider).asData?.value;
-    final source = pillars == null
-        ? mockForumCategories
-        : visibleForumPillars(pillars);
-    final byId = {for (final f in source) f.id: f};
-    return [
-      for (final id in noticiasRelatedForumIds)
-        if (byId[id] != null) byId[id]!,
-    ];
-  }
+  List<({String id, String label})> _noticiasCategoryOptions() =>
+      noticiasCategoryOptions;
 
   @override
   Widget build(BuildContext context) {
     final isAdmin = ref.watch(isAdminProvider);
     final publishDirect = _isNoticias && isAdmin;
-    final relatedOptions = _isNoticias ? _relatedForumOptions() : const <ForumCategory>[];
+    final relatedOptions =
+        _isNoticias ? _noticiasCategoryOptions() : const <({String id, String label})>[];
 
     return ForumComposeSheetLayout(
+      header: ForumComposeSheetTitleBar(
+        closeEnabled: !_submitting,
+        title: Text(
+          _isNoticias ? 'Nueva noticia' : 'Nuevo tema',
+          style: TopicDetailTypography.title(),
+        ),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ForumComposeSheetTitleBar(
-            closeEnabled: !_submitting,
-            title: Text(
-              _isNoticias ? 'Nueva noticia' : 'Nuevo tema',
-              style: TopicDetailTypography.title(),
-            ),
-          ),
-          const SizedBox(height: 12),
           TextField(
             controller: _titleController,
             autofocus: true,
@@ -273,7 +303,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
           if (_isNoticias && relatedOptions.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
-              'RELACIONADO CON',
+              'TIPO DE NOTICIA',
               style: AppTypography.labelSmall(
                 color: AppColors.textMuted,
               ).copyWith(
@@ -283,7 +313,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Opcional · etiqueta el foro del tema (no crea un hilo nuevo)',
+              'Opcional · ayuda a clasificar la pieza para el lector',
               style: AppTypography.bodyMedium(
                 color: AppColors.textMuted,
               ).copyWith(fontSize: 12.5, height: 1.25),
@@ -294,7 +324,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
               runSpacing: 8,
               children: [
                 ChoiceChip(
-                  label: const Text('Ninguno'),
+                  label: const Text('Sin etiqueta'),
                   selected: _relatedForumId == null,
                   onSelected: _submitting
                       ? null
@@ -312,24 +342,24 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
                   ),
                   showCheckmark: false,
                 ),
-                for (final forum in relatedOptions)
+                for (final cat in relatedOptions)
                   ChoiceChip(
-                    label: Text(forum.name),
-                    selected: _relatedForumId == forum.id,
+                    label: Text(cat.label),
+                    selected: _relatedForumId == cat.id,
                     onSelected: _submitting
                         ? null
                         : (selected) => setState(
                               () => _relatedForumId =
-                                  selected ? forum.id : null,
+                                  selected ? cat.id : null,
                             ),
                     selectedColor: AppColors.burgundy.withValues(alpha: 0.14),
                     labelStyle: AppTypography.labelSmall(
-                      color: _relatedForumId == forum.id
+                      color: _relatedForumId == cat.id
                           ? AppColors.burgundyDark
                           : AppColors.textSecondary,
                     ).copyWith(fontWeight: FontWeight.w600),
                     side: BorderSide(
-                      color: _relatedForumId == forum.id
+                      color: _relatedForumId == cat.id
                           ? AppColors.burgundy.withValues(alpha: 0.35)
                           : AppColors.border,
                     ),
@@ -353,6 +383,35 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
               });
             },
           ),
+          if (_supportsPoll) ...[
+            const SizedBox(height: 8),
+            TopicPollComposeSection(
+              enabled: !_submitting,
+              active: _pollEnabled,
+              questionController: _pollQuestionController,
+              optionControllers: _pollOptionControllers,
+              onToggle: (v) => setState(() => _pollEnabled = v),
+              onAddOption: () {
+                if (_pollOptionControllers.length >=
+                    TopicPollComposeSection.maxOptions) {
+                  return;
+                }
+                setState(
+                  () => _pollOptionControllers.add(TextEditingController()),
+                );
+              },
+              onRemoveOption: (index) {
+                if (_pollOptionControllers.length <=
+                    TopicPollComposeSection.minOptions) {
+                  return;
+                }
+                setState(() {
+                  final c = _pollOptionControllers.removeAt(index);
+                  c.dispose();
+                });
+              },
+            ),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(

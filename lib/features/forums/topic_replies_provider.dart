@@ -237,6 +237,7 @@ final topicRepliesPaginationProvider =
 final topicRepliesFirstPageProvider =
     FutureProvider.autoDispose.family<List<ForumReply>, String>(
   (ref, topicId) async {
+    ref.keepAlive();
     final hidden = await ref.watch(hiddenForumAuthorIdsProvider.future);
     final batch = await ref.read(forumsRepositoryProvider).fetchReplies(
           topicId,

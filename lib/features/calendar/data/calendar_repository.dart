@@ -153,6 +153,10 @@ class CalendarRepository {
     String? publisherHandle,
     String? customIconUrl,
     String? coverImageUrl,
+    String? admissionLabel,
+    List<EventTimeSlot>? timeSlots,
+    String? sourceReplyId,
+    String? status,
   }) async {
     if (_client == null) throw CalendarRemoteUnavailableException();
 
@@ -169,7 +173,11 @@ class CalendarRepository {
           'organizer_label': organizerLabel ?? '',
           'custom_icon_url': customIconUrl ?? '',
           'cover_image_url': coverImageUrl ?? '',
+          'admission_label': _admissionOrNull(admissionLabel),
+          'time_slots': _slotsPayload(timeSlots),
           'created_by': userId,
+          'source_reply_id': ?sourceReplyId,
+          'status': ?status,
         })
         .select('*, profiles!created_by(handle, display_name)')
         .single();
@@ -190,6 +198,8 @@ class CalendarRepository {
     String? organizerLabel,
     String? customIconUrl,
     String? coverImageUrl,
+    String? admissionLabel,
+    List<EventTimeSlot>? timeSlots,
   }) async {
     if (_client == null) throw CalendarRemoteUnavailableException();
 
@@ -203,6 +213,8 @@ class CalendarRepository {
       'organizer_label': organizerLabel ?? '',
       'custom_icon_url': customIconUrl ?? '',
       'cover_image_url': coverImageUrl ?? '',
+      'admission_label': _admissionOrNull(admissionLabel),
+      'time_slots': _slotsPayload(timeSlots),
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
     if (clearEndsAt) {
@@ -755,7 +767,38 @@ class CalendarRepository {
       liveForceState: EventLiveForceState.fromDb(
         row['live_force_state'] as String?,
       ),
+      viewCount: row['view_count'] as int? ?? 0,
+      admissionLabel: _admissionOrNull(row['admission_label'] as String?),
+      slots: EventTimeSlot.listFrom(row['time_slots']),
     );
+  }
+
+  /// Visita a un evento. Devuelve el contador actual (dedupe 1/día).
+  Future<int?> incrementEventView(
+    String eventId, {
+    required String viewerId,
+  }) async {
+    if (_client == null) return null;
+    final result = await _client!.rpc(
+      'increment_calendar_event_view',
+      params: {'p_event_id': eventId, 'p_viewer_id': viewerId},
+    );
+    if (result is int) return result;
+    if (result is num) return result.toInt();
+    return int.tryParse(result?.toString() ?? '');
+  }
+
+  Object? _slotsPayload(List<EventTimeSlot>? slots) {
+    if (slots == null || slots.isEmpty) return null;
+    final hasRange = slots.any((slot) => (slot.end ?? '').isNotEmpty);
+    if (slots.length < 2 && !hasRange) return null;
+    return slots.map((slot) => slot.toJson()).toList();
+  }
+
+  String? _admissionOrNull(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) return null;
+    return text.length > 40 ? text.substring(0, 40) : text;
   }
 
   String? _nonEmptyUrl(String? raw) {

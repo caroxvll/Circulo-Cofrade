@@ -13,10 +13,12 @@ import 'data/forums_repository.dart';
 import 'forums_provider.dart';
 import 'hermandad_scheduled_posts_provider.dart';
 import 'utils/official_post_categories.dart';
+import 'utils/official_post_content.dart';
 import 'widgets/forum_compose_field.dart';
 import 'widgets/forum_compose_sheet_layout.dart';
 import 'widgets/hermandad_official_compose_header.dart';
 import 'widgets/hermandad_official_post_preview.dart';
+import 'widgets/hermandad_official_title_field.dart';
 import 'widgets/hermandad_post_image_picker.dart';
 import 'widgets/official_post_categories_picker.dart';
 import 'widgets/scheduled_post_datetime_picker.dart';
@@ -476,6 +478,7 @@ class _PendingPostEditSheet extends ConsumerStatefulWidget {
 
 class _PendingPostEditSheetState extends ConsumerState<_PendingPostEditSheet> {
   late final TextEditingController _controller;
+  late final TextEditingController _titleController;
   late String _category;
   late DateTime _scheduledAt;
   bool _submitting = false;
@@ -491,7 +494,9 @@ class _PendingPostEditSheetState extends ConsumerState<_PendingPostEditSheet> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.post.content);
+    final draft = splitOfficialPostDraft(widget.post.content);
+    _titleController = TextEditingController(text: draft.title);
+    _controller = TextEditingController(text: draft.body);
     _category = widget.post.officialCategory;
     _scheduledAt = widget.post.scheduledAt ?? defaultHermandadScheduleTime();
     _imageUrl = widget.post.imageUrl;
@@ -500,6 +505,7 @@ class _PendingPostEditSheetState extends ConsumerState<_PendingPostEditSheet> {
   @override
   void dispose() {
     _controller.dispose();
+    _titleController.dispose();
     super.dispose();
   }
 
@@ -515,8 +521,15 @@ class _PendingPostEditSheetState extends ConsumerState<_PendingPostEditSheet> {
   }
 
   Future<void> _submit() async {
-    final text = _controller.text.trim();
+    final text = joinOfficialPostContent(
+      title: _titleController.text,
+      body: _controller.text,
+    );
     final hasImage = _imageBytes != null || (_imageUrl?.isNotEmpty ?? false);
+    if (_titleController.text.trim().isEmpty) {
+      setState(() => _error = 'Añade un título.');
+      return;
+    }
     if (text.isEmpty && !hasImage) return;
 
     if (_showsSchedulePicker && !isValidHermandadScheduleTime(_scheduledAt)) {
@@ -579,7 +592,10 @@ class _PendingPostEditSheetState extends ConsumerState<_PendingPostEditSheet> {
     final handle = ref.read(userHandleProvider);
     await showHermandadOfficialPostPreview(
       context,
-      content: _controller.text,
+      content: joinOfficialPostContent(
+        title: _titleController.text,
+        body: _controller.text,
+      ),
       officialCategory: _category,
       authorHandle: handle,
       imageUrl: _imageUrl,
@@ -624,12 +640,17 @@ class _PendingPostEditSheetState extends ConsumerState<_PendingPostEditSheet> {
             },
           ),
           const SizedBox(height: 12),
+          HermandadOfficialTitleField(
+            controller: _titleController,
+            enabled: !_submitting,
+          ),
+          const SizedBox(height: 12),
           ForumComposeField(
             controller: _controller,
             maxLines: 8,
             minLines: 6,
             toolbar: ForumComposeToolbar.editorial,
-            hintText: 'Redacta la publicación…',
+            hintText: 'Escribe el comunicado…',
           ),
           if (_showsSchedulePicker) ...[
             const SizedBox(height: 12),

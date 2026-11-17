@@ -10,27 +10,35 @@ export interface StaffProfile {
   avatarUrl: string | null;
   accountType: AccountType;
   verified: boolean;
+  /** Color de acento del panel hermandad (#RRGGBB), si lo personalizó. */
+  panelAccent: string | null;
 }
 
 export function isAdminRole(role: StaffRole | null | undefined): boolean {
   return role === 'admin';
 }
 
-/** Acceso al panel Junta: admin, rol staff o moderador de foro. */
+/**
+ * Acceso al panel web Junta: solo profiles.role = admin.
+ * Moderadores/editores operan en la app; no entran al panel web.
+ */
 export function canAccessJunta(opts: {
   role: StaffRole | null | undefined;
-  moderatedForumCount: number;
 }): boolean {
-  if (opts.role === 'admin' || opts.role === 'moderator' || opts.role === 'editor') {
-    return true;
-  }
-  return opts.moderatedForumCount > 0;
+  return isAdminRole(opts.role);
 }
 
-/** Acceso al portal privado de hermandad. */
+/** Cuenta de hermandad (oficial), verificada o no. */
+export function isBrotherhoodAccount(
+  accountType: AccountType | null | undefined,
+): boolean {
+  return accountType === 'brotherhood';
+}
+
+/** Acceso al portal privado: hermandad y verificada por la Junta. */
 export function canAccessHermandadPortal(opts: {
   accountType: AccountType | null | undefined;
   verified?: boolean;
 }): boolean {
-  return opts.accountType === 'brotherhood';
+  return isBrotherhoodAccount(opts.accountType) && opts.verified === true;
 }

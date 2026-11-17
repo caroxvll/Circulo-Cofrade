@@ -4,8 +4,8 @@ Dashboard Angular para gestionar Cofradeo desde el PC. Misma verdad que la app (
 
 ## Fase 0–3 (hecho)
 
-- Login email/contraseña (cuenta staff)
-- Guard: solo admin o moderador de foro
+- Login email/contraseña
+- Guard: solo `profiles.role = admin` o hermandad verificada (`account_type = brotherhood` + `verified`)
 - Shell escritorio + menú responsive
 - **Colas reales:** temas, rechazos, reportes, eventos (admin), cierres
 - **Comunidad (admin):** usuarios/altas, moderadores por foro, hermandades
@@ -42,7 +42,7 @@ npm run sync-env:pre   # → proyecto pre
 npm start
 ```
 
-Abre http://localhost:4200 y entra con una cuenta **admin** (o moderador) **de ese mismo proyecto**.
+Abre http://localhost:4200 y entra con una cuenta **admin** o **hermandad verificada** **de ese mismo proyecto**.
 
 App Flutter contra pre:
 ```powershell
@@ -64,11 +64,33 @@ y pega `SUPABASE_URL` / `SUPABASE_ANON_KEY`.
 | `npm run sync-env:pre` | Igual, desde `../env.pre.json` (staging) |
 | `npm run sync-env:prod` | Igual, desde `../env.json` |
 | `npm run build` | Build producción |
+| `npm run build:vercel` | Sync env (archivo o `SUPABASE_*`) + build (Vercel) |
+
+## Deploy Vercel (panel Junta / hermandades)
+
+1. [vercel.com](https://vercel.com) → Importar el repo → **Root Directory:** `admin-web`
+2. Variables de entorno (Production):
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY` (anon, nunca service_role)
+3. Deploy. URL tipo `https://….vercel.app`
+4. Dominio: en Vercel → Domains → `panel.circulocofrade.es` (recomendado) o el que elijas
+5. En Arsys DNS: CNAME `panel` → `cname.vercel-dns.com` (el que indique Vercel)
+6. Supabase → Auth → URL Configuration: añade `https://panel.circulocofrade.es/**` a Redirect URLs
+
+### Preview (rama ≠ main)
+
+Con el repo conectado, cualquier push a una rama distinta de `main` genera una URL de preview automática en Vercel (Deployments). No hace falta config extra.
+
+### Analytics / Speed Insights
+
+1. En Vercel → proyecto → **Analytics** → Enable  
+2. **Speed Insights** → Enable  
+3. El código ya llama a `inject()` / `injectSpeedInsights()` en `src/main.ts` (tras el deploy)
 
 ## Seguridad
 
 - Solo **anon key** en el front (nunca `service_role`)
-- El acceso real lo cierran RLS + comprobación de perfil/moderación en el cliente
+- El acceso web lo cierran guards + `signIn`: solo admin y hermandad verificada (RLS sigue aplicando en datos)
 - `meta robots = noindex`
 
 ## Próximo

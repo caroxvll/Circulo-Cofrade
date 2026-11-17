@@ -14,12 +14,16 @@ class ForumPostImage extends StatelessWidget {
     this.shareText,
     this.borderRadius = const BorderRadius.all(Radius.circular(12)),
     this.maxPreviewHeight = 420,
+    this.showExpandHint = true,
+    this.fit = BoxFit.contain,
   });
 
   final String imageUrl;
   final String? shareText;
   final BorderRadius borderRadius;
   final double maxPreviewHeight;
+  final bool showExpandHint;
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +51,7 @@ class ForumPostImage extends StatelessWidget {
                 constraints: BoxConstraints(maxHeight: maxPreviewHeight),
                 child: CofradeoNetworkImage(
                   url: url,
-                  fit: BoxFit.contain,
+                  fit: fit,
                   width: double.infinity,
                   cacheSize: width.clamp(320.0, 1080.0),
                   placeholder: const SizedBox(
@@ -61,36 +65,37 @@ class ForumPostImage extends StatelessWidget {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+            if (showExpandHint)
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.zoom_out_map,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Ver completa',
-                        style: AppTypography.labelSmall(color: Colors.white),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.zoom_out_map,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Ver completa',
+                          style: AppTypography.labelSmall(color: Colors.white),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),

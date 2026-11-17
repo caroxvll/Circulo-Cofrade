@@ -17,4 +17,10 @@ void main() {
     expect(parsed.processionDay, 'Domingo de Ramos');
     expect(parsed.hermandadName, 'La Borriquita');
   });
+
+  test('parses gloria hermandad title', () {
+    final parsed = parseHermandadTopicTitle('Glorias · Santa Lucía');
+    expect(parsed.processionDay, hermandadGloriasCategory);
+    expect(parsed.hermandadName, 'Santa Lucía');
+  });
 }

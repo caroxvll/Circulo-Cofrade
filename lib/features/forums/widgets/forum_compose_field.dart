@@ -32,6 +32,8 @@ class ForumComposeField extends ConsumerStatefulWidget {
     this.hintText,
     this.onSubmitted,
     this.toolbar = ForumComposeToolbar.standard,
+    this.dense = false,
+    this.showHintCaption = true,
   });
 
   final TextEditingController controller;
@@ -41,6 +43,9 @@ class ForumComposeField extends ConsumerStatefulWidget {
   final String? hintText;
   final VoidCallback? onSubmitted;
   final ForumComposeToolbar toolbar;
+  /// Estilo más ligero (tipo red social): menos caja, tipografía del hilo.
+  final bool dense;
+  final bool showHintCaption;
 
   @override
   ConsumerState<ForumComposeField> createState() => ForumComposeFieldState();
@@ -282,21 +287,23 @@ class ForumComposeFieldState extends ConsumerState<ForumComposeField> {
   String _hintText() {
     return widget.toolbar == ForumComposeToolbar.editorial
         ? 'Negrita, enlaces, listas y citas se ven al escribir.'
-        : 'Activa negrita o cursiva y escribe · @menciones y #hashtags también.';
+        : 'Negrita, cursiva, @menciones y #hashtags.';
   }
 
   double _editorHeight(BuildContext context) {
-    const lineHeight = 24.0;
-    const chrome = 24.0;
+    final lineHeight = widget.dense ? 20.0 : 24.0;
+    final chrome = widget.dense ? 12.0 : 24.0;
     final minH = widget.minLines * lineHeight + chrome;
     final preferred = widget.maxLines * lineHeight + chrome;
-    final screenCap = MediaQuery.sizeOf(context).height * 0.34;
+    final screenCap =
+        MediaQuery.sizeOf(context).height * (widget.dense ? 0.28 : 0.34);
     return preferred.clamp(minH, screenCap);
   }
 
   @override
   Widget build(BuildContext context) {
     final editorHeight = _editorHeight(context);
+    final dense = widget.dense;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -316,37 +323,55 @@ class ForumComposeFieldState extends ConsumerState<ForumComposeField> {
             suggestions: _hashtagSuggestions,
             onSelect: _selectHashtag,
           ),
-        forumQuillToolbar(controller: _quill, toolbar: widget.toolbar),
-        const SizedBox(height: 8),
         SizedBox(
           height: editorHeight,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
+              color: dense ? Colors.transparent : AppColors.surface,
+              borderRadius: BorderRadius.circular(dense ? 0 : 14),
+              border: dense
+                  ? Border(
+                      bottom: BorderSide(
+                        color: AppColors.border.withValues(alpha: 0.85),
+                      ),
+                    )
+                  : Border.all(color: AppColors.border),
             ),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              padding: EdgeInsets.fromLTRB(
+                dense ? 0 : 12,
+                dense ? 4 : 8,
+                dense ? 0 : 12,
+                dense ? 10 : 12,
+              ),
               child: QuillEditor.basic(
                 controller: _quill,
                 focusNode: _editorFocus,
                 config: forumQuillEditorConfig(
                   hintText: widget.hintText,
                   expands: true,
+                  dense: dense,
                 ),
               ),
             ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          _hintText(),
-          style: ForumTopicsTypography.style(
-            color: AppColors.textMuted,
-            fontWeight: FontWeight.w400,
-          ),
+        SizedBox(height: dense ? 6 : 8),
+        forumQuillToolbar(
+          controller: _quill,
+          toolbar: widget.toolbar,
+          compact: dense,
         ),
+        if (widget.showHintCaption) ...[
+          const SizedBox(height: 6),
+          Text(
+            _hintText(),
+            style: ForumTopicsTypography.style(
+              color: AppColors.textMuted,
+              fontWeight: FontWeight.w400,
+            ).copyWith(fontSize: dense ? 10.5 : null),
+          ),
+        ],
       ],
     );
   }

@@ -9,20 +9,21 @@ class AuthSplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Mismo tono que bienvenida/login para que el fade auth no “corte” de color.
     return const Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.burgundyDark,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppLogo(size: 120),
+            AppLogo(size: 220, forLogin: true),
             SizedBox(height: 28),
             SizedBox(
               width: 28,
               height: 28,
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
-                color: AppColors.burgundy,
+                color: AppColors.gold,
               ),
             ),
           ],

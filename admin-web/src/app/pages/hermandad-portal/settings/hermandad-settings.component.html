@@ -1,0 +1,214 @@
+<section class="settings-page">
+  <header class="settings-head">
+    <div>
+      <p class="eyebrow">Panel</p>
+      <h1>Ajustes</h1>
+      <p class="lead">
+        Identidad de tu canal y personalización del área privada con los colores de tu
+        hermandad.
+      </p>
+    </div>
+    @if (savedFlash()) {
+      <span class="saved-pill" aria-live="polite">Guardado</span>
+    }
+  </header>
+
+  <div class="settings-grid">
+    <article class="card identity">
+      <h2>Identidad</h2>
+      <p class="card-lead">Así te ven en el panel y en el canal oficial.</p>
+
+      <div class="identity-row">
+        <div class="crest" aria-hidden="true">
+          @if (crestUrl(); as url) {
+            <img [src]="url" alt="" />
+          } @else {
+            <span>{{ boardName().slice(0, 1) }}</span>
+          }
+        </div>
+        <div class="identity-copy">
+          <strong>{{ boardName() }}</strong>
+          <span>{{ '@' + (profile()?.handle || '—') }}</span>
+          @if (profile()?.verified) {
+            <em class="ok">Cuenta verificada</em>
+          } @else {
+            <em class="warn">Pendiente de verificación</em>
+          }
+        </div>
+      </div>
+
+      <ul class="info-list">
+        <li>
+          <span>Nombre público</span>
+          <strong>{{ profile()?.displayName || '—' }}</strong>
+        </li>
+        <li>
+          <span>Handle</span>
+          <strong>{{ '@' + (profile()?.handle || '—') }}</strong>
+        </li>
+      </ul>
+
+      <div class="branding-block">
+        <p class="field-label">Escudo (logo)</p>
+        <p class="custom-hint">PNG, JPEG o WebP · máx. 1 MB. Se ve en la app y en el panel.</p>
+        <div class="branding-row">
+          <div class="crest lg" aria-hidden="true">
+            @if (crestUrl(); as url) {
+              <img [src]="url" alt="" />
+            } @else {
+              <span>{{ boardName().slice(0, 1) }}</span>
+            }
+          </div>
+          <div class="branding-actions">
+            <label class="file-btn" [class.disabled]="brandingBusy() || !topicId()">
+              {{ crestUrl() ? 'Cambiar escudo' : 'Subir escudo' }}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                [disabled]="brandingBusy() || !topicId()"
+                (change)="onAssetPicked('escudo', $event)"
+              />
+            </label>
+            @if (crestUrl()) {
+              <button
+                type="button"
+                class="link-btn"
+                [disabled]="brandingBusy()"
+                (click)="clearAsset('escudo')"
+              >
+                Quitar
+              </button>
+            }
+          </div>
+        </div>
+
+        <p class="field-label">Portada (header)</p>
+        <p class="custom-hint">Imagen ancha · máx. 3 MB. Cabecera del tablón en la app.</p>
+        <div class="cover-box">
+          @if (coverUrl(); as url) {
+            <img [src]="url" alt="" class="cover-preview" />
+          } @else {
+            <div class="cover-preview empty">Sin portada</div>
+          }
+          <div class="branding-actions">
+            <label class="file-btn" [class.disabled]="brandingBusy() || !topicId()">
+              {{ coverUrl() ? 'Cambiar portada' : 'Subir portada' }}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                [disabled]="brandingBusy() || !topicId()"
+                (change)="onAssetPicked('cover', $event)"
+              />
+            </label>
+            @if (coverUrl()) {
+              <button
+                type="button"
+                class="link-btn"
+                [disabled]="brandingBusy()"
+                (click)="clearAsset('cover')"
+              >
+                Quitar
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (brandingBusy()) {
+          <p class="persist-msg">Subiendo…</p>
+        } @else if (brandingError()) {
+          <p class="persist-msg warn">{{ brandingError() }}</p>
+        } @else if (brandingOk()) {
+          <p class="persist-msg ok">{{ brandingOk() }}</p>
+        }
+      </div>
+
+      <p class="hint">
+        El nombre oficial del tablón lo gestiona la Junta. El escudo y la portada los
+        puedes cambiar aquí cuando quieras.
+      </p>
+    </article>
+
+    <article class="card appearance">
+      <h2>Apariencia del panel</h2>
+      <p class="card-lead">
+        Color de acento para botones, menú activo y acentos. Se guarda en tu cuenta: al
+        volver a entrar (en este u otro dispositivo) se mantiene.
+      </p>
+
+      <div class="preview" aria-hidden="true">
+        <span class="preview-label">Vista previa</span>
+        <div class="preview-row">
+          <button type="button" class="preview-btn solid">Publicar</button>
+          <button type="button" class="preview-btn soft">Acción</button>
+          <span class="preview-nav">Inicio</span>
+        </div>
+      </div>
+
+      <p class="field-label">Paletas sugeridas</p>
+      <div class="presets" role="list">
+        @for (p of presets; track p.id) {
+          <button
+            type="button"
+            class="preset"
+            role="listitem"
+            [class.active]="isActivePreset(p.accent)"
+            (click)="selectPreset(p.accent)"
+          >
+            <i [style.background]="p.accent"></i>
+            <span>{{ p.label }}</span>
+          </button>
+        }
+      </div>
+
+      <div class="custom-row">
+        <label class="field-label" for="accent-hex">Tu color (cualquiera)</label>
+        <p class="custom-hint">
+          Elige con el selector o escribe el código de tu hermandad y pulsa
+          <strong>Guardar color</strong>.
+        </p>
+        <div class="custom-controls">
+          <label class="swatch" [style.--swatch]="draftSwatch()" title="Elegir color">
+            <input
+              id="accent-color"
+              type="color"
+              [ngModel]="draftSwatch()"
+              (ngModelChange)="onColorPicked($event)"
+              aria-label="Elegir color de acento"
+            />
+          </label>
+          <input
+            id="accent-hex"
+            type="text"
+            class="hex-input"
+            maxlength="7"
+            placeholder="#RRGGBB"
+            [ngModel]="draftHex()"
+            (ngModelChange)="onHexText($event)"
+            spellcheck="false"
+            aria-label="Código hexadecimal"
+          />
+          <button
+            type="button"
+            class="save-btn"
+            [disabled]="!canSave() || theme.saving()"
+            (click)="saveCustom()"
+          >
+            Guardar color
+          </button>
+          <button type="button" class="reset-btn" (click)="resetTheme()">
+            Restaurar Cofradeo
+          </button>
+        </div>
+        @if (theme.saving()) {
+          <p class="persist-msg">Guardando en tu cuenta…</p>
+        } @else if (theme.saveError()) {
+          <p class="persist-msg warn">{{ theme.saveError() }}</p>
+        } @else if (savedFlash()) {
+          <p class="persist-msg ok">Guardado en tu cuenta</p>
+        } @else if (canSave()) {
+          <p class="persist-msg">Hay cambios sin guardar</p>
+        }
+      </div>
+    </article>
+  </div>
+</section>

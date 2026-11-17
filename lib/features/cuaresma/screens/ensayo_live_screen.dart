@@ -117,6 +117,7 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
           );
       ref.invalidate(calendarEventByIdProvider(widget.eventId));
       ref.invalidate(todayEnsayosProvider);
+      ref.invalidate(todayCuaresmaAgendaProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -332,7 +333,7 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
         loading: () => const LiveFeedSkeleton(),
         error: (_, _) => _ErrorState(onBack: () => context.pop()),
         data: (event) {
-          if (event == null || event.type != EventType.ensayo) {
+          if (event == null || !event.type.opensCuaresmaLive) {
             return _ErrorState(onBack: () => context.pop());
           }
 

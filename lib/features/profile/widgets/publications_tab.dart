@@ -32,6 +32,7 @@ class PublicationsTab extends ConsumerStatefulWidget {
 
 class _PublicationsTabState extends ConsumerState<PublicationsTab> {
   ActivityFeedFilter? _filter;
+  String? _placeKey;
   int _pageIndex = 0;
   Set<String>? _hiddenIds;
   final _hiddenStore = HiddenActivityStore();
@@ -129,10 +130,15 @@ class _PublicationsTabState extends ConsumerState<PublicationsTab> {
         activities: activities,
         filter: _activeFilter,
         hiddenIds: hiddenIds,
+        placeKey: _placeKey,
         pageIndex: _pageIndex,
         pageSize: _pageSize,
         isOwnProfile: _isOwnProfile,
         onHide: _hideActivity,
+        onPlaceChanged: (key) => setState(() {
+          _placeKey = key;
+          _pageIndex = 0;
+        }),
         onPageChanged: (page) => setState(() => _pageIndex = page),
         onRestoreHidden: _restoreHidden,
       ),
@@ -145,10 +151,12 @@ class _ActivityFeed extends StatelessWidget {
     required this.activities,
     required this.filter,
     required this.hiddenIds,
+    required this.placeKey,
     required this.pageIndex,
     required this.pageSize,
     required this.isOwnProfile,
     required this.onHide,
+    required this.onPlaceChanged,
     required this.onPageChanged,
     required this.onRestoreHidden,
   });
@@ -156,10 +164,12 @@ class _ActivityFeed extends StatelessWidget {
   final List<ProfileActivity> activities;
   final ActivityFeedFilter filter;
   final Set<String> hiddenIds;
+  final String? placeKey;
   final int pageIndex;
   final int pageSize;
   final bool isOwnProfile;
   final Future<void> Function(ProfileActivity) onHide;
+  final ValueChanged<String?> onPlaceChanged;
   final ValueChanged<int> onPageChanged;
   final Future<void> Function() onRestoreHidden;
 
@@ -169,7 +179,13 @@ class _ActivityFeed extends StatelessWidget {
         .where((a) => a.isTopic && a.topicStatus == TopicStatus.pending)
         .length;
 
-    final visible = filterActivities(activities, filter, hiddenIds);
+    final topics = filterActivities(activities, filter, hiddenIds);
+    final places = _placesOf(topics);
+    final selectedPlace =
+        places.any((place) => place.key == placeKey) ? placeKey : null;
+    final visible = selectedPlace == null
+        ? topics
+        : topics.where((item) => item.placeKey == selectedPlace).toList();
     final pageCount =
         visible.isEmpty ? 0 : ((visible.length + pageSize - 1) ~/ pageSize);
     final safePage = pageCount == 0 ? 0 : pageIndex.clamp(0, pageCount - 1);
@@ -203,6 +219,15 @@ class _ActivityFeed extends StatelessWidget {
                         _PendingTopicsBanner(count: pendingTopics),
                         const SizedBox(height: 6),
                       ],
+                      if (places.length > 1) ...[
+                        _PlaceFilterBar(
+                          places: places,
+                          selectedKey: selectedPlace,
+                          total: topics.length,
+                          onSelected: onPlaceChanged,
+                        ),
+                        const SizedBox(height: 6),
+                      ],
                       if (isOwnProfile && hiddenIds.isNotEmpty) ...[
                         Align(
                           alignment: Alignment.centerRight,
@@ -234,7 +259,9 @@ class _ActivityFeed extends StatelessWidget {
                                       hiddenIds.isNotEmpty
                                   ? 'Todo oculto. Pulsa «Mostrar ocultos» '
                                       'para recuperar.'
-                                  : 'Nada en esta categoría.',
+                                  : selectedPlace == null
+                                      ? 'Nada en esta categoría.'
+                                      : 'Nada en este foro.',
                               style: AppTypography.bodyMedium(),
                               textAlign: TextAlign.center,
                             ),
@@ -277,6 +304,118 @@ class _ActivityFeed extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _PlaceCount {
+  const _PlaceCount({required this.key, required this.name, required this.count});
+
+  final String key;
+  final String name;
+  final int count;
+}
+
+List<_PlaceCount> _placesOf(List<ProfileActivity> topics) {
+  final counts = <String, _PlaceCount>{};
+  for (final topic in topics) {
+    final current = counts[topic.placeKey];
+    counts[topic.placeKey] = _PlaceCount(
+      key: topic.placeKey,
+      name: topic.placeName,
+      count: (current?.count ?? 0) + 1,
+    );
+  }
+  final places = counts.values.toList()
+    ..sort((a, b) {
+      final byCount = b.count.compareTo(a.count);
+      if (byCount != 0) return byCount;
+      return a.name.compareTo(b.name);
+    });
+  return places;
+}
+
+class _PlaceFilterBar extends StatelessWidget {
+  const _PlaceFilterBar({
+    required this.places,
+    required this.selectedKey,
+    required this.total,
+    required this.onSelected,
+  });
+
+  final List<_PlaceCount> places;
+  final String? selectedKey;
+  final int total;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 30,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _PlaceChip(
+            label: 'Todos',
+            count: total,
+            selected: selectedKey == null,
+            onTap: () => onSelected(null),
+          ),
+          for (final place in places) ...[
+            const SizedBox(width: 6),
+            _PlaceChip(
+              label: place.name,
+              count: place.count,
+              selected: selectedKey == place.key,
+              onTap: () => onSelected(place.key),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PlaceChip extends StatelessWidget {
+  const _PlaceChip({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.burgundy : AppColors.surface,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? AppColors.burgundy
+                  : AppColors.gold.withValues(alpha: 0.45),
+            ),
+          ),
+          child: Text(
+            '$label $count',
+            style: AppTypography.labelSmall(
+              color: selected ? AppColors.textOnDark : AppColors.burgundy,
+            ).copyWith(fontSize: 11, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ),
     );
   }
 }

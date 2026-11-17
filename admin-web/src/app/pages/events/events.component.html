@@ -84,7 +84,13 @@
               <div class="event-body">
                 <div class="event-kicker">
                   <span class="type-pill">{{ typeLabel(event.eventType) }}</span>
+                  @if (event.admissionLabel) {
+                    <span class="type-pill">Entrada · {{ event.admissionLabel }}</span>
+                  }
                   <span>{{ dateTime(event.startsAt) }}</span>
+                  @if (scheduleOf(event)) {
+                    <span>{{ scheduleOf(event) }}</span>
+                  }
                   @if (event.endsAt) {
                     <span>· fin {{ dateTime(event.endsAt) }}</span>
                   }
@@ -164,7 +170,7 @@
               <div class="event-body">
                 <div class="event-kicker">
                   <span class="type-pill pending">Pendiente</span>
-                  <span>{{ typeLabel(event.eventType) }} · {{ dateTime(event.startsAt) }}</span>
+                  <span>{{ typeLabel(event.eventType) }} · {{ dateTime(event.startsAt) }}@if (event.admissionLabel) { · Entrada {{ event.admissionLabel }} }</span>
                 </div>
                 <h2>{{ event.title }}</h2>
                 <p class="queue-meta">
@@ -217,7 +223,7 @@
     <div class="dialog form-dialog" (click)="$event.stopPropagation()">
       <h3>{{ formTitleText() }}</h3>
       <p class="form-lead">
-        Misma ficha que en la app: tipo, fecha, lugar, organizador, portada e icono.
+        Misma ficha que en la app: tipo, fecha, lugar, entrada, organizador, portada e icono.
       </p>
 
       <label>
@@ -239,9 +245,12 @@
         <textarea
           [(ngModel)]="formSubtitle"
           rows="3"
-          maxlength="500"
+          maxlength="1000"
           placeholder="Detalle breve para el calendario"
         ></textarea>
+        <span class="form-hint"
+          >{{ formSubtitle.trim().length }}/1000 caracteres</span
+        >
       </label>
 
       <div class="form-row">
@@ -261,10 +270,43 @@
 
       <div class="form-row">
         <label>
+          Fin del primer tramo
+          <input type="time" [(ngModel)]="formFirstEnd" />
+        </label>
+      </div>
+      <p class="form-hint">Opcional. Es la hora a la que cierra ese tramo, distinta del fin del directo.</p>
+      @for (slot of formExtraSlots; track $index) {
+        <div class="form-row">
+          <label>
+            Otro tramo
+            <input type="time" [(ngModel)]="slot.start" />
+          </label>
+          <label>
+            Fin
+            <input type="time" [(ngModel)]="slot.end" />
+          </label>
+          <button type="button" class="btn" (click)="removeExtraSlot($index)">Quitar</button>
+        </div>
+      }
+      @if (formExtraSlots.length < 5) {
+        <button type="button" class="btn" (click)="addExtraSlot()">Añadir otro tramo</button>
+      }
+
+      <div class="form-row">
+        <label>
           Lugar
           <input [(ngModel)]="formLocation" maxlength="160" placeholder="Calle, templo…" />
         </label>
+        <label>
+          Entrada
+          <input
+            [(ngModel)]="formAdmission"
+            maxlength="40"
+            placeholder="12 €, desde 8 €, donativo"
+          />
+        </label>
       </div>
+      <p class="form-hint">Si la dejas vacía, la app no muestra el precio.</p>
 
       <div class="organizer-block">
         <div class="organizer-head">

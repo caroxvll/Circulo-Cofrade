@@ -47,11 +47,7 @@ export class HermandadFollowersPageComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    if (!this.store.boards().length && !this.store.loading()) {
-      void this.store.reload().then(() => this.loadPage(0));
-    } else {
-      void this.loadPage(0);
-    }
+    void this.store.ensureLoaded().then(() => this.loadPage(0));
   }
 
   async loadPage(page: number): Promise<void> {

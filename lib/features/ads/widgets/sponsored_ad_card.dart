@@ -42,6 +42,8 @@ class SponsoredAdCard extends ConsumerStatefulWidget {
 class _SponsoredAdCardState extends ConsumerState<SponsoredAdCard> {
   Timer? _visibleTimer;
   var _impressionSent = false;
+  var _impressionInFlight = false;
+  DateTime? _lastClickAt;
 
   @override
   void dispose() {
@@ -50,7 +52,7 @@ class _SponsoredAdCardState extends ConsumerState<SponsoredAdCard> {
   }
 
   void _onVisibilityChanged(VisibilityInfo info) {
-    if (_impressionSent) return;
+    if (_impressionSent || _impressionInFlight) return;
     if (info.visibleFraction < 0.5) {
       _visibleTimer?.cancel();
       _visibleTimer = null;
@@ -60,35 +62,47 @@ class _SponsoredAdCardState extends ConsumerState<SponsoredAdCard> {
   }
 
   Future<void> _registerImpression() async {
-    if (_impressionSent) return;
-    _impressionSent = true;
+    if (_impressionSent || _impressionInFlight) return;
+    _impressionInFlight = true;
     final viewerId = ref.read(viewerIdProvider);
-    await ref
-        .read(adsRepositoryProvider)
-        .registerImpression(adId: widget.ad.id, viewerId: viewerId);
+    try {
+      await ref
+          .read(adsRepositoryProvider)
+          .registerImpression(adId: widget.ad.id, viewerId: viewerId);
+      // Insert o dedupe 24 h: no reintentar en esta instancia.
+      _impressionSent = true;
+    } catch (_) {
+      // Red: se reintenta la próxima vez que cumpla el umbral de visibilidad.
+      _visibleTimer = null;
+    } finally {
+      _impressionInFlight = false;
+    }
+  }
+
+  void _trackClick() {
+    final now = DateTime.now();
+    final last = _lastClickAt;
+    if (last != null && now.difference(last) < const Duration(milliseconds: 400)) {
+      return;
+    }
+    _lastClickAt = now;
+    final viewerId = ref.read(viewerIdProvider);
+    unawaited(
+      ref
+          .read(adsRepositoryProvider)
+          .registerClick(adId: widget.ad.id, viewerId: viewerId),
+    );
   }
 
   Future<void> _openAd() async {
-    final viewerId = ref.read(viewerIdProvider);
-    await ref
-        .read(adsRepositoryProvider)
-        .registerClick(adId: widget.ad.id, viewerId: viewerId);
-
+    _trackClick();
     final uri = Uri.tryParse(widget.ad.targetUrl);
     if (uri == null) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  Future<void> _openEvent(CalendarEvent event) async {
-    final viewerId = ref.read(viewerIdProvider);
-    final adsRepository = ref.read(adsRepositoryProvider);
-
-    unawaited(
-      adsRepository
-          .registerClick(adId: widget.ad.id, viewerId: viewerId)
-          .catchError((_) {}),
-    );
-
+  void _openEvent(CalendarEvent event) {
+    _trackClick();
     widget.onEventTap?.call(event);
   }
 
@@ -249,47 +263,50 @@ class _ForumsDockedImageAd extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.navBarBackground,
-      elevation: 0,
-      child: InkWell(
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: AppColors.navBarBackground,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.burgundyDark.withValues(alpha: 0.1),
-                blurRadius: 18,
-                offset: const Offset(0, -5),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                height: 1.5,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.gold.withValues(alpha: 0.12),
-                      AppColors.gold.withValues(alpha: 0.85),
-                      AppColors.gold.withValues(alpha: 0.12),
-                    ],
+    return Semantics(
+      button: true,
+      label: 'Publicidad: ${ad.sponsorName}. ${ad.buttonText}',
+      child: Material(
+        color: AppColors.navBarBackground,
+        elevation: 0,
+        child: InkWell(
+          onTap: onTap,
+          child: Ink(
+            decoration: BoxDecoration(
+              color: AppColors.navBarBackground,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.burgundyDark.withValues(alpha: 0.1),
+                  blurRadius: 18,
+                  offset: const Offset(0, -5),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 1.5,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.gold.withValues(alpha: 0.12),
+                        AppColors.gold.withValues(alpha: 0.85),
+                        AppColors.gold.withValues(alpha: 0.12),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              AspectRatio(
-                aspectRatio: 4.35,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _AdBannerImage(
-                      imageUrl: imageUrl,
-                      fit: BoxFit.cover,
-                      cacheSize: 1200,
-                    ),
+                AspectRatio(
+                  aspectRatio: 4.35,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _AdBannerImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        cacheSize: 1200,
+                      ),
                     DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -370,6 +387,7 @@ class _ForumsDockedImageAd extends StatelessWidget {
           ),
         ),
       ),
+      ),
     );
   }
 }
@@ -387,7 +405,10 @@ class _ImageBannerAd extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    return Semantics(
+      button: true,
+      label: 'Publicidad: ${ad.sponsorName}. ${ad.buttonText}',
+      child: Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
@@ -468,6 +489,7 @@ class _ImageBannerAd extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

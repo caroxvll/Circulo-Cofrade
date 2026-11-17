@@ -1,14 +1,14 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/models/forum.dart';
 import '../data/forum_pillar_covers.dart';
-import '../data/mock_forums.dart';
 import '../utils/forum_activity_badge.dart';
-import 'forum_last_activity_link.dart';
+import '../utils/forum_navigation.dart';
 import 'forum_pillar_icon_mark.dart';
 
 class ForumCategoryCard extends StatelessWidget {
@@ -143,7 +143,9 @@ class _ForumCardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final metrics = _CardContentMetrics.forHeight(height, featured: featured);
-    final descriptionLines = height >= 118 ? 2 : 1;
+    final hasHotTopic = !locked &&
+        (forum.lastTopicTitle?.trim().isNotEmpty ?? false) &&
+        (forum.lastTopicId?.trim().isNotEmpty ?? false);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -153,6 +155,7 @@ class _ForumCardContent extends StatelessWidget {
         metrics.verticalPad,
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
@@ -194,41 +197,57 @@ class _ForumCardContent extends StatelessWidget {
               fontSize: metrics.bodySize,
               height: metrics.bodyLineHeight,
             ),
-            maxLines: descriptionLines,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const Spacer(),
+          SizedBox(height: metrics.metaGap + 2),
           if (locked && forum.lockedLabel != null)
-            Text(
-              forum.lockedLabel!,
-              style: AppTypography.labelSmall(
-                color: AppColors.burgundy,
-              ).copyWith(
-                fontSize: metrics.metaSize,
-                fontWeight: FontWeight.w600,
-                height: 1.12,
+            Expanded(
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  forum.lockedLabel!,
+                  style: AppTypography.labelSmall(
+                    color: AppColors.burgundy,
+                  ).copyWith(
+                    fontSize: metrics.metaSize,
+                    fontWeight: FontWeight.w600,
+                    height: 1.12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             )
-          else ...[
-            _ForumCardStatsRow(
+          else if (hasHotTopic)
+            _ForumHotTopicStrip(
               forum: forum,
               metaSize: metrics.metaSize,
-              iconSize: metrics.iconSize,
-              topicsLabel: featured ? 'noticias' : 'temas',
+              maxHeight: _hotTopicSlot(height),
+            )
+          else
+            Expanded(
+              child: _ForumIdleActivityPanel(
+                forum: forum,
+                metaSize: metrics.metaSize,
+                iconSize: metrics.iconSize,
+                topicsLabel: featured ? 'noticias' : 'temas',
+              ),
             ),
-            SizedBox(height: metrics.metaGap),
-            ForumLastActivityLink(
-              forum: forum,
-              compact: true,
-              accentColor: AppColors.burgundy,
-              fontSize: metrics.metaSize,
-            ),
-          ],
         ],
       ),
     );
+  }
+
+  /// Hueco del bloque AHORA: cabe el texto y, si la ficha es más alta,
+  /// el grupo (título, descripción y AHORA) queda centrado.
+  double _hotTopicSlot(double cardHeight) {
+    final reserve = cardHeight >= 160
+        ? 74.0
+        : cardHeight >= 120
+            ? 66.0
+            : 58.0;
+    return (cardHeight - reserve).clamp(40.0, 112.0);
   }
 
   TextStyle _titleStyle(bool locked, double titleSize) {
@@ -306,6 +325,222 @@ class _CardContentMetrics {
       iconSize: 10.5,
       gap: 3,
       metaGap: 2,
+    );
+  }
+}
+
+/// Vista previa del hilo. La card abre el foro; solo «Abrir hilo» entra al tema.
+class _ForumHotTopicStrip extends StatelessWidget {
+  const _ForumHotTopicStrip({
+    required this.forum,
+    required this.metaSize,
+    required this.maxHeight,
+  });
+
+  final ForumCategory forum;
+  final double metaSize;
+  final double maxHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = forum.lastTopicTitle!.trim();
+    final topicId = forum.lastTopicId!.trim();
+    final ago = forum.lastMessageAgo == 'sin actividad'
+        ? null
+        : forum.lastMessageAgo;
+    final excerpt = forum.lastTopicExcerpt?.trim() ?? '';
+
+    const padV = 6.0;
+    const gapAfterHeader = 4.0;
+    const gapAfterTitle = 3.0;
+    const gapBeforeCta = 2.0;
+    const heightSafety = 4.0;
+
+    final headerH = metaSize + 2.5;
+    final titleFontSize = metaSize + 2;
+    final titleLineH = titleFontSize * 1.18;
+    final excerptFontSize = metaSize + 0.5;
+    final excerptLineH = excerptFontSize * 1.22;
+    final ctaH = metaSize + 4;
+
+    final available = maxHeight.isFinite ? maxHeight : 96.0;
+    var budget =
+        available - (padV * 2) - heightSafety - headerH - gapAfterHeader;
+    final titleMaxLines =
+        budget >= titleLineH * 2 + gapBeforeCta + ctaH ? 2 : 1;
+    budget -= titleLineH * titleMaxLines;
+    final canShowCta = budget >= gapBeforeCta + ctaH;
+    if (canShowCta) budget -= gapBeforeCta + ctaH;
+    budget -= gapAfterTitle;
+    final excerptMaxLines = excerpt.isEmpty
+        ? 0
+        : (budget / excerptLineH).floor().clamp(0, 2);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.burgundyDark,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(9, padV, 9, padV),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ahoraHeader(ago),
+            const SizedBox(height: gapAfterHeader),
+            Text(
+              title,
+              style: AppTypography.bodyMedium(
+                color: AppColors.textOnDark,
+              ).copyWith(
+                fontSize: titleFontSize,
+                fontWeight: FontWeight.w700,
+                height: 1.18,
+              ),
+              maxLines: titleMaxLines,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (excerptMaxLines > 0) ...[
+              const SizedBox(height: gapAfterTitle),
+              Text(
+                excerpt,
+                style: AppTypography.bodyMedium(
+                  color: AppColors.goldPale.withValues(alpha: 0.88),
+                ).copyWith(
+                  fontSize: excerptFontSize,
+                  fontWeight: FontWeight.w400,
+                  height: 1.22,
+                ),
+                maxLines: excerptMaxLines,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            if (canShowCta) ...[
+              const SizedBox(height: gapBeforeCta),
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => context.push(
+                    forumTopicLocation(forum.id, topicId),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 2, 0, 1),
+                    child: Text(
+                      'Abrir hilo ›',
+                      style: AppTypography.labelSmall(
+                        color: AppColors.gold,
+                      ).copyWith(
+                        fontSize: metaSize,
+                        fontWeight: FontWeight.w700,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _ahoraHeader(String? ago) {
+    return Row(
+      children: [
+        Icon(
+          Icons.local_fire_department_rounded,
+          size: metaSize + 2.5,
+          color: AppColors.gold,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          'AHORA',
+          style: AppTypography.labelSmall(
+            color: AppColors.gold,
+          ).copyWith(
+            fontSize: metaSize,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+            height: 1,
+          ),
+        ),
+        if (ago != null) ...[
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              ago,
+              style: AppTypography.labelSmall(
+                color: AppColors.goldPale.withValues(alpha: 0.75),
+              ).copyWith(fontSize: metaSize - 0.5, height: 1),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+}
+
+/// Panel cuando aún no hay hilo caliente: rellena el hueco con stats.
+class _ForumIdleActivityPanel extends StatelessWidget {
+  const _ForumIdleActivityPanel({
+    required this.forum,
+    required this.metaSize,
+    required this.iconSize,
+    required this.topicsLabel,
+  });
+
+  final ForumCategory forum;
+  final double metaSize;
+  final double iconSize;
+  final String topicsLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.backgroundElevated.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sin actividad reciente',
+              style: AppTypography.labelSmall(
+                color: AppColors.burgundy,
+              ).copyWith(
+                fontSize: metaSize + 0.5,
+                fontWeight: FontWeight.w700,
+                height: 1.1,
+              ),
+            ),
+            const Spacer(),
+            _ForumCardStatsRow(
+              forum: forum,
+              metaSize: metaSize,
+              iconSize: iconSize,
+              topicsLabel: topicsLabel,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Sé el primero en abrir un tema',
+              style: AppTypography.labelSmall(
+                color: AppColors.textMuted,
+              ).copyWith(fontSize: metaSize, height: 1.15),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -572,5 +807,5 @@ String _shortCount(int value) {
     final short = value / 1000;
     return '${short.toStringAsFixed(short >= 10 ? 0 : 1)}k';
   }
-  return formatCount(value);
+  return '$value';
 }

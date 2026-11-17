@@ -5,15 +5,17 @@ import '../../../core/theme/app_typography.dart';
 
 /// Tabs del perfil: TEMAS · SIGUIENDO · INFORMACIÓN (underline).
 class ProfilePillTabBar extends StatelessWidget {
-  const ProfilePillTabBar({super.key, required this.tabs});
+  const ProfilePillTabBar({super.key, required this.tabs, this.controller});
 
   final List<Widget> tabs;
+  final TabController? controller;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: TabBar(
+        controller: controller,
         isScrollable: false,
         tabAlignment: TabAlignment.fill,
         dividerColor: AppColors.border.withValues(alpha: 0.7),

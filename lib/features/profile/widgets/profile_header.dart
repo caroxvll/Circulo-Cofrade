@@ -6,12 +6,14 @@ import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/verified_account_badge.dart';
 import '../../../shared/models/user_profile.dart';
+import '../../calendar/calendar_contributors_provider.dart';
+import '../../forums/news_publishers_provider.dart';
 import '../../forums/widgets/forums_beige_background.dart';
-import '../../permissions/permissions_provider.dart';
 import '../../search/follows_provider.dart';
 import '../../forums/widgets/profile_cofrade_rank_section.dart';
 import '../profile_design.dart';
@@ -75,17 +77,21 @@ class ProfileHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isJunta = ref.watch(isJuntaMemberProvider);
+    final newsPublisher =
+        ref.watch(isNewsPublisherProvider(profile.id)).asData?.value ?? false;
+    final calendarContributor =
+        ref.watch(isCalendarContributorProvider(profile.id)).asData?.value ??
+            false;
+    final forumModerator =
+        ref.watch(moderatesAnyForumProvider(profile.id)).asData?.value ??
+            false;
+    final newsMark = newsPublisher || calendarContributor || forumModerator;
     final currentProfile = ref.watch(currentUserProfileProvider).asData?.value;
     final isOwnProfile = currentProfile?.id == profile.id;
     final followingAsync =
         showFollowingCount ? ref.watch(followingCountProvider) : null;
 
-    final roleChip = _roleChip(
-      profile: profile,
-      isJunta: isJunta,
-      isOwnProfile: isOwnProfile,
-    );
+    final roleChip = _roleChip(profile: profile);
 
     final screenW = MediaQuery.sizeOf(context).width;
     final hero = _HeroMetrics.of(context);
@@ -189,6 +195,13 @@ class ProfileHeader extends ConsumerWidget {
                   if (profile.isVerified || profile.isAdmin) ...[
                     const SizedBox(width: 5),
                     const VerifiedAccountIcon(size: 15),
+                  ] else if (newsMark) ...[
+                    const SizedBox(width: 5),
+                    const _NewsPublisherMark(size: 15),
+                  ],
+                  if (forumModerator && !profile.isVerified && !profile.isAdmin) ...[
+                    const SizedBox(width: 4),
+                    const _ModeratorMark(size: 15),
                   ],
                 ],
               ),
@@ -227,7 +240,10 @@ class ProfileHeader extends ConsumerWidget {
                   ],
                 ),
               ],
-              if (profile.address.isNotEmpty || roleChip != null) ...[
+              if (profile.address.isNotEmpty ||
+                  roleChip != null ||
+                  newsMark ||
+                  forumModerator) ...[
                 SizedBox(height: compact ? 4 : 6),
                 Wrap(
                   alignment: WrapAlignment.center,
@@ -252,6 +268,24 @@ class ProfileHeader extends ConsumerWidget {
                         ],
                       ),
                     if (roleChip != null) roleChip,
+                    if (newsMark)
+                      const _RoleChip(
+                        label: 'Noticias',
+                        icon: Icons.newspaper_rounded,
+                        tone: _RoleChipTone.news,
+                      ),
+                    if (calendarContributor)
+                      const _RoleChip(
+                        label: 'Calendario',
+                        icon: Icons.event_available_rounded,
+                        tone: _RoleChipTone.gold,
+                      ),
+                    if (forumModerator && !profile.isAdmin)
+                      const _RoleChip(
+                        label: 'Moderador',
+                        icon: Icons.gavel_rounded,
+                        tone: _RoleChipTone.gold,
+                      ),
                   ],
                 ),
               ],
@@ -289,8 +323,6 @@ class ProfileHeader extends ConsumerWidget {
 
   Widget? _roleChip({
     required UserProfile profile,
-    required bool isJunta,
-    required bool isOwnProfile,
   }) {
     if (profile.isVerified) {
       return const _RoleChip(
@@ -304,13 +336,6 @@ class ProfileHeader extends ConsumerWidget {
         label: 'Admin',
         icon: Icons.verified,
         tone: _RoleChipTone.burgundy,
-      );
-    }
-    if (isJunta && isOwnProfile) {
-      return const _RoleChip(
-        label: 'Moderador',
-        icon: Icons.gavel_outlined,
-        tone: _RoleChipTone.gold,
       );
     }
     return null;
@@ -339,11 +364,12 @@ class _ProfileCoverImage extends StatelessWidget {
       );
     }
 
-    return Image.asset(
-      AppAssets.profileHeaderCover,
+    return CofradeoAssetImage(
+      assetPath: AppAssets.profileHeaderCover,
       fit: BoxFit.cover,
       alignment: const Alignment(0, -0.15),
       cacheWidth: ImageDecodeCache.px(context, screenWidth),
+      fadeDuration: const Duration(milliseconds: 320),
     );
   }
 }
@@ -420,7 +446,43 @@ class _AvatarRing extends StatelessWidget {
   }
 }
 
-enum _RoleChipTone { burgundy, gold }
+enum _RoleChipTone { burgundy, gold, news }
+
+class _ModeratorMark extends StatelessWidget {
+  const _ModeratorMark({this.size = 15});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Moderador de foro',
+      child: Icon(
+        Icons.gavel_rounded,
+        size: size,
+        color: AppColors.burgundy,
+      ),
+    );
+  }
+}
+
+class _NewsPublisherMark extends StatelessWidget {
+  const _NewsPublisherMark({this.size = 15});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Cuenta de noticias',
+      child: Icon(
+        Icons.verified_rounded,
+        size: size,
+        color: AppColors.goldDark,
+      ),
+    );
+  }
+}
 
 class _RoleChip extends StatelessWidget {
   const _RoleChip({
@@ -435,15 +497,24 @@ class _RoleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent =
-        tone == _RoleChipTone.burgundy ? AppColors.burgundy : AppColors.goldDark;
+    final accent = switch (tone) {
+      _RoleChipTone.burgundy => AppColors.burgundy,
+      _RoleChipTone.gold => AppColors.goldDark,
+      _RoleChipTone.news => AppColors.burgundy,
+    };
+    final background = tone == _RoleChipTone.news
+        ? AppColors.burgundy.withValues(alpha: 0.08)
+        : AppColors.goldPale.withValues(alpha: 0.25);
+    final border = tone == _RoleChipTone.news
+        ? AppColors.burgundy.withValues(alpha: 0.28)
+        : AppColors.gold.withValues(alpha: 0.35);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.goldPale.withValues(alpha: 0.25),
+        color: background,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+        border: Border.all(color: border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

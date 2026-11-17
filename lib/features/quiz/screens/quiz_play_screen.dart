@@ -9,12 +9,15 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/utils/image_decode_cache.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../auth/auth_provider.dart';
 import '../../forums/forum_topics_typography.dart';
 import '../data/quiz_repository.dart';
 import '../models/quiz_models.dart';
 import '../quiz_provider.dart';
+import '../widgets/quiz_prize_banner.dart';
+import '../../../core/platform/screen_guard.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 
 class QuizPlayScreen extends ConsumerStatefulWidget {
@@ -24,7 +27,8 @@ class QuizPlayScreen extends ConsumerStatefulWidget {
   ConsumerState<QuizPlayScreen> createState() => _QuizPlayScreenState();
 }
 
-class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
+class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen>
+    with WidgetsBindingObserver {
   var _opening = false;
   var _submitting = false;
   var _userWantsStart = false;
@@ -32,6 +36,9 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
   DateTime? _openedAt;
   int _secondsLeft = 15;
   Timer? _timer;
+  Timer? _revealTimer;
+  DateTime? _armedClose;
+  String? _dismissedRevealId;
   QuizSubmitResult? _result;
   String? _error;
   String? _activeRoundId;
@@ -45,6 +52,7 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
   var _audioSilenced = false;
   var _hasQuestionAudio = false;
   StreamSubscription<void>? _audioCompleteSub;
+  StreamSubscription<void>? _screenshotSub;
 
   /// Tras Empezar y sin resultado: salir cuenta como fallo.
   bool get _shouldBlockLeave =>
@@ -97,6 +105,12 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    ScreenGuard.instance.ensureListening();
+    _screenshotSub = ScreenGuard.instance.screenshots.listen((_) {
+      if (!_shouldBlockLeave || _submitting) return;
+      unawaited(_forfeitAndLeave());
+    });
     _audioCompleteSub = _audioPlayer.onPlayerComplete.listen((_) {
       if (!mounted) return;
       setState(() {
@@ -108,7 +122,11 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _revealTimer?.cancel();
+    unawaited(_screenshotSub?.cancel() ?? Future.value());
+    unawaited(ScreenGuard.instance.unprotect());
     unawaited(_audioCompleteSub?.cancel() ?? Future.value());
     unawaited(_stopQuestionAudio());
     unawaited(_audioPlayer.dispose());
@@ -126,9 +144,39 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
     super.dispose();
   }
 
+  void _scheduleReveal(DateTime? closesAt) {
+    if (closesAt == null || _armedClose == closesAt) return;
+    _armedClose = closesAt;
+    _revealTimer?.cancel();
+    final wait = closesAt.difference(DateTime.now()) + const Duration(seconds: 1);
+    _revealTimer = Timer(wait.isNegative ? Duration.zero : wait, () {
+      if (!mounted) return;
+      ref.invalidate(quizLivePayloadProvider);
+      ref.invalidate(quizMonthlyLeaderboardProvider);
+      ref.invalidate(quizMonthlyRankingBundleProvider);
+    });
+  }
+
+  Future<void> _dismissReveal(String roundId) async {
+    setState(() => _dismissedRevealId = roundId);
+    try {
+      await ref.read(quizRepositoryProvider).markRevealSeen(roundId);
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _result = null;
+      _forfeitStarted = false;
+      _openedAt = null;
+      _userWantsStart = false;
+    });
+    ref.invalidate(quizLivePayloadProvider);
+    ref.invalidate(quizMonthlyRankingBundleProvider);
+  }
+
   Future<void> _forfeitAndLeave() async {
     final roundId = _activeRoundId;
-    if (roundId == null || _result != null || _forfeitStarted) {
+    if (_result != null || _forfeitStarted) return;
+    if (roundId == null) {
       if (mounted) context.pop();
       return;
     }
@@ -143,6 +191,7 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
       final result = await repo.forfeitRound(roundId);
       if (!mounted) return;
       if (result != null) {
+        unawaited(ScreenGuard.instance.unprotect());
         setState(() {
           _result = result;
           _submitting = false;
@@ -160,6 +209,15 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
     }
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_submitting || !_shouldBlockLeave) return;
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      unawaited(_forfeitAndLeave());
+    }
+  }
+
   /// Sin diálogo: salir tras Empezar = fallo inmediato (anti-trampa).
   Future<void> _onLeaveAttempt() async {
     if (!_shouldBlockLeave) {
@@ -170,6 +228,7 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
   }
 
   void _startTimer(int answerSeconds, DateTime openedAt, String roundId) {
+    unawaited(ScreenGuard.instance.protect());
     _timer?.cancel();
     _openedAt = openedAt;
     _activeRoundId = roundId;
@@ -272,6 +331,7 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
           );
       _timer?.cancel();
       unawaited(_stopQuestionAudio());
+      unawaited(ScreenGuard.instance.unprotect());
       if (!mounted) return;
       setState(() {
         _result = result.copyWith(timedOut: isTimeout);
@@ -399,7 +459,11 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
           ),
         ],
       ),
-      body: liveAsync.when(
+      body: Column(
+        children: [
+          if (!_shouldBlockLeave) const QuizPrizeBanner(compact: true),
+          Expanded(
+            child: liveAsync.when(
         skipLoadingOnReload: true,
         loading: () => const QuizScreenSkeleton(),
         error: (_, _) => Center(
@@ -410,6 +474,51 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
           ),
         ),
         data: (payload) {
+          final reveal = payload.reveal;
+          if (reveal != null && _dismissedRevealId != reveal.roundId) {
+            final hasNext = payload.round != null;
+            return _ResultView(
+              prompt: reveal.prompt,
+              imageUrl: reveal.imageUrl,
+              isCorrect: reveal.isCorrect ?? false,
+              score: reveal.score ?? 0,
+              explanation: reveal.explanation,
+              optionA: reveal.optionA,
+              optionB: reveal.optionB,
+              optionC: reveal.optionC,
+              optionD: reveal.optionD,
+              correctOption: reveal.correctOption,
+              selectedOption: reveal.selectedOption,
+              forfeited: reveal.forfeited,
+              timedOut: reveal.timedOut,
+              answeredCount: reveal.answeredCount,
+              correctCount: reveal.correctCount,
+              players: reveal.players,
+              onRanking: () => context.push('/quiz/ranking'),
+              onContinue: () => unawaited(_dismissReveal(reveal.roundId)),
+              continueLabel: hasNext ? 'Ver la pregunta de hoy' : 'Entendido',
+            );
+          }
+
+          final holding = payload.isAnswered &&
+              ((_result?.sealed ?? false) || (payload.answer?.sealed ?? false));
+          if (holding && payload.reveal == null) {
+            _scheduleReveal(payload.round?.closesAt);
+            final answer = payload.answer;
+            return _SealedView(
+              prompt: payload.prompt ?? '',
+              imageUrl: payload.imageUrl,
+              optionA: payload.optionA ?? '',
+              optionB: payload.optionB ?? '',
+              optionC: payload.optionC ?? '',
+              optionD: payload.optionD ?? '',
+              selectedOption:
+                  _result?.selectedOption ?? answer?.selectedOption,
+              forfeited: _result?.forfeited ?? answer?.forfeited ?? false,
+              timedOut: _result?.timedOut ?? answer?.timedOut ?? false,
+            );
+          }
+
           if (payload.isIdle) {
             final season = ref.watch(quizSeasonInfoProvider).asData?.value;
             return _IdleState(
@@ -545,7 +654,10 @@ class _QuizPlayScreenState extends ConsumerState<QuizPlayScreen> {
           );
         },
       ),
-    ),
+          ),
+        ],
+      ),
+      ),
     );
   }
 }
@@ -789,24 +901,30 @@ class _QuizImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final cache = width.isFinite ? width : 200.0;
+        return Container(
+          height: 200,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.gold.withValues(alpha: 0.28)),
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AspectRatio(
-          aspectRatio: 16 / 10,
-          child: CofradeoNetworkImage(url: url, fit: BoxFit.cover),
-        ),
-      ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: CofradeoNetworkImage(
+              url: url,
+              fit: BoxFit.contain,
+              width: width.isFinite ? width : null,
+              height: 200,
+              cacheSize: cache,
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -851,6 +969,13 @@ class _OptionButton extends StatelessWidget {
           AppColors.border,
           AppColors.textMuted,
           AppColors.textMuted,
+        ),
+      _OptionVisual.held => (
+          const Color(0xFFE7E2DC),
+          const Color(0xFFB7B1A8),
+          const Color(0xFF8C867E),
+          Colors.white,
+          AppColors.textSecondary,
         ),
       _OptionVisual.neutral => (
           selected
@@ -923,6 +1048,9 @@ class _OptionButton extends StatelessWidget {
               else if (state == _OptionVisual.wrong)
                 const Icon(Icons.cancel_rounded,
                     color: AppColors.accentRed, size: 22)
+              else if (state == _OptionVisual.held)
+                const Icon(Icons.lock_outline_rounded,
+                    color: Color(0xFF8C867E), size: 20)
               else if (selected)
                 const SizedBox(
                   width: 18,
@@ -937,7 +1065,7 @@ class _OptionButton extends StatelessWidget {
   }
 }
 
-enum _OptionVisual { neutral, correct, wrong, muted }
+enum _OptionVisual { neutral, correct, wrong, muted, held }
 
 class _ReadyToPlayState extends StatelessWidget {
   const _ReadyToPlayState({
@@ -956,169 +1084,232 @@ class _ReadyToPlayState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-          sliver: SliverFillRemaining(
-            hasScrollBody: false,
-            child: Column(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Column(
+        children: [
+          const Spacer(),
+          const _ReadyBrandLockup(),
+          const SizedBox(height: 14),
+          Text(
+            'La pregunta del día está lista',
+            style: AppTypography.displaySmall(color: AppColors.burgundy)
+                .copyWith(fontSize: 20, height: 1.15),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _ReadyMediaChip(
+                icon: hasImage
+                    ? Icons.image_rounded
+                    : Icons.hide_image_outlined,
+                label: hasImage ? 'Con imagen' : 'Sin imagen',
+                active: hasImage,
+              ),
+              _ReadyMediaChip(
+                icon: hasAudio
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_off_outlined,
+                label: hasAudio ? 'Con sonido' : 'Sin sonido',
+                active: hasAudio,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'El tiempo no corre hasta que pulses.',
+            style: AppTypography.bodyMedium(color: AppColors.textMuted)
+                .copyWith(fontSize: 13.5, height: 1.3),
+            textAlign: TextAlign.center,
+          ),
+          if (hasAudio) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Spacer(flex: 2),
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.gold.withValues(alpha: 0.28),
-                        AppColors.burgundy.withValues(alpha: 0.1),
-                      ],
-                    ),
-                    border: Border.all(
-                      color: AppColors.gold.withValues(alpha: 0.55),
-                      width: 1.4,
-                    ),
-                  ),
-                  alignment: Alignment.center,
+                Icon(
+                  Icons.volume_up_rounded,
+                  size: 16,
+                  color: AppColors.goldDark.withValues(alpha: 0.95),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
                   child: Text(
-                    '?',
-                    style: AppTypography.displaySmall(color: AppColors.burgundy)
-                        .copyWith(
-                      fontSize: 38,
-                      fontWeight: FontWeight.w600,
-                      height: 1,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'La pregunta del día está lista',
-                  style: AppTypography.displaySmall(color: AppColors.burgundy)
-                      .copyWith(fontSize: 22, height: 1.15),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _ReadyMediaChip(
-                      icon: hasImage
-                          ? Icons.image_rounded
-                          : Icons.hide_image_outlined,
-                      label: hasImage ? 'Con imagen' : 'Sin imagen',
-                      active: hasImage,
-                    ),
-                    _ReadyMediaChip(
-                      icon: hasAudio
-                          ? Icons.volume_up_rounded
-                          : Icons.volume_off_outlined,
-                      label: hasAudio ? 'Con sonido' : 'Sin sonido',
-                      active: hasAudio,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Cuando pulses Empezar, tendrás $answerSeconds segundos '
-                  'para responder. Hasta entonces el tiempo no corre.',
-                  style: AppTypography.bodyMedium(color: AppColors.textMuted)
-                      .copyWith(fontSize: 14.5, height: 1.4),
-                  textAlign: TextAlign.center,
-                ),
-                if (hasAudio) ...[
-                  const SizedBox(height: 14),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.gold.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.volume_up_rounded,
-                          size: 20,
-                          color: AppColors.goldDark.withValues(alpha: 0.95),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Sube el volumen: el audio suena una sola vez '
-                            'al Empezar (no se puede repetir).',
-                            style: AppTypography.bodyMedium(
-                              color: AppColors.textSecondary,
-                            ).copyWith(fontSize: 13.5, height: 1.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.burgundy.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.burgundy.withValues(alpha: 0.22),
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        size: 20,
-                        color: AppColors.burgundy.withValues(alpha: 0.9),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Si sales después de Empezar, cuenta como fallo '
-                          '(-40 puntos) y no podrás volver a intentar.',
-                          style: AppTypography.bodyMedium(
-                            color: AppColors.textSecondary,
-                          ).copyWith(fontSize: 13.5, height: 1.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (error != null) ...[
-                  const SizedBox(height: 14),
-                  Text(
-                    error!,
-                    style: AppTypography.bodyMedium(color: AppColors.accentRed),
+                    'Sube el volumen: suena una vez y no se repite.',
+                    style: AppTypography.bodyMedium(
+                      color: AppColors.textSecondary,
+                    ).copyWith(fontSize: 13, height: 1.3),
                     textAlign: TextAlign.center,
                   ),
-                ],
-                const Spacer(flex: 3),
-                FilledButton(
-                  onPressed: onStart,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.burgundy,
-                    minimumSize: const Size.fromHeight(48),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            decoration: BoxDecoration(
+              color: AppColors.gold.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.gold.withValues(alpha: 0.45),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: AppColors.goldDark.withValues(alpha: 0.95),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Acertar suma 100. Cuanto antes respondas, más: '
+                    'hasta 50 extra con el tiempo que sobre, y hasta '
+                    'otros 50 si entras en la primera media hora.',
+                    style: AppTypography.bodyMedium(
+                      color: AppColors.textSecondary,
+                    ).copyWith(fontSize: 13, height: 1.3),
                   ),
-                  child: const Text('Empezar'),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            decoration: BoxDecoration(
+              color: AppColors.burgundy.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.burgundy.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 18,
+                  color: AppColors.burgundy.withValues(alpha: 0.9),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Si sales después de empezar, es fallo (−40) '
+                    'y no hay segundo intento.',
+                    style: AppTypography.bodyMedium(
+                      color: AppColors.textSecondary,
+                    ).copyWith(fontSize: 13, height: 1.3),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              error!,
+              style: AppTypography.bodyMedium(color: AppColors.accentRed),
+              textAlign: TextAlign.center,
+            ),
+          ],
+          const Spacer(),
+          FilledButton(
+            onPressed: onStart,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.burgundy,
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: Text('Empezar · $answerSeconds s'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReadyBrandLockup extends StatelessWidget {
+  const _ReadyBrandLockup();
+
+  @override
+  Widget build(BuildContext context) {
+    final quizCache = ImageDecodeCache.px(context, 112);
+    final markCache = ImageDecodeCache.px(context, 40);
+    return SizedBox(
+      width: 136,
+      height: 128,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.burgundyDark.withValues(alpha: 0.18),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: Image.asset(
+                  AppAssets.quizLiveLogo,
+                  width: 112,
+                  height: 112,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.medium,
+                  cacheWidth: quizCache,
+                  cacheHeight: quizCache,
+                  gaplessPlayback: true,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.gold, width: 1.4),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.burgundyDark.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12.5),
+                child: Image.asset(
+                  AppAssets.logo,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.medium,
+                  cacheWidth: markCache,
+                  cacheHeight: markCache,
+                  gaplessPlayback: true,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1204,7 +1395,7 @@ class _IdleState extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
           sliver: SliverFillRemaining(
             hasScrollBody: false,
             child: Column(
@@ -1254,7 +1445,9 @@ class _IdleState extends StatelessWidget {
                       SizedBox(height: 6),
                       _QuizAboutRuleRow(
                         icon: Icons.emoji_events_outlined,
-                        text: 'Los aciertos suman al marcador mensual.',
+                        text:
+                            'Acertar suma 100. Responder antes da hasta 50 '
+                            'de más, y entrar en la primera media hora, otros 50.',
                       ),
                     ],
                   ),
@@ -1472,6 +1665,11 @@ class _ResultView extends StatelessWidget {
     required this.onRanking,
     this.forfeited = false,
     this.timedOut = false,
+    this.answeredCount = 0,
+    this.correctCount = 0,
+    this.players = const [],
+    this.onContinue,
+    this.continueLabel = 'Entendido',
   });
 
   final String prompt;
@@ -1488,6 +1686,11 @@ class _ResultView extends StatelessWidget {
   final VoidCallback onRanking;
   final bool forfeited;
   final bool timedOut;
+  final int answeredCount;
+  final int correctCount;
+  final List<QuizRevealPlayer> players;
+  final VoidCallback? onContinue;
+  final String continueLabel;
 
   String _label(QuizOption o) => switch (o) {
         QuizOption.a => optionA,
@@ -1529,39 +1732,22 @@ class _ResultView extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 36),
       children: [
         Container(
-          padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isCorrect
-                  ? [
-                      const Color(0xFF2E7D32).withValues(alpha: 0.12),
-                      AppColors.goldPale.withValues(alpha: 0.45),
-                    ]
-                  : [
-                      AppColors.accentRed.withValues(alpha: 0.10),
-                      AppColors.goldPale.withValues(alpha: 0.35),
-                    ],
-            ),
+            borderRadius: BorderRadius.circular(16),
+            color: isCorrect
+                ? const Color(0xFF2E7D32).withValues(alpha: 0.08)
+                : AppColors.accentRed.withValues(alpha: 0.08),
             border: Border.all(color: accent.withValues(alpha: 0.35)),
           ),
-          child: Column(
+          child: Row(
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: accent,
                   shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: accent.withValues(alpha: 0.35),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
                 ),
                 child: Icon(
                   isCorrect
@@ -1572,32 +1758,47 @@ class _ResultView extends StatelessWidget {
                               ? Icons.timer_off_outlined
                               : Icons.close_rounded,
                   color: Colors.white,
-                  size: 30,
+                  size: 22,
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: AppTypography.displaySmall(color: accent).copyWith(
-                  fontWeight: FontWeight.w700,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.titleLarge(color: accent).copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: AppTypography.bodyMedium(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(width: 8),
               Text(
-                score >= 0 ? '+$score pts' : '$score pts',
+                score >= 0 ? '+$score' : '$score',
                 style: AppTypography.displayMedium(color: AppColors.burgundy)
-                    .copyWith(fontSize: 34, height: 1.05),
+                    .copyWith(fontSize: 26, height: 1, fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(width: 4),
               Text(
-                subtitle,
-                style: AppTypography.bodyMedium(color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
+                'pts',
+                style: AppTypography.labelSmall(color: AppColors.burgundy)
+                    .copyWith(fontWeight: FontWeight.w700),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
         Text(
           prompt,
           style: AppTypography.titleLarge(color: AppColors.textPrimary)
@@ -1607,16 +1808,9 @@ class _ResultView extends StatelessWidget {
           const SizedBox(height: 14),
           _QuizImage(url: img),
         ],
-        const SizedBox(height: 18),
-        Text(
-          'RESULTADO',
-          style: AppTypography.labelSmall(color: AppColors.textMuted).copyWith(
-            letterSpacing: 0.9,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         for (final option in QuizOption.values)
+          if (_label(option).trim().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _OptionButton(
@@ -1665,8 +1859,66 @@ class _ResultView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 22),
+        if (answeredCount > 0) ...[
+          Text(
+            answeredCount == 1
+                ? '1 ha jugado · $correctCount ha acertado'
+                : '$answeredCount han jugado · $correctCount han acertado',
+            style: AppTypography.labelSmall(color: AppColors.burgundy)
+                .copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.2),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final player in players)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: player.correct
+                        ? const Color(0xFF2E7D32).withValues(alpha: 0.1)
+                        : AppColors.surfaceAlt,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: player.correct
+                          ? const Color(0xFF2E7D32).withValues(alpha: 0.35)
+                          : AppColors.border,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (player.correct) ...[
+                        const Icon(
+                          Icons.check_rounded,
+                          size: 14,
+                          color: Color(0xFF2E7D32),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Text(
+                        player.name,
+                        style: AppTypography.labelSmall(
+                          color: AppColors.textPrimary,
+                        ).copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          if (answeredCount > players.length) ...[
+            const SizedBox(height: 8),
+            Text(
+              'y ${answeredCount - players.length} más',
+              style: AppTypography.labelSmall(color: AppColors.textMuted),
+            ),
+          ],
+          const SizedBox(height: 22),
+        ],
         FilledButton(
-          onPressed: onRanking,
+          onPressed: onContinue ?? onRanking,
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.burgundy,
             minimumSize: const Size.fromHeight(50),
@@ -1674,7 +1926,144 @@ class _ResultView extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          child: const Text('Ver ranking del mes'),
+          child: Text(onContinue == null ? 'Ver ranking del mes' : continueLabel),
+        ),
+        if (onContinue != null) ...[
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: onRanking,
+            child: const Text('Ver ranking del mes'),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SealedView extends StatelessWidget {
+  const _SealedView({
+    required this.prompt,
+    required this.imageUrl,
+    required this.optionA,
+    required this.optionB,
+    required this.optionC,
+    required this.optionD,
+    required this.selectedOption,
+    required this.forfeited,
+    required this.timedOut,
+  });
+
+  final String prompt;
+  final String? imageUrl;
+  final String optionA;
+  final String optionB;
+  final String optionC;
+  final String optionD;
+  final QuizOption? selectedOption;
+  final bool forfeited;
+  final bool timedOut;
+
+  String _label(QuizOption o) => switch (o) {
+        QuizOption.a => optionA,
+        QuizOption.b => optionB,
+        QuizOption.c => optionC,
+        QuizOption.d => optionD,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final img = imageUrl?.trim();
+    final title = forfeited
+        ? 'Has salido'
+        : timedOut
+            ? 'Tiempo agotado'
+            : 'Respuesta guardada';
+    final subtitle = forfeited
+        ? 'Cuenta como fallo. A las 00:00 se abre la correcta y quién ha respondido.'
+        : 'En blanco hasta las 00:00. Entonces verás la correcta, tus puntos y quién ha respondido.';
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 36),
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: const Color(0xFFE7E2DC),
+            border: Border.all(color: const Color(0xFFB7B1A8)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF8C867E),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  forfeited
+                      ? Icons.exit_to_app_rounded
+                      : timedOut
+                          ? Icons.timer_off_outlined
+                          : Icons.lock_outline_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.titleLarge(
+                        color: AppColors.textSecondary,
+                      ).copyWith(fontWeight: FontWeight.w700, fontSize: 16),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: AppTypography.bodyMedium(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          prompt,
+          style: AppTypography.titleLarge(color: AppColors.textMuted)
+              .copyWith(fontSize: 17, height: 1.3, fontWeight: FontWeight.w600),
+        ),
+        if (img != null && img.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Opacity(opacity: 0.55, child: _QuizImage(url: img)),
+        ],
+        const SizedBox(height: 14),
+        for (final option in QuizOption.values)
+          if (_label(option).trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _OptionButton(
+                letter: option.name.toUpperCase(),
+                label: _label(option),
+                enabled: false,
+                state: option == selectedOption
+                    ? _OptionVisual.held
+                    : _OptionVisual.muted,
+                onTap: () {},
+              ),
+            ),
+        const SizedBox(height: 8),
+        Text(
+          'Los puntos entran en el ranking al cerrar el día.',
+          style: AppTypography.labelSmall(color: AppColors.textMuted),
         ),
       ],
     );

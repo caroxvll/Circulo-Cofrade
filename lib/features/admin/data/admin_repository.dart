@@ -230,6 +230,76 @@ class AdminRepository {
         .eq('id', profileId);
   }
 
+  /// Permiso aparte de la verificación: solo publicar noticias.
+  Future<void> setNewsPublisher({
+    required String profileId,
+    required bool enabled,
+  }) async {
+    final client = _client;
+    if (client == null) throw const AdminUnavailableException();
+
+    if (!enabled) {
+      await client.from('news_publishers').delete().eq('profile_id', profileId);
+      return;
+    }
+
+    await client.from('news_publishers').upsert({
+      'profile_id': profileId,
+      'assigned_by': client.auth.currentUser?.id,
+      'assigned_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  /// Propone eventos (quedan en revisión) y también puede publicar noticias.
+  Future<void> setCalendarContributor({
+    required String profileId,
+    required bool enabled,
+  }) async {
+    final client = _client;
+    if (client == null) throw const AdminUnavailableException();
+
+    if (!enabled) {
+      await client
+          .from('calendar_contributors')
+          .delete()
+          .eq('profile_id', profileId);
+      return;
+    }
+
+    final assignedBy = client.auth.currentUser?.id;
+    final assignedAt = DateTime.now().toUtc().toIso8601String();
+    await client.from('calendar_contributors').upsert({
+      'profile_id': profileId,
+      'assigned_by': assignedBy,
+      'assigned_at': assignedAt,
+    });
+    await client.from('news_publishers').upsert({
+      'profile_id': profileId,
+      'assigned_by': assignedBy,
+      'assigned_at': assignedAt,
+    });
+  }
+
+  Future<void> unifyNoticias({
+    required String topicId,
+    required String otherTopicId,
+  }) async {
+    final client = _client;
+    if (client == null) throw const AdminUnavailableException();
+    await client.rpc(
+      'unify_noticias',
+      params: {
+        'p_topic_ids': [topicId, otherTopicId],
+      },
+    );
+  }
+
+  Future<void> splitNoticia(String topicId) async {
+    final client = _client;
+    if (client == null) throw const AdminUnavailableException();
+    await client.rpc('split_noticia', params: {'p_topic_id': topicId});
+  }
+
   Future<List<ModerationReport>> _enrichReportTargets(
     List<ModerationReport> reports,
   ) async {
@@ -477,18 +547,26 @@ class AdminRepository {
     return rows.map(_topicFromRow).toList();
   }
 
-  /// Elimina un tema (y respuestas por cascade). Requiere poder moderar el foro.
+  /// Elimina un tema y sus respuestas. Requiere poder moderar el foro.
   Future<void> deleteTopic(String topicId) async {
     if (_client == null) throw const AdminUnavailableException();
 
-    final deleted = await _client!
-        .from('forum_topics')
-        .delete()
-        .eq('id', topicId)
-        .select('id');
+    try {
+      await _client!.rpc(
+        'delete_forum_topic',
+        params: {'p_topic_id': topicId},
+      );
+    } on PostgrestException catch (error) {
+      final missing = error.code == 'PGRST202' ||
+          error.message.contains('delete_forum_topic');
+      if (!missing) throw const TopicDeleteFailedException();
 
-    if (deleted.isEmpty) {
-      throw const TopicDeleteFailedException();
+      final deleted = await _client!
+          .from('forum_topics')
+          .delete()
+          .eq('id', topicId)
+          .select('id');
+      if (deleted.isEmpty) throw const TopicDeleteFailedException();
     }
   }
 
@@ -913,6 +991,7 @@ class AdminRepository {
       lastMessageAgo: enabled ? '—' : '—',
       lastTopicId: row['last_topic_id'] as String?,
       lastTopicTitle: row['last_topic_title'] as String?,
+      lastTopicExcerpt: row['last_topic_excerpt'] as String?,
       isEnabled: enabled,
       isActive: row['is_active'] as bool? ?? false,
       lockedLabel: row['locked_label'] as String?,

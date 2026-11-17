@@ -38,6 +38,7 @@ class MentionRichText extends ConsumerStatefulWidget {
     this.maxLines,
     this.overflow,
     this.subtleLinks = false,
+    this.textAlign,
   });
 
   final String text;
@@ -45,6 +46,7 @@ class MentionRichText extends ConsumerStatefulWidget {
   final int? maxLines;
   final TextOverflow? overflow;
   final bool subtleLinks;
+  final TextAlign? textAlign;
 
   @override
   ConsumerState<MentionRichText> createState() => _MentionRichTextState();
@@ -84,7 +86,7 @@ class _MentionRichTextState extends ConsumerState<MentionRichText> {
 
   void _openHashtagSearch(String hashtag) {
     final tag = hashtag.startsWith('#') ? hashtag : '#$hashtag';
-    context.go('/buscar?q=${Uri.encodeComponent(tag)}');
+    context.push('/buscar?q=${Uri.encodeComponent(tag)}');
   }
 
   Future<void> _openUrl(String raw) async {
@@ -327,6 +329,7 @@ class _MentionRichTextState extends ConsumerState<MentionRichText> {
       TextSpan(children: spans, style: _baseStyle()),
       maxLines: widget.maxLines,
       overflow: widget.overflow,
+      textAlign: widget.textAlign ?? TextAlign.start,
     );
   }
 }

@@ -117,6 +117,15 @@
           >
             Recargar API
           </button>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            [disabled]="queueBusy()"
+            (click)="purgeQueueHistory()"
+            title="Borra historial done/failed/skipped de más de 7 días"
+          >
+            Limpiar historial
+          </button>
         </div>
 
         @if (d.byKindPending.length) {
@@ -131,7 +140,38 @@
           </ul>
         }
 
-        <h2 class="section-title">Últimos trabajos (creación)</h2>
+        <div class="section-row">
+          <h2 class="section-title">Últimos trabajos (creación)</h2>
+          <div class="block-tools">
+            <span class="range">{{ dispatchJobsRange() }}</span>
+            @if (dispatchJobsPageCount() > 1) {
+              <div class="queue-pager">
+                <button
+                  type="button"
+                  class="queue-pager-btn"
+                  [disabled]="dispatchJobsPage() <= 0 || queueBusy()"
+                  (click)="shiftDispatchJobsPage(-1)"
+                  aria-label="Anterior"
+                >
+                  ‹
+                </button>
+                <span>{{ dispatchJobsPage() + 1 }}/{{ dispatchJobsPageCount() }}</span>
+                <button
+                  type="button"
+                  class="queue-pager-btn"
+                  [disabled]="
+                    dispatchJobsPage() >= dispatchJobsPageCount() - 1 ||
+                    queueBusy()
+                  "
+                  (click)="shiftDispatchJobsPage(1)"
+                  aria-label="Siguiente"
+                >
+                  ›
+                </button>
+              </div>
+            }
+          </div>
+        </div>
         @if (dispatchJobs().length === 0) {
           <div class="empty-box soft">Aún no hay trabajos en la cola.</div>
         } @else {
@@ -255,7 +295,42 @@
           </button>
         </div>
 
-        <h2 class="section-title">Últimos jobs FCM</h2>
+        <div class="section-row">
+          <h2 class="section-title">Últimos jobs FCM</h2>
+          <div class="block-tools">
+            <span class="range">{{ pushJobsRange() }}</span>
+            @if (pushJobsPageCount() > 1) {
+              <div class="queue-pager">
+                <button
+                  type="button"
+                  class="queue-pager-btn"
+                  [disabled]="pushDeliveryJobsPage() <= 0 || queueBusy()"
+                  (click)="shiftPushJobsPage(-1)"
+                  aria-label="Anterior"
+                >
+                  ‹
+                </button>
+                <span
+                  >{{ pushDeliveryJobsPage() + 1 }}/{{
+                    pushJobsPageCount()
+                  }}</span
+                >
+                <button
+                  type="button"
+                  class="queue-pager-btn"
+                  [disabled]="
+                    pushDeliveryJobsPage() >= pushJobsPageCount() - 1 ||
+                    queueBusy()
+                  "
+                  (click)="shiftPushJobsPage(1)"
+                  aria-label="Siguiente"
+                >
+                  ›
+                </button>
+              </div>
+            }
+          </div>
+        </div>
         @if (pushDeliveryJobs().length === 0) {
           <div class="empty-box soft">
             Cola FCM vacía. Se llena al crear notificaciones nuevas.
@@ -643,6 +718,35 @@
             }
           </div>
         </div>
+
+        <h4>Hermandades que sigue</h4>
+        @if (!diag()!.followedHermandades?.length) {
+          <p class="muted warn-text">
+            No sigue ningún tablón de hermandad → no recibirá avisos de publicaciones oficiales.
+          </p>
+        } @else {
+          <ul class="plain hermandad-follows">
+            @for (h of diag()!.followedHermandades!; track h.topicId) {
+              <li>
+                <strong>{{ h.title }}</strong>
+                <span class="sub">{{ h.topicId }}</span>
+                <span
+                  class="pill sm"
+                  [class.ok]="h.notifyAllSections"
+                  [class.warn]="h.notifyNone || (!h.notifyAllSections && !h.notifyNone)"
+                >
+                  @if (h.notifyNone) {
+                    Sin avisos de sección
+                  } @else if (h.notifyAllSections) {
+                    Todas las secciones
+                  } @else {
+                    Solo: {{ (h.notifyCategories || []).join(', ') }}
+                  }
+                </span>
+              </li>
+            }
+          </ul>
+        }
 
         <h4>Últimos avisos</h4>
         @if (!diag()!.recentNotifications?.length) {

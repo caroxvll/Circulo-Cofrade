@@ -43,11 +43,14 @@ import '../../features/profile/profile_screen.dart';
 import '../../features/admin/junta_screen.dart';
 import '../../features/search/search_screen.dart';
 import '../../features/shell/cofradeo_shell.dart';
+import '../../features/forums/utils/noticias_forum.dart';
 import 'cofradeo_page.dart';
+import 'safe_redirect.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final _forumsNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'foros');
+final _noticiasNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'noticias');
 
 bool _isPublicAuthRoute(String location) =>
     location == '/splash' ||
@@ -60,6 +63,17 @@ bool _isPublicAuthRoute(String location) =>
 
 bool _isPasswordRecoveryRoute(String location) =>
     location == '/recuperar-contrasena' || location == '/nueva-contrasena';
+
+/// Tema o noticia abiertos por enlace, con la query (comentario, sección).
+String? _sharedContentLocation(GoRouterState state) {
+  final location = state.matchedLocation;
+  if (!location.startsWith('/foros/') && !location.startsWith('/noticias')) {
+    return null;
+  }
+  final path =
+      '${state.uri.path}${state.uri.hasQuery ? '?${state.uri.query}' : ''}';
+  return safeInternalLocation(path);
+}
 
 Future<String?> _authRedirect(Ref ref, GoRouterState state) async {
   final location = state.matchedLocation;
@@ -88,10 +102,9 @@ Future<String?> _authRedirect(Ref ref, GoRouterState state) async {
       return '/login?redirect=${Uri.encodeComponent('/completar-perfil')}';
     }
     // Enlace compartido a un tema/comentario: tras login volver ahí.
-    if (location.startsWith('/foros/')) {
-      final path =
-          '${state.uri.path}${state.uri.hasQuery ? '?${state.uri.query}' : ''}';
-      return '/login?redirect=${Uri.encodeComponent(path)}';
+    final shared = _sharedContentLocation(state);
+    if (shared != null) {
+      return '/login?redirect=${Uri.encodeComponent(shared)}';
     }
     return '/bienvenida';
   }
@@ -99,25 +112,33 @@ Future<String?> _authRedirect(Ref ref, GoRouterState state) async {
   if (isLoggedIn && !emailVerified) {
     if (_isPasswordRecoveryRoute(location)) return null;
     if (location == '/verificar-email') return null;
+    final shared = _sharedContentLocation(state);
+    if (shared != null) {
+      return '/verificar-email?redirect=${Uri.encodeComponent(shared)}';
+    }
     return '/verificar-email';
   }
 
   if (isLoggedIn && location == '/completar-perfil') {
     if (!await needsProfileOnboarding(ref)) {
-      return '/calendario';
+      return safeInternalLocation(state.uri.queryParameters['redirect']) ??
+          '/calendario';
     }
     return null;
   }
 
   if (isLoggedIn && await needsProfileOnboarding(ref)) {
+    final shared = _sharedContentLocation(state);
+    if (shared != null) {
+      return '/completar-perfil?redirect=${Uri.encodeComponent(shared)}';
+    }
     return '/completar-perfil';
   }
 
   if (isLoggedIn && _isPublicAuthRoute(location)) {
     if (_isPasswordRecoveryRoute(location)) return null;
-    if (location == '/verificar-email') return '/calendario';
-    final redirect = state.uri.queryParameters['redirect'];
-    if (redirect != null && redirect.isNotEmpty) return redirect;
+    final redirect = safeInternalLocation(state.uri.queryParameters['redirect']);
+    if (redirect != null) return redirect;
     return '/calendario';
   }
 
@@ -146,7 +167,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/splash',
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => cofradeoTabPage(
+        pageBuilder: (context, state) => cofradeoAuthPage(
           state: state,
           child: const AuthSplashScreen(),
         ),
@@ -154,7 +175,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/bienvenida',
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => cofradeoFadePage(
+        pageBuilder: (context, state) => cofradeoAuthPage(
           state: state,
           child: const WelcomeScreen(),
         ),
@@ -162,7 +183,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => cofradeoFadePage(
+        pageBuilder: (context, state) => cofradeoAuthPage(
           state: state,
           child: LoginScreen(redirect: state.uri.queryParameters['redirect']),
         ),
@@ -170,7 +191,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/registro',
         parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) => cofradeoFadePage(
+        pageBuilder: (context, state) => cofradeoAuthPage(
           state: state,
           child: RegisterScreen(redirect: state.uri.queryParameters['redirect']),
         ),
@@ -198,6 +219,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           state: state,
           child: VerifyEmailScreen(
             email: state.uri.queryParameters['email'],
+            redirect: state.uri.queryParameters['redirect'],
           ),
         ),
       ),
@@ -224,6 +246,34 @@ final routerProvider = Provider<GoRouter>((ref) {
                   state: state,
                   child: const CalendarScreen(),
                 ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _noticiasNavigatorKey,
+            routes: [
+              GoRoute(
+                path: '/noticias',
+                pageBuilder: (context, state) => cofradeoTabPage(
+                  state: state,
+                  child: const ForumTopicsScreen(forumId: noticiasForumId),
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'tema/:topicId',
+                    pageBuilder: (context, state) {
+                      final topicId = state.pathParameters['topicId']!;
+                      return cofradeoFadePage(
+                        state: state,
+                        child: TopicDetailScreen(
+                          forumId: noticiasForumId,
+                          topicId: topicId,
+                          highlightReplyId: state.uri.queryParameters['reply'],
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -260,6 +310,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
               GoRoute(
                 path: '/foros/:forumId',
+                redirect: (context, state) {
+                  final forumId = state.pathParameters['forumId'];
+                  if (forumId == noticiasForumId) return '/noticias';
+                  return null;
+                },
                 pageBuilder: (context, state) {
                   final forumId = state.pathParameters['forumId']!;
                   return cofradeoFadePage(
@@ -270,6 +325,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
               GoRoute(
                 path: '/foros/:forumId/tema/:topicId',
+                redirect: (context, state) {
+                  final forumId = state.pathParameters['forumId'];
+                  if (forumId != noticiasForumId) return null;
+                  final topicId = state.pathParameters['topicId']!;
+                  final q = state.uri.hasQuery ? '?${state.uri.query}' : '';
+                  return '/noticias/tema/$topicId$q';
+                },
                 pageBuilder: (context, state) {
                   final forumId = state.pathParameters['forumId']!;
                   final topicId = state.pathParameters['topicId']!;
@@ -341,17 +403,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                     ],
                   ),
                 ],
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/buscar',
-                pageBuilder: (context, state) => cofradeoTabPage(
-                  state: state,
-                  child: const SearchScreen(),
-                ),
               ),
             ],
           ),
@@ -479,6 +530,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+          // Rama sin ítem en bottom nav: Buscar mantiene la barra inferior.
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/buscar',
+                pageBuilder: (context, state) => cofradeoTabPage(
+                  state: state,
+                  child: const SearchScreen(),
+                ),
               ),
             ],
           ),

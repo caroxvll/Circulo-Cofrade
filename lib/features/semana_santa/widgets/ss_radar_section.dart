@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/time_ago.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../auth/auth_provider.dart';
-import '../../cuaresma/widgets/cuaresma_hub_design.dart';
 import '../../forums/topic_detail_typography.dart';
 import '../../forums/utils/hermandad_local_assets.dart';
 import '../../forums/widgets/forum_post_image_viewer.dart';
@@ -48,13 +48,15 @@ class _SemanaSantaRadarSectionState
   Widget build(BuildContext context) {
     final kindFilter = ref.watch(ssLiveFeedFilterProvider);
     final feedAsync = ref.watch(ssLiveFeedProvider);
-    final canInform = ref.watch(ssCanInformProvider).asData?.value ?? false;
+    final reporter = ref.watch(ssCanInformProvider).asData?.value ?? false;
     final gate = ref.watch(ssLiveGateProvider).asData?.value;
+    final liveOpen = gate?.isOpen == true;
+    final canInform = reporter && liveOpen;
     final rawDayLabel = gate?.activeDay?.label;
     final dayLabel = rawDayLabel?.trim();
     final hasActiveDay = dayLabel != null && dayLabel.isNotEmpty;
     final sectionSubtitle = hasActiveDay
-        ? 'Jornada: $dayLabel · últimas 12 h'
+        ? 'Jornada: $dayLabel · hoy'
         : 'Sin jornada activa · el directo está en pausa';
 
     if (!hasActiveDay) {
@@ -113,16 +115,6 @@ class _SemanaSantaRadarSectionState
     final header = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: CuaresmaHubLiveBadge(compact: true),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          sectionSubtitle,
-          style: TopicDetailTypography.sectionSubtitle(),
-        ),
-        const SizedBox(height: 8),
         SizedBox(
           height: 32,
           child: ListView(
@@ -169,17 +161,21 @@ class _SemanaSantaRadarSectionState
             ),
             const SizedBox(height: 8),
             Text(
-              kindFilter == null
-                  ? (canInform
-                      ? 'Todavía no hay avisos. Sé el primero.'
-                      : 'Todavía no hay avisos en directo.')
-                  : 'Ningún aviso con este filtro.',
+              kindFilter != null
+                  ? 'Ningún aviso con este filtro.'
+                  : !liveOpen
+                      ? (gate?.closedMessage.isNotEmpty == true
+                          ? gate!.closedMessage
+                          : 'El en directo está cerrado.')
+                      : (canInform
+                          ? 'Todavía no hay avisos. Sé el primero.'
+                          : 'Todavía no hay avisos en directo.'),
               textAlign: TextAlign.center,
               style: TopicDetailTypography.meta(
                 color: AppColors.textSecondary,
               ),
             ),
-            if (kindFilter == null && !canInform) ...[
+            if (kindFilter == null && liveOpen && !canInform) ...[
               const SizedBox(height: 6),
               Text(
                 'Los publican hermandades y reporteros de confianza.\nTú puedes reaccionar y comentar.',
@@ -337,8 +333,8 @@ class _SsFeedStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   final Widget child;
 
-  /// Badge + subtítulo + chips (+ márgenes).
-  static const double _height = 98;
+  /// Fila de filtros.
+  static const double _height = 36;
 
   @override
   double get minExtent => _height;
@@ -357,7 +353,7 @@ class _SsFeedStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
       elevation: overlapsContent || shrinkOffset > 0.5 ? 1.5 : 0,
       shadowColor: AppColors.burgundyDark.withValues(alpha: 0.12),
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.only(bottom: 2),
         child: child,
       ),
     );
@@ -450,7 +446,7 @@ class SsLiveHubCompactTile extends ConsumerWidget {
       child: InkWell(
         onTap: () => showSsLiveUpdateDetailSheet(context, update: update),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+          padding: const EdgeInsets.fromLTRB(2, 8, 2, 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -474,6 +470,11 @@ class SsLiveHubCompactTile extends ConsumerWidget {
                         width: 42,
                         height: 42,
                         cacheSize: 84,
+                        placeholder: const CofradeoSkeletonBone(
+                          width: 42,
+                          height: 42,
+                          borderRadius: 21,
+                        ),
                         errorWidget: Icon(
                           Icons.church_outlined,
                           size: 18,
@@ -481,7 +482,10 @@ class SsLiveHubCompactTile extends ConsumerWidget {
                         ),
                       )
                     : localAvatar != null
-                        ? Image.asset(localAvatar, fit: BoxFit.cover)
+                        ? CofradeoAssetImage(
+                            assetPath: localAvatar,
+                            fit: BoxFit.contain,
+                          )
                         : Icon(
                             Icons.church_outlined,
                             size: 18,
@@ -1093,32 +1097,36 @@ class _KindChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected
-          ? color.withValues(alpha: 0.14)
-          : AppColors.backgroundElevated,
-      borderRadius: BorderRadius.circular(16),
+      color: selected ? AppColors.burgundy : AppColors.surface,
+      borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(999),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: selected ? color.withValues(alpha: 0.4) : AppColors.border,
+              color: selected
+                  ? AppColors.burgundy
+                  : AppColors.gold.withValues(alpha: 0.4),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 13, color: color),
-              const SizedBox(width: 4),
+              Icon(
+                icon,
+                size: 13,
+                color: selected ? Colors.white : color,
+              ),
+              const SizedBox(width: 5),
               Text(
                 label,
                 style: TopicDetailTypography.meta(
-                  color: selected ? color : AppColors.textSecondary,
+                  color: selected ? Colors.white : AppColors.textPrimary,
                   fontWeight: FontWeight.w700,
-                ).copyWith(fontSize: 11),
+                ).copyWith(fontSize: 12, height: 1),
               ),
             ],
           ),

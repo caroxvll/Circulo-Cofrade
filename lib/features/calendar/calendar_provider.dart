@@ -8,6 +8,7 @@ import '../../shared/models/calendar_event.dart';
 import '../admin/admin_provider.dart';
 import '../auth/auth_provider.dart';
 import '../profile/profile_provider.dart';
+import 'calendar_contributors_provider.dart';
 import 'data/calendar_repository.dart';
 import 'models/calendar_focus_request.dart';
 import 'models/calendar_upcoming_snapshot.dart';
@@ -89,11 +90,15 @@ final calendarHasEventTodayProvider = Provider<bool>((ref) {
       );
 });
 
-/// Moderadores de foro o admin pueden proponer eventos (con aprobación si no es admin).
+/// Admin publica al momento. Moderador o acceso a calendario: el evento queda en revisión.
 final isCalendarEditorProvider = Provider<bool>((ref) {
   final profile = ref.watch(currentUserProfileProvider).asData?.value;
   if (profile == null || profile.isSuspended) return false;
-  return ref.watch(isJuntaMemberProvider);
+  if (ref.watch(isJuntaMemberProvider)) return true;
+  final userId = ref.watch(currentUserProvider)?.id;
+  if (userId == null) return false;
+  return ref.watch(isCalendarContributorProvider(userId)).asData?.value ??
+      false;
 });
 
 final isCalendarAdminProvider = Provider<bool>((ref) {

@@ -33,7 +33,7 @@ class ForumsRepository {
 
   /// PostgREST exige el FK explícito tras añadir `parent_reply_id` en respuestas.
   static const _profileAuthorSelect =
-      'profiles!author_id(avatar_url, verified, suspended_at, trophy_points)';
+      'profiles!author_id(avatar_url, display_name, verified, suspended_at, trophy_points)';
 
   bool get _useRemote => _client != null;
 
@@ -95,6 +95,89 @@ class ForumsRepository {
     );
   }
 
+  /// El tema con la actividad más reciente, si sigue caliente.
+  ///
+  /// La actividad es la respuesta más nueva o, si no hay, la creación del tema.
+  /// Si ese momento queda fuera de [maxAge], no hay nada que enseñar.
+  Future<({ForumTopic topic, DateTime activityAt})?> hottestSeasonTopic(
+    List<ForumTopic> topics, {
+    Duration maxAge = const Duration(days: 3),
+  }) async {
+    final candidates = [
+      for (final topic in topics)
+        if (topic.createdAt != null) topic,
+    ];
+    if (candidates.isEmpty) return null;
+
+    final byId = {for (final topic in candidates) topic.id: topic};
+    final newestTopic = candidates.reduce(
+      (a, b) => a.createdAt!.isAfter(b.createdAt!) ? a : b,
+    );
+
+    DateTime? replyAt;
+    ForumTopic? replyTopic;
+    if (_useRemote && byId.isNotEmpty) {
+      try {
+        final replyRows = await _client!
+            .from('forum_replies')
+            .select('topic_id, created_at')
+            .inFilter('topic_id', byId.keys.toList())
+            .isFilter('deleted_at', null)
+            .order('created_at', ascending: false)
+            .limit(1);
+        if (replyRows.isNotEmpty) {
+          final row = replyRows.first;
+          final topicId = row['topic_id'] as String?;
+          final raw = row['created_at'] as String?;
+          replyTopic = topicId == null ? null : byId[topicId];
+          if (replyTopic != null && raw != null && raw.isNotEmpty) {
+            replyAt = DateTime.parse(raw).toLocal();
+          }
+        }
+      } catch (_) {
+        replyAt = null;
+        replyTopic = null;
+      }
+    }
+
+    final topicAt = newestTopic.createdAt!;
+    final ForumTopic winner;
+    final DateTime activityAt;
+    if (replyAt != null && replyTopic != null && replyAt.isAfter(topicAt)) {
+      winner = replyTopic;
+      activityAt = replyAt;
+    } else {
+      winner = newestTopic;
+      activityAt = topicAt;
+    }
+
+    if (DateTime.now().difference(activityAt) > maxAge) return null;
+    return (topic: winner, activityAt: activityAt);
+  }
+
+  /// Tablones de hermandad con cuenta oficial verificada y activa.
+  ///
+  /// Requiere `list_registered_hermandad_topics.sql` desplegado en Supabase.
+  Future<Set<String>> fetchRegisteredHermandadTopicIds() async {
+    if (!_useRemote) {
+      return {for (final t in topicsForForum('hermandades')) t.id};
+    }
+
+    final rows = await _client!.rpc('list_registered_hermandad_topic_ids');
+    if (rows is! List) return {};
+
+    final ids = <String>{};
+    for (final row in rows) {
+      if (row is Map) {
+        final id = row['topic_id'];
+        if (id is String && id.isNotEmpty) ids.add(id);
+      } else if (row is String && row.isNotEmpty) {
+        ids.add(row);
+      }
+    }
+    return ids;
+  }
+
   Future<ForumTopic?> fetchTopic(String forumId, String topicId) async {
     if (!_useRemote) return topicById(forumId, topicId);
 
@@ -120,6 +203,7 @@ class ForumsRepository {
         .from('forum_replies')
         .select('*, $_profileAuthorSelect')
         .eq('topic_id', topicId)
+        .isFilter('deleted_at', null)
         .order('created_at', ascending: false)
         .range(offset, offset + limit - 1);
 
@@ -163,6 +247,69 @@ class ForumsRepository {
         .toList();
   }
 
+  /// Último comunicado oficial de cada sección (noticias, cultos, actos, patrimonio).
+  Future<List<ForumReply>> fetchLatestOfficialBySection(
+    List<String> topicIds,
+  ) async {
+    if (topicIds.isEmpty) return [];
+    const sections = ['noticia', 'culto', 'acto', 'patrimonio'];
+
+    if (!_useRemote) {
+      final latest = <ForumReply>[];
+      for (final topicId in topicIds) {
+        final official = repliesForTopic(topicId)
+            .where(
+              (reply) =>
+                  reply.isOfficial &&
+                  !reply.isDeleted &&
+                  reply.parentReplyId == null,
+            )
+            .toList();
+        for (final section in sections) {
+          final matches = official
+              .where((reply) => reply.officialCategory == section)
+              .toList()
+            ..sort((a, b) {
+              final aMs = a.createdAt?.millisecondsSinceEpoch ?? 0;
+              final bMs = b.createdAt?.millisecondsSinceEpoch ?? 0;
+              return bMs.compareTo(aMs);
+            });
+          if (matches.isNotEmpty) latest.add(matches.first);
+        }
+      }
+      return latest;
+    }
+
+    final pending = <Future<ForumReply?>>[
+      for (final topicId in topicIds)
+        for (final section in sections) _latestOfficialInSection(topicId, section),
+    ];
+    final rows = await Future.wait(pending);
+    return [for (final reply in rows) ?reply];
+  }
+
+  Future<ForumReply?> _latestOfficialInSection(
+    String topicId,
+    String section,
+  ) async {
+    final rows = await _client!
+        .from('forum_replies')
+        .select('*, $_profileAuthorSelect')
+        .eq('topic_id', topicId)
+        .eq('is_official', true)
+        .eq('official_category', section)
+        .isFilter('deleted_at', null)
+        .isFilter('parent_reply_id', null)
+        .order('created_at', ascending: false)
+        .limit(1);
+
+    for (final row in rows) {
+      if (_isAuthorSuspended(row)) continue;
+      return _replyFromRow(row);
+    }
+    return null;
+  }
+
   Future<void> incrementTopicView(
     String topicId, {
     required String viewerId,
@@ -173,6 +320,22 @@ class ForumsRepository {
       'increment_topic_view',
       params: {'p_topic_id': topicId, 'p_viewer_id': viewerId},
     );
+  }
+
+  /// Visita a un comunicado oficial. Devuelve el contador actual (dedupe 1/día).
+  Future<int?> incrementOfficialReplyView(
+    String replyId, {
+    required String viewerId,
+  }) async {
+    if (!_useRemote) return null;
+
+    final result = await _client!.rpc(
+      'increment_official_reply_view',
+      params: {'p_reply_id': replyId, 'p_viewer_id': viewerId},
+    );
+    if (result is int) return result;
+    if (result is num) return result.toInt();
+    return int.tryParse(result?.toString() ?? '');
   }
 
   Future<ForumTopic> createTopic({
@@ -327,8 +490,10 @@ class ForumsRepository {
       topicCount: row['topic_count'] as int? ?? 0,
       messageCount: row['message_count'] as int? ?? 0,
       lastMessageAgo: _formatLastActivity(lastActivity, enabled),
+      lastActivityAt: lastActivity,
       lastTopicId: row['last_topic_id'] as String?,
       lastTopicTitle: row['last_topic_title'] as String?,
+      lastTopicExcerpt: row['last_topic_excerpt'] as String?,
       isEnabled: enabled,
       isActive: row['is_active'] as bool? ?? false,
       lockedLabel: row['locked_label'] as String?,
@@ -383,6 +548,7 @@ class ForumsRepository {
       excerpt: row['excerpt'] as String,
       body: normalizeStoredText(row['body'] as String),
       authorHandle: row['author_handle'] as String,
+      authorDisplayName: _authorDisplayNameFromRow(row),
       timeAgo: formatTimeAgo(createdAt),
       commentCount: row['comment_count'] as int? ?? 0,
       viewCount: row['view_count'] as int? ?? 0,
@@ -408,6 +574,9 @@ class ForumsRepository {
           ? null
           : DateTime.parse(row['edited_at'] as String),
       relatedForumId: row['related_forum_id'] as String?,
+      newsGroupId: (row['news_group_id'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (row['news_group_id'] as String).trim(),
     );
   }
 
@@ -702,6 +871,14 @@ class ForumsRepository {
     };
   }
 
+  String? _authorDisplayNameFromRow(Map<String, dynamic> row) {
+    final profile = row['profiles'];
+    if (profile is! Map<String, dynamic>) return null;
+    final name = (profile['display_name'] as String?)?.trim();
+    if (name == null || name.isEmpty) return null;
+    return name;
+  }
+
   String? _avatarUrlFromRow(Map<String, dynamic> row) {
     final profile = row['profiles'];
     if (profile is Map<String, dynamic>) {
@@ -798,6 +975,8 @@ class ForumsRepository {
         authorHandle: parsed.authorHandle.isNotEmpty
             ? parsed.authorHandle
             : previous.authorHandle,
+        authorDisplayName:
+            parsed.authorDisplayName ?? previous.authorDisplayName,
         timeAgo: parsed.timeAgo,
         commentCount: parsed.commentCount,
         viewCount: parsed.viewCount,
@@ -823,6 +1002,9 @@ class ForumsRepository {
         isClosed: parsed.isClosed,
         editedAt: parsed.editedAt ?? previous.editedAt,
         relatedForumId: parsed.relatedForumId ?? previous.relatedForumId,
+        newsGroupId: record.containsKey('news_group_id')
+            ? parsed.newsGroupId
+            : previous.newsGroupId,
       );
     } catch (_) {
       return null;
@@ -870,6 +1052,7 @@ class ForumsRepository {
           : DateTime.parse(deletedRaw).toLocal(),
       isFeatured: row['is_featured'] as bool? ?? false,
       imageUrl: row['image_url'] as String?,
+      viewCount: row['view_count'] as int? ?? 0,
     );
   }
 

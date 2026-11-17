@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/router/safe_redirect.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/cofradeo_avatar.dart';
@@ -110,8 +111,8 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   }
 
   void _finish() {
-    final redirect = widget.redirect;
-    if (redirect != null && redirect.isNotEmpty) {
+    final redirect = safeInternalLocation(widget.redirect);
+    if (redirect != null) {
       context.go(redirect);
     } else {
       context.go('/calendario');

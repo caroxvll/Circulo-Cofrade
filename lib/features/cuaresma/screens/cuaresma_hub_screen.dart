@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/cofradeo_bottom_nav.dart';
@@ -36,7 +37,7 @@ class CuaresmaHubScreen extends ConsumerWidget {
     ref.watch(topicViewTrackerProvider(topicKey));
 
     final topicAsync = ref.watch(forumTopicProvider(topicKey));
-    final ensayosAsync = ref.watch(todayEnsayosProvider);
+    final agendaAsync = ref.watch(todayCuaresmaAgendaProvider);
     final topicsAsync = ref.watch(forumTopicsProvider(forumId));
     if (supabaseReady) {
       ref.watch(forumTopicsRealtimeProvider(forumId));
@@ -60,12 +61,11 @@ class CuaresmaHubScreen extends ConsumerWidget {
           );
         }
 
-        final ensayos = ensayosAsync.asData?.value ?? const [];
-        final groups = groupTodayEnsayos(ensayos);
-        final liveCount = groups.live.length;
-        final todayCount = groups.total;
+        final agenda = agendaAsync.asData?.value ?? const [];
+        final groups = groupTodayEnsayos(agenda);
         final topicsCount =
             cuaresmaCommunityTopics(topicsAsync.asData?.value ?? const []).length;
+        final focusEventId = GoRouterState.of(context).uri.queryParameters['cita'];
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -84,59 +84,64 @@ class CuaresmaHubScreen extends ConsumerWidget {
             ),
             centerTitle: true,
           ),
-          body: RefreshIndicator(
-            color: AppColors.burgundy,
-            onRefresh: () async {
-              ref.invalidate(forumTopicProvider(topicKey));
-              ref.invalidate(todayEnsayosProvider);
-              ref.invalidate(forumTopicsProvider(forumId));
-            },
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
-              ),
-              padding: EdgeInsets.only(
-                bottom: cofradeoBottomScrollPadding(context) + 20,
-              ),
-              children: [
-                CuaresmaHubHeroStack(
-                  topic: topic,
-                  liveEnsayoCount: liveCount,
-                  todayEnsayoCount: todayCount,
-                  topicsCount: topicsCount,
-                  onNewTopic: () => openCuaresmaTopicCompose(
-                    context,
-                    ref,
-                    forumId: forumId,
-                  ),
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CuaresmaHubHeroStack(
+                agendaLabel: cuaresmaHubAgendaLabel(
+                  agenda,
+                  liveCount: groups.live.length,
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                  child: SponsoredPlacementSlot(
-                    placement: AdPlacement.featuredTopic,
-                    topicId: topicId,
-                    style: SponsoredAdCardStyle.banner,
-                    compact: true,
-                    sectionLabel: 'Publicidad',
-                  ),
+                agendaLive: groups.live.isNotEmpty,
+                topicsCount: topicsCount,
+                onNewTopic: () => openCuaresmaTopicCompose(
+                  context,
+                  ref,
+                  forumId: forumId,
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SponsoredPlacementSlot(
+                  placement: AdPlacement.featuredTopic,
+                  topicId: topicId,
+                  style: SponsoredAdCardStyle.banner,
+                  compact: true,
+                  sectionLabel: 'Publicidad',
+                ),
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  color: AppColors.burgundy,
+                  onRefresh: () async {
+                    ref.invalidate(forumTopicProvider(topicKey));
+                    ref.invalidate(todayCuaresmaAgendaProvider);
+                    ref.invalidate(todayEnsayosProvider);
+                    ref.invalidate(forumTopicsProvider(forumId));
+                  },
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      12,
+                      16,
+                      cofradeoBottomScrollPadding(context) + 20,
+                    ),
                     children: [
-                      const SizedBox(height: 12),
                       CuaresmaHubLiveSection(
                         forumId: forumId,
                         topicId: topicId,
+                        focusEventId: focusEventId,
                       ),
                       const SizedBox(height: 12),
                       CuaresmaTopicsPanel(forumId: forumId),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },

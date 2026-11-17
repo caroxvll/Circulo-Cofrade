@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/verified_account_badge.dart';
@@ -15,9 +16,11 @@ import '../../search/follows_provider.dart';
 import '../forum_topics_typography.dart';
 import '../data/topic_icon_assets.dart';
 import '../data/mock_forums.dart';
+import '../utils/forum_navigation.dart';
 import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
 import '../utils/topic_list_order.dart';
+import 'hermandad_crest_hero.dart';
 import 'related_forum_chip.dart';
 import 'topic_status_badge.dart';
 
@@ -31,6 +34,7 @@ class TopicCard extends StatelessWidget {
     this.pinned = false,
     this.variant = TopicCardVariant.standard,
     this.forumId,
+    this.compact = false,
   });
 
   final ForumTopic topic;
@@ -38,6 +42,8 @@ class TopicCard extends StatelessWidget {
   final bool pinned;
   final TopicCardVariant variant;
   final String? forumId;
+  /// Listado denso (p. ej. resultados de Buscar).
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +67,7 @@ class TopicCard extends StatelessWidget {
       topic: topic,
       onTap: onTap,
       pinned: pinned,
+      compact: compact,
     );
   }
 }
@@ -70,147 +77,461 @@ class _StandardTopicCard extends StatelessWidget {
     required this.topic,
     required this.onTap,
     required this.pinned,
+    this.compact = false,
   });
 
   final ForumTopic topic;
   final VoidCallback onTap;
   final bool pinned;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final displayTitle = _displayTitle(topic.title);
+    final excerpt = topic.excerpt.trim();
+    final radius = compact ? 12.0 : 14.0;
+    final coverUrl = _topicListCoverUrl(topic);
+    final isNew = isTopicNew(topic) && !pinned;
+    final rawHandle = topic.authorHandle.trim();
+    final handle = rawHandle.isEmpty
+        ? '@cofrade'
+        : (rawHandle.startsWith('@') ? rawHandle : '@$rawHandle');
+
+    if (pinned && !compact) {
+      return _PinnedForumTopicCard(
+        topic: topic,
+        onTap: onTap,
+        displayTitle: displayTitle,
+        excerpt: excerpt,
+        coverUrl: coverUrl,
+        handle: handle,
+      );
+    }
 
     return Material(
-      color: pinned ? AppColors.backgroundElevated : AppColors.surface,
-      borderRadius: BorderRadius.circular(14),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(radius),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(16),
+        borderRadius: BorderRadius.circular(radius),
+        splashColor: AppColors.burgundy.withValues(alpha: 0.06),
+        child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(radius),
+            color: AppColors.surface,
             border: Border.all(
-              color: pinned ? AppColors.goldDark : AppColors.border,
-              width: pinned ? 1.5 : 1,
+              color: pinned
+                  ? AppColors.goldDark.withValues(alpha: 0.42)
+                  : AppColors.gold.withValues(alpha: 0.22),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.burgundyDark.withValues(
+                  alpha: pinned ? 0.09 : 0.06,
+                ),
+                blurRadius: pinned ? 16 : 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              pinned
-                  ? PinnedTopicMark(topic: topic)
-                  : CofradeoAvatar(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              compact ? 10 : 12,
+              compact ? 10 : 12,
+              compact ? 10 : 12,
+              compact ? 10 : 12,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    CofradeoAvatar(
                       imageUrl: topic.authorAvatarUrl,
                       icon: topic.avatarIcon,
-                      size: 44,
+                      size: compact ? 26 : 30,
                       backgroundColor: AppColors.backgroundElevated,
                     ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              if (pinned) ...[
-                                Icon(
-                                  Icons.push_pin,
-                                  size: 14,
-                                  color: AppColors.goldDark,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Destacado',
-                                  style: AppTypography.labelSmall(
-                                    color: AppColors.goldDark,
-                                  ),
-                                ),
-                              ] else ...[
-                                Flexible(
-                                  child: Text(
-                                    topic.authorHandle,
-                                    style: AppTypography.bodyMedium(),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (topic.authorVerified) ...[
-                                  const SizedBox(width: 4),
-                                  const VerifiedAccountIcon(size: 15),
-                                ],
-                              ],
-                            ],
-                          ),
-                        ),
-                        if (!pinned)
-                          Text(
-                            topic.timeAgo,
-                            style: AppTypography.labelSmall(
-                              color: AppColors.accentRed,
+                    SizedBox(width: compact ? 8 : 10),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              handle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: ForumTopicsTypography.card(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ).copyWith(fontSize: compact ? 12 : 13),
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      displayTitle,
-                      style: AppTypography.displaySmall(
-                        color: AppColors.textPrimary,
-                      ).copyWith(fontSize: 17),
-                    ),
-                    if (topic.relatedForumId != null) ...[
-                      const SizedBox(height: 8),
-                      RelatedForumChip(
-                        relatedForumId: topic.relatedForumId!,
-                        compact: true,
+                          if (topic.authorVerified) ...[
+                            const SizedBox(width: 4),
+                            VerifiedAccountIcon(size: compact ? 12 : 14),
+                          ],
+                        ],
                       ),
-                    ],
-                    const SizedBox(height: 6),
-                    Text(
-                      topic.excerpt,
-                      style: AppTypography.bodyMedium(),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.chat_bubble_outline,
-                          size: 14,
-                          color: AppColors.textMuted,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${topic.commentCount}',
-                          style: AppTypography.labelSmall(),
-                        ),
-                        const SizedBox(width: 14),
-                        Icon(
-                          Icons.visibility_outlined,
-                          size: 14,
-                          color: AppColors.textMuted,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${formatCount(topic.viewCount)} vistas',
-                          style: AppTypography.labelSmall(),
-                        ),
-                        const Spacer(),
-                        TopicStatusBadge(topic: topic),
-                      ],
+                    const SizedBox(width: 8),
+                    Text(
+                      topic.timeAgo,
+                      style: ForumTopicsTypography.card(
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ).copyWith(fontSize: compact ? 10.5 : 11.5),
                     ),
                   ],
                 ),
-              ),
-              if (_topicListCoverUrl(topic) != null) ...[
-                const SizedBox(width: 10),
-                _TopicListCoverThumb(url: _topicListCoverUrl(topic)!),
+                SizedBox(height: compact ? 8 : 10),
+                Text(
+                  displayTitle,
+                  style: AppTypography.newsHeadline(
+                    color: AppColors.textPrimary,
+                  ).copyWith(
+                    fontSize: compact ? 16.5 : 18.5,
+                    height: 1.15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (pinned ||
+                    topic.relatedForumId != null ||
+                    topic.listStatusBadge != null) ...[
+                  SizedBox(height: compact ? 6 : 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (pinned)
+                        const _HermandadMetaPill(
+                          label: 'Destacado',
+                          foreground: AppColors.goldDark,
+                          background: AppColors.goldPale,
+                          icon: Icons.push_pin,
+                        ),
+                      if (topic.relatedForumId != null)
+                        RelatedForumChip(
+                          relatedForumId: topic.relatedForumId!,
+                          compact: true,
+                        ),
+                      TopicStatusBadge(topic: topic),
+                    ],
+                  ),
+                ],
+                if (excerpt.isNotEmpty || coverUrl != null) ...[
+                  SizedBox(height: compact ? 6 : 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: excerpt.isEmpty
+                            ? const SizedBox.shrink()
+                            : Text(
+                                excerpt,
+                                style: ForumTopicsTypography.card(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w400,
+                                ).copyWith(
+                                  fontSize: compact ? 12 : 13,
+                                  height: 1.35,
+                                ),
+                                maxLines: coverUrl != null ? 3 : 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                      ),
+                      if (coverUrl != null) ...[
+                        const SizedBox(width: 10),
+                        _TopicListCoverThumb(url: coverUrl, compact: compact),
+                      ],
+                    ],
+                  ),
+                ],
+                SizedBox(height: compact ? 8 : 10),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_outline,
+                      size: compact ? 13 : 14,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${topic.commentCount}',
+                      style: ForumTopicsTypography.card(
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w600,
+                      ).copyWith(fontSize: compact ? 11 : 12),
+                    ),
+                    SizedBox(width: compact ? 12 : 14),
+                    Icon(
+                      Icons.visibility_outlined,
+                      size: compact ? 13 : 14,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${formatCount(topic.viewCount)} vistas',
+                      style: ForumTopicsTypography.card(
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w600,
+                      ).copyWith(fontSize: compact ? 11 : 12),
+                    ),
+                    const Spacer(),
+                    if (isNew)
+                      Text(
+                        'Nuevo',
+                        style: ForumTopicsTypography.card(
+                          color: AppColors.burgundy,
+                          fontWeight: FontWeight.w700,
+                        ).copyWith(fontSize: compact ? 11 : 12),
+                      ),
+                  ],
+                ),
               ],
-            ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PinnedForumTopicCard extends StatelessWidget {
+  const _PinnedForumTopicCard({
+    required this.topic,
+    required this.onTap,
+    required this.displayTitle,
+    required this.excerpt,
+    required this.coverUrl,
+    required this.handle,
+  });
+
+  final ForumTopic topic;
+  final VoidCallback onTap;
+  final String displayTitle;
+  final String excerpt;
+  final String? coverUrl;
+  final String handle;
+
+  @override
+  Widget build(BuildContext context) {
+    const radius = 14.0;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.burgundyDark.withValues(alpha: 0.1),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(radius),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(radius),
+          splashColor: AppColors.burgundy.withValues(alpha: 0.06),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              color: AppColors.surface,
+              border: Border.all(
+                color: AppColors.goldDark.withValues(alpha: 0.45),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(radius - 1),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (coverUrl != null)
+                    SizedBox(
+                      height: 132,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CofradeoNetworkImage(
+                            url: coverUrl!,
+                            fit: BoxFit.cover,
+                            borderRadius: BorderRadius.zero,
+                          ),
+                          const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Color(0x00000000), Color(0x73000000)],
+                                stops: [0.45, 1],
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: 10,
+                            bottom: 10,
+                            right: 10,
+                            child: Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                const _HermandadMetaPill(
+                                  label: 'Destacado',
+                                  foreground: AppColors.goldDark,
+                                  background: AppColors.goldPale,
+                                  icon: Icons.push_pin,
+                                ),
+                                TopicStatusBadge(topic: topic),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    const SizedBox(
+                      height: 4,
+                      child: ColoredBox(color: AppColors.gold),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CofradeoAvatar(
+                              imageUrl: topic.authorAvatarUrl,
+                              icon: topic.avatarIcon,
+                              size: 30,
+                              backgroundColor: AppColors.backgroundElevated,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      handle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: ForumTopicsTypography.card(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                      ).copyWith(fontSize: 13),
+                                    ),
+                                  ),
+                                  if (topic.authorVerified) ...[
+                                    const SizedBox(width: 4),
+                                    const VerifiedAccountIcon(size: 14),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              topic.timeAgo,
+                              style: ForumTopicsTypography.card(
+                                color: AppColors.textMuted,
+                                fontWeight: FontWeight.w500,
+                              ).copyWith(fontSize: 11.5),
+                            ),
+                          ],
+                        ),
+                        if (coverUrl == null) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              const _HermandadMetaPill(
+                                label: 'Destacado',
+                                foreground: AppColors.goldDark,
+                                background: AppColors.goldPale,
+                                icon: Icons.push_pin,
+                              ),
+                              TopicStatusBadge(topic: topic),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          displayTitle,
+                          style: AppTypography.newsHeadline(
+                            color: AppColors.textPrimary,
+                          ).copyWith(
+                            fontSize: 22,
+                            height: 1.12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (topic.relatedForumId != null) ...[
+                          const SizedBox(height: 8),
+                          RelatedForumChip(
+                            relatedForumId: topic.relatedForumId!,
+                            compact: true,
+                          ),
+                        ],
+                        if (excerpt.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            excerpt,
+                            style: ForumTopicsTypography.card(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w400,
+                            ).copyWith(fontSize: 13.5, height: 1.35),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.chat_bubble_outline,
+                              size: 14,
+                              color: AppColors.textMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${topic.commentCount}',
+                              style: ForumTopicsTypography.card(
+                                color: AppColors.textMuted,
+                                fontWeight: FontWeight.w600,
+                              ).copyWith(fontSize: 12),
+                            ),
+                            const SizedBox(width: 14),
+                            Icon(
+                              Icons.visibility_outlined,
+                              size: 14,
+                              color: AppColors.textMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${formatCount(topic.viewCount)} vistas',
+                              style: ForumTopicsTypography.card(
+                                color: AppColors.textMuted,
+                                fontWeight: FontWeight.w600,
+                              ).copyWith(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -301,6 +622,7 @@ class _PremiumTopicCard extends StatelessWidget {
                                 topic: topic,
                                 size: pinned ? 52 : 44,
                                 circular: !pinned,
+                                heroTopicId: topic.id,
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -754,11 +1076,15 @@ class _NoticiasCoverImage extends StatelessWidget {
       ),
     );
 
+    Widget softPlaceholder() => ColoredBox(
+      color: AppColors.burgundy.withValues(alpha: 0.55),
+    );
+
     Widget buildImage({required double? imageHeight}) {
       if (cover == null) return placeholder();
       if (topicCoverIsAsset(cover)) {
-        return Image.asset(
-          cover,
+        return CofradeoAssetImage(
+          assetPath: cover,
           fit: BoxFit.cover,
           width: width,
           height: imageHeight,
@@ -768,7 +1094,6 @@ class _NoticiasCoverImage extends StatelessWidget {
             context,
             imageHeight ?? resolvedHeight,
           ),
-          gaplessPlayback: true,
           errorBuilder: (_, _, _) => placeholder(),
         );
       }
@@ -778,6 +1103,7 @@ class _NoticiasCoverImage extends StatelessWidget {
         width: width,
         height: imageHeight,
         cacheSize: width,
+        placeholder: softPlaceholder(),
         errorWidget: placeholder(),
       );
     }
@@ -818,13 +1144,12 @@ class _HermandadCardWash extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            assetPath,
+          CofradeoAssetImage(
+            assetPath: assetPath,
             fit: BoxFit.cover,
             alignment: const Alignment(-0.4, 0),
             filterQuality: FilterQuality.low,
             cacheWidth: cacheW,
-            gaplessPlayback: true,
           ),
           const DecoratedBox(
             decoration: BoxDecoration(
@@ -1144,7 +1469,7 @@ class TopicCardFollowMark extends ConsumerWidget {
     final user = ref.read(currentUserProvider);
     if (user == null) {
       await context.push(
-        '/login?redirect=${Uri.encodeComponent('/foros/$forumId/tema/$topicId')}',
+        '/login?redirect=${Uri.encodeComponent(forumTopicLocation(forumId, topicId))}',
       );
       return;
     }
@@ -1159,7 +1484,7 @@ class TopicCardFollowMark extends ConsumerWidget {
     } on FollowRequiresAuthException {
       if (context.mounted) {
         await context.push(
-          '/login?redirect=${Uri.encodeComponent('/foros/$forumId/tema/$topicId')}',
+          '/login?redirect=${Uri.encodeComponent(forumTopicLocation(forumId, topicId))}',
         );
       }
     } catch (_) {
@@ -1180,11 +1505,15 @@ class PinnedTopicMark extends StatelessWidget {
     required this.topic,
     this.size = 44,
     this.circular = false,
+    this.heroTopicId,
   });
 
   final ForumTopic topic;
   final double size;
   final bool circular;
+
+  /// Si no es null, envuelve el escudo en [HermandadCrestHero] (vuelo al header).
+  final String? heroTopicId;
 
   @override
   Widget build(BuildContext context) {
@@ -1205,7 +1534,7 @@ class PinnedTopicMark extends StatelessWidget {
     final isLocalAsset = (!hasRemoteEscudo && localEscudo != null) ||
         (cover != null && topicCoverIsAsset(cover));
 
-    return Container(
+    final mark = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -1222,13 +1551,14 @@ class PinnedTopicMark extends StatelessWidget {
       child: cover == null
           ? Icon(icon, color: AppColors.gold, size: size * 0.5)
           : isLocalAsset
-          ? Image.asset(
-              cover,
+          ? CofradeoAssetImage(
+              assetPath: cover,
               fit: isEscudo ? BoxFit.contain : BoxFit.cover,
               filterQuality: FilterQuality.low,
               cacheWidth: ImageDecodeCache.px(context, size),
               cacheHeight: ImageDecodeCache.px(context, size),
-              gaplessPlayback: true,
+              // Sin fade en vuelo Hero: el decode ya está en caché.
+              fadeDuration: Duration.zero,
               errorBuilder: (_, _, _) =>
                   Icon(icon, color: AppColors.gold, size: size * 0.5),
             )
@@ -1238,9 +1568,15 @@ class PinnedTopicMark extends StatelessWidget {
               width: size,
               height: size,
               cacheSize: size,
+              fadeInDuration: Duration.zero,
+              fadeOutDuration: Duration.zero,
               errorWidget: Icon(icon, color: AppColors.gold, size: size * 0.5),
             ),
     );
+
+    final heroId = heroTopicId?.trim();
+    if (heroId == null || heroId.isEmpty) return mark;
+    return HermandadCrestHero(topicId: heroId, child: mark);
   }
 }
 
@@ -1251,21 +1587,28 @@ String? _topicListCoverUrl(ForumTopic topic) {
 }
 
 class _TopicListCoverThumb extends StatelessWidget {
-  const _TopicListCoverThumb({required this.url});
+  const _TopicListCoverThumb({
+    required this.url,
+    this.compact = false,
+  });
 
   final String url;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final side = compact ? 52.0 : 58.0;
+    final w = side;
+    final h = side;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(compact ? 7 : 8),
       child: SizedBox(
-        width: 52,
-        height: 68,
+        width: w,
+        height: h,
         child: CofradeoNetworkImage(
           url: url,
           fit: BoxFit.cover,
-          cacheSize: 160,
+          cacheSize: compact ? 120 : 160,
           errorWidget: ColoredBox(
             color: AppColors.backgroundElevated,
             child: Icon(

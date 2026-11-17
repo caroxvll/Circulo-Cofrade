@@ -88,6 +88,8 @@ class QuizAnswerState {
     this.isCorrect,
     this.score,
     this.correctOption,
+    this.forfeited = false,
+    this.timedOut = false,
   });
 
   final DateTime? openedAt;
@@ -96,8 +98,13 @@ class QuizAnswerState {
   final bool? isCorrect;
   final int? score;
   final QuizOption? correctOption;
+  final bool forfeited;
+  final bool timedOut;
 
   bool get hasAnswered => answeredAt != null;
+
+  /// Contestada y aún sin decir si va bien. Se abre al cerrar el día.
+  bool get sealed => hasAnswered && isCorrect == null && correctOption == null;
 }
 
 class QuizLivePayload {
@@ -113,6 +120,7 @@ class QuizLivePayload {
     this.optionD,
     this.explanation,
     this.answer,
+    this.reveal,
   });
 
   /// idle | live | answered
@@ -128,6 +136,9 @@ class QuizLivePayload {
   final String? explanation;
   final QuizAnswerState? answer;
 
+  /// Resultado de la jornada ya cerrada, si quien juega aún no lo ha visto.
+  final QuizDayReveal? reveal;
+
   bool get isLive => state == 'live';
   bool get isAnswered => state == 'answered';
   bool get isIdle => state == 'idle';
@@ -140,24 +151,28 @@ class QuizLivePayload {
 
 class QuizSubmitResult {
   const QuizSubmitResult({
-    required this.isCorrect,
-    required this.score,
-    required this.correctOption,
-    required this.selectedOption,
+    this.sealed = false,
+    this.isCorrect,
+    this.score,
+    this.correctOption,
+    this.selectedOption,
     this.explanation,
     this.forfeited = false,
     this.timedOut = false,
   });
 
-  final bool isCorrect;
-  final int score;
-  final QuizOption correctOption;
-  final QuizOption selectedOption;
+  /// Guardada, sin decir aún si va bien.
+  final bool sealed;
+  final bool? isCorrect;
+  final int? score;
+  final QuizOption? correctOption;
+  final QuizOption? selectedOption;
   final String? explanation;
   final bool forfeited;
   final bool timedOut;
 
   QuizSubmitResult copyWith({
+    bool? sealed,
     bool? isCorrect,
     int? score,
     QuizOption? correctOption,
@@ -167,6 +182,7 @@ class QuizSubmitResult {
     bool? timedOut,
   }) {
     return QuizSubmitResult(
+      sealed: sealed ?? this.sealed,
       isCorrect: isCorrect ?? this.isCorrect,
       score: score ?? this.score,
       correctOption: correctOption ?? this.correctOption,
@@ -176,6 +192,54 @@ class QuizSubmitResult {
       timedOut: timedOut ?? this.timedOut,
     );
   }
+}
+
+class QuizRevealPlayer {
+  const QuizRevealPlayer({required this.name, required this.correct});
+
+  final String name;
+  final bool correct;
+}
+
+/// Lo que se abre a las 00:00: la correcta y quién ha respondido.
+class QuizDayReveal {
+  const QuizDayReveal({
+    required this.roundId,
+    required this.prompt,
+    this.imageUrl,
+    required this.optionA,
+    required this.optionB,
+    required this.optionC,
+    required this.optionD,
+    this.explanation,
+    this.selectedOption,
+    this.correctOption,
+    this.isCorrect,
+    this.score,
+    this.forfeited = false,
+    this.timedOut = false,
+    this.answeredCount = 0,
+    this.correctCount = 0,
+    this.players = const [],
+  });
+
+  final String roundId;
+  final String prompt;
+  final String? imageUrl;
+  final String optionA;
+  final String optionB;
+  final String optionC;
+  final String optionD;
+  final String? explanation;
+  final QuizOption? selectedOption;
+  final QuizOption? correctOption;
+  final bool? isCorrect;
+  final int? score;
+  final bool forfeited;
+  final bool timedOut;
+  final int answeredCount;
+  final int correctCount;
+  final List<QuizRevealPlayer> players;
 }
 
 class QuizLeaderboardEntry {
@@ -200,7 +264,98 @@ class QuizLeaderboardEntry {
   final int rank;
 }
 
-/// Aviso de inicio de temporada en la pantalla idle del quiz.
+/// Premio de un mes. Si [active] es falso, no se enseña a quien juega.
+class QuizPrize {
+  const QuizPrize({
+    required this.yearMonth,
+    required this.active,
+    this.sponsorName = '',
+    this.title = '',
+    this.description = '',
+    this.imageUrl,
+    this.address = '',
+    this.claimUntil,
+  });
+
+  final String yearMonth;
+  final bool active;
+  final String sponsorName;
+  final String title;
+  final String description;
+  final String? imageUrl;
+  final String address;
+  final DateTime? claimUntil;
+
+  bool get hasCopy {
+    return title.trim().isNotEmpty || sponsorName.trim().isNotEmpty;
+  }
+
+  bool get visibleToPlayers => active && hasCopy;
+
+  bool get claimStillOpen {
+    if (claimUntil == null) return true;
+    final today = DateTime.now();
+    final end = DateTime(claimUntil!.year, claimUntil!.month, claimUntil!.day);
+    final day = DateTime(today.year, today.month, today.day);
+    return !day.isAfter(end);
+  }
+
+  String get monthLabel => quizMonthLabel(yearMonth);
+}
+
+/// Lo que se pinta en la pregunta y en el ranking.
+class QuizPrizeShowcase {
+  const QuizPrizeShowcase({this.stake, this.claimPrize, this.claimMe});
+
+  /// Premio del mes en curso, si está activo.
+  final QuizPrize? stake;
+
+  /// Premio del mes ya cerrado, si sigue activo y en plazo.
+  final QuizPrize? claimPrize;
+
+  /// El usuario, cuando es el primero de ese mes.
+  final QuizLeaderboardEntry? claimMe;
+
+  bool get showClaim =>
+      claimPrize != null &&
+      claimPrize!.visibleToPlayers &&
+      claimPrize!.claimStillOpen &&
+      claimMe != null &&
+      claimMe!.rank == 1;
+
+  bool get showStake => stake != null && stake!.visibleToPlayers;
+
+  bool get isEmpty => !showClaim && !showStake;
+}
+
+String quizMonthLabel(String yearMonth) {
+  final parts = yearMonth.split('-');
+  if (parts.length != 2) return yearMonth;
+  const names = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+  ];
+  final year = parts[0];
+  final month = int.tryParse(parts[1]) ?? 0;
+  if (month < 1 || month > 12) return yearMonth;
+  return '${names[month - 1]} $year';
+}
+
+String quizYearMonthOf(DateTime date) {
+  final month = date.month.toString().padLeft(2, '0');
+  return '${date.year}-$month';
+}
+
 class QuizSeasonInfo {
   const QuizSeasonInfo({this.startsOn, this.message});
 

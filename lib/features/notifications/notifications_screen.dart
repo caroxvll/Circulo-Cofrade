@@ -61,13 +61,16 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     if (notification.kind == AppNotificationKind.ssLiveOfficial) {
       final route = notification.route ??
           (notification.forumId != null && notification.topicId != null
-              ? '/foros/${notification.forumId}/tema/${notification.topicId}'
+              ? forumTopicLocation(
+                  notification.forumId!,
+                  notification.topicId!,
+                )
               : null);
       if (!mounted) return;
       if (route != null) {
         context.go(route);
       }
-      unawaited(notifier.dismiss(notification.id));
+      unawaited(notifier.markRead(notification.id));
       return;
     }
 
@@ -105,21 +108,21 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         topicId: notification.topicId!,
         querySuffix: suffix,
       );
-      unawaited(notifier.dismiss(notification.id));
+      unawaited(notifier.markRead(notification.id));
       return;
     }
 
     if (notification.kind == AppNotificationKind.cofradeRankUp) {
       if (!mounted) return;
       context.go('/perfil');
-      unawaited(notifier.dismiss(notification.id));
+      unawaited(notifier.markRead(notification.id));
       return;
     }
 
     if (notification.kind == AppNotificationKind.newReport) {
       if (!mounted) return;
       context.go('/perfil/junta');
-      unawaited(notifier.dismiss(notification.id));
+      unawaited(notifier.markRead(notification.id));
       return;
     }
 
@@ -135,7 +138,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     if (notification.profileId != null) {
       if (!mounted) return;
       context.go('/perfil/usuario/${notification.profileId}');
-      unawaited(notifier.dismiss(notification.id));
+      unawaited(notifier.markRead(notification.id));
       return;
     }
 
@@ -153,7 +156,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     if (route != null) {
       context.go(route);
     }
-    unawaited(notifier.dismiss(notification.id));
+    unawaited(notifier.markRead(notification.id));
   }
 
   Future<void> _acceptFollowRequest(AppNotification notification) async {
@@ -323,7 +326,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               onAcceptFollowRequest: _acceptFollowRequest,
               onRejectFollowRequest: _rejectFollowRequest,
               onDismiss: (n) =>
-                  ref.read(notificationsProvider.notifier).dismiss(n.id),
+                  ref.read(notificationsProvider.notifier).dismissAfterRead(n.id),
               onMarkAllRead: () =>
                   ref.read(notificationsProvider.notifier).markAllRead(),
               onClearAll: _confirmClear,

@@ -1,24 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../core/constants/app_assets.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
-import '../../core/utils/image_decode_cache.dart';
 import '../../core/widgets/cofradeo_error_panel.dart';
-import '../../core/widgets/cofradeo_network_image.dart';
 import '../../core/widgets/cofradeo_skeleton.dart';
-import '../../shared/models/forum.dart';
-import '../semana_santa/widgets/ss_forums_live_chip.dart';
+import '../permissions/permissions_provider.dart';
+import '../profile/profile_provider.dart';
 import 'forums_provider.dart';
 import 'utils/forum_pillar_image_cache.dart';
 import 'utils/hermandad_local_assets.dart';
 import 'utils/topic_list_order.dart';
-import 'widgets/forum_category_card.dart';
+import 'topic_detail_screen.dart';
+import 'widgets/comunidad_home.dart';
 import 'widgets/forums_beige_background.dart';
-import 'widgets/noticias_premium_banner.dart';
-import 'forums_hero_tokens.dart';
 import '../quiz/quiz_provider.dart';
 import '../quiz/widgets/quiz_forums_card.dart';
 
@@ -34,7 +28,11 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
   void initState() {
     super.initState();
     // Calentar escudos/fondos locales antes de abrir Hermandades.
-    HermandadLocalAssets.ensureLoaded();
+    if (!HermandadLocalAssets.isReady) {
+      HermandadLocalAssets.ensureLoaded().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   @override
@@ -53,6 +51,27 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
       });
     });
 
+    final profile = ref.watch(currentUserProfileProvider).asData?.value;
+    final topicIds = ref.watch(hermandadTopicIdsProvider).asData?.value;
+    final officialHermandad =
+        profile?.accountType.isBrotherhood == true && profile?.isSuspended != true;
+    if (officialHermandad && topicIds == null) {
+      return const Stack(
+        fit: StackFit.expand,
+        children: [
+          ForumsBeigeBackground(),
+          Center(child: CircularProgressIndicator()),
+        ],
+      );
+    }
+    if (officialHermandad && topicIds!.isNotEmpty) {
+      return TopicDetailScreen(
+        forumId: 'hermandades',
+        topicId: topicIds.first,
+        embedded: true,
+      );
+    }
+
     final pillarsAsync = ref.watch(forumPillarsProvider);
 
     return Stack(
@@ -64,7 +83,7 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
           loading: () => const ForumsHomeSkeleton(),
           error: (_, _) => CofradeoErrorPanel(
             message: 'No se pudieron cargar los foros.',
-            subtitle: 'Comprueba tu conexión e inténtalo de nuevo.',
+            subtitle: 'Comprueba tu conexiÃ³n e intÃ©ntalo de nuevo.',
             onRetry: () => invalidateForumPillarData(ref),
           ),
           data: (pillars) {
@@ -77,45 +96,18 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
             }
 
             final split = splitNoticiasFromForums(visible);
-            final noticias = split.noticias;
             final forums = split.forums;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _ForumsHero(),
                 Expanded(
                   child: RefreshIndicator(
                     color: AppColors.burgundy,
                     onRefresh: () => _refreshForums(ref),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(
-                            parent: BouncingScrollPhysics(),
-                          ),
-                          child: SizedBox(
-                            height: constraints.maxHeight,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (noticias != null)
-                                  NoticiasPremiumBanner(
-                                    forum: noticias,
-                                    onTap: () => context.push(
-                                      '/foros/${noticias.id}',
-                                    ),
-                                  ),
-                                Expanded(
-                                  child: _CenteredForumsBlock(
-                                    pillars: forums,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                    child: ComunidadHome(
+                      forums: forums,
+                      noticias: split.noticias,
                     ),
                   ),
                 ),
@@ -123,7 +115,6 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
             );
           },
         ),
-        const SemanaSantaForumsLiveChip(),
         if (ref.watch(quizLiveVisibleProvider).asData?.value == true)
           const QuizForumsFab(),
       ],
@@ -139,196 +130,6 @@ class _ForumsScreenState extends ConsumerState<ForumsScreen> {
       context,
       visibleForumPillars(pillars),
       heroUrl: heroUrl,
-    );
-  }
-}
-
-class _CenteredForumsBlock extends StatelessWidget {
-  const _CenteredForumsBlock({required this.pillars});
-
-  final List<ForumCategory> pillars;
-
-  @override
-  Widget build(BuildContext context) {
-    if (pillars.isEmpty) return const SizedBox.shrink();
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const sectionHeaderHeight = 30.0;
-        const afterHeaderGap = 8.0;
-        const safety = 12.0;
-        final gaps = (pillars.length - 1) * ForumCategoryCard.cardGap;
-        final availableForCards = (constraints.maxHeight -
-                sectionHeaderHeight -
-                afterHeaderGap -
-                safety)
-            .clamp(0.0, constraints.maxHeight);
-
-        final idealCard = ForumCategoryCard.cardHeight;
-        final idealBlock = pillars.length * idealCard + gaps;
-
-        final double cardHeight;
-        final double sidePad;
-        if (idealBlock <= availableForCards) {
-          cardHeight = idealCard;
-          sidePad = (availableForCards - idealBlock) / 2;
-        } else {
-          // Encaja sí o sí (Samsung / 360x740): floor evita desbordes por decimales.
-          final raw = (availableForCards - gaps) / pillars.length;
-          cardHeight = raw.floorToDouble().clamp(1.0, idealCard);
-          sidePad = 0;
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (sidePad > 0) SizedBox(height: sidePad),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 0),
-              child: SizedBox(
-                height: sectionHeaderHeight,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _FeaturedSectionHeader(),
-                ),
-              ),
-            ),
-            const SizedBox(height: afterHeaderGap),
-            _ForumsCardsList(
-              pillars: pillars,
-              cardHeight: cardHeight,
-            ),
-            if (sidePad > 0) SizedBox(height: sidePad),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _ForumsCardsList extends StatelessWidget {
-  const _ForumsCardsList({
-    required this.pillars,
-    required this.cardHeight,
-  });
-
-  final List<ForumCategory> pillars;
-  final double cardHeight;
-
-  @override
-  Widget build(BuildContext context) {
-    if (pillars.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var i = 0; i < pillars.length; i++) ...[
-            if (i > 0) const SizedBox(height: ForumCategoryCard.cardGap),
-            SizedBox(
-              height: cardHeight,
-              child: ForumCategoryCard(
-                forum: pillars[i],
-                height: cardHeight,
-                onTap: () => context.push('/foros/${pillars[i].id}'),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _FeaturedSectionHeader extends StatelessWidget {
-  const _FeaturedSectionHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Foros destacados',
-          style: AppTypography.displaySmall(
-            color: AppColors.textPrimary,
-          ).copyWith(fontSize: 18, letterSpacing: 0.08),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          width: 44,
-          height: 1.5,
-          decoration: BoxDecoration(
-            color: AppColors.gold.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(999),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ForumsHero extends ConsumerWidget {
-  const _ForumsHero();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final heroUrl = ref.watch(forumsListHeroImageProvider).asData?.value;
-    final screenW = MediaQuery.sizeOf(context).width;
-    final heroCache = ImageDecodeCache.px(context, screenW);
-    final heroAsset = Image.asset(
-      AppAssets.heroProcesion,
-      fit: BoxFit.cover,
-      alignment: const Alignment(0, -0.45),
-      filterQuality: FilterQuality.medium,
-      cacheWidth: heroCache,
-      gaplessPlayback: true,
-    );
-
-    return ClipRect(
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: heroUrl != null && heroUrl.isNotEmpty
-                ? CofradeoNetworkImage(
-                    url: heroUrl,
-                    fit: BoxFit.cover,
-                    alignment: const Alignment(0, -0.45),
-                    cacheSize: screenW,
-                    filterQuality: FilterQuality.medium,
-                    placeholder: heroAsset,
-                    errorWidget: heroAsset,
-                  )
-                : heroAsset,
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: ForumsHeroTokens.gradientOverlay(),
-              ),
-            ),
-          ),
-          Padding(
-            padding: ForumsHeroTokens.contentPadding(context),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'FOROS',
-                  style: ForumsHeroTokens.heroTitleStyle(),
-                ),
-                const SizedBox(height: ForumsHeroTokens.afterTitleGap),
-                Text(
-                  'Participa en la mayor\ncomunidad cofrade',
-                  style: ForumsHeroTokens.heroSubtitleStyle(),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

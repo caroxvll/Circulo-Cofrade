@@ -327,6 +327,12 @@ class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
     }
   }
 
+  /// Marca leído y luego elimina (p. ej. al deslizar en la bandeja).
+  Future<void> dismissAfterRead(String id) async {
+    await markRead(id);
+    await dismiss(id);
+  }
+
   Future<void> dismiss(String id) async {
     final user = ref.read(currentUserProvider);
     final repo = ref.read(notificationsRepositoryProvider);
@@ -397,9 +403,13 @@ class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
 }
 
 final hasUnreadNotificationsProvider = Provider<bool>((ref) {
+  final user = ref.watch(currentUserProvider);
+  final repo = ref.watch(notificationsRepositoryProvider);
+  if (user == null || !repo.isAvailable) return false;
+
   final notifications = ref.watch(notificationsProvider);
   return notifications.maybeWhen(
     data: (list) => list.any((n) => !n.isRead),
-    orElse: () => mockNotifications.any((n) => !n.isRead),
+    orElse: () => false,
   );
 });

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +9,7 @@ import '../../core/config/firebase_config.dart';
 import '../../core/firebase/firebase_bootstrap.dart';
 import '../../core/router/app_router.dart';
 import '../../core/utils/forum_topic_query.dart';
+import '../../features/forums/utils/forum_navigation.dart';
 import '../../features/forums/utils/official_post_categories.dart';
 import '../../firebase_background.dart';
 import '../auth/auth_provider.dart';
@@ -108,17 +111,83 @@ class PushMessagingService {
     }
   }
 
+  /// Quita el token de Supabase. La sesión tiene que seguir abierta.
+  /// No invalida el token en Firebase: al volver a activar avisos se reutiliza.
   Future<void> unregister() async {
-    final token = _currentToken;
-    final userId = _lastRegisteredUserId;
+    final sessionUserId = _ref.read(currentUserProvider)?.id;
+    final userId = sessionUserId ?? _lastRegisteredUserId;
+    var token = _currentToken;
+    // Sin sesión no pedimos un token nuevo: getToken() lo crearía.
+    if (token == null && sessionUserId != null && isAvailable) {
+      token = await _getToken();
+    }
     if (token != null && userId != null) {
-      await createDeviceTokensRepository().delete(
-            userId: userId,
-            fcmToken: token,
-          );
+      try {
+        await createDeviceTokensRepository().delete(
+          userId: userId,
+          fcmToken: token,
+        );
+      } catch (error, stack) {
+        debugPrint('No se pudo borrar el token del dispositivo: $error\n$stack');
+      }
     }
     _currentToken = null;
     _lastRegisteredUserId = null;
+  }
+
+  /// Cierra el canal push de este móvil antes de cerrar sesión.
+  /// Primero borra la fila (el JWT sigue válido) y después invalida el token.
+  Future<void> detachForSignOut(String? userId) async {
+    final resolvedUserId =
+        userId ?? _ref.read(currentUserProvider)?.id ?? _lastRegisteredUserId;
+    final knownToken = _currentToken;
+    Future<String?>? pendingToken;
+    String? fetchedToken;
+    if (knownToken == null && isAvailable) {
+      pendingToken = _getToken();
+      try {
+        fetchedToken = await pendingToken.timeout(const Duration(seconds: 6));
+      } catch (_) {
+        fetchedToken = null;
+      }
+    }
+
+    final token = knownToken ?? fetchedToken;
+    if (token != null && resolvedUserId != null) {
+      try {
+        await createDeviceTokensRepository()
+            .delete(
+              userId: resolvedUserId,
+              fcmToken: token,
+            )
+            .timeout(const Duration(seconds: 5));
+      } catch (error, stack) {
+        debugPrint('No se pudo borrar el token al salir: $error\n$stack');
+      }
+    }
+
+    await _deleteLocalFcmToken();
+    if (pendingToken != null) {
+      // getToken puede terminar después del primer deleteToken y dejar uno nuevo.
+      try {
+        await pendingToken.timeout(const Duration(seconds: 2));
+      } catch (_) {}
+      await _deleteLocalFcmToken();
+    }
+
+    _currentToken = null;
+    _lastRegisteredUserId = null;
+  }
+
+  Future<void> _deleteLocalFcmToken() async {
+    if (!isAvailable) return;
+    try {
+      await FirebaseMessaging.instance
+          .deleteToken()
+          .timeout(const Duration(seconds: 5));
+    } catch (error, stack) {
+      debugPrint('No se pudo invalidar el token FCM: $error\n$stack');
+    }
   }
 
   Future<String?> _getToken() async {
@@ -175,6 +244,12 @@ class PushMessagingService {
   }
 
   void _onMessageOpened(RemoteMessage message) {
+    final notificationId = message.data['notificationId']?.toString();
+    if (notificationId != null && notificationId.isNotEmpty) {
+      unawaited(
+        _ref.read(notificationsProvider.notifier).markRead(notificationId),
+      );
+    }
     _navigateFromData(message.data);
   }
 
@@ -221,7 +296,7 @@ class PushMessagingService {
       section: forumId == 'hermandades' ? section : null,
       replyId: replyId is String ? replyId : null,
     );
-    return '/foros/$forumId/tema/$topicId$query';
+    return forumTopicLocation(forumId, topicId, querySuffix: query);
   }
 
   void _navigateToRoute(String route) {

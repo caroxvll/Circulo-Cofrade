@@ -11,6 +11,7 @@ class QuizRepository {
 
   static const _imagesBucket = 'quiz-images';
   static const _audioBucket = 'quiz-audio';
+  static const _prizesBucket = 'quiz-prizes';
   static const maxImageBytes = 500 * 1024;
   static const maxAudioBytes = 1024 * 1024;
   static const maxAudioSeconds = 20;
@@ -51,6 +52,16 @@ class QuizRepository {
     if (map['forfeited'] != true && map['reason'] == 'not_opened') {
       return null;
     }
+    final sealed = map['sealed'] == true || map['correctOption'] == null;
+    if (sealed && map['isCorrect'] == null) {
+      return QuizSubmitResult(
+        sealed: true,
+        selectedOption:
+            quizOptionFromString(map['selectedOption'] as String?),
+        forfeited: map['forfeited'] == true,
+        timedOut: map['timedOut'] == true,
+      );
+    }
     final correct = quizOptionFromString(map['correctOption'] as String?);
     if (correct == null) return null;
     return QuizSubmitResult(
@@ -61,6 +72,7 @@ class QuizRepository {
           quizOptionFromString(map['selectedOption'] as String?) ?? correct,
       explanation: map['explanation'] as String?,
       forfeited: map['forfeited'] == true,
+      timedOut: map['timedOut'] == true,
     );
   }
 
@@ -78,13 +90,32 @@ class QuizRepository {
       },
     );
     final map = Map<String, dynamic>.from(raw as Map);
+    final sealed = map['sealed'] == true || map['correctOption'] == null;
+    if (sealed && map['isCorrect'] == null) {
+      return QuizSubmitResult(
+        sealed: true,
+        selectedOption:
+            quizOptionFromString(map['selectedOption'] as String?),
+        forfeited: map['forfeited'] == true,
+        timedOut: map['timedOut'] == true,
+      );
+    }
     return QuizSubmitResult(
       isCorrect: map['isCorrect'] as bool? ?? false,
       score: (map['score'] as num?)?.toInt() ?? 0,
       correctOption: quizOptionFromString(map['correctOption'] as String?)!,
       selectedOption: quizOptionFromString(map['selectedOption'] as String?)!,
       explanation: map['explanation'] as String?,
+      forfeited: map['forfeited'] == true,
+      timedOut: map['timedOut'] == true,
     );
+  }
+
+  Future<void> markRevealSeen(String roundId) async {
+    if (_client == null) return;
+    await _client!.rpc('quiz_mark_reveal_seen', params: {
+      'p_round_id': roundId,
+    });
   }
 
   Future<List<QuizLeaderboardEntry>> fetchMonthlyLeaderboard({
@@ -151,7 +182,7 @@ class QuizRepository {
         .from('quiz_questions')
         .select()
         .order('created_at', ascending: false)
-        .limit(100);
+        .limit(400);
 
     return rows.map(_questionFromRow).toList();
   }
@@ -238,10 +269,25 @@ class QuizRepository {
   }
 
   Future<void> deleteQuestion(String questionId) async {
-    if (_client == null) throw const QuizUnavailableException();
-    await _client!.rpc('quiz_delete_question', params: {
+    final client = _client;
+    if (client == null) throw const QuizUnavailableException();
+    String? imageUrl;
+    String? audioUrl;
+    try {
+      final row = await client
+          .from('quiz_questions')
+          .select('image_url, audio_url')
+          .eq('id', questionId)
+          .maybeSingle();
+      imageUrl = row?['image_url'] as String?;
+      audioUrl = row?['audio_url'] as String?;
+    } catch (_) {}
+    await client.rpc('quiz_delete_question', params: {
       'p_question_id': questionId,
     });
+    await _removeQuestionMedia(questionId);
+    await _removeStoredUrl(imageUrl);
+    await _removeStoredUrl(audioUrl);
   }
 
   Future<({int deleted, int skippedLive})> deleteQuestionsForMonth(
@@ -253,10 +299,100 @@ class QuizRepository {
       params: {'p_year_month': yearMonth},
     );
     final map = Map<String, dynamic>.from(raw as Map);
+    final ids = map['ids'];
+    if (ids is List) {
+      for (final id in ids) {
+        if (id is String && id.isNotEmpty) {
+          await _removeQuestionMedia(id);
+        }
+      }
+    }
     return (
       deleted: (map['deleted'] as num?)?.toInt() ?? 0,
       skippedLive: (map['skippedLive'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  /// Preguntas programadas para un día futuro. Clave = id de pregunta.
+  Future<Map<String, DateTime>> fetchScheduledRounds() async {
+    if (_client == null) return const {};
+    final rows = await _client!
+        .from('quiz_rounds')
+        .select('question_id, play_on')
+        .eq('status', 'scheduled')
+        .order('play_on');
+    final out = <String, DateTime>{};
+    for (final row in rows) {
+      final id = row['question_id'] as String?;
+      final raw = row['play_on'] as String?;
+      if (id == null || raw == null || raw.isEmpty) continue;
+      final parsed = DateTime.tryParse(raw);
+      if (parsed == null) continue;
+      out[id] = DateTime(parsed.year, parsed.month, parsed.day);
+    }
+    return out;
+  }
+
+  /// Hoy lanza la ronda. Un día futuro la deja guardada hasta esa medianoche.
+  Future<void> scheduleRound({
+    required String questionId,
+    required DateTime day,
+  }) async {
+    if (_client == null) throw const QuizUnavailableException();
+    final date =
+        '${day.year.toString().padLeft(4, '0')}-'
+        '${day.month.toString().padLeft(2, '0')}-'
+        '${day.day.toString().padLeft(2, '0')}';
+    await _client!.rpc('quiz_schedule_round', params: {
+      'p_question_id': questionId,
+      'p_day': date,
+    });
+  }
+
+  Future<void> cancelScheduledRound(String questionId) async {
+    if (_client == null) throw const QuizUnavailableException();
+    await _client!.rpc('quiz_cancel_scheduled_round', params: {
+      'p_question_id': questionId,
+    });
+  }
+
+  Future<void> _removeQuestionMedia(String questionId) async {
+    final client = _client;
+    if (client == null) return;
+    for (final bucket in [_imagesBucket, _audioBucket]) {
+      try {
+        final listed = await client.storage.from(bucket).list(path: questionId);
+        final paths = [
+          for (final item in listed)
+            if (item.name.isNotEmpty) '$questionId/${item.name}',
+        ];
+        if (paths.isEmpty) continue;
+        await client.storage.from(bucket).remove(paths);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _removeStoredUrl(String? url) async {
+    final client = _client;
+    final located = _locateStoredObject(url);
+    if (client == null || located == null) return;
+    try {
+      await client.storage.from(located.bucket).remove([located.path]);
+    } catch (_) {}
+  }
+
+  ({String bucket, String path})? _locateStoredObject(String? url) {
+    final clean = url?.split('?').first.trim();
+    if (clean == null || clean.isEmpty) return null;
+    for (final bucket in [_imagesBucket, _audioBucket]) {
+      final marker = '/$bucket/';
+      final index = clean.indexOf(marker);
+      if (index < 0) continue;
+      final path = Uri.decodeComponent(clean.substring(index + marker.length));
+      if (path.isEmpty) return null;
+      return (bucket: bucket, path: path);
+    }
+    return null;
   }
 
   Future<QuizSeasonInfo> fetchSeasonInfo() async {
@@ -537,6 +673,8 @@ class QuizRepository {
         score: (answerJson['score'] as num?)?.toInt(),
         correctOption:
             quizOptionFromString(answerJson['correctOption'] as String?),
+        forfeited: answerJson['forfeited'] == true,
+        timedOut: answerJson['timedOut'] == true,
       );
     }
 
@@ -552,6 +690,42 @@ class QuizRepository {
       optionD: questionJson?['optionD'] as String?,
       explanation: questionJson?['explanation'] as String?,
       answer: answer,
+      reveal: _revealFromJson(json['reveal'] as Map<String, dynamic>?),
+    );
+  }
+
+  QuizDayReveal? _revealFromJson(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    final playersRaw = json['players'] as List? ?? const [];
+    return QuizDayReveal(
+      roundId: json['roundId'] as String? ?? '',
+      prompt: json['prompt'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String?,
+      optionA: json['optionA'] as String? ?? '',
+      optionB: json['optionB'] as String? ?? '',
+      optionC: json['optionC'] as String? ?? '',
+      optionD: json['optionD'] as String? ?? '',
+      explanation: json['explanation'] as String?,
+      selectedOption:
+          quizOptionFromString(json['selectedOption'] as String?),
+      correctOption:
+          quizOptionFromString(json['correctOption'] as String?),
+      isCorrect: json['isCorrect'] as bool?,
+      score: (json['score'] as num?)?.toInt(),
+      forfeited: json['forfeited'] == true,
+      timedOut: json['timedOut'] == true,
+      answeredCount: (json['answeredCount'] as num?)?.toInt() ?? 0,
+      correctCount: (json['correctCount'] as num?)?.toInt() ?? 0,
+      players: [
+        for (final raw in playersRaw)
+          if (raw is Map)
+            QuizRevealPlayer(
+              name: (raw['name'] as String?)?.trim().isNotEmpty == true
+                  ? (raw['name'] as String).trim()
+                  : 'Alguien',
+              correct: raw['correct'] == true,
+            ),
+      ],
     );
   }
 
@@ -610,6 +784,122 @@ class QuizRepository {
           ((row['correctCount'] ?? row['correct_count']) as num?)?.toInt() ??
               0,
       rank: (row['rank'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Future<QuizPrize?> fetchPrize(String yearMonth) async {
+    final client = _client;
+    if (client == null) return null;
+    final row = await client
+        .from('quiz_month_prizes')
+        .select()
+        .eq('year_month', yearMonth)
+        .maybeSingle();
+    if (row == null) return null;
+    return _prizeFromRow(row);
+  }
+
+  Future<QuizPrizeShowcase> fetchPrizeShowcase(String? userId) async {
+    final now = DateTime.now();
+    final current = quizYearMonthOf(now);
+    final previous = quizYearMonthOf(DateTime(now.year, now.month - 1));
+    final stake = await fetchPrize(current);
+    final previousPrize = await fetchPrize(previous);
+    final stakeVisible = stake != null && stake.visibleToPlayers ? stake : null;
+    final claimPrize = previousPrize != null &&
+            previousPrize.visibleToPlayers &&
+            previousPrize.claimStillOpen
+        ? previousPrize
+        : null;
+    QuizLeaderboardEntry? claimMe;
+    if (claimPrize != null) {
+      final bundle = await fetchMonthlyRankingBundle(
+        yearMonth: previous,
+        mode: QuizRankingMode.top,
+        limit: 5,
+      );
+      final me = bundle.me;
+      if (userId != null &&
+          me != null &&
+          me.userId == userId &&
+          me.rank == 1) {
+        claimMe = me;
+      }
+    }
+    return QuizPrizeShowcase(
+      stake: stakeVisible,
+      claimPrize: claimPrize,
+      claimMe: claimMe,
+    );
+  }
+
+  Future<void> savePrize(QuizPrize prize) async {
+    final client = _client;
+    if (client == null) throw const QuizUnavailableException();
+    final uid = client.auth.currentUser?.id;
+    final until = prize.claimUntil;
+    await client.from('quiz_month_prizes').upsert({
+      'year_month': prize.yearMonth,
+      'active': prize.active,
+      'sponsor_name': prize.sponsorName.trim(),
+      'title': prize.title.trim(),
+      'description': prize.description.trim(),
+      'image_url': prize.imageUrl,
+      'address': prize.address.trim(),
+      'claim_until': until == null
+          ? null
+          : '${until.year.toString().padLeft(4, '0')}-'
+              '${until.month.toString().padLeft(2, '0')}-'
+              '${until.day.toString().padLeft(2, '0')}',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      'updated_by': uid,
+    });
+  }
+
+  Future<String> uploadPrizeImage({
+    required String yearMonth,
+    required Uint8List bytes,
+  }) async {
+    final client = _client;
+    if (client == null) throw const QuizUnavailableException();
+    final prepared = await prepareImageUploadAsync(
+      rawBytes: bytes,
+      extension: 'jpg',
+      contentType: 'image/jpeg',
+      maxBytes: ImageUploadLimits.eventCoverMaxBytes,
+      maxSide: ImageUploadLimits.eventCoverMaxSide,
+    );
+    final path = 'prizes/$yearMonth/cover.jpg';
+    await client.storage.from(_prizesBucket).uploadBinary(
+          path,
+          prepared.bytes,
+          fileOptions: const FileOptions(
+            upsert: true,
+            contentType: 'image/jpeg',
+          ),
+        );
+    final url = client.storage.from(_prizesBucket).getPublicUrl(path);
+    return '$url?v=${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  QuizPrize _prizeFromRow(Map<String, dynamic> row) {
+    final untilRaw = row['claim_until'] as String?;
+    DateTime? until;
+    if (untilRaw != null && untilRaw.isNotEmpty) {
+      final parsed = DateTime.tryParse(untilRaw);
+      if (parsed != null) {
+        until = DateTime(parsed.year, parsed.month, parsed.day);
+      }
+    }
+    return QuizPrize(
+      yearMonth: row['year_month'] as String? ?? '',
+      active: row['active'] as bool? ?? false,
+      sponsorName: row['sponsor_name'] as String? ?? '',
+      title: row['title'] as String? ?? '',
+      description: row['description'] as String? ?? '',
+      imageUrl: row['image_url'] as String?,
+      address: row['address'] as String? ?? '',
+      claimUntil: until,
     );
   }
 }

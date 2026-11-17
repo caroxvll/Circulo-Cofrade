@@ -6,15 +6,18 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/forum_text_format.dart';
 import '../../core/widgets/cofradeo_error_panel.dart';
+import '../../core/widgets/cofradeo_asset_image.dart';
 import '../../core/widgets/cofradeo_network_image.dart';
 import '../../shared/models/followed_topic.dart';
 import '../search/follows_provider.dart';
+import '../profile/open_hermandad_picker.dart';
 import 'mis_hermandades_provider.dart';
 import 'utils/forum_navigation.dart';
 import 'utils/hermandad_board_display.dart';
 import 'utils/hermandad_local_assets.dart';
 import 'utils/official_post_categories.dart';
 import 'widgets/forums_beige_background.dart';
+import 'widgets/hermandad_crest_hero.dart';
 import '../../core/widgets/cofradeo_skeleton.dart';
 
 class MisHermandadesScreen extends ConsumerStatefulWidget {
@@ -29,7 +32,11 @@ class _MisHermandadesScreenState extends ConsumerState<MisHermandadesScreen> {
   @override
   void initState() {
     super.initState();
-    HermandadLocalAssets.ensureLoaded();
+    if (!HermandadLocalAssets.isReady) {
+      HermandadLocalAssets.ensureLoaded().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   @override
@@ -176,6 +183,7 @@ class _BoardsHeader extends ConsumerWidget {
               final board = boards[index];
               final parsed = parseHermandadTopicTitle(board.title);
               return _BoardTile(
+                topicId: board.topicId,
                 name: parsed.hermandadName,
                 day: parsed.processionDay,
                 iconImageUrl: board.iconImageUrl,
@@ -196,12 +204,14 @@ class _BoardsHeader extends ConsumerWidget {
 
 class _BoardTile extends StatelessWidget {
   const _BoardTile({
+    required this.topicId,
     required this.name,
     required this.day,
     required this.onTap,
     this.iconImageUrl,
   });
 
+  final String topicId;
   final String name;
   final String? day;
   final String? iconImageUrl;
@@ -237,37 +247,46 @@ class _BoardTile extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: accent.withValues(alpha: 0.1),
-                      border: Border.all(
-                        color: accent.withValues(alpha: 0.45),
+                  HermandadCrestHero(
+                    topicId: topicId,
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: accent.withValues(alpha: 0.1),
+                        border: Border.all(
+                          color: accent.withValues(alpha: 0.45),
+                        ),
                       ),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: hasRemote
-                        ? CofradeoNetworkImage(
-                            url: remote,
-                            fit: BoxFit.contain,
-                            width: 34,
-                            height: 34,
-                            cacheSize: 68,
-                            errorWidget: Icon(
+                      clipBehavior: Clip.antiAlias,
+                      child: hasRemote
+                          ? CofradeoNetworkImage(
+                              url: remote,
+                              fit: BoxFit.contain,
+                              width: 34,
+                              height: 34,
+                              cacheSize: 68,
+                              fadeInDuration: Duration.zero,
+                              fadeOutDuration: Duration.zero,
+                              errorWidget: Icon(
+                                Icons.church_outlined,
+                                size: 17,
+                                color: accent,
+                              ),
+                            )
+                          : localAvatar != null
+                          ? CofradeoAssetImage(
+                              assetPath: localAvatar,
+                              fit: BoxFit.contain,
+                              fadeDuration: Duration.zero,
+                            )
+                          : Icon(
                               Icons.church_outlined,
                               size: 17,
                               color: accent,
                             ),
-                          )
-                        : localAvatar != null
-                        ? Image.asset(localAvatar, fit: BoxFit.cover)
-                        : Icon(
-                            Icons.church_outlined,
-                            size: 17,
-                            color: accent,
-                          ),
+                    ),
                   ),
                   const Spacer(),
                   Icon(
@@ -432,11 +451,11 @@ class _FeedCard extends ConsumerWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _EmptyState extends ConsumerWidget {
   const _EmptyState();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),

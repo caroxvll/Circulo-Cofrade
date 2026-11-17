@@ -53,7 +53,7 @@ export class QuizService {
       .from('quiz_questions')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(400);
     if (error) throw error;
     return (data ?? []).map((row) => this.mapQuestion(row as Record<string, unknown>));
   }
@@ -140,10 +140,85 @@ export class QuizService {
   }
 
   async deleteQuestion(questionId: string): Promise<void> {
-    const { error } = await getSupabase().rpc('quiz_delete_question', {
+    const supabase = getSupabase();
+    const { data: row } = await supabase
+      .from('quiz_questions')
+      .select('image_url, audio_url')
+      .eq('id', questionId)
+      .maybeSingle();
+    const { error } = await supabase.rpc('quiz_delete_question', {
       p_question_id: questionId,
     });
     if (error) throw error;
+    await this.removeQuestionMedia(questionId);
+    await this.removeStoredUrl(row?.['image_url'] as string | null);
+    await this.removeStoredUrl(row?.['audio_url'] as string | null);
+  }
+
+  async fetchScheduled(): Promise<Map<string, string>> {
+    const { data, error } = await getSupabase()
+      .from('quiz_rounds')
+      .select('question_id, play_on')
+      .eq('status', 'scheduled')
+      .order('play_on');
+    if (error) throw error;
+    const out = new Map<string, string>();
+    for (const row of data ?? []) {
+      const id = String(row['question_id'] ?? '');
+      const day = String(row['play_on'] ?? '');
+      if (id && day) out.set(id, day);
+    }
+    return out;
+  }
+
+  async scheduleRound(questionId: string, day: string): Promise<void> {
+    const { error } = await getSupabase().rpc('quiz_schedule_round', {
+      p_question_id: questionId,
+      p_day: day,
+    });
+    if (error) throw error;
+  }
+
+  async cancelScheduledRound(questionId: string): Promise<void> {
+    const { error } = await getSupabase().rpc('quiz_cancel_scheduled_round', {
+      p_question_id: questionId,
+    });
+    if (error) throw error;
+  }
+
+  private async removeQuestionMedia(questionId: string): Promise<void> {
+    const supabase = getSupabase();
+    for (const bucket of ['quiz-images', 'quiz-audio']) {
+      const { data } = await supabase.storage.from(bucket).list(questionId);
+      const paths = (data ?? [])
+        .map((file) => file.name)
+        .filter((name) => !!name)
+        .map((name) => `${questionId}/${name}`);
+      if (paths.length === 0) continue;
+      await supabase.storage.from(bucket).remove(paths);
+    }
+  }
+
+  private async removeStoredUrl(url: string | null | undefined): Promise<void> {
+    const located = this.locateStoredObject(url);
+    if (!located) return;
+    await getSupabase().storage.from(located.bucket).remove([located.path]);
+  }
+
+  private locateStoredObject(
+    url: string | null | undefined,
+  ): { bucket: string; path: string } | null {
+    const clean = (url ?? '').split('?')[0].trim();
+    if (!clean) return null;
+    for (const bucket of ['quiz-images', 'quiz-audio']) {
+      const marker = `/${bucket}/`;
+      const index = clean.indexOf(marker);
+      if (index < 0) continue;
+      const path = decodeURIComponent(clean.slice(index + marker.length));
+      if (!path) return null;
+      return { bucket, path };
+    }
+    return null;
   }
 
   async launchRound(questionId: string, force = false): Promise<void> {
@@ -231,6 +306,77 @@ export class QuizService {
     });
     if (error) throw error;
     return getSupabase().storage.from('quiz-images').getPublicUrl(path).data.publicUrl;
+  }
+
+  async fetchPrize(yearMonth: string): Promise<{
+    active: boolean;
+    sponsorName: string;
+    title: string;
+    description: string;
+    imageUrl: string | null;
+    address: string;
+    claimUntil: string | null;
+  } | null> {
+    const { data, error } = await getSupabase()
+      .from('quiz_month_prizes')
+      .select('*')
+      .eq('year_month', yearMonth)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as Record<string, unknown>;
+    return {
+      active: row['active'] === true,
+      sponsorName: String(row['sponsor_name'] ?? ''),
+      title: String(row['title'] ?? ''),
+      description: String(row['description'] ?? ''),
+      imageUrl: (row['image_url'] as string | null) ?? null,
+      address: String(row['address'] ?? ''),
+      claimUntil: (row['claim_until'] as string | null) ?? null,
+    };
+  }
+
+  async savePrize(input: {
+    yearMonth: string;
+    active: boolean;
+    sponsorName: string;
+    title: string;
+    description: string;
+    imageUrl: string | null;
+    address: string;
+    claimUntil: string | null;
+    updatedBy: string | null;
+  }): Promise<void> {
+    const { error } = await getSupabase().from('quiz_month_prizes').upsert({
+      year_month: input.yearMonth,
+      active: input.active,
+      sponsor_name: input.sponsorName.trim(),
+      title: input.title.trim(),
+      description: input.description.trim(),
+      image_url: input.imageUrl,
+      address: input.address.trim(),
+      claim_until: input.claimUntil || null,
+      updated_at: new Date().toISOString(),
+      updated_by: input.updatedBy,
+    });
+    if (error) throw error;
+  }
+
+  async uploadPrizeImage(yearMonth: string, file: File): Promise<string> {
+    if (file.size > 4 * 1024 * 1024) {
+      throw new Error('La foto no puede superar 4 MB.');
+    }
+    const path = `prizes/${yearMonth}/cover.jpg`;
+    const { error } = await getSupabase()
+      .storage.from('quiz-prizes')
+      .upload(path, file, {
+        upsert: true,
+        contentType: file.type || 'image/jpeg',
+      });
+    if (error) throw error;
+    const url = getSupabase().storage.from('quiz-prizes').getPublicUrl(path).data
+      .publicUrl;
+    return `${url}?v=${Date.now()}`;
   }
 
   statusLabel(status: QuizQuestionStatus): string {

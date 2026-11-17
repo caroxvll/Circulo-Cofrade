@@ -12,6 +12,8 @@ import '../notifications/widgets/notifications_bell_button.dart';
 import '../../core/widgets/cofrade_countdown_banner.dart';
 import '../../core/widgets/cofradeo_error_panel.dart';
 import '../../core/widgets/cofradeo_skeleton.dart';
+import '../../core/widgets/screen_title_row.dart';
+import '../../core/widgets/search_quick_access_button.dart';
 import 'calendar_design_tokens.dart';
 import 'calendar_provider.dart';
 import 'event_bookmarks_provider.dart';
@@ -481,8 +483,8 @@ class _CalendarBody extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Text(
-                    'CALENDARIO',
+                  child: AdaptiveScreenTitle(
+                    text: 'CALENDARIO',
                     style: AppTypography.screenTitle().copyWith(
                       fontSize: CalendarDesign.headerTitleSize,
                       letterSpacing: CalendarDesign.headerLetterSpacing,
@@ -522,6 +524,9 @@ class _CalendarBody extends ConsumerWidget {
                     color: AppColors.textPrimary,
                     visualDensity: VisualDensity.compact,
                   ),
+                const SearchQuickAccessButton(
+                  iconColor: AppColors.textPrimary,
+                ),
                 const NotificationsBellButton(
                   iconColor: AppColors.textPrimary,
                 ),

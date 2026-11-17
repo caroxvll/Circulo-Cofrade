@@ -8,6 +8,7 @@
     "sync-env:pre": "node ./scripts/sync-env.mjs pre",
     "sync-env:prod": "node ./scripts/sync-env.mjs prod",
     "build": "ng build",
+    "build:vercel": "node ./scripts/sync-env.mjs && ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
@@ -21,6 +22,8 @@
     "@angular/platform-browser-dynamic": "^19.2.0",
     "@angular/router": "^19.2.0",
     "@supabase/supabase-js": "^2.115.0",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"

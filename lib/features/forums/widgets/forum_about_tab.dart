@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/cofradeo_bottom_nav.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../../shared/models/forum.dart';
@@ -640,17 +641,10 @@ class _AboutModeratorChip extends StatelessWidget {
                 ),
               ],
             ),
-            child: CircleAvatar(
-              radius: 28,
+            child: CofradeoAvatar(
+              imageUrl: moderator.avatarUrl,
+              size: 56,
               backgroundColor: AppColors.backgroundElevated,
-              backgroundImage: moderator.avatarUrl != null &&
-                      moderator.avatarUrl!.trim().isNotEmpty
-                  ? NetworkImage(moderator.avatarUrl!)
-                  : null,
-              child: moderator.avatarUrl == null ||
-                      moderator.avatarUrl!.trim().isEmpty
-                  ? Icon(Icons.person, color: AppColors.goldDark, size: 28)
-                  : null,
             ),
           ),
           const SizedBox(height: 8),

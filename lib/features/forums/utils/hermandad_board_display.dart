@@ -18,7 +18,27 @@ String? hermandadBoardCustomBody(String body) {
   return text.isEmpty ? null : text;
 }
 
+/// Categoría de hermandades de Gloria (no es día de estación).
+const hermandadGloriasCategory = 'Glorias';
+
+/// Directorio: días SS Sevilla + Glorias (mismo orden que el panel admin).
+const hermandadDirectoryDays = [
+  'Viernes de Dolores',
+  'Sábado de Pasión',
+  'Domingo de Ramos',
+  'Lunes Santo',
+  'Martes Santo',
+  'Miércoles Santo',
+  'Jueves Santo',
+  'Madrugá',
+  'Viernes Santo',
+  'Sábado Santo',
+  'Domingo de Resurrección',
+  hermandadGloriasCategory,
+];
+
 /// `"Domingo de Ramos · La Borriquita"` → `(Domingo de Ramos, La Borriquita)`.
+/// `"Glorias · Santa Lucía"` → `(Glorias, Santa Lucía)`.
 ({String? processionDay, String hermandadName}) parseHermandadTopicTitle(
   String title,
 ) {
@@ -30,7 +50,7 @@ String? hermandadBoardCustomBody(String body) {
   return (processionDay: null, hermandadName: title.trim());
 }
 
-/// Franja de color del card según el día de estación.
+/// Franja de color del card según el día de estación o Glorias.
 Color hermandadDayAccentColor(String? day) {
   return switch (day) {
     'Viernes de Dolores' => const Color(0xFF2E7D32),
@@ -44,6 +64,7 @@ Color hermandadDayAccentColor(String? day) {
     'Viernes Santo' => const Color(0xFFB71C1C),
     'Sábado Santo' => const Color(0xFF37474F),
     'Domingo de Resurrección' => AppColors.goldDark,
+    hermandadGloriasCategory => AppColors.goldDark,
     _ => AppColors.burgundy,
   };
 }
@@ -62,6 +83,7 @@ Color hermandadDayAccentColor(String? day) {
     'Viernes Santo' => (weekday: 'Vie', label: 'Santo'),
     'Sábado Santo' => (weekday: 'Sáb', label: 'Santo'),
     'Domingo de Resurrección' => (weekday: 'Dom', label: 'Resurrección'),
+    hermandadGloriasCategory => (weekday: 'Gloria', label: 'Sevilla'),
     _ => (
         weekday: day.split(' ').first,
         label: day.split(' ').skip(1).join(' '),

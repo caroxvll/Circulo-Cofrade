@@ -7,7 +7,7 @@ import '../../core/theme/app_typography.dart';
 abstract final class SearchDesign {
   static const screenPadding = 14.0;
   static const sectionGap = 14.0;
-  static const cardGap = 8.0;
+  static const cardGap = 6.0;
   static const cardRadius = 16.0;
 
   static const headerTitleSize = 28.0;

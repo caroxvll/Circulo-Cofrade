@@ -11,11 +11,13 @@ import '../data/reply_moderation_exception.dart';
 import '../forums_provider.dart';
 import '../topic_detail_typography.dart';
 import '../utils/official_post_categories.dart';
+import '../utils/official_post_content.dart';
 import 'forum_compose_field.dart';
 import 'forum_compose_sheet_layout.dart';
 import 'hermandad_official_compose_header.dart';
 import 'hermandad_official_confirm_dialogs.dart';
 import 'hermandad_official_post_preview.dart';
+import 'hermandad_official_title_field.dart';
 import 'hermandad_post_image_picker.dart';
 import 'official_post_categories_picker.dart';
 import '../../../shared/models/forum.dart';
@@ -67,6 +69,7 @@ class _HermandadOfficialEditSheet extends ConsumerStatefulWidget {
 class _HermandadOfficialEditSheetState
     extends ConsumerState<_HermandadOfficialEditSheet> {
   late final TextEditingController _controller;
+  late final TextEditingController _titleController;
   late String _officialCategory;
   bool _submitting = false;
   String? _error;
@@ -78,7 +81,9 @@ class _HermandadOfficialEditSheetState
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.reply.content);
+    final draft = splitOfficialPostDraft(widget.reply.content);
+    _titleController = TextEditingController(text: draft.title);
+    _controller = TextEditingController(text: draft.body);
     _officialCategory = widget.reply.officialCategory ?? 'noticia';
     _imageUrl = widget.reply.imageUrl;
   }
@@ -86,6 +91,7 @@ class _HermandadOfficialEditSheetState
   @override
   void dispose() {
     _controller.dispose();
+    _titleController.dispose();
     super.dispose();
   }
 
@@ -105,7 +111,7 @@ class _HermandadOfficialEditSheetState
     final handle = ref.read(userHandleProvider);
     await showHermandadOfficialPostPreview(
       context,
-      content: _controller.text,
+      content: _composedContent,
       officialCategory: _officialCategory,
       authorHandle: handle,
       imageUrl: _clearImage ? null : _imageUrl,
@@ -114,18 +120,27 @@ class _HermandadOfficialEditSheetState
     );
   }
 
+  String get _composedContent => joinOfficialPostContent(
+        title: _titleController.text,
+        body: _controller.text,
+      );
+
   bool get _hasChanges {
     final originalCategory = widget.reply.officialCategory ?? 'noticia';
-    final textChanged = _controller.text.trim() != widget.reply.content.trim();
+    final textChanged = _composedContent != widget.reply.content.trim();
     final categoryChanged = _officialCategory != originalCategory;
     final imageChanged = _clearImage || _imageBytes != null;
     return textChanged || categoryChanged || imageChanged;
   }
 
   Future<void> _submit() async {
-    final text = _controller.text.trim();
+    final text = _composedContent;
     final hasImage =
         !_clearImage && (_imageBytes != null || (_imageUrl?.isNotEmpty ?? false));
+    if (_titleController.text.trim().isEmpty) {
+      setState(() => _error = 'Añade un título.');
+      return;
+    }
     if (text.isEmpty && !hasImage) return;
 
     if (!_hasChanges) {
@@ -229,6 +244,11 @@ class _HermandadOfficialEditSheetState
                 }
               });
             },
+          ),
+          const SizedBox(height: 10),
+          HermandadOfficialTitleField(
+            controller: _titleController,
+            enabled: !_submitting,
           ),
           const SizedBox(height: 10),
           ForumComposeField(

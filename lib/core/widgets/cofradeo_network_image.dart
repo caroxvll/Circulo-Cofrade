@@ -20,6 +20,8 @@ class CofradeoNetworkImage extends StatelessWidget {
     this.borderRadius,
     this.errorWidget,
     this.placeholder,
+    this.fadeInDuration = const Duration(milliseconds: 240),
+    this.fadeOutDuration = const Duration(milliseconds: 90),
   });
 
   final String url;
@@ -37,6 +39,10 @@ class CofradeoNetworkImage extends StatelessWidget {
   final Widget? errorWidget;
   final Widget? placeholder;
 
+  /// Fade al revelar la imagen tras el placeholder (sensación nativa).
+  final Duration fadeInDuration;
+  final Duration fadeOutDuration;
+
   @override
   Widget build(BuildContext context) {
     final trimmed = url.trim();
@@ -45,7 +51,8 @@ class CofradeoNetworkImage extends StatelessWidget {
     }
 
     final pixelRatio = MediaQuery.devicePixelRatioOf(context);
-    final logical = cacheSize ?? width ?? height;
+    final raw = cacheSize ?? width ?? height;
+    final logical = raw != null && raw.isFinite ? raw : null;
     final cachePx = logical != null ? (logical * pixelRatio).round() : null;
     final memCache = _resolveMemCache(cachePx, width, height);
 
@@ -62,9 +69,8 @@ class CofradeoNetworkImage extends StatelessWidget {
       memCacheHeight: memCache.$2,
       maxWidthDiskCache: memCache.$1 != null ? memCache.$1! * 2 : null,
       maxHeightDiskCache: memCache.$2 != null ? memCache.$2! * 2 : null,
-      // Sin fade: evita parpadeo en scroll/push cuando la imagen ya está en caché.
-      fadeInDuration: Duration.zero,
-      fadeOutDuration: Duration.zero,
+      fadeInDuration: fadeInDuration,
+      fadeOutDuration: fadeOutDuration,
       placeholder: (_, __) =>
           placeholder ?? _defaultPlaceholder(logical),
       errorWidget: (_, __, ___) =>

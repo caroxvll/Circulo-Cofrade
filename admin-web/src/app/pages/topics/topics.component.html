@@ -34,6 +34,51 @@
           @if (topic.excerpt) {
             <p class="queue-excerpt">{{ topic.excerpt }}</p>
           }
+          @if (pollFor(topic.id); as poll) {
+            <div class="queue-poll">
+              <p class="queue-poll-label">Encuesta</p>
+              <p class="queue-poll-question">{{ poll.question }}</p>
+              <ul class="queue-poll-options">
+                @for (opt of poll.options; track opt.id) {
+                  <li>
+                    {{ opt.label }}
+                    @if (poll.totalVotes > 0) {
+                      · {{ opt.voteCount }}
+                    }
+                  </li>
+                }
+              </ul>
+              <p class="queue-poll-meta">
+                @if (poll.closedAt) {
+                  Cerrada
+                } @else {
+                  Abierta
+                }
+                · {{ poll.totalVotes }}
+                {{ poll.totalVotes === 1 ? 'voto' : 'votos' }}
+              </p>
+              <div class="queue-poll-actions">
+                @if (!poll.closedAt) {
+                  <button
+                    type="button"
+                    class="btn btn-soft"
+                    [disabled]="busyId() === 'poll-' + poll.id"
+                    (click)="closePoll(topic)"
+                  >
+                    Cerrar encuesta
+                  </button>
+                }
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  [disabled]="busyId() === 'poll-' + poll.id"
+                  (click)="deletePoll(topic)"
+                >
+                  Quitar encuesta
+                </button>
+              </div>
+            </div>
+          }
           <div class="queue-actions">
             <button
               type="button"

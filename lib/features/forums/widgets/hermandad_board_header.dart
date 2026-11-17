@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/forum.dart';
 import '../../search/follows_provider.dart';
@@ -11,6 +12,7 @@ import '../data/mock_forums.dart';
 import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
 import 'hermandad_board_stats_sheet.dart';
+import 'hermandad_crest_hero.dart';
 import 'topic_card.dart';
 import 'topic_follow_button.dart';
 
@@ -199,32 +201,36 @@ class _CrestBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const size = 56.0;
+    // El Hero envuelve solo el escudo (sin el check) para emparejar con las cards.
     return SizedBox(
       width: size,
       height: size,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Container(
-            width: size,
-            height: size,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-              border: Border.all(color: Colors.white, width: 2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.28),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: PinnedTopicMark(
-              topic: topic,
-              size: size - 6,
-              circular: true,
+          HermandadCrestHero(
+            topicId: topic.id,
+            child: Container(
+              width: size,
+              height: size,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.28),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: PinnedTopicMark(
+                topic: topic,
+                size: size - 6,
+                circular: true,
+              ),
             ),
           ),
           Positioned(
@@ -273,13 +279,13 @@ class _BoardHeroCover extends StatelessWidget {
         context,
         MediaQuery.sizeOf(context).width,
       );
-      return Image.asset(
-        asset,
+      return CofradeoAssetImage(
+        assetPath: asset,
         fit: BoxFit.cover,
         alignment: Alignment.center,
         filterQuality: FilterQuality.medium,
         cacheWidth: cacheW,
-        gaplessPlayback: true,
+        fadeDuration: const Duration(milliseconds: 360),
       );
     }
 
@@ -290,17 +296,19 @@ class _BoardHeroCover extends StatelessWidget {
         context,
         MediaQuery.sizeOf(context).width,
       );
-      return Image.asset(
-        url,
+      return CofradeoAssetImage(
+        assetPath: url,
         fit: BoxFit.cover,
         cacheWidth: cacheW,
-        gaplessPlayback: true,
+        fadeDuration: const Duration(milliseconds: 360),
       );
     }
     return CofradeoNetworkImage(
       url: url,
       fit: BoxFit.cover,
       borderRadius: BorderRadius.zero,
+      fadeInDuration: const Duration(milliseconds: 360),
+      placeholder: const ColoredBox(color: AppColors.burgundyDark),
     );
   }
 }

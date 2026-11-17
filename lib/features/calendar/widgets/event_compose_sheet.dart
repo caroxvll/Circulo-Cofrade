@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_upload_compress.dart';
+import '../../../core/utils/pick_gallery_image.dart';
 import '../../../core/widgets/cofradeo_bottom_nav.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/event_type_icon.dart';
@@ -47,7 +47,7 @@ Future<void> showEventComposeSheet(
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Solo moderadores de foro pueden proponer eventos al calendario.',
+            'Solo moderadores, o cuentas con acceso al calendario, pueden proponer eventos.',
           ),
         ),
       );
@@ -84,20 +84,31 @@ Future<void> showEventComposeSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppColors.background,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    backgroundColor: Colors.transparent,
+    builder: (_) => DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.74,
+      minChildSize: 0.42,
+      maxChildSize: 0.88,
+      builder: (context, scrollController) => _EventComposeSheet(
+        initialDate: initialDate,
+        existing: existing,
+        scrollController: scrollController,
+      ),
     ),
-    builder: (_) =>
-        _EventComposeSheet(initialDate: initialDate, existing: existing),
   );
 }
 
 class _EventComposeSheet extends ConsumerStatefulWidget {
-  const _EventComposeSheet({this.initialDate, this.existing});
+  const _EventComposeSheet({
+    this.initialDate,
+    this.existing,
+    required this.scrollController,
+  });
 
   final DateTime? initialDate;
   final CalendarEvent? existing;
+  final ScrollController scrollController;
 
   @override
   ConsumerState<_EventComposeSheet> createState() => _EventComposeSheetState();
@@ -107,6 +118,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   final _titleController = TextEditingController();
   final _subtitleController = TextEditingController();
   final _locationController = TextEditingController();
+  final _admissionController = TextEditingController();
   final _organizerController = TextEditingController();
 
   late DateTime _date;
@@ -133,6 +145,8 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   String? _initialOrganizerKey;
 
   bool get _isEditing => widget.existing?.id != null;
+  TimeOfDay? _firstEnd;
+  final List<({TimeOfDay start, TimeOfDay? end})> _extraSlots = [];
 
   @override
   void initState() {
@@ -143,6 +157,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       _titleController.text = existing.title;
       _subtitleController.text = existing.subtitle;
       _locationController.text = existing.location ?? '';
+      _admissionController.text = existing.admissionLabel ?? '';
       _organizerController.text = existing.organizerLabel ?? '';
       _date = existing.date;
       _type = existing.type;
@@ -155,6 +170,16 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               minute: int.tryParse(parts[1]) ?? 0,
             )
           : const TimeOfDay(hour: 12, minute: 0);
+      if (existing.slots.isNotEmpty) {
+        final first = existing.slots.first;
+        _time = _timeFromClock(first.start) ?? _time;
+        _firstEnd = _timeFromClock(first.end);
+        for (final slot in existing.slots.skip(1)) {
+          final start = _timeFromClock(slot.start);
+          if (start == null) continue;
+          _extraSlots.add((start: start, end: _timeFromClock(slot.end)));
+        }
+      }
     } else {
       _date = DateTime(
         (widget.initialDate ?? DateTime.now()).year,
@@ -270,6 +295,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     _titleController.dispose();
     _subtitleController.dispose();
     _locationController.dispose();
+    _admissionController.dispose();
     _organizerController.dispose();
     super.dispose();
   }
@@ -303,24 +329,89 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     }
   }
 
+  TimeOfDay? _timeFromClock(String? raw) {
+    final text = raw?.trim() ?? '';
+    final parts = text.split(':');
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _clockLabel(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  String? _endAfter(TimeOfDay start, TimeOfDay? end) {
+    if (end == null) return null;
+    final startMin = start.hour * 60 + start.minute;
+    final endMin = end.hour * 60 + end.minute;
+    if (endMin <= startMin) return null;
+    return _clockLabel(end);
+  }
+
+  List<EventTimeSlot> _collectSlots() {
+    final slots = <EventTimeSlot>[
+      EventTimeSlot(
+        start: _clockLabel(_time),
+        end: _endAfter(_time, _firstEnd),
+      ),
+      for (final extra in _extraSlots)
+        EventTimeSlot(
+          start: _clockLabel(extra.start),
+          end: _endAfter(extra.start, extra.end),
+        ),
+    ];
+    slots.sort((a, b) => a.start.compareTo(b.start));
+    final hasRange = slots.any((slot) => (slot.end ?? '').isNotEmpty);
+    if (slots.length < 2 && !hasRange) return const [];
+    return slots;
+  }
+
+  Future<void> _pickFirstEnd() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _firstEnd ?? _time,
+    );
+    if (picked != null) setState(() => _firstEnd = picked);
+  }
+
+  Future<void> _pickExtraStart(int index) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _extraSlots[index].start,
+    );
+    if (picked == null) return;
+    setState(() {
+      _extraSlots[index] = (start: picked, end: _extraSlots[index].end);
+    });
+  }
+
+  Future<void> _pickExtraEnd(int index) async {
+    final current = _extraSlots[index];
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: current.end ?? current.start,
+    );
+    if (picked == null) return;
+    setState(() {
+      _extraSlots[index] = (start: current.start, end: picked);
+    });
+  }
+
   Future<void> _pickCover() async {
     if (_processingImagePick) return;
 
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['png', 'webp', 'jpg', 'jpeg'],
-      withData: true,
-    );
-    final file = result?.files.single;
-    final bytes = file?.bytes;
-    if (file == null || bytes == null) return;
+    final file = await pickGalleryImage();
+    if (file == null || !mounted) return;
 
-    final extension = (file.extension ?? '').toLowerCase();
-    final contentType = _contentTypeForExtension(extension);
-    if (contentType == null || extension == 'svg') {
-      setState(() => _error = 'La portada debe ser PNG, WebP o JPG.');
-      return;
-    }
+    final bytes = file.bytes;
+    final extension = file.extension;
+    final contentType = file.contentType;
     if (bytes.length > ImageUploadLimits.eventCoverPickMaxBytes) {
       setState(
         () => _error = 'La portada es demasiado grande. Prueba con otra foto.',
@@ -388,21 +479,12 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   Future<void> _pickIcon() async {
     if (_processingImagePick) return;
 
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['svg', 'png', 'webp', 'jpg', 'jpeg'],
-      withData: true,
-    );
-    final file = result?.files.single;
-    final bytes = file?.bytes;
-    if (file == null || bytes == null) return;
+    final file = await pickGalleryImage(maxWidth: 1200);
+    if (file == null || !mounted) return;
 
-    final extension = (file.extension ?? '').toLowerCase();
-    final contentType = _contentTypeForExtension(extension);
-    if (contentType == null) {
-      setState(() => _error = 'El icono debe ser SVG, PNG, WebP o JPG.');
-      return;
-    }
+    final bytes = file.bytes;
+    final extension = file.extension;
+    final contentType = file.contentType;
     if (bytes.length > ImageUploadLimits.eventIconPickMaxBytes) {
       setState(
         () => _error = 'El escudo es demasiado grande. Prueba con otra imagen.',
@@ -485,28 +567,35 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     });
   }
 
-  String? _contentTypeForExtension(String extension) {
-    return switch (extension) {
-      'svg' => 'image/svg+xml',
-      'png' => 'image/png',
-      'webp' => 'image/webp',
-      'jpg' || 'jpeg' => 'image/jpeg',
-      _ => null,
-    };
-  }
-
   Future<void> _submit() async {
     final title = _titleController.text.trim();
     final subtitle = _subtitleController.text.trim();
     final location = _locationController.text.trim();
+    final admission = _admissionController.text.trim();
+    final slots = _collectSlots();
     final organizer = _organizerController.text.trim();
 
     if (title.length < 3) {
       setState(() => _error = 'El título debe tener al menos 3 caracteres.');
       return;
     }
+    if (title.length > 120) {
+      setState(() => _error = 'El título no puede superar 120 caracteres.');
+      return;
+    }
+    if (subtitle.length > 1000) {
+      setState(
+        () => _error =
+            'La descripción no puede superar 1000 caracteres (${subtitle.length}/1000).',
+      );
+      return;
+    }
+    if (location.length > 160) {
+      setState(() => _error = 'El lugar no puede superar 160 caracteres.');
+      return;
+    }
 
-    if (_startsAt.isBefore(DateTime.now())) {
+    if (!_isEditing && _startsAt.isBefore(DateTime.now())) {
       setState(
         () => _error = 'La fecha y hora del evento deben ser futuras.',
       );
@@ -570,6 +659,8 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           organizerLabel: organizer,
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
+          admissionLabel: admission,
+          timeSlots: slots,
         );
       } else {
         await repo.createEvent(
@@ -584,6 +675,8 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           publisherHandle: handle,
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
+          admissionLabel: admission,
+          timeSlots: slots,
         );
       }
 
@@ -625,13 +718,25 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     final dateLabel = DateFormat('d MMMM yyyy', 'es').format(_date);
     final timeLabel = _time.format(context);
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, cofradeoSheetBottomPadding(context)),
-      child: SingleChildScrollView(
+    return Material(
+      color: AppColors.background,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
             Row(
               children: [
                 Expanded(
@@ -646,7 +751,16 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: widget.scrollController,
+                padding: EdgeInsets.only(
+                  right: 8,
+                  bottom: cofradeoSheetBottomPadding(context),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
             DropdownButtonFormField<EventType>(
               initialValue: _type,
               decoration: const InputDecoration(labelText: 'Tipo'),
@@ -708,13 +822,41 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _subtitleController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Descripción',
-                hintText: 'Detalle del acto cofrade…',
-              ),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _subtitleController,
+              builder: (context, value, _) {
+                final len = value.text.trim().length;
+                final over = len > 1000;
+                return TextField(
+                  controller: _subtitleController,
+                  maxLines: 4,
+                  maxLength: 1000,
+                  buildCounter: (
+                    context, {
+                    required currentLength,
+                    required isFocused,
+                    required maxLength,
+                  }) {
+                    final n = _subtitleController.text.trim().length;
+                    return Text(
+                      '$n/1000',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: n > 1000
+                            ? Theme.of(context).colorScheme.error
+                            : null,
+                      ),
+                    );
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Descripción',
+                    hintText: 'Detalle del acto cofrade…',
+                    errorText: over
+                        ? 'Máximo 1000 caracteres ($len/1000).'
+                        : null,
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 12),
             TextField(
@@ -722,6 +864,17 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               decoration: const InputDecoration(
                 labelText: 'Lugar',
                 hintText: 'Parroquia, calle, templo…',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _admissionController,
+              maxLength: 40,
+              decoration: const InputDecoration(
+                labelText: 'Entrada',
+                hintText: '12 €, desde 8 €, donativo',
+                helperText: 'Opcional. Si lo dejas vacío, no se muestra.',
+                counterText: '',
               ),
             ),
             const SizedBox(height: 12),
@@ -742,6 +895,76 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _submitting ? null : _pickFirstEnd,
+                icon: const Icon(Icons.flag_outlined, size: 18),
+                label: Text(
+                  _firstEnd == null
+                      ? 'Fin del tramo (opcional)'
+                      : 'Hasta ${_clockLabel(_firstEnd!)}',
+                ),
+              ),
+            ),
+            if (_firstEnd != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _submitting
+                      ? null
+                      : () => setState(() => _firstEnd = null),
+                  child: const Text('Quitar el fin'),
+                ),
+              ),
+            for (var i = 0; i < _extraSlots.length; i++) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _submitting ? null : () => _pickExtraStart(i),
+                      child: Text(_clockLabel(_extraSlots[i].start)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _submitting ? null : () => _pickExtraEnd(i),
+                      child: Text(
+                        _extraSlots[i].end == null
+                            ? 'Fin'
+                            : 'Hasta ${_clockLabel(_extraSlots[i].end!)}',
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _submitting
+                        ? null
+                        : () => setState(() => _extraSlots.removeAt(i)),
+                    icon: const Icon(Icons.close, size: 18),
+                    tooltip: 'Quitar tramo',
+                  ),
+                ],
+              ),
+            ],
+            if (_extraSlots.length < 5)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _submitting
+                      ? null
+                      : () => setState(() {
+                            _extraSlots.add((
+                              start: const TimeOfDay(hour: 19, minute: 0),
+                              end: null,
+                            ));
+                          }),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Añadir otro tramo'),
+                ),
+              ),
             if (_error != null) ...[
               const SizedBox(height: 8),
               Text(
@@ -764,6 +987,10 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Text(_isEditing ? 'Guardar cambios' : 'Publicar evento'),
+            ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),

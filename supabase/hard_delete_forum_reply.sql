@@ -1,5 +1,5 @@
--- Cofradero · borrar definitivamente respuestas ya ocultas (Junta)
--- Ejecutar en SQL Editor después de forum_reply_edit_delete.sql
+-- Cofradeo · borrar definitivamente respuestas ya soft-deleted
+-- Autor del comunicado o staff. Ejecutar en SQL Editor (idempotente).
 
 create or replace function public.hard_delete_forum_reply(p_reply_id uuid)
 returns void
@@ -26,7 +26,8 @@ begin
     raise exception 'not_soft_deleted';
   end if;
 
-  if not public.is_staff_user(auth.uid()) then
+  if v_reply.author_id is distinct from auth.uid()
+     and not public.is_staff_user(auth.uid()) then
     raise exception 'forbidden';
   end if;
 
@@ -36,4 +37,10 @@ begin
 end;
 $$;
 
+revoke all on function public.hard_delete_forum_reply(uuid) from public;
 grant execute on function public.hard_delete_forum_reply(uuid) to authenticated;
+
+comment on function public.hard_delete_forum_reply(uuid) is
+  'Borra definitivamente un comunicado ya soft-deleted. Solo autor o staff.';
+
+notify pgrst, 'reload schema';

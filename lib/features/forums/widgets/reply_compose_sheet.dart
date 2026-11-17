@@ -7,24 +7,34 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_upload_compress.dart';
+import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../auth/auth_provider.dart';
 import '../../auth/email_verification_gate.dart';
+import '../../../shared/models/calendar_event.dart';
+import '../../calendar/calendar_provider.dart';
 import '../../permissions/permissions_provider.dart';
 import '../../profile/profile_provider.dart';
 import '../data/forums_repository.dart';
+import '../data/hermandad_scheduled_posts_repository.dart';
 import '../forums_provider.dart';
 import '../hermandad_scheduled_posts_provider.dart';
 import '../hermandad_scheduled_posts_screen.dart';
+import '../utils/forum_navigation.dart';
+import '../utils/hermandad_board_display.dart';
+import '../utils/hermandad_publish_kinds.dart';
 import '../utils/official_post_categories.dart';
 import '../topic_detail_typography.dart';
 import 'forum_compose_field.dart';
 import 'forum_compose_sheet_header.dart';
 import 'forum_compose_sheet_layout.dart';
+import '../utils/official_post_content.dart';
 import 'hermandad_official_compose_header.dart';
+import 'hermandad_official_title_field.dart';
 import 'hermandad_official_post_preview.dart';
 import 'hermandad_post_image_picker.dart';
 import 'hermandad_publish_mode_picker.dart';
-import 'official_post_categories_picker.dart';
+import 'hermandad_publish_kind_picker.dart';
+import '../topic_replies_provider.dart';
 import 'scheduled_post_datetime_picker.dart';
 
 Future<void> showReplyComposeSheet(
@@ -38,7 +48,7 @@ Future<void> showReplyComposeSheet(
 }) async {
   final isAuth = ref.read(isAuthenticatedProvider);
   if (!isAuth) {
-    final redirect = '/foros/$forumId/tema/$topicId';
+    final redirect = forumTopicLocation(forumId, topicId);
     if (context.mounted) {
       await context.push('/login?redirect=${Uri.encodeComponent(redirect)}');
     }
@@ -90,6 +100,17 @@ Future<void> showReplyComposeSheet(
     return;
   }
 
+  if (forumId == 'noticias') {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Las noticias no admiten comentarios.'),
+        ),
+      );
+    }
+    return;
+  }
+
   if (forumId == 'hermandades') {
     final profile = ref.read(currentUserProfileProvider).asData?.value;
     final hermandadTopics = await ref.read(hermandadTopicIdsProvider.future);
@@ -117,9 +138,9 @@ Future<void> showReplyComposeSheet(
     isScrollControlled: true,
     isDismissible: true,
     enableDrag: true,
-    backgroundColor: AppColors.background,
+    backgroundColor: AppColors.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (sheetContext) {
       return _ReplyComposeSheet(
@@ -154,8 +175,13 @@ class _ReplyComposeSheet extends ConsumerStatefulWidget {
 
 class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
   final _controller = TextEditingController();
+  final _titleController = TextEditingController();
   bool _submitting = false;
+  String _kindId = 'noticia';
   String _officialCategory = 'noticia';
+  bool _alsoCalendar = false;
+  late DateTime _eventStartsAt;
+  final _locationController = TextEditingController();
   String? _error;
   HermandadPublishMode _publishMode = HermandadPublishMode.now;
   late DateTime _scheduledAt;
@@ -167,10 +193,11 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
   void initState() {
     super.initState();
     _scheduledAt = defaultHermandadScheduleTime();
-    final preset = widget.initialOfficialCategory?.trim();
-    if (preset != null && preset.isNotEmpty) {
-      _officialCategory = preset;
-    }
+    _eventStartsAt = defaultHermandadScheduleTime();
+    final kind = hermandadPublishKindForSection(widget.initialOfficialCategory);
+    _kindId = kind.id;
+    _officialCategory = kind.officialCategory;
+    _alsoCalendar = kind.canCalendar;
     final handle = widget.mentionHandle;
     if (handle != null && handle.isNotEmpty) {
       final mention = handle.startsWith('@') ? handle : '@$handle';
@@ -181,6 +208,8 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
   @override
   void dispose() {
     _controller.dispose();
+    _titleController.dispose();
+    _locationController.dispose();
     super.dispose();
   }
 
@@ -197,7 +226,7 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
 
   Future<void> _submitNow(String text, {String? imageUrl}) async {
     final isOfficial = widget.forumId == 'hermandades' && _canPostOfficialNow();
-    await ref
+    final reply = await ref
         .read(
           replyControllerProvider(
             ReplyTarget(
@@ -211,6 +240,16 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
         )
         .submit(text, imageUrl: imageUrl);
 
+    if (isOfficial && _wantsCalendar && reply != null) {
+      try {
+        await _createCalendarEvent(replyId: reply.id, imageUrl: imageUrl);
+      } catch (_) {
+        await ref.read(forumsRepositoryProvider).softDeleteReply(reply.id);
+        await refreshTopicReplies(ref, widget.topicId);
+        throw const HermandadCalendarPublishException();
+      }
+    }
+
     if (mounted) Navigator.pop(context);
   }
 
@@ -221,6 +260,7 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
           content: text,
           officialCategory: _officialCategory,
           imageUrl: imageUrl,
+          calendar: _scheduledCalendar(imageUrl: imageUrl),
         );
 
     if (mounted) Navigator.pop(context);
@@ -241,23 +281,105 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
           officialCategory: _officialCategory,
           scheduledAt: _scheduledAt,
           imageUrl: imageUrl,
+          calendar: _scheduledCalendar(imageUrl: imageUrl),
         );
 
     if (mounted) Navigator.pop(context);
   }
 
+  bool get _wantsCalendar =>
+      _alsoCalendar && hermandadPublishKindById(_kindId).canCalendar;
+
+  HermandadScheduledCalendar? _scheduledCalendar({String? imageUrl}) {
+    if (!_wantsCalendar) return null;
+    final place = _calendarPlace();
+    return HermandadScheduledCalendar(
+      eventType: hermandadPublishKindById(_kindId).calendarEventType!,
+      startsAt: _eventStartsAt,
+      location: _locationController.text.trim(),
+      title: place.title,
+      coverImageUrl: imageUrl,
+      customIconUrl: place.iconUrl,
+      organizerLabel: place.organizer,
+    );
+  }
+
+  ({String title, String organizer, String? iconUrl}) _calendarPlace() {
+    final topics =
+        ref.read(forumTopicsProvider(widget.forumId)).asData?.value ?? const [];
+    final topic = topics.where((item) => item.id == widget.topicId).firstOrNull;
+    final parsed = topic == null
+        ? (processionDay: null, hermandadName: '')
+        : parseHermandadTopicTitle(topic.title);
+    final profile = ref.read(currentUserProfileProvider).asData?.value;
+    final organizer = parsed.hermandadName.trim().isNotEmpty
+        ? parsed.hermandadName.trim()
+        : (profile?.displayName.trim().isNotEmpty == true
+            ? profile!.displayName.trim()
+            : 'Hermandad');
+    final headline = _titleController.text.trim();
+    final title = headline.length >= 3
+        ? headline
+        : hermandadPublishKindById(_kindId).label;
+    return (
+      title: title,
+      organizer: organizer,
+      iconUrl: topic?.iconImageUrl,
+    );
+  }
+
+  Future<void> _createCalendarEvent({
+    required String replyId,
+    String? imageUrl,
+  }) async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+    final place = _calendarPlace();
+    final kind = hermandadPublishKindById(_kindId);
+    await ref.read(calendarRepositoryProvider).createEvent(
+          userId: user.id,
+          title: place.title,
+          subtitle: place.organizer,
+          type: EventType.fromDb(kind.calendarEventType),
+          startsAt: _eventStartsAt,
+          location: _locationController.text.trim(),
+          organizerLabel: place.organizer,
+          customIconUrl: place.iconUrl,
+          coverImageUrl: imageUrl,
+          sourceReplyId: replyId,
+          status: 'published',
+        );
+    ref.invalidate(calendarEventsProvider);
+    ref.invalidate(calendarUpcomingProvider);
+  }
+
   Future<void> _submit() async {
-    final text = _controller.text.trim();
+    final isOfficialHermandad =
+        widget.forumId == 'hermandades' && _canPostOfficialNow();
+    final body = _controller.text.trim();
     final hasImage = _imageBytes != null || (_imageUrl?.isNotEmpty ?? false);
+    final text = isOfficialHermandad
+        ? joinOfficialPostContent(title: _titleController.text, body: body)
+        : body;
+    if (isOfficialHermandad && _titleController.text.trim().isEmpty) {
+      setState(() => _error = 'Añade un título.');
+      return;
+    }
+    if (isOfficialHermandad &&
+        _wantsCalendar &&
+        _locationController.text.trim().isEmpty) {
+      setState(
+        () => _error =
+            'Indica el lugar del acto para publicarlo en el calendario.',
+      );
+      return;
+    }
     if (text.isEmpty && !hasImage) return;
 
     setState(() {
       _submitting = true;
       _error = null;
     });
-
-    final isOfficialHermandad =
-        widget.forumId == 'hermandades' && _canPostOfficialNow();
     final isScheduled =
         isOfficialHermandad && _publishMode == HermandadPublishMode.scheduled;
     final isDraft =
@@ -291,6 +413,11 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
       setState(() => _error = 'La imagen supera 5 MB.');
     } on ForumsRemoteUnavailableException {
       setState(() => _error = 'Supabase no disponible.');
+    } on HermandadCalendarPublishException {
+      setState(
+        () => _error =
+            'No se pudo crear el evento de calendario. La publicación se ha revertido.',
+      );
     } catch (_) {
       setState(
         () => _error = isDraft
@@ -318,11 +445,41 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
     final handle = ref.read(userHandleProvider);
     await showHermandadOfficialPostPreview(
       context,
-      content: _controller.text,
+      content: joinOfficialPostContent(
+        title: _titleController.text,
+        body: _controller.text,
+      ),
       officialCategory: _officialCategory,
       authorHandle: handle,
       imageUrl: _imageUrl,
       imageBytes: _imageBytes,
+    );
+  }
+
+  Widget _socialSubmitButton({required bool enabled}) {
+    return FilledButton(
+      onPressed: (_submitting || !enabled) ? null : _submit,
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.burgundy,
+        disabledBackgroundColor: AppColors.burgundy.withValues(alpha: 0.35),
+        foregroundColor: AppColors.textOnDark,
+        disabledForegroundColor: AppColors.textOnDark.withValues(alpha: 0.85),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        minimumSize: const Size(0, 34),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: const StadiumBorder(),
+        textStyle: AppTypography.buttonLabel().copyWith(fontSize: 12.5),
+      ),
+      child: _submitting
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.textOnDark,
+              ),
+            )
+          : const Text('Responder'),
     );
   }
 
@@ -335,30 +492,107 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
         isHermandadBoard &&
         canPostOfficial &&
         _publishMode == HermandadPublishMode.scheduled;
-    final title = isHermandadBoard && canPostOfficial
-        ? null
-        : 'Escribe una respuesta';
+    final socialReply = !useRichEditor;
+    final profile = ref.watch(currentUserProfileProvider).asData?.value;
 
     return ForumComposeSheetLayout(
+      padding: socialReply
+          ? const EdgeInsets.fromLTRB(14, 0, 12, 0)
+          : const EdgeInsets.fromLTRB(20, 0, 12, 0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (title != null)
-            ForumComposeSheetTitleBar(
-              closeEnabled: !_submitting,
-              title: Text(title, style: TopicDetailTypography.title()),
-            )
+          if (useRichEditor)
+            HermandadOfficialComposeHeader(closeEnabled: !_submitting)
           else
-            HermandadOfficialComposeHeader(closeEnabled: !_submitting),
-          const SizedBox(height: 10),
-          if (isHermandadBoard && canPostOfficial) ...[
-            OfficialPostCategoriesPicker(
-              category: _officialCategory,
-              onCategoryChanged: (value) {
-                setState(() => _officialCategory = value);
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _controller,
+              builder: (context, value, _) {
+                final canSubmit = value.text.trim().isNotEmpty;
+                return Row(
+                  children: [
+                    ForumComposeSheetCloseButton(enabled: !_submitting),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        widget.parentReplyId != null
+                            ? 'Responder'
+                            : 'Nueva respuesta',
+                        style: TopicDetailTypography.meta(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ).copyWith(fontSize: 13),
+                      ),
+                    ),
+                    _socialSubmitButton(enabled: canSubmit),
+                  ],
+                );
               },
             ),
+          SizedBox(height: socialReply ? 6 : 10),
+          if (useRichEditor) ...[
+            HermandadPublishKindPicker(
+              kindId: _kindId,
+              onChanged: (kind) {
+                setState(() {
+                  _kindId = kind.id;
+                  _officialCategory = kind.officialCategory;
+                  _alsoCalendar = kind.canCalendar;
+                });
+              },
+            ),
+            if (hermandadPublishKindById(_kindId).canCalendar) ...[
+              const SizedBox(height: 10),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                activeThumbColor: AppColors.burgundy,
+                title: Text(
+                  'También en el calendario',
+                  style: AppTypography.bodyMedium(color: AppColors.textPrimary)
+                      .copyWith(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                subtitle: Text(
+                  'Fecha y lugar del acto en Círculo Cofrade.',
+                  style: AppTypography.bodyMedium(color: AppColors.textSecondary)
+                      .copyWith(fontSize: 12),
+                ),
+                value: _alsoCalendar,
+                onChanged: _submitting
+                    ? null
+                    : (value) => setState(() => _alsoCalendar = value),
+              ),
+              if (_alsoCalendar) ...[
+                ScheduledPostDatetimePicker(
+                  actionLabel: 'El acto',
+                  scheduledAt: _eventStartsAt,
+                  onChanged: (value) => setState(() => _eventStartsAt = value),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _locationController,
+                  enabled: !_submitting,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    hintText: 'Templo, casa de hermandad…',
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                  ),
+                ),
+              ],
+            ],
             const SizedBox(height: 10),
             HermandadPublishModePicker(
               mode: _publishMode,
@@ -383,18 +617,51 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
               },
             ),
             const SizedBox(height: 10),
+            HermandadOfficialTitleField(
+              controller: _titleController,
+              enabled: !_submitting,
+            ),
+            const SizedBox(height: 10),
           ],
-          ForumComposeField(
-            controller: _controller,
-            maxLines: isHermandadBoard ? 8 : 6,
-            minLines: useRichEditor ? 6 : 4,
-            toolbar: useRichEditor
-                ? ForumComposeToolbar.editorial
-                : ForumComposeToolbar.standard,
-            hintText: useRichEditor
-                ? 'Redacta la noticia o comunicado oficial…'
-                : 'Comparte tu opinión con claridad…',
-          ),
+          if (socialReply)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (profile != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: CofradeoAvatar(
+                      imageUrl: profile.avatarUrl,
+                      icon: profile.avatarIcon,
+                      size: 34,
+                      backgroundColor: AppColors.backgroundElevated,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: ForumComposeField(
+                    controller: _controller,
+                    maxLines: 4,
+                    minLines: 3,
+                    dense: true,
+                    showHintCaption: false,
+                    toolbar: ForumComposeToolbar.standard,
+                    hintText: widget.parentReplyId != null
+                        ? 'Escribe tu respuesta…'
+                        : '¿Qué opinas?',
+                  ),
+                ),
+              ],
+            )
+          else
+            ForumComposeField(
+              controller: _controller,
+              maxLines: 8,
+              minLines: 6,
+              toolbar: ForumComposeToolbar.editorial,
+              hintText: 'Escribe el comunicado…',
+            ),
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -402,8 +669,8 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
               style: AppTypography.bodyMedium(color: AppColors.accentRed),
             ),
           ],
-          const SizedBox(height: 12),
-          if (isHermandadBoard && canPostOfficial) ...[
+          if (useRichEditor) ...[
+            const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _submitting ? null : _showPreview,
               icon: const Icon(Icons.visibility_outlined, size: 18),
@@ -415,22 +682,22 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
               ),
             ),
             const SizedBox(height: 8),
-          ],
-          FilledButton(
-            onPressed: _submitting ? null : _submit,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.burgundy,
-              foregroundColor: AppColors.textOnDark,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+            FilledButton(
+              onPressed: _submitting ? null : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.burgundy,
+                foregroundColor: AppColors.textOnDark,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: _submitting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(_submitButtonLabel(isHermandadBoard, canPostOfficial)),
             ),
-            child: _submitting
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(_submitButtonLabel(isHermandadBoard, canPostOfficial)),
-          ),
+          ],
         ],
       ),
     );
@@ -446,4 +713,8 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
         'Publicar en ${officialCategoryLabel(_officialCategory)}',
     };
   }
+}
+
+class HermandadCalendarPublishException implements Exception {
+  const HermandadCalendarPublishException();
 }

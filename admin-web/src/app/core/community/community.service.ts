@@ -8,9 +8,17 @@ export interface AdminUserRow {
   role: 'member' | 'admin';
   accountType: 'cofrade' | 'brotherhood' | string;
   verified: boolean;
+  /** Puede publicar en Noticias. No es la verificación de hermandad. */
+  newsPublisher: boolean;
+  /** Puede proponer eventos. Quedan en revisión de la Junta. */
+  calendarContributor: boolean;
+  /** Modera al menos un foro. */
+  forumModerator: boolean;
   suspendedAt: string | null;
   suspendedReason: string | null;
   createdAt: string;
+  /** Email de Auth (solo vía admin_list_users). */
+  email: string | null;
 }
 
 export interface HandleHit {
@@ -68,6 +76,37 @@ export interface CreatedHermandadAccount {
   email: string;
   topicId: string | null;
   temporaryPassword: string | null;
+  /** True si usó la clave elegida en la solicitud (no se muestra al admin). */
+  passwordFromRequest: boolean;
+}
+
+export type HermandadAccessRequestStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'spam';
+
+export type HermandadBoardKind = 'semana_santa' | 'glorias';
+
+export interface HermandadAccessRequest {
+  id: string;
+  hermandadName: string;
+  city: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  message: string;
+  /** `semana_santa` (Sevilla) o `glorias`. */
+  boardKind: HermandadBoardKind;
+  /** Día de estación si es SS; vacío si es Gloria. */
+  processionDay: string;
+  /** La hermandad eligió clave al solicitar (no es legible por la Junta). */
+  hasRequestedPassword: boolean;
+  status: HermandadAccessRequestStatus;
+  reviewNotes: string;
+  createdProfileId: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
 }
 
 export interface HermandadAccountCredentials {
@@ -77,7 +116,10 @@ export interface HermandadAccountCredentials {
   email: string;
 }
 
-/** Días de estación (mismo orden que la app). */
+/** Categoría de tablones de hermandades de Gloria (no es día de estación). */
+export const HERMANDAD_GLORIAS_CATEGORY = 'Glorias';
+
+/** Días de estación SS Sevilla (mismo orden que la app). */
 export const HERMANDAD_STATION_DAYS = [
   'Viernes de Dolores',
   'Sábado de Pasión',
@@ -91,6 +133,20 @@ export const HERMANDAD_STATION_DAYS = [
   'Sábado Santo',
   'Domingo de Resurrección',
 ] as const;
+
+/** Directorio completo: estación SS + Glorias. */
+export const HERMANDAD_DIRECTORY_DAYS = [
+  ...HERMANDAD_STATION_DAYS,
+  HERMANDAD_GLORIAS_CATEGORY,
+] as const;
+
+export function hermandadBoardSeasonKey(
+  day: string,
+): 'semana_santa' | 'glorias' {
+  return day.trim() === HERMANDAD_GLORIAS_CATEGORY
+    ? 'glorias'
+    : 'semana_santa';
+}
 
 export function parseHermandadTopicTitle(title: string): {
   processionDay: string | null;
@@ -119,10 +175,14 @@ export function hermandadBoardTemplate(name: string, day: string): {
 } {
   const n = name.trim();
   const d = day.trim();
+  const isGloria = d === HERMANDAD_GLORIAS_CATEGORY;
+  const scope = isGloria
+    ? `de ${n} (hermandad de Gloria)`
+    : `de ${n} para el ${d}`;
   return {
     excerpt: `Espacio para noticias, horarios, avisos e información oficial de ${n}.`,
     body:
-      `Este es el espacio de seguimiento de ${n} para el ${d}.\n\n` +
+      `Este es el espacio de seguimiento ${scope}.\n\n` +
       `Aquí se podrán centralizar noticias, horarios, avisos de última hora, ` +
       `comunicados, cambios de itinerario y comentarios de la comunidad.\n\n` +
       `Cuando exista una cuenta verificada de la hermandad, sus publicaciones ` +
@@ -188,31 +248,21 @@ export class CommunityService {
   }
 
   async fetchRecentUsers(limit = 40): Promise<AdminUserRow[]> {
-    const { data, error } = await getSupabase()
-      .from('profiles')
-      .select(
-        'id, handle, display_name, role, account_type, verified, suspended_at, suspended_reason, created_at',
-      )
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    if (error) throw error;
-    return (data ?? []).map((row) => this.mapUser(row));
+    return this.searchUsers('', limit);
   }
 
+  /**
+   * Listado admin con email de Auth.
+   * Requiere `admin_list_users.sql` en Supabase.
+   */
   async searchUsers(query: string, limit = 40): Promise<AdminUserRow[]> {
     const q = query.replace(/^@/, '').trim();
-    if (q.length < 2) return this.fetchRecentUsers(limit);
-
-    const { data, error } = await getSupabase()
-      .from('profiles')
-      .select(
-        'id, handle, display_name, role, account_type, verified, suspended_at, suspended_reason, created_at',
-      )
-      .or(`handle.ilike.%${q}%,display_name.ilike.%${q}%`)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    const { data, error } = await getSupabase().rpc('admin_list_users', {
+      p_query: q.length >= 2 ? q : '',
+      p_limit: limit,
+    });
     if (error) throw error;
-    return (data ?? []).map((row) => this.mapUser(row));
+    return (data ?? []).map((row: Record<string, unknown>) => this.mapUser(row));
   }
 
   async searchHandles(rawQuery: string, limit = 8): Promise<HandleHit[]> {
@@ -244,6 +294,71 @@ export class CommunityService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', profileId);
+    if (error) throw error;
+  }
+
+  async fetchNewsPublisherIds(): Promise<Set<string>> {
+    const { data, error } = await getSupabase()
+      .from('news_publishers')
+      .select('profile_id');
+    if (error) throw error;
+    return new Set((data ?? []).map((row) => String(row.profile_id)));
+  }
+
+  async fetchCalendarContributorIds(): Promise<Set<string>> {
+    const { data, error } = await getSupabase()
+      .from('calendar_contributors')
+      .select('profile_id');
+    if (error) throw error;
+    return new Set((data ?? []).map((row) => String(row.profile_id)));
+  }
+
+  async fetchForumModeratorIds(): Promise<Set<string>> {
+    const { data, error } = await getSupabase()
+      .from('forum_moderators')
+      .select('profile_id');
+    if (error) throw error;
+    return new Set((data ?? []).map((row) => String(row.profile_id)));
+  }
+
+  async setCalendarContributor(profileId: string, enabled: boolean): Promise<void> {
+    if (!enabled) {
+      const { error } = await getSupabase()
+        .from('calendar_contributors')
+        .delete()
+        .eq('profile_id', profileId);
+      if (error) throw error;
+      return;
+    }
+
+    const { data: session } = await getSupabase().auth.getUser();
+    const assignedBy = session.user?.id ?? null;
+    const assignedAt = new Date().toISOString();
+    const calendar = await getSupabase().from('calendar_contributors').upsert({
+      profile_id: profileId,
+      assigned_by: assignedBy,
+      assigned_at: assignedAt,
+    });
+    if (calendar.error) throw calendar.error;
+    await this.setNewsPublisher(profileId, true);
+  }
+
+  async setNewsPublisher(profileId: string, enabled: boolean): Promise<void> {
+    if (!enabled) {
+      const { error } = await getSupabase()
+        .from('news_publishers')
+        .delete()
+        .eq('profile_id', profileId);
+      if (error) throw error;
+      return;
+    }
+
+    const { data: session } = await getSupabase().auth.getUser();
+    const { error } = await getSupabase().from('news_publishers').upsert({
+      profile_id: profileId,
+      assigned_by: session.user?.id ?? null,
+      assigned_at: new Date().toISOString(),
+    });
     if (error) throw error;
   }
 
@@ -280,6 +395,76 @@ export class CommunityService {
       })
       .eq('id', profileId);
     if (error) throw error;
+  }
+
+  /**
+   * Elimina Auth + perfil. Por defecto también borra temas (salvo tablones
+   * hermandad / sistema) y comentarios del usuario.
+   * Requiere Edge Function `admin-delete-user` desplegada.
+   */
+  async updateUser(input: {
+    profileId: string;
+    displayName: string;
+    handle: string;
+    email: string;
+    password?: string | null;
+  }): Promise<{
+    displayName: string;
+    handle: string;
+    email: string;
+    profileUpdated: boolean;
+    emailUpdated: boolean;
+    passwordUpdated: boolean;
+  }> {
+    const body: Record<string, unknown> = {
+      profileId: input.profileId,
+      displayName: input.displayName.trim(),
+      handle: input.handle.replace(/^@/, '').trim().toLowerCase(),
+      email: input.email.trim().toLowerCase(),
+    };
+    if (input.password?.trim()) body['password'] = input.password.trim();
+
+    const { data, error } = await getSupabase().functions.invoke(
+      'admin-update-user',
+      { body },
+    );
+    if (error) throw error;
+    const payload = data as Record<string, unknown>;
+    if (payload?.['error']) {
+      throw new Error(String(payload['error']));
+    }
+    return {
+      displayName: String(payload['displayName'] ?? body['displayName']),
+      handle: String(payload['handle'] ?? body['handle']),
+      email: String(payload['email'] ?? body['email']),
+      profileUpdated: Boolean(payload['profileUpdated']),
+      emailUpdated: Boolean(payload['emailUpdated']),
+      passwordUpdated: Boolean(payload['passwordUpdated']),
+    };
+  }
+
+  async deleteUser(
+    profileId: string,
+    options: { deleteContent?: boolean } = {},
+  ): Promise<{ deletedTopics: number; deletedReplies: number }> {
+    const { data, error } = await getSupabase().functions.invoke(
+      'admin-delete-user',
+      {
+        body: {
+          profileId,
+          deleteContent: options.deleteContent !== false,
+        },
+      },
+    );
+    if (error) throw error;
+    const payload = data as Record<string, unknown>;
+    if (payload?.['error']) {
+      throw new Error(String(payload['error']));
+    }
+    return {
+      deletedTopics: Number(payload['deletedTopics'] ?? 0),
+      deletedReplies: Number(payload['deletedReplies'] ?? 0),
+    };
   }
 
   async fetchForumPillars(): Promise<ForumPillarOption[]> {
@@ -402,7 +587,7 @@ export class CommunityService {
   }): Promise<HermandadTopicOption> {
     const day = input.processionDay.trim();
     const name = input.hermandadName.trim();
-    if (!day) throw new Error('Elige el día de estación.');
+    if (!day) throw new Error('Elige el día de estación o Glorias.');
     if (name.length < 2) {
       throw new Error('Indica el nombre de la hermandad (mín. 2 caracteres).');
     }
@@ -427,6 +612,7 @@ export class CommunityService {
         status: 'published',
         is_pinned: false,
         is_system: false,
+        season_key: hermandadBoardSeasonKey(day),
         cover_image_url: cover,
         icon_image_url: icon,
       })
@@ -464,7 +650,7 @@ export class CommunityService {
   }): Promise<void> {
     const day = input.processionDay.trim();
     const name = input.hermandadName.trim();
-    if (!day) throw new Error('Elige el día de estación.');
+    if (!day) throw new Error('Elige el día de estación o Glorias.');
     if (name.length < 2) {
       throw new Error('Indica el nombre de la hermandad (mín. 2 caracteres).');
     }
@@ -474,6 +660,7 @@ export class CommunityService {
     const patch: Record<string, unknown> = {
       title,
       excerpt: template.excerpt,
+      season_key: hermandadBoardSeasonKey(day),
     };
     if (input.resetBodyToTemplate) {
       patch['body'] = template.body;
@@ -612,6 +799,7 @@ export class CommunityService {
     displayName: string;
     password?: string | null;
     topicId?: string | null;
+    accessRequestId?: string | null;
   }): Promise<CreatedHermandadAccount> {
     const body: Record<string, unknown> = {
       email: input.email.trim(),
@@ -620,23 +808,35 @@ export class CommunityService {
     };
     if (input.password?.trim()) body['password'] = input.password.trim();
     if (input.topicId) body['topicId'] = input.topicId;
+    if (input.accessRequestId) body['accessRequestId'] = input.accessRequestId;
 
     const { data, error } = await getSupabase().functions.invoke(
       'create-hermandad-account',
       { body },
     );
-    if (error) throw error;
-    const payload = data as Record<string, unknown>;
+    const payload = (data ?? {}) as Record<string, unknown>;
+    if (error) {
+      throw new Error(
+        await this.edgeFunctionErrorMessage(
+          error,
+          payload,
+          'No se pudo crear la cuenta hermandad',
+        ),
+      );
+    }
     if (payload?.['error']) {
       throw new Error(String(payload['error']));
     }
+    const temp = payload['temporaryPassword'];
     return {
       profileId: String(payload['profileId'] ?? ''),
       handle: String(payload['handle'] ?? body['handle']),
       displayName: String(payload['displayName'] ?? body['displayName']),
       email: String(payload['email'] ?? body['email']),
       topicId: (payload['topicId'] as string | null) ?? null,
-      temporaryPassword: (payload['temporaryPassword'] as string | null) ?? null,
+      temporaryPassword:
+        typeof temp === 'string' && temp.trim() ? temp.trim() : null,
+      passwordFromRequest: Boolean(payload['passwordFromRequest']),
     };
   }
 
@@ -707,7 +907,136 @@ export class CommunityService {
     return (data ?? []).map((row) => this.mapUser(row));
   }
 
+  async submitHermandadAccessRequest(input: {
+    hermandadName: string;
+    city: string;
+    contactName: string;
+    contactEmail: string;
+    contactPhone?: string;
+    message?: string;
+    boardKind: HermandadBoardKind;
+    processionDay?: string;
+    password: string;
+    clientFingerprint: string;
+    honeypot?: string;
+  }): Promise<void> {
+    const { error } = await getSupabase().rpc('submit_hermandad_access_request', {
+      p_hermandad_name: input.hermandadName.trim(),
+      p_city: input.city.trim(),
+      p_contact_name: input.contactName.trim(),
+      p_contact_email: input.contactEmail.trim().toLowerCase(),
+      p_contact_phone: (input.contactPhone ?? '').trim(),
+      p_message: (input.message ?? '').trim(),
+      p_client_fingerprint: input.clientFingerprint.slice(0, 128),
+      p_honeypot: input.honeypot ?? '',
+      p_board_kind: input.boardKind,
+      p_procession_day:
+        input.boardKind === 'glorias'
+          ? ''
+          : (input.processionDay ?? '').trim(),
+      p_password: input.password,
+    });
+    if (error) {
+      const parts = [error.message, error.details, error.hint, error.code]
+        .filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+      throw new Error(parts.join(' — ') || 'No se pudo enviar la solicitud');
+    }
+  }
+
+  async fetchHermandadAccessRequests(
+    status: HermandadAccessRequestStatus | 'all' = 'pending',
+    limit = 50,
+  ): Promise<HermandadAccessRequest[]> {
+    let query = getSupabase()
+      .from('hermandad_access_requests')
+      .select(
+        'id, hermandad_name, city, contact_name, contact_email, contact_phone, message, board_kind, procession_day, has_requested_password, status, review_notes, created_profile_id, created_at, reviewed_at',
+      )
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (status !== 'all') {
+      query = query.eq('status', status);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map((row) => this.mapAccessRequest(row));
+  }
+
+  async reviewHermandadAccessRequest(input: {
+    requestId: string;
+    status: Exclude<HermandadAccessRequestStatus, 'pending'>;
+    notes?: string;
+    createdProfileId?: string | null;
+  }): Promise<void> {
+    const { error } = await getSupabase().rpc('review_hermandad_access_request', {
+      p_request_id: input.requestId,
+      p_status: input.status,
+      p_notes: (input.notes ?? '').trim(),
+      p_created_profile_id: input.createdProfileId ?? null,
+    });
+    if (error) throw error;
+  }
+
+  /** Extrae el `error` del body de una Edge Function (Supabase a veces solo dice non-2xx). */
+  private async edgeFunctionErrorMessage(
+    error: unknown,
+    payload: Record<string, unknown>,
+    fallback: string,
+  ): Promise<string> {
+    if (typeof payload['error'] === 'string' && payload['error'].trim()) {
+      return payload['error'].trim();
+    }
+    const ctx = (error as { context?: Response })?.context;
+    if (ctx && typeof ctx.json === 'function') {
+      try {
+        const body = (await ctx.json()) as Record<string, unknown>;
+        if (typeof body['error'] === 'string' && body['error'].trim()) {
+          return body['error'].trim();
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (error instanceof Error && error.message.trim()) {
+      return error.message.trim();
+    }
+    return fallback;
+  }
+
+  private mapAccessRequest(row: Record<string, unknown>): HermandadAccessRequest {
+    const status = String(row['status'] ?? 'pending');
+    const kindRaw = String(row['board_kind'] ?? 'semana_santa');
+    return {
+      id: String(row['id'] ?? ''),
+      hermandadName: String(row['hermandad_name'] ?? ''),
+      city: String(row['city'] ?? ''),
+      contactName: String(row['contact_name'] ?? ''),
+      contactEmail: String(row['contact_email'] ?? ''),
+      contactPhone: String(row['contact_phone'] ?? ''),
+      message: String(row['message'] ?? ''),
+      boardKind: kindRaw === 'glorias' ? 'glorias' : 'semana_santa',
+      processionDay: String(row['procession_day'] ?? ''),
+      hasRequestedPassword: Boolean(row['has_requested_password']),
+      status:
+        status === 'approved' ||
+        status === 'rejected' ||
+        status === 'spam' ||
+        status === 'pending'
+          ? status
+          : 'pending',
+      reviewNotes: String(row['review_notes'] ?? ''),
+      createdProfileId: (row['created_profile_id'] as string | null) ?? null,
+      createdAt: String(row['created_at'] ?? ''),
+      reviewedAt: (row['reviewed_at'] as string | null) ?? null,
+    };
+  }
+
   private mapUser(row: Record<string, unknown>): AdminUserRow {
+    const emailRaw = row['email'];
+    const email =
+      typeof emailRaw === 'string' && emailRaw.trim()
+        ? emailRaw.trim()
+        : null;
     return {
       id: String(row['id'] ?? ''),
       handle: String(row['handle'] ?? ''),
@@ -715,9 +1044,13 @@ export class CommunityService {
       role: row['role'] === 'admin' ? 'admin' : 'member',
       accountType: String(row['account_type'] ?? 'cofrade'),
       verified: Boolean(row['verified']),
+      newsPublisher: false,
+      calendarContributor: false,
+      forumModerator: false,
       suspendedAt: (row['suspended_at'] as string | null) ?? null,
       suspendedReason: (row['suspended_reason'] as string | null) ?? null,
       createdAt: String(row['created_at'] ?? ''),
+      email,
     };
   }
 }

@@ -48,6 +48,7 @@ class HermandadScheduledPostsRepository {
     required String officialCategory,
     required DateTime scheduledAt,
     String? imageUrl,
+    HermandadScheduledCalendar? calendar,
   }) async {
     if (_client == null) throw const ForumsRemoteUnavailableException();
 
@@ -62,6 +63,7 @@ class HermandadScheduledPostsRepository {
           'scheduled_at': scheduledAt.toUtc().toIso8601String(),
           'status': 'scheduled',
           'image_url': ?imageUrl,
+          ...?calendar?.columns,
         })
         .select(_select)
         .single();
@@ -76,6 +78,7 @@ class HermandadScheduledPostsRepository {
     required String content,
     required String officialCategory,
     String? imageUrl,
+    HermandadScheduledCalendar? calendar,
   }) async {
     if (_client == null) throw const ForumsRemoteUnavailableException();
 
@@ -89,6 +92,7 @@ class HermandadScheduledPostsRepository {
           'official_category': officialCategory,
           'status': 'draft',
           'image_url': ?imageUrl,
+          ...?calendar?.columns,
         })
         .select(_select)
         .single();
@@ -207,6 +211,36 @@ class HermandadScheduledPostsRepository {
     if (result is num) return result.toInt();
     return 0;
   }
+}
+
+class HermandadScheduledCalendar {
+  const HermandadScheduledCalendar({
+    required this.eventType,
+    required this.startsAt,
+    required this.location,
+    required this.title,
+    this.coverImageUrl,
+    this.customIconUrl,
+    this.organizerLabel,
+  });
+
+  final String eventType;
+  final DateTime startsAt;
+  final String location;
+  final String title;
+  final String? coverImageUrl;
+  final String? customIconUrl;
+  final String? organizerLabel;
+
+  Map<String, dynamic> get columns => {
+        'calendar_event_type': eventType,
+        'calendar_starts_at': startsAt.toUtc().toIso8601String(),
+        'calendar_location': location.trim(),
+        'calendar_title': title.trim(),
+        'calendar_cover_image_url': coverImageUrl?.trim(),
+        'calendar_custom_icon_url': customIconUrl?.trim(),
+        'calendar_organizer_label': organizerLabel?.trim(),
+      };
 }
 
 HermandadScheduledPostsRepository createHermandadScheduledPostsRepository() {

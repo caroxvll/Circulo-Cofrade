@@ -128,6 +128,7 @@ class ReplyThreadList extends StatefulWidget {
     this.officialChannelStyle = false,
     /// Abrir comunicado oficial a pantalla casi completa.
     this.onOfficialOpen,
+    this.boardTopic,
   });
 
   final List<ReplyTreeNode> nodes;
@@ -147,6 +148,7 @@ class ReplyThreadList extends StatefulWidget {
   final bool sliver;
   final bool officialChannelStyle;
   final void Function(ForumReply reply)? onOfficialOpen;
+  final ForumTopic? boardTopic;
 
   @override
   State<ReplyThreadList> createState() => _ReplyThreadListState();
@@ -229,6 +231,7 @@ class _ReplyThreadListState extends State<ReplyThreadList> {
           showReport: widget.showReport,
           officialChannelStyle: widget.officialChannelStyle,
           onOfficialOpen: widget.onOfficialOpen,
+          boardTopic: widget.boardTopic,
         ),
         if (node.children.isNotEmpty && !widget.officialChannelStyle)
           _ReplyThreadBranch(
@@ -256,11 +259,8 @@ class _ReplyThreadListState extends State<ReplyThreadList> {
     if (widget.officialChannelStyle) {
       return const SizedBox(height: 10);
     }
-    return Divider(
-      height: 1,
-      thickness: 1,
-      color: AppColors.border.withValues(alpha: 0.55),
-    );
+    // Instagram: separación por aire, sin rayas fuertes.
+    return const SizedBox(height: 4);
   }
 
   @override
@@ -343,28 +343,22 @@ class _ReplyThreadBranch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Estilo X: sin riel lateral ni sangría fuerte. El contexto va
-    // en "Respondiendo a @…" dentro de cada reply.
+    // Estilo Instagram: sangría suave + «Ver X respuestas».
     return Padding(
-      padding: const EdgeInsets.only(left: 12, top: 0, bottom: 2),
+      // Alinea el hilo bajo el texto del padre (avatar 44 + gap), sin aplastar el @.
+      padding: const EdgeInsets.only(left: 36, top: 0, bottom: 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (_isCollapsible && !expanded && _hiddenCount > 0)
             _ThreadToggleButton(
               label: _hiddenCount == 1
-                  ? 'Mostrar 1 respuesta'
-                  : 'Mostrar $_hiddenCount respuestas',
-              expanded: false,
+                  ? 'Ver 1 respuesta más'
+                  : 'Ver $_hiddenCount respuestas más',
               onPressed: onToggle,
             ),
           for (var i = 0; i < _visibleChildren.length; i++) ...[
-            if (i > 0)
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: AppColors.border.withValues(alpha: 0.35),
-              ),
+            if (i > 0) const SizedBox(height: 2),
             _ReplyCardSlot(
               node: _visibleChildren[i],
               topicAuthorId: topicAuthorId,
@@ -384,7 +378,6 @@ class _ReplyThreadBranch extends StatelessWidget {
           if (_isCollapsible && expanded)
             _ThreadToggleButton(
               label: 'Ocultar respuestas',
-              expanded: true,
               onPressed: onToggle,
             ),
         ],
@@ -397,43 +390,39 @@ class _ThreadToggleButton extends StatelessWidget {
   const _ThreadToggleButton({
     required this.label,
     required this.onPressed,
-    required this.expanded,
   });
 
   final String label;
   final VoidCallback onPressed;
-  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 6),
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
       child: Align(
         alignment: Alignment.centerLeft,
         child: TextButton(
           onPressed: onPressed,
           style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Container(
+                width: 22,
+                height: 1,
+                margin: const EdgeInsets.only(right: 8),
+                color: AppColors.border.withValues(alpha: 0.7),
+              ),
               Text(
                 label,
                 style: TopicDetailTypography.meta(
-                  color: AppColors.burgundy,
+                  color: AppColors.textMuted,
                   fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 2),
-              Icon(
-                expanded
-                    ? Icons.keyboard_arrow_up_rounded
-                    : Icons.keyboard_arrow_down_rounded,
-                size: 18,
-                color: AppColors.burgundy,
+                ).copyWith(fontSize: 12),
               ),
             ],
           ),
@@ -460,6 +449,7 @@ class _ReplyCardSlot extends StatelessWidget {
     this.showReport,
     this.officialChannelStyle = false,
     this.onOfficialOpen,
+    this.boardTopic,
   });
 
   final ReplyTreeNode node;
@@ -478,6 +468,7 @@ class _ReplyCardSlot extends StatelessWidget {
   final bool Function(ForumReply reply)? showReport;
   final bool officialChannelStyle;
   final void Function(ForumReply reply)? onOfficialOpen;
+  final ForumTopic? boardTopic;
 
   bool get _isTopicAuthor {
     final authorId = topicAuthorId;
@@ -509,6 +500,7 @@ class _ReplyCardSlot extends StatelessWidget {
               ? (reaction) => onReactionChanged!(reply, reaction)
               : null,
           onOpen: onOfficialOpen != null ? () => onOfficialOpen!(reply) : null,
+          boardTopic: boardTopic,
         ),
       );
     }

@@ -4,8 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 /// Tipografía dual:
-/// - **Cormorant** → marca / editorial (pantallas, secciones, hermandades, rangos).
-/// - **Inter** → UI / lectura (nav, chips, body, botones, Noticias).
+/// - **Cormorant** → marca / editorial (pantallas, secciones, hermandades, Noticias).
+/// - **Inter** → UI / lectura (nav, chips, body de foros, botones).
 abstract final class AppTypography {
   static const screenTitleFontSize = 34.0;
   static const screenTitleLetterSpacing = 0.5;
@@ -89,13 +89,23 @@ abstract final class AppTypography {
         color: color ?? AppColors.textPrimary,
       );
 
-  /// Titulares de Noticias (sin serifa editorial).
-  static TextStyle newsHeadline({Color? color}) => GoogleFonts.inter(
-        fontSize: 22,
+  /// Titulares de Noticias (serifa editorial).
+  static TextStyle newsHeadline({Color? color}) =>
+      GoogleFonts.cormorantGaramond(
+        fontSize: 26,
         fontWeight: FontWeight.w700,
         color: color ?? AppColors.textPrimary,
-        height: 1.2,
-        letterSpacing: -0.2,
+        height: 1.18,
+        letterSpacing: -0.15,
+      );
+
+  /// Cuerpo de artículo en Noticias (serifa de periódico).
+  static TextStyle newsBody({Color? color}) => GoogleFonts.libreBaskerville(
+        fontSize: 16.5,
+        fontWeight: FontWeight.w400,
+        color: color ?? AppColors.textPrimary,
+        height: 1.58,
+        letterSpacing: 0.05,
       );
 
   static TextStyle bodyLarge({Color? color}) => GoogleFonts.inter(

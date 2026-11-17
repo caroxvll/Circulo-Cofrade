@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/calendar_quick_access_button.dart';
+import '../../../core/widgets/screen_title_row.dart';
+import '../../../core/widgets/search_quick_access_button.dart';
 import '../notifications_design.dart';
 
 class NotificationsScreenHeader extends StatelessWidget {
@@ -27,13 +29,12 @@ class NotificationsScreenHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              child: Text(
-                'NOTIFICACIONES',
+              child: AdaptiveScreenTitle(
+                text: 'NOTIFICACIONES',
                 style: NotificationsDesign.screenTitle(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
+            const SearchQuickAccessButton(),
             const CalendarQuickAccessButton(),
           ],
         ),

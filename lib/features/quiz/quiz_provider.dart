@@ -44,6 +44,11 @@ final juntaQuizQuestionsProvider =
   return ref.watch(quizRepositoryProvider).fetchQuestionsForJunta();
 });
 
+final juntaQuizScheduleProvider =
+    FutureProvider.autoDispose<Map<String, DateTime>>((ref) async {
+  return ref.watch(quizRepositoryProvider).fetchScheduledRounds();
+});
+
 final juntaQuizLaunchedIdsProvider =
     FutureProvider.autoDispose<Set<String>>((ref) async {
   return ref.watch(quizRepositoryProvider).fetchLaunchedQuestionIds();
@@ -82,6 +87,13 @@ final quizSeasonInfoProvider =
 final quizLiveVisibleProvider = FutureProvider.autoDispose<bool>((ref) async {
   ref.keepAlive();
   return ref.watch(quizRepositoryProvider).fetchLiveVisible();
+});
+
+/// Premio del mes en curso y, si eres el primero del mes pasado, el de recoger.
+final quizPrizeShowcaseProvider =
+    FutureProvider.autoDispose<QuizPrizeShowcase>((ref) async {
+  final userId = ref.watch(currentUserProvider)?.id;
+  return ref.watch(quizRepositoryProvider).fetchPrizeShowcase(userId);
 });
 
 String currentQuizYearMonth() {

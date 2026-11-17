@@ -46,9 +46,11 @@ class _QuizForumsFabState extends ConsumerState<QuizForumsFab>
 
     final tooltip = live
         ? '¡Pregunta en vivo! 15 segundos'
-        : answered
-            ? 'Ver ranking de la pregunta'
-            : 'Pregunta en vivo';
+        : liveAsync.asData?.value.reveal != null
+            ? 'Ya puedes ver el resultado'
+            : answered
+                ? 'Respuesta guardada hasta las 00:00'
+                : 'Pregunta en vivo';
 
     return Positioned(
       right: 14,

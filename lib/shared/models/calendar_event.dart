@@ -11,6 +11,28 @@ enum EventType {
 
   concierto('Conciertos'),
 
+  culto('Cultos'),
+
+  besamanos('Besamanos'),
+
+  quinario('Quinarios'),
+
+  triduo('Triduos'),
+
+  pregon('Pregones'),
+
+  traslado('Traslados'),
+
+  muda('Mudas'),
+
+  desarma('Desarmas'),
+
+  retranqueo('Retranqueos'),
+
+  viaCrucis('Vía crucis'),
+
+  viaCrucisConsejo('Vía crucis del Consejo'),
+
   evento('Eventos');
 
   const EventType(this.label);
@@ -29,6 +51,28 @@ enum EventType {
 
       'concierto' => EventType.concierto,
 
+      'culto' => EventType.culto,
+
+      'besamanos' => EventType.besamanos,
+
+      'quinario' => EventType.quinario,
+
+      'triduo' => EventType.triduo,
+
+      'pregon' => EventType.pregon,
+
+      'traslado' => EventType.traslado,
+
+      'muda' => EventType.muda,
+
+      'desarma' => EventType.desarma,
+
+      'retranqueo' => EventType.retranqueo,
+
+      'via_crucis' => EventType.viaCrucis,
+
+      'via_crucis_consejo' => EventType.viaCrucisConsejo,
+
       _ => EventType.evento,
     };
   }
@@ -44,6 +88,28 @@ enum EventType {
 
     EventType.concierto => 'concierto',
 
+    EventType.culto => 'culto',
+
+    EventType.besamanos => 'besamanos',
+
+    EventType.quinario => 'quinario',
+
+    EventType.triduo => 'triduo',
+
+    EventType.pregon => 'pregon',
+
+    EventType.traslado => 'traslado',
+
+    EventType.muda => 'muda',
+
+    EventType.desarma => 'desarma',
+
+    EventType.retranqueo => 'retranqueo',
+
+    EventType.viaCrucis => 'via_crucis',
+
+    EventType.viaCrucisConsejo => 'via_crucis_consejo',
+
     EventType.evento => 'evento',
   };
 
@@ -54,7 +120,30 @@ enum EventType {
     EventType.ensayo => 'Ensayo',
     EventType.iguala => 'Iguala',
     EventType.concierto => 'Concierto',
+    EventType.culto => 'Culto',
+    EventType.besamanos => 'Besamanos',
+    EventType.quinario => 'Quinario',
+    EventType.triduo => 'Triduo',
+    EventType.pregon => 'Pregón',
+    EventType.traslado => 'Traslado',
+    EventType.muda => 'Muda',
+    EventType.desarma => 'Desarma',
+    EventType.retranqueo => 'Retranqueo',
+    EventType.viaCrucis => 'Vía crucis',
+    EventType.viaCrucisConsejo => 'Vía crucis del Consejo',
     EventType.evento => 'Evento',
+  };
+
+  /// Ensayo y citas de Cuaresma que tienen hilo de avisos en directo.
+  bool get opensCuaresmaLive => switch (this) {
+    EventType.ensayo ||
+    EventType.traslado ||
+    EventType.muda ||
+    EventType.desarma ||
+    EventType.retranqueo ||
+    EventType.viaCrucis ||
+    EventType.viaCrucisConsejo => true,
+    _ => false,
   };
 }
 
@@ -95,6 +184,50 @@ extension CalendarEventStatusX on CalendarEventStatus {
   bool get isVisibleInCalendar => this == CalendarEventStatus.published;
 }
 
+/// Un tramo horario del mismo día (`18:30` o `18:30–20:00`).
+class EventTimeSlot {
+  const EventTimeSlot({required this.start, this.end});
+
+  final String start;
+  final String? end;
+
+  static final RegExp _clock = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$');
+
+  String get label {
+    final until = end?.trim() ?? '';
+    if (until.isEmpty) return '$start h';
+    return '$start–$until h';
+  }
+
+  Map<String, String> toJson() => {
+        'start': start,
+        if (end != null && end!.trim().isNotEmpty) 'end': end!.trim(),
+      };
+
+  static EventTimeSlot? tryParse(Object? raw) {
+    if (raw is! Map) return null;
+    final start = '${raw['start'] ?? ''}'.trim();
+    if (!_clock.hasMatch(start)) return null;
+    final endRaw = '${raw['end'] ?? ''}'.trim();
+    final end =
+        _clock.hasMatch(endRaw) && endRaw.compareTo(start) > 0 ? endRaw : null;
+    return EventTimeSlot(start: start, end: end);
+  }
+
+  static List<EventTimeSlot> listFrom(Object? raw) {
+    if (raw is! List) return const [];
+    final slots = <EventTimeSlot>[];
+    for (final item in raw) {
+      final slot = tryParse(item);
+      if (slot == null) continue;
+      slots.add(slot);
+      if (slots.length == 6) break;
+    }
+    slots.sort((a, b) => a.start.compareTo(b.start));
+    return slots;
+  }
+}
+
 class CalendarEvent {
   const CalendarEvent({
     this.id,
@@ -125,6 +258,9 @@ class CalendarEvent {
     this.status = CalendarEventStatus.published,
     this.endsAt,
     this.liveForceState = EventLiveForceState.auto,
+    this.viewCount = 0,
+    this.admissionLabel,
+    this.slots = const [],
   });
 
   final String? id;
@@ -162,6 +298,21 @@ class CalendarEvent {
   /// auto / open / closed — cierre manual (lluvia, etc.).
   final EventLiveForceState liveForceState;
 
+  /// Visitas deduplicadas (1 por viewer/día) al abrir el evento en la app.
+  final int viewCount;
+
+  /// Texto corto de entrada, si la hay. Vacío = no se muestra.
+  final String? admissionLabel;
+
+  /// Tramos del mismo día. Vacío = solo vale [time].
+  final List<EventTimeSlot> slots;
+
+  String? get admissionChip {
+    final text = admissionLabel?.trim() ?? '';
+    if (text.isEmpty) return null;
+    return 'Entrada · $text';
+  }
+
   bool get isPublished => status == CalendarEventStatus.published;
   bool get isPendingReview => status == CalendarEventStatus.pendingReview;
 
@@ -191,6 +342,10 @@ class CalendarEvent {
     DateTime? endsAt,
     bool clearEndsAt = false,
     EventLiveForceState? liveForceState,
+    int? viewCount,
+    String? admissionLabel,
+    bool clearAdmissionLabel = false,
+    List<EventTimeSlot>? slots,
   }) {
     return CalendarEvent(
       id: id ?? this.id,
@@ -209,6 +364,11 @@ class CalendarEvent {
       status: status ?? this.status,
       endsAt: clearEndsAt ? null : (endsAt ?? this.endsAt),
       liveForceState: liveForceState ?? this.liveForceState,
+      viewCount: viewCount ?? this.viewCount,
+      admissionLabel: clearAdmissionLabel
+          ? null
+          : (admissionLabel ?? this.admissionLabel),
+      slots: slots ?? this.slots,
     );
   }
 }
@@ -227,6 +387,28 @@ enum EventFilter {
   procesiones('Procesiones'),
 
   glorias('Glorias'),
+
+  cultos('Cultos'),
+
+  besamanos('Besamanos'),
+
+  quinarios('Quinarios'),
+
+  triduos('Triduos'),
+
+  pregones('Pregones'),
+
+  traslados('Traslados'),
+
+  mudas('Mudas'),
+
+  desarmas('Desarmas'),
+
+  retranqueos('Retranqueos'),
+
+  viaCrucis('Vía crucis'),
+
+  viaCrucisConsejo('Vía crucis Consejo'),
 
   eventos('Eventos'),
 
@@ -249,6 +431,28 @@ enum EventFilter {
     EventFilter.procesiones => EventType.procesion,
 
     EventFilter.glorias => EventType.gloria,
+
+    EventFilter.cultos => EventType.culto,
+
+    EventFilter.besamanos => EventType.besamanos,
+
+    EventFilter.quinarios => EventType.quinario,
+
+    EventFilter.triduos => EventType.triduo,
+
+    EventFilter.pregones => EventType.pregon,
+
+    EventFilter.traslados => EventType.traslado,
+
+    EventFilter.mudas => EventType.muda,
+
+    EventFilter.desarmas => EventType.desarma,
+
+    EventFilter.retranqueos => EventType.retranqueo,
+
+    EventFilter.viaCrucis => EventType.viaCrucis,
+
+    EventFilter.viaCrucisConsejo => EventType.viaCrucisConsejo,
 
     EventFilter.eventos => EventType.evento,
   };

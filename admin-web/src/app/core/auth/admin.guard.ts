@@ -8,11 +8,17 @@ export const adminGuard: CanActivateFn = async () => {
   const router = inject(Router);
   await auth.init();
 
-  if (!auth.session() || !auth.canAccess()) {
+  if (!auth.session()) {
     return router.createUrlTree(['/login']);
   }
   if (!auth.isAdmin()) {
-    return router.createUrlTree(['/app/resumen']);
+    if (auth.isHermandadAccount()) {
+      return router.createUrlTree(['/hermandad']);
+    }
+    await auth.signOut();
+    return router.createUrlTree(['/login'], {
+      queryParams: { denied: '1' },
+    });
   }
   return true;
 };

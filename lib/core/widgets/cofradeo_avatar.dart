@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import 'cofradeo_network_image.dart';
+import 'cofradeo_skeleton.dart';
 
 class CofradeoAvatar extends StatelessWidget {
   const CofradeoAvatar({
@@ -19,6 +20,14 @@ class CofradeoAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final url = imageUrl?.trim();
+    final hasUrl = url != null && url.isNotEmpty;
+    final fallbackIcon = Icon(
+      icon ?? Icons.person,
+      color: AppColors.gold,
+      size: size * 0.5,
+    );
+
     return Container(
       width: size,
       height: size,
@@ -31,29 +40,22 @@ class CofradeoAvatar extends StatelessWidget {
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      child: imageUrl != null && imageUrl!.trim().isNotEmpty
+      child: hasUrl
           ? CofradeoNetworkImage(
-              url: imageUrl!,
+              url: url,
               width: size,
               height: size,
               cacheSize: size,
               fit: BoxFit.cover,
-              placeholder: Icon(
-                icon ?? Icons.person,
-                color: AppColors.gold,
-                size: size * 0.5,
+              // Skeleton suave: evita el salto icono → foto en listados.
+              placeholder: CofradeoSkeletonBone(
+                width: size,
+                height: size,
+                borderRadius: size / 2,
               ),
-              errorWidget: Icon(
-                icon ?? Icons.person,
-                color: AppColors.gold,
-                size: size * 0.5,
-              ),
+              errorWidget: fallbackIcon,
             )
-          : Icon(
-              icon ?? Icons.person,
-              color: AppColors.gold,
-              size: size * 0.5,
-            ),
+          : fallbackIcon,
     );
   }
 }

@@ -5,6 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/models/user_profile.dart';
 import '../../admin/admin_provider.dart';
+import '../../calendar/calendar_contributors_provider.dart';
+import '../../forums/news_publishers_provider.dart';
 import '../../moderation/moderation_provider.dart';
 
 class StaffProfileActionsBar extends ConsumerStatefulWidget {
@@ -77,6 +79,141 @@ class _StaffProfileActionsBarState
           const SnackBar(
             content: Text(
               'No se pudo actualizar la verificación. ¿Ejecutaste profile_verification.sql?',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setNewsPublisher(bool enabled) async {
+    final profile = widget.profile;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          enabled
+              ? '¿Dejar que ${profile.handle} publique noticias?'
+              : '¿Quitar el acceso a noticias de ${profile.handle}?',
+        ),
+        content: Text(
+          enabled
+              ? 'Podrá publicar noticias con su nombre, al momento. '
+                  'El calendario sigue aparte: se da con «acceso a calendario».'
+              : 'Dejará de poder crear noticias. Lo ya publicado sigue con su firma.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.burgundy,
+              foregroundColor: AppColors.textOnDark,
+            ),
+            child: Text(enabled ? 'Dar acceso' : 'Quitar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await ref.read(adminRepositoryProvider).setNewsPublisher(
+            profileId: profile.id,
+            enabled: enabled,
+          );
+      ref.invalidate(isNewsPublisherProvider(profile.id));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              enabled
+                  ? '${profile.handle} ya puede publicar noticias'
+                  : '${profile.handle} ya no publica noticias',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se pudo actualizar. ¿Ejecutaste news_publishers.sql?',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setCalendarContributor(bool enabled) async {
+    final profile = widget.profile;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          enabled
+              ? '¿Dejar que ${profile.handle} proponga eventos?'
+              : '¿Quitar el acceso al calendario de ${profile.handle}?',
+        ),
+        content: Text(
+          enabled
+              ? 'Podrá crear eventos. No salen solos: la Junta los aprueba en Eventos. '
+                  'También podrá publicar noticias, con el verificado dorado.'
+              : 'Dejará de proponer eventos. El acceso a noticias, si lo tiene, se queda.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.burgundy,
+              foregroundColor: AppColors.textOnDark,
+            ),
+            child: Text(enabled ? 'Dar acceso' : 'Quitar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await ref.read(adminRepositoryProvider).setCalendarContributor(
+            profileId: profile.id,
+            enabled: enabled,
+          );
+      ref.invalidate(isCalendarContributorProvider(profile.id));
+      ref.invalidate(isNewsPublisherProvider(profile.id));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              enabled
+                  ? '${profile.handle} puede proponer eventos y publicar noticias'
+                  : '${profile.handle} ya no propone eventos',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se pudo actualizar. ¿Ejecutaste calendar_contributors.sql?',
             ),
           ),
         );
@@ -169,6 +306,11 @@ class _StaffProfileActionsBarState
 
     final profile = widget.profile;
     final isAdmin = ref.watch(isAdminProvider);
+    final canPublishNews =
+        ref.watch(isNewsPublisherProvider(profile.id)).asData?.value ?? false;
+    final canProposeCalendar =
+        ref.watch(isCalendarContributorProvider(profile.id)).asData?.value ??
+            false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -193,6 +335,46 @@ class _StaffProfileActionsBarState
             ),
             label: Text(
               profile.isVerified ? 'Quitar verificación' : 'Verificar cuenta',
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : () => _setNewsPublisher(!canPublishNews),
+            icon: Icon(
+              canPublishNews
+                  ? Icons.newspaper
+                  : Icons.newspaper_outlined,
+              size: 18,
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.burgundy,
+              side: const BorderSide(color: AppColors.burgundy),
+            ),
+            label: Text(
+              canPublishNews
+                  ? 'Quitar acceso a noticias'
+                  : 'Dar acceso a noticias',
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _busy
+                ? null
+                : () => _setCalendarContributor(!canProposeCalendar),
+            icon: Icon(
+              canProposeCalendar
+                  ? Icons.event_available
+                  : Icons.event_available_outlined,
+              size: 18,
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.burgundy,
+              side: const BorderSide(color: AppColors.burgundy),
+            ),
+            label: Text(
+              canProposeCalendar
+                  ? 'Quitar acceso a calendario'
+                  : 'Dar acceso a calendario',
             ),
           ),
           const SizedBox(height: 8),

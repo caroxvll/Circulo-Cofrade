@@ -1,11 +1,13 @@
-<section class="queue-page">
+<section class="queue-page users-page">
   <header>
     <div>
       <p class="eyebrow">Comunidad · solo admin</p>
       <h1>Usuarios y altas</h1>
       <p class="lead">
-        Altas recientes, búsqueda y gestión de rol, verificación y suspensión.
-        El email no está en profiles (vive en Auth).
+        Altas recientes, búsqueda y gestión de rol, verificación, noticias,
+        calendario, suspensión y borrado. Verificar es la cuenta oficial.
+        Noticias lleva el verificado dorado. Calendario propone eventos y
+        también abre noticias. Un moderador de foro ya puede las dos cosas.
       </p>
     </div>
     <div class="queue-toolbar">
@@ -29,7 +31,7 @@
       type="search"
       [(ngModel)]="search"
       (keyup.enter)="onSearch()"
-      placeholder="Buscar handle o nombre…"
+      placeholder="Buscar handle, nombre o email…"
     />
     <button type="button" class="btn btn-ghost" (click)="onSearch()">Buscar</button>
     <select [ngModel]="filter()" (ngModelChange)="filter.set($event)">
@@ -37,6 +39,9 @@
       <option value="admin">Solo admins</option>
       <option value="brotherhood">Hermandades</option>
       <option value="suspended">Suspendidos</option>
+      <option value="noticias">Pueden publicar noticias</option>
+      <option value="calendario">Pueden proponer calendario</option>
+      <option value="moderador">Moderadores de foro</option>
     </select>
   </div>
 
@@ -49,11 +54,13 @@
   } @else if (visibleUsers().length === 0) {
     <div class="empty-box">Sin resultados.</div>
   } @else {
-    <div class="table-wrap">
+    <!-- Desktop -->
+    <div class="table-wrap users-table">
       <table>
         <thead>
           <tr>
             <th>Usuario</th>
+            <th>Email</th>
             <th>Tipo</th>
             <th>Alta</th>
             <th>Estado</th>
@@ -68,12 +75,30 @@
                 <div class="sub">{{ '@' + user.handle }}</div>
               </td>
               <td>
+                @if (user.email) {
+                  <a class="email-link" [href]="'mailto:' + user.email">{{
+                    user.email
+                  }}</a>
+                } @else {
+                  <span class="sub">—</span>
+                }
+              </td>
+              <td>
                 <span class="pill">{{ user.accountType }}</span>
                 @if (user.role === 'admin') {
                   <span class="pill admin">admin</span>
                 }
                 @if (user.verified) {
                   <span class="pill ok">verificado</span>
+                }
+                @if (user.newsPublisher || user.forumModerator) {
+                  <span class="pill">noticias</span>
+                }
+                @if (user.calendarContributor || user.forumModerator) {
+                  <span class="pill">calendario</span>
+                }
+                @if (user.forumModerator) {
+                  <span class="pill">moderador</span>
                 }
               </td>
               <td>
@@ -89,6 +114,14 @@
                 }
               </td>
               <td class="actions">
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === user.id || editSaving()"
+                  (click)="openEdit(user)"
+                >
+                  Editar
+                </button>
                 <button
                   type="button"
                   class="btn btn-ghost"
@@ -107,11 +140,36 @@
                 </button>
                 <button
                   type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === user.id"
+                  (click)="toggleNewsPublisher(user)"
+                >
+                  {{ user.newsPublisher ? 'Quitar noticias' : 'Dar noticias' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === user.id"
+                  (click)="toggleCalendarContributor(user)"
+                >
+                  {{ user.calendarContributor ? 'Quitar calendario' : 'Dar calendario' }}
+                </button>
+                <button
+                  type="button"
                   class="btn btn-danger"
                   [disabled]="busyId() === user.id || user.id === selfId()"
                   (click)="toggleSuspend(user)"
                 >
                   {{ user.suspendedAt ? 'Reactivar' : 'Suspender' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  [disabled]="busyId() === user.id || user.id === selfId()"
+                  (click)="deleteUser(user)"
+                  title="Borra Auth, perfil, temas y comentarios"
+                >
+                  Eliminar
                 </button>
               </td>
             </tr>
@@ -119,5 +177,199 @@
         </tbody>
       </table>
     </div>
+
+    <!-- Mobile cards -->
+    <div class="users-cards" aria-label="Usuarios">
+      @for (user of visibleUsers(); track user.id) {
+        <article class="user-card" [class.dim]="!!user.suspendedAt">
+          <header class="user-card-head">
+            <div>
+              <strong>{{ user.displayName }}</strong>
+              <div class="sub">{{ '@' + user.handle }}</div>
+              @if (user.email) {
+                <a class="email-link" [href]="'mailto:' + user.email">{{
+                  user.email
+                }}</a>
+              }
+            </div>
+            @if (user.suspendedAt) {
+              <span class="pill danger">suspendido</span>
+            } @else {
+              <span class="pill ok">activo</span>
+            }
+          </header>
+
+          <div class="user-card-meta">
+            <span class="pill">{{ user.accountType }}</span>
+            @if (user.role === 'admin') {
+              <span class="pill admin">admin</span>
+            }
+            @if (user.verified) {
+              <span class="pill ok">verificado</span>
+            }
+            @if (user.newsPublisher || user.forumModerator) {
+              <span class="pill">noticias</span>
+            }
+            @if (user.calendarContributor || user.forumModerator) {
+              <span class="pill">calendario</span>
+            }
+            @if (user.forumModerator) {
+              <span class="pill">moderador</span>
+            }
+            <span class="sub">Alta · {{ timeAgo(user.createdAt) }}</span>
+          </div>
+
+          @if (user.suspendedAt && user.suspendedReason) {
+            <p class="user-card-reason">{{ user.suspendedReason }}</p>
+          }
+
+          <div class="user-card-actions">
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="busyId() === user.id || editSaving()"
+              (click)="openEdit(user)"
+            >
+              Editar
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost"
+              [disabled]="busyId() === user.id || user.id === selfId()"
+              (click)="toggleAdmin(user)"
+            >
+              {{ user.role === 'admin' ? 'Quitar admin' : 'Hacer admin' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="busyId() === user.id"
+              (click)="toggleVerified(user)"
+            >
+              {{ user.verified ? 'Quitar verif.' : 'Verificar' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="busyId() === user.id"
+              (click)="toggleNewsPublisher(user)"
+            >
+              {{ user.newsPublisher ? 'Quitar noticias' : 'Dar noticias' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="busyId() === user.id"
+              (click)="toggleCalendarContributor(user)"
+            >
+              {{ user.calendarContributor ? 'Quitar calendario' : 'Dar calendario' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-danger"
+              [disabled]="busyId() === user.id || user.id === selfId()"
+              (click)="toggleSuspend(user)"
+            >
+              {{ user.suspendedAt ? 'Reactivar' : 'Suspender' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-danger"
+              [disabled]="busyId() === user.id || user.id === selfId()"
+              (click)="deleteUser(user)"
+            >
+              Eliminar
+            </button>
+          </div>
+        </article>
+      }
+    </div>
   }
 </section>
+
+@if (editingUser(); as user) {
+  <div class="modal-backdrop" (click)="closeEdit()">
+    <div class="modal-card" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+      <header>
+        <h2>Editar usuario</h2>
+        <button
+          type="button"
+          class="btn btn-ghost"
+          (click)="closeEdit()"
+          [disabled]="editSaving()"
+        >
+          Cerrar
+        </button>
+      </header>
+
+      <p class="modal-lead">
+        Perfil y acceso de
+        <strong>{{ '@' + user.handle }}</strong>. Cambiar el email cambia el login.
+      </p>
+
+      @if (editError(); as err) {
+        <div class="error-box">{{ err }}</div>
+      }
+
+      <label>
+        Nombre visible
+        <input
+          type="text"
+          [(ngModel)]="editDisplayName"
+          maxlength="80"
+          [disabled]="editSaving()"
+        />
+      </label>
+      <label>
+        Handle
+        <input
+          type="text"
+          [(ngModel)]="editHandle"
+          maxlength="30"
+          [disabled]="editSaving()"
+          placeholder="sin @"
+        />
+      </label>
+      <label>
+        Email (login)
+        <input
+          type="email"
+          [(ngModel)]="editEmail"
+          maxlength="160"
+          [disabled]="editSaving()"
+        />
+      </label>
+      <label>
+        Nueva contraseña
+        <em>(opcional, mín. 8)</em>
+        <input
+          type="text"
+          [(ngModel)]="editPassword"
+          maxlength="72"
+          [disabled]="editSaving()"
+          autocomplete="new-password"
+          placeholder="Dejar vacío para no cambiarla"
+        />
+      </label>
+
+      <div class="modal-actions">
+        <button
+          type="button"
+          class="btn btn-ghost"
+          (click)="closeEdit()"
+          [disabled]="editSaving()"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="saveEdit()"
+          [disabled]="editSaving()"
+        >
+          {{ editSaving() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

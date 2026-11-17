@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/image_decode_cache.dart';
 import '../../core/utils/image_upload_compress.dart';
+import '../../core/widgets/cofradeo_asset_image.dart';
 import '../../core/widgets/cofradeo_avatar.dart';
 import '../../core/widgets/cofradeo_network_image.dart';
 import '../../core/constants/app_assets.dart';
@@ -309,14 +310,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         ).toDouble(),
       );
     }
-    return Image.asset(
-      AppAssets.profileHeaderCover,
+    return CofradeoAssetImage(
+      assetPath: AppAssets.profileHeaderCover,
       fit: BoxFit.cover,
       alignment: const Alignment(0, -0.15),
       cacheWidth: ImageDecodeCache.px(
         context,
         MediaQuery.sizeOf(context).width,
       ),
+      fadeDuration: const Duration(milliseconds: 320),
     );
   }
 

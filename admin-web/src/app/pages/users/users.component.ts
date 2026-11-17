@@ -13,6 +13,7 @@ import { formatDateTime, formatTimeAgo } from '../../core/utils/date';
   standalone: true,
   imports: [FormsModule],
   templateUrl: './users.component.html',
+  styleUrl: './users.component.scss',
 })
 export class UsersPageComponent implements OnInit {
   private readonly community = inject(CommunityService);
@@ -23,8 +24,17 @@ export class UsersPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly busyId = signal<string | null>(null);
-  readonly filter = signal<'all' | 'admin' | 'brotherhood' | 'suspended'>('all');
+  readonly filter = signal<
+    'all' | 'admin' | 'brotherhood' | 'suspended' | 'noticias' | 'calendario' | 'moderador'
+  >('all');
+  readonly editingUser = signal<AdminUserRow | null>(null);
+  readonly editSaving = signal(false);
+  readonly editError = signal<string | null>(null);
   search = '';
+  editDisplayName = '';
+  editHandle = '';
+  editEmail = '';
+  editPassword = '';
   readonly timeAgo = formatTimeAgo;
   readonly dateTime = formatDateTime;
   readonly selfId = () => this.auth.profile()?.id;
@@ -37,12 +47,20 @@ export class UsersPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [stats, users] = await Promise.all([
-        this.community.fetchSignupStats(),
-        this.community.searchUsers(this.search),
-      ]);
+      const [stats, users, publisherIds, calendarIds, moderatorIds] =
+        await Promise.all([
+          this.community.fetchSignupStats(),
+          this.community.searchUsers(this.search),
+          this.community.fetchNewsPublisherIds().catch(() => new Set<string>()),
+          this.community
+            .fetchCalendarContributorIds()
+            .catch(() => new Set<string>()),
+          this.community.fetchForumModeratorIds().catch(() => new Set<string>()),
+        ]);
       this.stats.set(stats);
-      this.users.set(users);
+      this.users.set(
+        this.withAccess(users, publisherIds, calendarIds, moderatorIds),
+      );
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo cargar');
     } finally {
@@ -54,7 +72,17 @@ export class UsersPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      this.users.set(await this.community.searchUsers(this.search));
+      const [users, publisherIds, calendarIds, moderatorIds] = await Promise.all([
+        this.community.searchUsers(this.search),
+        this.community.fetchNewsPublisherIds().catch(() => new Set<string>()),
+        this.community
+          .fetchCalendarContributorIds()
+          .catch(() => new Set<string>()),
+        this.community.fetchForumModeratorIds().catch(() => new Set<string>()),
+      ]);
+      this.users.set(
+        this.withAccess(users, publisherIds, calendarIds, moderatorIds),
+      );
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Error de búsqueda');
     } finally {
@@ -71,6 +99,12 @@ export class UsersPageComponent implements OnInit {
         return list.filter((u) => u.accountType === 'brotherhood');
       case 'suspended':
         return list.filter((u) => !!u.suspendedAt);
+      case 'noticias':
+        return list.filter((u) => u.newsPublisher || u.forumModerator);
+      case 'calendario':
+        return list.filter((u) => u.calendarContributor || u.forumModerator);
+      case 'moderador':
+        return list.filter((u) => u.forumModerator);
       default:
         return list;
     }
@@ -92,6 +126,76 @@ export class UsersPageComponent implements OnInit {
       );
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo cambiar el rol');
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  async toggleNewsPublisher(user: AdminUserRow): Promise<void> {
+    const next = !user.newsPublisher;
+    const question = next
+      ? `¿Dejar que @${user.handle} publique noticias? El verificado dorado sale en su perfil. El calendario oficial no se abre con esto.`
+      : `¿Quitar a @${user.handle} el acceso a noticias? Lo ya publicado sigue con su firma.`;
+    if (!confirm(question)) return;
+    this.busyId.set(user.id);
+    try {
+      await this.community.setNewsPublisher(user.id, next);
+      this.users.update((list) =>
+        list.map((u) =>
+          u.id === user.id ? { ...u, newsPublisher: next } : u,
+        ),
+      );
+    } catch (err) {
+      this.error.set(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo actualizar. ¿Ejecutaste news_publishers.sql?',
+      );
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  private withAccess(
+    users: AdminUserRow[],
+    publisherIds: Set<string>,
+    calendarIds: Set<string>,
+    moderatorIds: Set<string>,
+  ): AdminUserRow[] {
+    return users.map((user) => ({
+      ...user,
+      newsPublisher: publisherIds.has(user.id),
+      calendarContributor: calendarIds.has(user.id),
+      forumModerator: moderatorIds.has(user.id),
+    }));
+  }
+
+  async toggleCalendarContributor(user: AdminUserRow): Promise<void> {
+    const next = !user.calendarContributor;
+    const question = next
+      ? `¿Dejar que @${user.handle} proponga eventos? Quedan en revisión de la Junta. También podrá publicar noticias.`
+      : `¿Quitar a @${user.handle} el acceso al calendario? El acceso a noticias, si lo tiene, se queda.`;
+    if (!confirm(question)) return;
+    this.busyId.set(user.id);
+    try {
+      await this.community.setCalendarContributor(user.id, next);
+      this.users.update((list) =>
+        list.map((u) =>
+          u.id === user.id
+            ? {
+                ...u,
+                calendarContributor: next,
+                newsPublisher: next ? true : u.newsPublisher,
+              }
+            : u,
+        ),
+      );
+    } catch (err) {
+      this.error.set(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo actualizar. ¿Ejecutaste calendar_contributors.sql?',
+      );
     } finally {
       this.busyId.set(null);
     }
@@ -151,6 +255,153 @@ export class UsersPageComponent implements OnInit {
       }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo suspender');
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  openEdit(user: AdminUserRow): void {
+    this.editingUser.set(user);
+    this.editDisplayName = user.displayName;
+    this.editHandle = user.handle;
+    this.editEmail = user.email ?? '';
+    this.editPassword = '';
+    this.editError.set(null);
+  }
+
+  closeEdit(): void {
+    if (this.editSaving()) return;
+    this.editingUser.set(null);
+    this.editError.set(null);
+    this.editPassword = '';
+  }
+
+  async saveEdit(): Promise<void> {
+    const user = this.editingUser();
+    if (!user) return;
+
+    const displayName = this.editDisplayName.trim();
+    const handle = this.editHandle.replace(/^@/, '').trim().toLowerCase();
+    const email = this.editEmail.trim().toLowerCase();
+    const password = this.editPassword.trim();
+
+    if (displayName.length < 2) {
+      this.editError.set('El nombre debe tener al menos 2 caracteres.');
+      return;
+    }
+    if (handle.length < 2 || !/^[a-z0-9_]+$/.test(handle)) {
+      this.editError.set('Handle: solo a-z, 0-9 y _ (mín. 2).');
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.editError.set('Indica un email válido.');
+      return;
+    }
+    if (password && password.length < 8) {
+      this.editError.set('La contraseña nueva debe tener al menos 8 caracteres.');
+      return;
+    }
+
+    const emailChanged = email !== (user.email ?? '').toLowerCase();
+    if (emailChanged) {
+      if (
+        !confirm(
+          `Vas a cambiar el email de @${user.handle} a:\n${email}\n\n` +
+            'Ese será el nuevo acceso de login. ¿Continuar?',
+        )
+      ) {
+        return;
+      }
+    }
+
+    this.editSaving.set(true);
+    this.editError.set(null);
+    this.error.set(null);
+    try {
+      const result = await this.community.updateUser({
+        profileId: user.id,
+        displayName,
+        handle,
+        email,
+        password: password || null,
+      });
+      this.users.update((list) =>
+        list.map((u) =>
+          u.id === user.id
+            ? {
+                ...u,
+                displayName: result.displayName,
+                handle: result.handle,
+                email: result.email,
+              }
+            : u,
+        ),
+      );
+      this.editingUser.set(null);
+      this.editPassword = '';
+      const bits = [
+        result.profileUpdated ? 'perfil' : null,
+        result.emailUpdated ? 'email' : null,
+        result.passwordUpdated ? 'contraseña' : null,
+      ].filter(Boolean);
+      alert(
+        bits.length
+          ? `Actualizado @${result.handle} (${bits.join(', ')}).`
+          : `Sin cambios en @${result.handle}.`,
+      );
+    } catch (err) {
+      this.editError.set(
+        err instanceof Error ? err.message : 'No se pudo guardar',
+      );
+    } finally {
+      this.editSaving.set(false);
+    }
+  }
+
+  async deleteUser(user: AdminUserRow): Promise<void> {
+    if (user.id === this.selfId()) {
+      this.error.set('No puedes eliminarte a ti mismo.');
+      return;
+    }
+    if (
+      !confirm(
+        `¿Eliminar a @${user.handle}?\n\n` +
+          'Se borrará la cuenta (Auth + perfil), sus temas y sus comentarios.\n' +
+          'No se tocan los tablones del foro Hermandades ni temas de sistema.',
+      )
+    ) {
+      return;
+    }
+    if (
+      !confirm(
+        `Última confirmación: borrar permanentemente a @${user.handle}. Esta acción no se puede deshacer.`,
+      )
+    ) {
+      return;
+    }
+
+    this.busyId.set(user.id);
+    this.error.set(null);
+    try {
+      const result = await this.community.deleteUser(user.id, {
+        deleteContent: true,
+      });
+      this.users.update((list) => list.filter((u) => u.id !== user.id));
+      const stats = this.stats();
+      if (stats) {
+        this.stats.set({
+          ...stats,
+          total: Math.max(0, stats.total - 1),
+        });
+      }
+      alert(
+        `Eliminado @${user.handle}.\n` +
+          `Temas: ${result.deletedTopics} · Comentarios: ${result.deletedReplies}`,
+      );
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo eliminar el usuario',
+      );
     } finally {
       this.busyId.set(null);
     }

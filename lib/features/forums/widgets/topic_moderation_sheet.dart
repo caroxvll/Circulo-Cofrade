@@ -7,9 +7,11 @@ import '../../../shared/models/forum.dart';
 import '../../admin/admin_provider.dart';
 import '../../auth/auth_provider.dart';
 import '../../permissions/permissions_provider.dart';
+import '../../profile/profile_provider.dart';
 import '../forums_provider.dart';
 import '../utils/forum_navigation.dart';
 import '../utils/noticias_forum.dart';
+import 'noticias_unify_sheet.dart';
 
 Future<void> showTopicModerationSheet(
   BuildContext context,
@@ -27,6 +29,60 @@ Future<void> showTopicModerationSheet(
     ),
     builder: (_) => _TopicModerationSheet(forumId: forumId, topic: topic),
   );
+}
+
+/// Borra el tema y sus respuestas. Devuelve true si se eliminó.
+Future<bool> confirmAndDeleteForumTopic(
+  BuildContext context,
+  WidgetRef ref, {
+  required ForumTopic topic,
+  required String forumId,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('¿Eliminar «${topic.title}»?'),
+      content: const Text(
+        'Se borrará el tema y todos sus comentarios. '
+        'Esta acción no se puede deshacer.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.accentRed),
+          child: const Text('Eliminar'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return false;
+
+  try {
+    await ref.read(adminRepositoryProvider).deleteTopic(topic.id);
+    ref.invalidate(forumTopicsProvider(forumId));
+    ref.invalidate(rejectedTopicsProvider);
+    final authorId = topic.authorId;
+    if (authorId != null) {
+      ref.invalidate(userActivityProvider(authorId));
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('«${topic.title}» eliminado')),
+      );
+    }
+    return true;
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo eliminar el tema')),
+      );
+    }
+    return false;
+  }
 }
 
 class _TopicModerationSheet extends ConsumerStatefulWidget {
@@ -122,50 +178,18 @@ class _TopicModerationSheetState extends ConsumerState<_TopicModerationSheet> {
   }
 
   Future<void> _deleteTopic() async {
-    final topic = widget.topic;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('¿Eliminar «${topic.title}»?'),
-        content: const Text(
-          'Se borrará el tema y todas sus respuestas de la base de datos. '
-          'Esta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.accentRed),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
     setState(() => _busy = true);
-    try {
-      await ref.read(adminRepositoryProvider).deleteTopic(topic.id);
-      ref.invalidate(forumTopicsProvider(widget.forumId));
-      ref.invalidate(rejectedTopicsProvider);
-      if (!mounted) return;
-      Navigator.pop(context); // cierra el sheet
-      popForumTopic(context, forumId: widget.forumId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('«${topic.title}» eliminado')),
-      );
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo eliminar el tema')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final deleted = await confirmAndDeleteForumTopic(
+      context,
+      ref,
+      topic: widget.topic,
+      forumId: widget.forumId,
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!deleted) return;
+    Navigator.pop(context);
+    popForumTopic(context, forumId: widget.forumId);
   }
 
   Future<void> _banAuthor() async {
@@ -250,7 +274,7 @@ class _TopicModerationSheetState extends ConsumerState<_TopicModerationSheet> {
         topic.authorId != currentUserId &&
         !topic.isSystem;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -265,6 +289,48 @@ class _TopicModerationSheetState extends ConsumerState<_TopicModerationSheet> {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 20),
+          if (isNoticiasForum(widget.forumId) && topic.isPublished) ...[
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(
+                Icons.view_carousel_outlined,
+                color: AppColors.burgundy,
+              ),
+              title: Text(
+                topic.newsGroupId == null
+                    ? 'Unir con otra noticia'
+                    : 'Añadir otra cuenta al carrusel',
+              ),
+              subtitle: Text(
+                'Misma noticia, una ficha, se pasa con el dedo',
+                style: AppTypography.bodyMedium(color: AppColors.textMuted),
+              ),
+              onTap: _busy
+                  ? null
+                  : () => showUnifyNoticiaSheet(context, ref, topic: topic),
+            ),
+            if (topic.newsGroupId != null)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(
+                  Icons.call_split,
+                  color: AppColors.burgundy,
+                ),
+                title: const Text('Separar esta noticia'),
+                subtitle: Text(
+                  'Vuelve a ser una ficha propia',
+                  style: AppTypography.bodyMedium(color: AppColors.textMuted),
+                ),
+                onTap: _busy
+                    ? null
+                    : () => _run(
+                          () => ref
+                              .read(adminRepositoryProvider)
+                              .splitNoticia(topic.id),
+                          'Noticia separada',
+                        ),
+              ),
+          ],
           if (!topic.isSystem)
             ListTile(
               contentPadding: EdgeInsets.zero,

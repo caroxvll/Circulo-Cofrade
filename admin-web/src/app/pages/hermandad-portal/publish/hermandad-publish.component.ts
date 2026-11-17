@@ -50,9 +50,7 @@ export class HermandadPublishPageComponent implements OnInit {
   }
 
   private async ensureLoaded(): Promise<void> {
-    if (!this.store.boards().length) {
-      await this.store.reload();
-    }
+    await this.store.ensureLoaded();
     this.topicId = this.store.activeTopicId() ?? '';
     this.applyKindDefaults(this.kindId);
   }
@@ -114,6 +112,19 @@ export class HermandadPublishPageComponent implements OnInit {
       if (Number.isNaN(when) || when <= Date.now() + 5 * 60 * 1000) {
         this.error.set(
           'La programación debe ser al menos 5 minutos en el futuro.',
+        );
+        return;
+      }
+    }
+
+    if (this.destCalendar && this.activeKind.needsDate) {
+      if (!this.startsAtLocal) {
+        this.error.set('Indica la fecha y hora del acto.');
+        return;
+      }
+      if (!this.location.trim()) {
+        this.error.set(
+          'Indica el lugar del acto para publicarlo en el calendario.',
         );
         return;
       }

@@ -71,19 +71,50 @@ class _ProfileTextureBackground extends StatelessWidget {
   }
 }
 
-class _ProfileBody extends ConsumerWidget {
+class _ProfileBody extends ConsumerStatefulWidget {
   const _ProfileBody({required this.profile, required this.isAuthenticated});
 
   final UserProfile profile;
   final bool isAuthenticated;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tabCount = isAuthenticated ? 3 : 2;
+  ConsumerState<_ProfileBody> createState() => _ProfileBodyState();
+}
 
-    return DefaultTabController(
-      length: tabCount,
-      child: SafeArea(
+class _ProfileBodyState extends ConsumerState<_ProfileBody>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    final length = widget.isAuthenticated ? 3 : 2;
+    final openFollowing = widget.isAuthenticated &&
+        ref.read(profileFollowingIntentProvider) != null;
+    _tabs = TabController(
+      length: length,
+      vsync: this,
+      initialIndex: openFollowing ? 1 : 0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = widget.profile;
+    final isAuthenticated = widget.isAuthenticated;
+
+    ref.listen(profileFollowingIntentProvider, (previous, next) {
+      if (next == null || !isAuthenticated || _tabs.index == 1) return;
+      _tabs.animateTo(1);
+    });
+
+    return SafeArea(
         bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -140,6 +171,7 @@ class _ProfileBody extends ConsumerWidget {
             ),
             const SizedBox(height: 2),
             ProfilePillTabBar(
+              controller: _tabs,
               tabs: [
                 const ProfilePillTab(label: 'Temas'),
                 if (isAuthenticated)
@@ -149,6 +181,7 @@ class _ProfileBody extends ConsumerWidget {
             ),
             Expanded(
               child: TabBarView(
+                controller: _tabs,
                 children: [
                   PublicationsTab(
                     userId: profile.id,
@@ -164,7 +197,6 @@ class _ProfileBody extends ConsumerWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }

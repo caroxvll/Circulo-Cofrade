@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/forum.dart';
 import '../../cuaresma/widgets/cuaresma_hub_design.dart';
@@ -45,16 +46,17 @@ class GloriasHubHeroStack extends StatelessWidget {
             children: [
               if (_hasCoverBackground && cover != null)
                 topicCoverIsAsset(cover)
-                    ? Image.asset(
-                        cover,
+                    ? CofradeoAssetImage(
+                        assetPath: cover,
                         fit: BoxFit.cover,
                         filterQuality: FilterQuality.medium,
                         cacheWidth: ImageDecodeCache.px(
                           context,
                           MediaQuery.sizeOf(context).width,
                         ),
-                        gaplessPlayback: true,
-                        errorBuilder: (_, _, _) => const _GloriasHeroFallback(),
+                        fadeDuration: const Duration(milliseconds: 360),
+                        errorBuilder: (_, _, _) =>
+                            const _GloriasHeroFallback(),
                       )
                     : CofradeoNetworkImage(
                         url: cover,
@@ -63,6 +65,10 @@ class GloriasHubHeroStack extends StatelessWidget {
                         height: _heroHeight,
                         cacheSize: 720,
                         filterQuality: FilterQuality.medium,
+                        fadeInDuration: const Duration(milliseconds: 360),
+                        placeholder: const ColoredBox(
+                          color: AppColors.burgundyDark,
+                        ),
                         errorWidget: const _GloriasHeroFallback(),
                       )
               else

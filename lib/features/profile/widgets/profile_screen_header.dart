@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/calendar_quick_access_button.dart';
+import '../../../core/widgets/screen_title_row.dart';
 import '../profile_design.dart';
 
 class ProfileScreenHeader extends StatelessWidget {
@@ -18,11 +19,9 @@ class ProfileScreenHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: Text(
-            'PERFIL',
+          child: AdaptiveScreenTitle(
+            text: 'PERFIL',
             style: ProfileDesign.screenTitle(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ),
         const CalendarQuickAccessButton(),

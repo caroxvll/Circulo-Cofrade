@@ -14,11 +14,32 @@ import '../admin_provider.dart';
 import '../data/admin_repository.dart';
 import '../junta_ui.dart';
 
-class JuntaPendingTopicsPanel extends ConsumerWidget {
+class JuntaPendingTopicsPanel extends ConsumerStatefulWidget {
   const JuntaPendingTopicsPanel({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<JuntaPendingTopicsPanel> createState() =>
+      _JuntaPendingTopicsPanelState();
+}
+
+class _JuntaPendingTopicsPanelState
+    extends ConsumerState<JuntaPendingTopicsPanel> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(pendingTopicsProvider);
+    });
+  }
+
+  Future<void> _reload() async {
+    ref.invalidate(pendingTopicsProvider);
+    await ref.read(pendingTopicsProvider.future);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.watch(pendingTopicsRealtimeProvider);
     final topicsAsync = ref.watch(pendingTopicsProvider);
 
@@ -31,18 +52,25 @@ class JuntaPendingTopicsPanel extends ConsumerWidget {
       ),
       data: (topics) {
         if (topics.isEmpty) {
-          return const JuntaEmptyPanel(
-            icon: Icons.check_circle_outline,
-            message: 'Sin temas pendientes',
-            subtitle: 'Los nuevos hilos aparecerán aquí.',
+          return RefreshIndicator(
+            onRefresh: _reload,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [
+                SizedBox(height: 80),
+                JuntaEmptyPanel(
+                  icon: Icons.check_circle_outline,
+                  message: 'Sin temas pendientes',
+                  subtitle:
+                      'Los nuevos hilos aparecerán aquí. Desliza para actualizar.',
+                ),
+              ],
+            ),
           );
         }
 
         return RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(pendingTopicsProvider);
-            await ref.read(pendingTopicsProvider.future);
-          },
+          onRefresh: _reload,
           child: ListView.separated(
             padding: JuntaUi.listPadding,
             itemCount: topics.length,
