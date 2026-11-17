@@ -229,9 +229,9 @@ class ReplyCard extends StatelessWidget {
                         shareText: _imageShareText(reply),
                         borderRadius:
                             const BorderRadius.all(Radius.circular(10)),
-                        maxPreviewHeight: 220,
+                        maxPreviewHeight: 560,
                         showExpandHint: false,
-                        fit: BoxFit.cover,
+                        adaptiveOrientation: true,
                       ),
                     ],
                     if (!deleted) ...[

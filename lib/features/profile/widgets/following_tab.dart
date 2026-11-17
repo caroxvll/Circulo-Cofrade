@@ -17,6 +17,7 @@ import '../../forums/utils/hermandad_local_assets.dart';
 import '../../forums/widgets/hermandad_crest_hero.dart';
 import '../../forums/widgets/hermandad_follow_sections_sheet.dart';
 import '../../search/follows_provider.dart';
+import '../hermandad_following_provider.dart';
 import '../profile_provider.dart';
 import '../profile_design.dart';
 import 'profile_people_mode.dart';
@@ -134,21 +135,24 @@ class _FollowingTabState extends ConsumerState<FollowingTab> {
           const Center(child: Text('Error al cargar seguimientos')),
       data: (topics) {
         final hashtags = hashtagsAsync.asData?.value ?? {};
+        final availability = ref.watch(hermandadFollowingEnabledProvider);
+        final hermandadEnabled = availability.asData?.value ?? false;
         final all = _buildEntries(topics: topics, hashtags: hashtags);
         final hermandadCount =
             all.where((e) => e.kind == _FollowKind.hermandad).length;
 
         // Sin seguimientos: en hermandades mostramos el directorio; en el resto, vacío.
         if (all.isEmpty && _filter != _FollowFilter.hermandad) {
-          return const Padding(
-            padding: EdgeInsets.all(ProfileDesign.screenPadding),
+          return Padding(
+            padding: const EdgeInsets.all(ProfileDesign.screenPadding),
             child: Center(
               child: ProfileEmptyState(
                 icon: Icons.bookmark_outline_rounded,
                 title: 'Aún no sigues foros',
-                subtitle:
-                    'Elige tu hermandad en el chip de arriba, o sigue '
-                    'hilos y hashtags desde Buscar.',
+                subtitle: hermandadEnabled
+                    ? 'Elige tu hermandad en el chip de arriba, o sigue '
+                        'hilos y hashtags desde Buscar.'
+                    : 'Sigue hilos y hashtags desde Buscar.',
               ),
             ),
           );
@@ -210,6 +214,7 @@ class _FollowingTabState extends ConsumerState<FollowingTab> {
                     _FollowingHeader(
                       filter: _filter,
                       hermandadCount: hermandadCount,
+                      hermandadEnabled: hermandadEnabled,
                     ),
                     const SizedBox(height: 8),
                     SingleChildScrollView(
@@ -221,11 +226,13 @@ class _FollowingTabState extends ConsumerState<FollowingTab> {
                               padding: const EdgeInsets.only(right: 8),
                               child: ChoiceChip(
                                 label: Text(switch (f) {
-                                  _FollowFilter.hermandad => hermandadCount == 0
-                                      ? 'Hermandades'
-                                      : hermandadCount == 1
-                                          ? 'Tu hermandad'
-                                          : 'Tus hermandades',
+                                  _FollowFilter.hermandad => !hermandadEnabled
+                                      ? 'Tu hermandad'
+                                      : hermandadCount == 0
+                                          ? 'Hermandades'
+                                          : hermandadCount == 1
+                                              ? 'Tu hermandad'
+                                              : 'Tus hermandades',
                                   _FollowFilter.hilo => 'Hilos',
                                   _FollowFilter.hashtag => 'Hashtags',
                                 }),
@@ -253,6 +260,23 @@ class _FollowingTabState extends ConsumerState<FollowingTab> {
                     ),
                     const SizedBox(height: 8),
                     if (_filter == _FollowFilter.hermandad &&
+                        !hermandadEnabled)
+                      Expanded(
+                        child: Center(
+                          child: availability.isLoading
+                              ? const CircularProgressIndicator(
+                                  color: AppColors.burgundy,
+                                )
+                              : const ProfileEmptyState(
+                                  icon: Icons.church_outlined,
+                                  title: 'Próximamente',
+                                  subtitle:
+                                      'Podrás elegir tu hermandad y seguir '
+                                      'lo que publique. Lo abriremos en breve.',
+                                ),
+                        ),
+                      )
+                    else if (_filter == _FollowFilter.hermandad &&
                         (hermandadCount == 0 || _exploreMoreHermandades))
                       Expanded(
                         child: _HermandadDiscoverPane(
@@ -407,22 +431,26 @@ class _FollowingHeader extends StatelessWidget {
   const _FollowingHeader({
     required this.filter,
     required this.hermandadCount,
+    required this.hermandadEnabled,
   });
 
   final _FollowFilter filter;
   final int hermandadCount;
+  final bool hermandadEnabled;
 
   @override
   Widget build(BuildContext context) {
     final (icon, title, count) = switch (filter) {
       _FollowFilter.hermandad => (
           Icons.church_outlined,
-          hermandadCount == 0
-              ? 'Elige tu hermandad'
-              : hermandadCount == 1
-                  ? 'Tu hermandad'
-                  : 'Tus hermandades',
-          hermandadCount == 0 ? null : hermandadCount,
+          !hermandadEnabled
+              ? 'Tu hermandad'
+              : hermandadCount == 0
+                  ? 'Elige tu hermandad'
+                  : hermandadCount == 1
+                      ? 'Tu hermandad'
+                      : 'Tus hermandades',
+          !hermandadEnabled || hermandadCount == 0 ? null : hermandadCount,
         ),
       _FollowFilter.hilo => (Icons.forum_outlined, 'Hilos que sigues', null),
       _FollowFilter.hashtag => (Icons.tag_rounded, 'Hashtags que sigues', null),

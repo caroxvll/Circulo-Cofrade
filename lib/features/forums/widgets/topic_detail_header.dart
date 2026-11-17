@@ -233,7 +233,11 @@ class _TopicEditorialBody extends StatelessWidget {
             imageUrl: coverUrl!,
             shareText: topic.title,
             borderRadius: const BorderRadius.all(Radius.circular(10)),
-            maxPreviewHeight: stack ? 420 : 480,
+            maxPreviewHeight: isNoticiasForum(topic.forumId) ? 300 : 560,
+            adaptiveOrientation: !isNoticiasForum(topic.forumId),
+            fit: isNoticiasForum(topic.forumId)
+                ? BoxFit.cover
+                : BoxFit.contain,
           );
 
     if (!hasBody) return media;

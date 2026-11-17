@@ -8,7 +8,7 @@ abstract final class AppAssets {
   static const logoLogin = 'assets/images/logo-login.png';
   static const loginBackground = 'assets/images/fondo.jpeg';
   static const googleLogo = 'assets/images/google.svg';
-  static const logoIcon = 'assets/images/logo_icon.png';
+  static const logoIcon = 'assets/images/logo.png';
   static const forumsBeigeBackground = 'assets/images/fondobeige.jpeg';
   static const countdownBanner = 'assets/images/bannerDias.png';
 
