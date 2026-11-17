@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const MAX_BYTES = 80 * 1024 * 1024;
+const MAX_BYTES = 150 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
   "video/mp4",
   "video/quicktime",
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "byteLength inválido" }, 400);
     }
     if (byteLength > MAX_BYTES) {
-      return jsonResponse({ error: "El vídeo supera 80 MB" }, 400);
+      return jsonResponse({ error: "El vídeo supera 150 MB" }, 400);
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey);

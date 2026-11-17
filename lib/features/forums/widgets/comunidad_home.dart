@@ -891,17 +891,10 @@ class _ParaTiEditorialCard extends StatelessWidget {
     final cover = topic.coverImageUrl?.trim();
     final poster = topic.editorialPosterUrl;
     final isVideo = topic.hasReadyEditorialVideo;
-    // Vídeo: nunca rota «último comentario» (_ConversationSlide).
+    // Vídeo: poster ligero en el feed (sin inicializar el MP4).
+    // Al abrir el tema se reproduce una sola vez en el detalle.
     final Widget? media = isVideo
-        ? EditorialVideoPlayer(
-            videoUrl: topic.videoUrl!,
-            posterUrl: poster,
-            autoPlay: true,
-            muted: true,
-            pauseWhenOffscreen: true,
-            showVideoLabel: true,
-            openFullscreenOnTap: true,
-          )
+        ? EditorialVideoPoster(posterUrl: poster)
         : (cover == null || cover.isEmpty)
             ? null
             : ForumPostImage(
@@ -919,7 +912,7 @@ class _ParaTiEditorialCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const AppLogo(size: 40, useIconVariant: true),
+              const AppLogo(size: 40, useIconVariant: true, circular: true),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(

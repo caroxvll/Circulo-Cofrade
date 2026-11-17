@@ -5,7 +5,7 @@ const editorialPublicHandle = '@cofradeo';
 const editorialPublicName = 'Círculo Cofrade';
 
 /// Límite Fase 2a (MP4 directo en R2). FFmpeg/HLS subirá el techo después.
-const editorialVideoMaxBytes = 80 * 1024 * 1024;
+const editorialVideoMaxBytes = 150 * 1024 * 1024;
 
 bool isEditorialTopic(ForumTopic topic) => topic.isEditorial;
 
