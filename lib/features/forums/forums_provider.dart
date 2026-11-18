@@ -176,7 +176,11 @@ class ForumTopicsNotifier extends AsyncNotifier<List<ForumTopic>> {
         );
         if (parsed == null) return;
         // Solo publicados listados (igual que fetchTopics).
-        if (!parsed.isListed || !parsed.isPublished || parsed.isRejected) {
+        // Editoriales no van al listado del foro (viven en Para ti).
+        if (parsed.isEditorial ||
+            !parsed.isListed ||
+            !parsed.isPublished ||
+            parsed.isRejected) {
           removeById(id);
           return;
         }

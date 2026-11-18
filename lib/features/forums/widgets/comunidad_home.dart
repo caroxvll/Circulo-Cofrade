@@ -890,11 +890,14 @@ class _ParaTiEditorialCard extends StatelessWidget {
     );
     final cover = topic.coverImageUrl?.trim();
     final poster = topic.editorialPosterUrl;
-    final isVideo = topic.hasReadyEditorialVideo;
-    // Vídeo: poster ligero en el feed (sin inicializar el MP4).
+    final isVideo = topic.hasEditorialVideoMedia;
+    // Vídeo: poster ligero en el feed (sin inicializar el MP4/HLS).
     // Al abrir el tema se reproduce una sola vez en el detalle.
     final Widget? media = isVideo
-        ? EditorialVideoPoster(posterUrl: poster)
+        ? EditorialVideoPoster(
+            posterUrl: poster,
+            processing: topic.hasProcessingEditorialVideo,
+          )
         : (cover == null || cover.isEmpty)
             ? null
             : ForumPostImage(

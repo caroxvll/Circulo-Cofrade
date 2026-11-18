@@ -80,11 +80,13 @@ class ForumsRepository {
   Future<List<ForumTopic>> fetchTopics(String forumId) async {
     if (!_useRemote) return topicsForForum(forumId);
 
+    // Editoriales viven en Para ti, no en el listado del foro.
     final rows = await _client!
         .from('forum_topics')
         .select('*, $_profileAuthorSelect')
         .eq('forum_id', forumId)
         .eq('status', 'published')
+        .eq('is_editorial', false)
         .order('created_at', ascending: false);
 
     return orderForumTopics(
@@ -594,6 +596,8 @@ class ForumsRepository {
       videoUrl: row['video_url'] as String?,
       videoPosterUrl: row['video_poster_url'] as String?,
       videoStatus: row['video_status'] as String?,
+      videoProvider: row['video_provider'] as String?,
+      videoExternalId: row['video_external_id'] as String?,
       showHubTitle: row['show_hub_title'] as bool? ?? true,
       isListed: row['is_listed'] as bool? ?? true,
       createdAt: createdAt,

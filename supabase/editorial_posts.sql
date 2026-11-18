@@ -13,7 +13,7 @@ create index if not exists forum_topics_editorial_published_idx
   where is_editorial = true and status = 'published';
 
 comment on column public.forum_topics.is_editorial is
-  'Publicación oficial de Círculo Cofrade para Para ti (no hub de sistema).';
+  'Publicación oficial de Círculo Cofrade para Para ti (no aparece en el listado del foro; sí admite detalle y comentarios).';
 
 comment on column public.forum_topics.via_author_id is
   'Quién redactó la publicación editorial; la marca pública es Círculo Cofrade.';
@@ -106,7 +106,7 @@ begin
     nullif(trim(coalesce(p_cover_image_url, '')), ''),
     false,
     false,
-    true
+    false
   )
   returning * into v_row;
 
@@ -116,6 +116,12 @@ $$;
 
 revoke all on function public.create_editorial_post(text, text, text, text) from public;
 grant execute on function public.create_editorial_post(text, text, text, text) to authenticated;
+
+-- Ya publicadas: fuera del listado del foro (siguen en Para ti + detalle).
+update public.forum_topics
+set is_listed = false
+where is_editorial = true
+  and is_listed = true;
 
 -- Portada: el creador (via/author) o staff puede fijarla en editoriales.
 create or replace function public.set_editorial_cover(
