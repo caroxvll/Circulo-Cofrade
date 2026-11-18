@@ -212,8 +212,18 @@ const seasonActDbValues = <String>[
 bool eventBelongsToHermandad(
   CalendarEvent event, {
   required String hermandadName,
+  String? hermandadTopicId,
   String? profileId,
 }) {
+  final topicId = hermandadTopicId?.trim();
+  final linked = event.hermandadTopicId?.trim();
+  if (topicId != null &&
+      topicId.isNotEmpty &&
+      linked != null &&
+      linked.isNotEmpty &&
+      linked == topicId) {
+    return true;
+  }
   if (profileId != null &&
       profileId.isNotEmpty &&
       event.createdById == profileId) {
@@ -282,6 +292,7 @@ HermandadSeasonActsSnapshot buildHermandadSeasonActsSnapshot({
         (e) => eventBelongsToHermandad(
           e,
           hermandadName: hermandadName,
+          hermandadTopicId: topicId,
           profileId: profileId,
         ),
       )
