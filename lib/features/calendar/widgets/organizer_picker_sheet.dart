@@ -327,11 +327,18 @@ class _OrganizerLogoTile extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (!item.hasLogo)
-                      Text(
-                        'Sin escudo guardado',
-                        style: AppTypography.labelSmall(),
+                    Text(
+                      item.isHermandadBoard
+                          ? 'Tablón oficial'
+                          : (item.hasLogo
+                              ? 'Escudo en biblioteca'
+                              : 'Sin escudo guardado'),
+                      style: AppTypography.labelSmall(
+                        color: item.isHermandadBoard
+                            ? AppColors.burgundy
+                            : null,
                       ),
+                    ),
                   ],
                 ),
               ),
