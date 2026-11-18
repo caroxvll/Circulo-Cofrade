@@ -206,9 +206,18 @@ class AdminRepository {
     );
   }
 
-  /// Presign PUT a R2 + metadatos públicos. Requiere Edge Function desplegada.
-  Future<({String uploadUrl, String publicUrl, String objectKey})>
-      requestEditorialVideoUpload({
+  /// Presign Stream (POST) o R2 (PUT). Requiere Edge Function desplegada.
+  Future<
+      ({
+        String mode,
+        String uploadMethod,
+        String uploadUrl,
+        String publicUrl,
+        String objectKey,
+        String? posterUrl,
+        String? externalId,
+        int? maxBytes,
+      })> requestEditorialVideoUpload({
     required String topicId,
     required String contentType,
     required int byteLength,
@@ -240,9 +249,14 @@ class AdminRepository {
       throw const AdminUnavailableException();
     }
     return (
+      mode: data['mode']?.toString() ?? 'r2',
+      uploadMethod: data['uploadMethod']?.toString() ?? 'PUT',
       uploadUrl: uploadUrl,
       publicUrl: publicUrl,
       objectKey: objectKey,
+      posterUrl: data['posterUrl']?.toString(),
+      externalId: data['externalId']?.toString() ?? objectKey,
+      maxBytes: (data['maxBytes'] as num?)?.toInt(),
     );
   }
 
@@ -251,6 +265,8 @@ class AdminRepository {
     String? videoUrl,
     String? videoPosterUrl,
     String videoStatus = 'ready',
+    String? videoProvider,
+    String? videoExternalId,
   }) async {
     if (_client == null) throw const AdminUnavailableException();
     await _client!.rpc(
@@ -260,8 +276,22 @@ class AdminRepository {
         'p_video_url': videoUrl,
         'p_video_poster_url': videoPosterUrl,
         'p_video_status': videoStatus,
+        'p_video_provider': videoProvider,
+        'p_video_external_id': videoExternalId,
       },
     );
+  }
+
+  /// Consulta Stream y marca ready si ya terminó el HLS.
+  Future<bool> finalizeEditorialVideo({required String topicId}) async {
+    if (_client == null) throw const AdminUnavailableException();
+    final response = await _client!.functions.invoke(
+      'editorial-video-finalize',
+      body: {'topicId': topicId},
+    );
+    final data = response.data;
+    if (data is! Map) return false;
+    return data['ready'] == true;
   }
 
   Future<List<ModerationReport>> fetchPendingReports() async {
@@ -584,6 +614,8 @@ class AdminRepository {
       videoUrl: row['video_url'] as String?,
       videoPosterUrl: row['video_poster_url'] as String?,
       videoStatus: row['video_status'] as String?,
+      videoProvider: row['video_provider'] as String?,
+      videoExternalId: row['video_external_id'] as String?,
       isListed: row['is_listed'] as bool? ?? true,
       createdAt: createdAt,
       closeStatus: TopicCloseStatusX.fromDb(row['close_status'] as String?),
@@ -680,9 +712,40 @@ class AdminRepository {
     return rows.map(_topicFromRow).toList();
   }
 
+  /// Borra el MP4/HLS remoto (Stream o R2) de una editorial, si existe.
+  Future<void> deleteEditorialVideoMedia({required String topicId}) async {
+    if (_client == null) throw const AdminUnavailableException();
+    try {
+      await _client!.functions.invoke(
+        'editorial-video-delete',
+        body: {'topicId': topicId},
+      );
+    } catch (_) {
+      // No bloqueamos el borrado del tema si falla el remoto;
+      // se puede limpiar a mano en Cloudflare.
+    }
+  }
+
   /// Elimina un tema y sus respuestas. Requiere poder moderar el foro.
+  /// Si es editorial con vídeo, intenta liberar Stream/R2 antes.
   Future<void> deleteTopic(String topicId) async {
     if (_client == null) throw const AdminUnavailableException();
+
+    try {
+      final row = await _client!
+          .from('forum_topics')
+          .select('is_editorial, video_provider, video_external_id')
+          .eq('id', topicId)
+          .maybeSingle();
+      final isEditorial = row?['is_editorial'] == true;
+      final hasRemote = (row?['video_external_id'] as String?)?.trim().isNotEmpty ==
+          true;
+      if (isEditorial && hasRemote) {
+        await deleteEditorialVideoMedia(topicId: topicId);
+      }
+    } catch (_) {
+      // Seguimos con el borrado del tema.
+    }
 
     try {
       await _client!.rpc(

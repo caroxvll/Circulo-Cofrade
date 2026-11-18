@@ -194,6 +194,8 @@ class ForumTopic {
     this.videoUrl,
     this.videoPosterUrl,
     this.videoStatus,
+    this.videoProvider,
+    this.videoExternalId,
     this.showHubTitle = true,
     this.isListed = true,
     this.createdAt,
@@ -242,12 +244,16 @@ class ForumTopic {
   final String? iconImageUrl;
   final String? coverImageUrl;
 
-  /// Vídeo editorial (R2). Solo publicaciones oficiales.
+  /// Vídeo editorial (HLS Stream o MP4 R2). Solo publicaciones oficiales.
   final String? videoUrl;
   final String? videoPosterUrl;
 
   /// `uploading` | `processing` | `ready` | `failed`.
   final String? videoStatus;
+
+  /// `r2` | `stream`.
+  final String? videoProvider;
+  final String? videoExternalId;
 
   /// En hubs estacionales: mostrar icono + título sobre la portada.
   final bool showHubTitle;
@@ -278,6 +284,14 @@ class ForumTopic {
         url != null &&
         url.isNotEmpty;
   }
+
+  /// Subido a Stream y aún transcodificando (HLS).
+  bool get hasProcessingEditorialVideo =>
+      isEditorial && videoStatus == 'processing';
+
+  /// Hay pieza de vídeo (lista o en proceso) para UI de feed.
+  bool get hasEditorialVideoMedia =>
+      hasReadyEditorialVideo || hasProcessingEditorialVideo;
 
   String? get editorialPosterUrl {
     final poster = videoPosterUrl?.trim();
@@ -323,6 +337,8 @@ class ForumTopic {
     String? videoUrl,
     String? videoPosterUrl,
     String? videoStatus,
+    String? videoProvider,
+    String? videoExternalId,
     bool? showHubTitle,
     bool? isListed,
     DateTime? createdAt,
@@ -365,6 +381,8 @@ class ForumTopic {
       videoUrl: videoUrl ?? this.videoUrl,
       videoPosterUrl: videoPosterUrl ?? this.videoPosterUrl,
       videoStatus: videoStatus ?? this.videoStatus,
+      videoProvider: videoProvider ?? this.videoProvider,
+      videoExternalId: videoExternalId ?? this.videoExternalId,
       showHubTitle: showHubTitle ?? this.showHubTitle,
       isListed: isListed ?? this.isListed,
       createdAt: createdAt ?? this.createdAt,

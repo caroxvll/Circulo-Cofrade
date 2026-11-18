@@ -9,6 +9,7 @@ import '../../auth/auth_provider.dart';
 import '../../permissions/permissions_provider.dart';
 import '../../profile/profile_provider.dart';
 import '../forums_provider.dart';
+import '../para_ti_pulse_provider.dart';
 import '../utils/forum_navigation.dart';
 import '../utils/noticias_forum.dart';
 import 'noticias_unify_sheet.dart';
@@ -42,9 +43,11 @@ Future<bool> confirmAndDeleteForumTopic(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text('¿Eliminar «${topic.title}»?'),
-      content: const Text(
-        'Se borrará el tema y todos sus comentarios. '
-        'Esta acción no se puede deshacer.',
+      content: Text(
+        topic.isEditorial && topic.hasEditorialVideoMedia
+            ? 'Se borrará la publicación, sus comentarios y el vídeo en Cloudflare (Stream/R2). No se puede deshacer.'
+            : 'Se borrará el tema y todos sus comentarios. '
+                'Esta acción no se puede deshacer.',
       ),
       actions: [
         TextButton(
@@ -65,6 +68,11 @@ Future<bool> confirmAndDeleteForumTopic(
     await ref.read(adminRepositoryProvider).deleteTopic(topic.id);
     ref.invalidate(forumTopicsProvider(forumId));
     ref.invalidate(rejectedTopicsProvider);
+    if (topic.isEditorial) {
+      ref.invalidate(editorialPostsProvider);
+      ref.invalidate(publishedEditorialPostsProvider);
+      ref.invalidate(paraTiRiverProvider);
+    }
     final authorId = topic.authorId;
     if (authorId != null) {
       ref.invalidate(userActivityProvider(authorId));
