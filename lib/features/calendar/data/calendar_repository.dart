@@ -185,6 +185,7 @@ class CalendarRepository {
     String? dayLabel,
     String? location,
     String? organizerLabel,
+    String? hermandadTopicId,
     String? publisherHandle,
     String? customIconUrl,
     String? coverImageUrl,
@@ -195,6 +196,7 @@ class CalendarRepository {
   }) async {
     if (_client == null) throw CalendarRemoteUnavailableException();
 
+    final hermandadId = hermandadTopicId?.trim();
     final row = await _client!
         .from('calendar_events')
         .insert({
@@ -206,6 +208,8 @@ class CalendarRepository {
           'day_label': dayLabel,
           'location': location ?? '',
           'organizer_label': organizerLabel ?? '',
+          'hermandad_topic_id':
+              (hermandadId == null || hermandadId.isEmpty) ? null : hermandadId,
           'custom_icon_url': customIconUrl ?? '',
           'cover_image_url': coverImageUrl ?? '',
           'admission_label': _admissionOrNull(admissionLabel),
@@ -231,6 +235,8 @@ class CalendarRepository {
     String? dayLabel,
     String? location,
     String? organizerLabel,
+    String? hermandadTopicId,
+    bool clearHermandadTopicId = false,
     String? customIconUrl,
     String? coverImageUrl,
     String? admissionLabel,
@@ -238,6 +244,7 @@ class CalendarRepository {
   }) async {
     if (_client == null) throw CalendarRemoteUnavailableException();
 
+    final hermandadId = hermandadTopicId?.trim();
     final payload = <String, dynamic>{
       'title': title,
       'subtitle': subtitle,
@@ -252,6 +259,12 @@ class CalendarRepository {
       'time_slots': _slotsPayload(timeSlots),
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
+    if (clearHermandadTopicId) {
+      payload['hermandad_topic_id'] = null;
+    } else if (hermandadId != null) {
+      payload['hermandad_topic_id'] =
+          hermandadId.isEmpty ? null : hermandadId;
+    }
     if (clearEndsAt) {
       payload['ends_at'] = null;
     } else if (endsAt != null) {
@@ -486,16 +499,16 @@ class CalendarRepository {
     try {
       final rows = await _client!
           .from('forum_topics')
-          .select('title, icon_image_url')
+          .select('id, title, icon_image_url')
           .eq('forum_id', 'hermandades')
-          .not('icon_image_url', 'eq', '')
+          .eq('status', 'published')
           .limit(400);
 
       final result = <String, OrganizerLogo>{};
       for (final row in rows as List<dynamic>) {
         final map = Map<String, dynamic>.from(row as Map);
-        final icon = _nonEmptyUrl(map['icon_image_url'] as String?);
-        if (icon == null) continue;
+        final topicId = (map['id'] as String?)?.trim() ?? '';
+        if (topicId.isEmpty) continue;
         final title = (map['title'] as String?)?.trim() ?? '';
         if (title.isEmpty) continue;
         final parsed = parseHermandadTopicTitle(title);
@@ -506,7 +519,8 @@ class CalendarRepository {
         result[key] = OrganizerLogo(
           organizerKey: key,
           displayLabel: name,
-          logoUrl: icon,
+          logoUrl: _nonEmptyUrl(map['icon_image_url'] as String?) ?? '',
+          hermandadTopicId: topicId,
         );
       }
       return result;
@@ -736,6 +750,21 @@ class CalendarRepository {
           .toList();
     }
 
+    // Preferimos tablones oficiales (con topic id) y completamos con biblioteca.
+    final hermandadMap = await fetchHermandadOrganizerLogos();
+    final hermandadList = hermandadMap.values.toList()
+      ..sort((a, b) => a.displayLabel.compareTo(b.displayLabel));
+
+    final q = query.toLowerCase();
+    final matchedHermandades = hermandadList
+        .where(
+          (item) =>
+              q.isEmpty ||
+              item.displayLabel.toLowerCase().contains(q) ||
+              item.organizerKey.contains(q),
+        )
+        .toList();
+
     final builder = _client!.from('organizer_logos').select(
       'organizer_key, display_label, logo_url',
     );
@@ -749,7 +778,7 @@ class CalendarRepository {
               .order('display_label', ascending: true)
               .limit(limit);
 
-    return rows
+    final library = rows
         .map(
           (row) => OrganizerLogo(
             organizerKey: row['organizer_key'] as String,
@@ -758,7 +787,10 @@ class CalendarRepository {
           ),
         )
         .where((item) => item.displayLabel.isNotEmpty)
+        .where((item) => !hermandadMap.containsKey(item.organizerKey))
         .toList();
+
+    return [...matchedHermandades, ...library].take(limit).toList();
   }
 
   CalendarEvent eventFromRow(Map<String, dynamic> row) => _fromRow(row);
@@ -774,6 +806,8 @@ class CalendarRepository {
         : '@$handleRaw';
     final organizer = row['organizer_label'] as String? ?? '';
     final location = row['location'] as String? ?? '';
+    final hermandadTopicId =
+        (row['hermandad_topic_id'] as String?)?.trim();
     final subtitleRaw = row['subtitle'] as String? ?? '';
     final subtitle = _buildSubtitle(
       subtitle: subtitleRaw,
@@ -791,6 +825,10 @@ class CalendarRepository {
       time: DateFormat('HH:mm').format(startsAt),
       location: location.isEmpty ? null : location,
       organizerLabel: organizer.isEmpty ? null : organizer,
+      hermandadTopicId:
+          (hermandadTopicId == null || hermandadTopicId.isEmpty)
+              ? null
+              : hermandadTopicId,
       createdById: row['created_by'] as String?,
       publisherHandle: handle,
       customIconUrl: row['custom_icon_url'] as String?,

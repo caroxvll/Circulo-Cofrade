@@ -248,6 +248,8 @@ class CalendarEvent {
 
     this.organizerLabel,
 
+    this.hermandadTopicId,
+
     this.createdById,
 
     this.publisherHandle,
@@ -280,6 +282,9 @@ class CalendarEvent {
   final String? location;
 
   final String? organizerLabel;
+
+  /// Tablón oficial enlazado (`forum_topics.id` en foro hermandades).
+  final String? hermandadTopicId;
 
   final String? createdById;
 
@@ -334,6 +339,8 @@ class CalendarEvent {
     String? time,
     String? location,
     String? organizerLabel,
+    String? hermandadTopicId,
+    bool clearHermandadTopicId = false,
     String? createdById,
     String? publisherHandle,
     String? customIconUrl,
@@ -357,6 +364,9 @@ class CalendarEvent {
       time: time ?? this.time,
       location: location ?? this.location,
       organizerLabel: organizerLabel ?? this.organizerLabel,
+      hermandadTopicId: clearHermandadTopicId
+          ? null
+          : (hermandadTopicId ?? this.hermandadTopicId),
       createdById: createdById ?? this.createdById,
       publisherHandle: publisherHandle ?? this.publisherHandle,
       customIconUrl: customIconUrl ?? this.customIconUrl,

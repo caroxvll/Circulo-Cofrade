@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -162,6 +163,33 @@ class _EventDetailSheet extends ConsumerWidget {
                             organizer: organizer,
                             shieldUrl: shieldUrl,
                           ),
+                          if (event.hermandadTopicId != null &&
+                              event.hermandadTopicId!.trim().isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  final topicId =
+                                      event.hermandadTopicId!.trim();
+                                  Navigator.pop(context);
+                                  context.push(
+                                    '/foros/hermandades/tema/$topicId',
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons.account_balance_outlined,
+                                  size: 18,
+                                ),
+                                label: const Text('Ver tablón'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.burgundy,
+                                  padding: EdgeInsets.zero,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 14),
                           Text(
                             event.title,

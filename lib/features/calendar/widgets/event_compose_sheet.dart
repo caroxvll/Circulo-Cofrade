@@ -128,6 +128,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   String? _error;
   String? _customIconUrl;
   String? _coverImageUrl;
+  String? _hermandadTopicId;
   String? _selectedIconName;
   String? _selectedIconExtension;
   String? _selectedIconContentType;
@@ -163,6 +164,11 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       _type = existing.type;
       _customIconUrl = existing.customIconUrl;
       _coverImageUrl = existing.coverImageUrl;
+      _hermandadTopicId = existing.hermandadTopicId;
+      if (_hermandadTopicId != null) {
+        _linkedOrganizerKey =
+            normalizeOrganizerKey(existing.organizerLabel ?? '');
+      }
       final parts = existing.time?.split(':');
       _time = parts != null && parts.length >= 2
           ? TimeOfDay(
@@ -198,10 +204,22 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     _scheduleOrganizerShieldLookup();
   }
 
+  String? _linkedOrganizerKey;
+
   void _onOrganizerChanged() {
     final key = normalizeOrganizerKey(_organizerController.text);
     if (_shieldSkipAutoLoadKey != null && _shieldSkipAutoLoadKey != key) {
       _shieldSkipAutoLoadKey = null;
+    }
+    // Si editan a mano el nombre, se pierde el enlace al tablón.
+    final linkedKey = _linkedOrganizerKey;
+    if (_hermandadTopicId != null &&
+        linkedKey != null &&
+        key != linkedKey) {
+      setState(() {
+        _hermandadTopicId = null;
+        _linkedOrganizerKey = null;
+      });
     }
     _scheduleOrganizerShieldLookup();
   }
@@ -261,6 +279,8 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
 
     setState(() {
       _organizerController.text = picked.displayLabel;
+      _hermandadTopicId = picked.hermandadTopicId;
+      _linkedOrganizerKey = picked.organizerKey;
       _shieldSkipAutoLoadKey = null;
       _shieldManualOverride = false;
       _selectedIconName = null;
@@ -647,6 +667,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
         );
       }
 
+      final hermandadId = _hermandadTopicId?.trim();
       if (_isEditing) {
         await repo.updateEvent(
           eventId: widget.existing!.id!,
@@ -657,6 +678,8 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           dayLabel: _type.cellLabel,
           location: location,
           organizerLabel: organizer,
+          hermandadTopicId: hermandadId,
+          clearHermandadTopicId: hermandadId == null || hermandadId.isEmpty,
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
           admissionLabel: admission,
@@ -672,6 +695,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           dayLabel: _type.cellLabel,
           location: location,
           organizerLabel: organizer,
+          hermandadTopicId: hermandadId,
           publisherHandle: handle,
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
@@ -774,10 +798,13 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               controller: _organizerController,
               decoration: InputDecoration(
                 labelText: 'Hermandad / organizador',
-                hintText: 'Hermandad de la Macarena',
+                hintText: 'Elige el tablón oficial o escribe un nombre',
+                helperText: _hermandadTopicId != null
+                    ? 'Enlazado al tablón oficial'
+                    : 'Usa «Elegir hermandad» para enlazar escudo e igualás',
                 suffixIcon: IconButton(
                   onPressed: _submitting ? null : _openOrganizerLibrary,
-                  tooltip: 'Biblioteca de escudos',
+                  tooltip: 'Elegir hermandad o escudo',
                   icon: const Icon(Icons.account_balance_outlined),
                   color: AppColors.burgundy,
                 ),
@@ -789,7 +816,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               child: TextButton.icon(
                 onPressed: _submitting ? null : _openOrganizerLibrary,
                 icon: const Icon(Icons.search, size: 18),
-                label: const Text('Elegir de la biblioteca'),
+                label: const Text('Elegir hermandad'),
               ),
             ),
             const SizedBox(height: 12),
