@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -13,8 +14,11 @@ import '../../../core/widgets/cofradeo_badge.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../shared/models/forum.dart';
 import '../../forums/forums_provider.dart';
+import '../../forums/para_ti_pulse_provider.dart';
 import '../../forums/utils/editorial_post.dart';
 import '../../forums/widgets/forum_compose_field.dart';
+import '../../forums/widgets/forum_compose_sheet_header.dart';
+import '../../forums/widgets/forum_compose_sheet_layout.dart';
 import '../admin_provider.dart';
 import '../junta_ui.dart';
 
@@ -23,7 +27,12 @@ Future<bool> showEditorialComposeSheet(BuildContext context) async {
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
+        isDismissible: true,
+        enableDrag: true,
         backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
         builder: (context) => const _EditorialComposeSheet(),
       ) ??
       false;
@@ -48,6 +57,8 @@ class _JuntaEditorialTabState extends ConsumerState<JuntaEditorialTab> {
       await _reload();
       ref.invalidate(pendingTopicsProvider);
       ref.invalidate(forumTopicsProvider(editorialForumId));
+      ref.invalidate(publishedEditorialPostsProvider);
+      ref.invalidate(paraTiRiverProvider);
     }
   }
 
@@ -179,7 +190,7 @@ class _EditorialPostCard extends ConsumerWidget {
                   style: JuntaUi.body(),
                 ),
               ],
-              if (topic.hasReadyEditorialVideo) ...[
+              if (topic.hasEditorialVideoMedia) ...[
                 const SizedBox(height: 10),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
@@ -225,7 +236,10 @@ class _EditorialPostCard extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(
                 [
-                  if (topic.hasReadyEditorialVideo) 'Vídeo',
+                  if (topic.hasProcessingEditorialVideo)
+                    'Optimizando'
+                  else if (topic.hasReadyEditorialVideo)
+                    'Vídeo',
                   topic.timeAgo,
                 ].join(' · '),
                 style: JuntaUi.caption(),
@@ -303,7 +317,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
     if (bytes.length > editorialVideoMaxBytes) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El vídeo supera 150 MB')),
+        const SnackBar(content: Text('El vídeo supera 500 MB')),
       );
       return;
     }
@@ -323,8 +337,10 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
 
   Future<bool> _uploadVideoWithRetries({
     required String uploadUrl,
+    required String uploadMethod,
     required Uint8List bytes,
     required String contentType,
+    String? fileName,
   }) async {
     const maxAttempts = 3;
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -334,32 +350,58 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
         _uploadProgress = 0;
       });
       try {
-        final request = http.StreamedRequest('PUT', Uri.parse(uploadUrl))
-          ..headers['Content-Type'] = contentType
-          ..contentLength = bytes.length;
-        final responseFuture = request.send().timeout(
-              const Duration(minutes: 8),
-            );
-        const chunkSize = 256 * 1024;
-        for (var offset = 0; offset < bytes.length; offset += chunkSize) {
-          final end = (offset + chunkSize < bytes.length)
-              ? offset + chunkSize
-              : bytes.length;
-          request.sink.add(Uint8List.sublistView(bytes, offset, end));
-          if (mounted) {
-            setState(() => _uploadProgress = end / bytes.length);
+        if (uploadMethod.toUpperCase() == 'POST') {
+          // Cloudflare Stream: multipart POST a uploadURL de un solo uso.
+          final request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              bytes,
+              filename: fileName ?? 'video.mp4',
+              contentType: MediaType.parse(contentType),
+            ),
+          );
+          if (mounted) setState(() => _uploadProgress = 0.15);
+          final response = await request.send().timeout(
+                const Duration(minutes: 12),
+              );
+          if (mounted) setState(() => _uploadProgress = 1);
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            return true;
           }
-          await Future<void>.delayed(Duration.zero);
-        }
-        await request.sink.close();
-        final response = await responseFuture;
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          return true;
-        }
-        if (response.statusCode < 500 &&
-            response.statusCode != 408 &&
-            response.statusCode != 429) {
-          return false;
+          if (response.statusCode < 500 &&
+              response.statusCode != 408 &&
+              response.statusCode != 429) {
+            return false;
+          }
+        } else {
+          final request = http.StreamedRequest('PUT', Uri.parse(uploadUrl))
+            ..headers['Content-Type'] = contentType
+            ..contentLength = bytes.length;
+          final responseFuture = request.send().timeout(
+                const Duration(minutes: 8),
+              );
+          const chunkSize = 256 * 1024;
+          for (var offset = 0; offset < bytes.length; offset += chunkSize) {
+            final end = (offset + chunkSize < bytes.length)
+                ? offset + chunkSize
+                : bytes.length;
+            request.sink.add(Uint8List.sublistView(bytes, offset, end));
+            if (mounted) {
+              setState(() => _uploadProgress = end / bytes.length);
+            }
+            await Future<void>.delayed(Duration.zero);
+          }
+          await request.sink.close();
+          final response = await responseFuture;
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            return true;
+          }
+          if (response.statusCode < 500 &&
+              response.statusCode != 408 &&
+              response.statusCode != 429) {
+            return false;
+          }
         }
       } catch (_) {
         // Un corte breve se reintenta automáticamente.
@@ -369,6 +411,18 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
       }
     }
     return false;
+  }
+
+  Future<void> _waitForStreamReady({
+    required String topicId,
+  }) async {
+    final repo = ref.read(adminRepositoryProvider);
+    for (var i = 0; i < 10; i++) {
+      if (!mounted) return;
+      final ready = await repo.finalizeEditorialVideo(topicId: topicId);
+      if (ready) return;
+      await Future<void>.delayed(Duration(seconds: 2 + (i ~/ 2)));
+    }
   }
 
   Future<void> _submit() async {
@@ -388,15 +442,6 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
       );
       return;
     }
-    if (_videoBytes != null && (_coverBytes == null || _coverBytes!.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Añade una imagen de portada para el vídeo'),
-        ),
-      );
-      return;
-    }
-
     setState(() => _saving = true);
     try {
       final repo = ref.read(adminRepositoryProvider);
@@ -418,6 +463,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
         );
       }
 
+      var videoProcessing = false;
       if (_videoBytes != null && _videoBytes!.isNotEmpty) {
         final contentType = _videoMime ?? 'video/mp4';
         await repo.setEditorialVideo(
@@ -430,25 +476,50 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
           contentType: contentType,
           byteLength: _videoBytes!.length,
         );
+        final streamMode = upload.mode == 'stream';
+        final poster = coverUrl ?? upload.posterUrl;
         final uploaded = await _uploadVideoWithRetries(
           uploadUrl: upload.uploadUrl,
+          uploadMethod: upload.uploadMethod,
           bytes: _videoBytes!,
           contentType: contentType,
+          fileName: _videoName,
         );
         if (!uploaded) {
           await repo.setEditorialVideo(
             topicId: topic.id,
             videoStatus: 'failed',
-            videoPosterUrl: coverUrl,
+            videoPosterUrl: poster,
+            videoProvider: upload.mode,
+            videoExternalId: upload.externalId,
           );
           throw StateError('video upload failed');
         }
-        await repo.setEditorialVideo(
-          topicId: topic.id,
-          videoUrl: upload.publicUrl,
-          videoPosterUrl: coverUrl,
-          videoStatus: 'ready',
-        );
+        if (streamMode) {
+          // HLS: poster automático de Stream; listo cuando finalize/webhook.
+          await repo.setEditorialVideo(
+            topicId: topic.id,
+            videoUrl: upload.publicUrl,
+            videoPosterUrl: poster,
+            videoStatus: 'processing',
+            videoProvider: 'stream',
+            videoExternalId: upload.externalId,
+          );
+          videoProcessing = true;
+          await _waitForStreamReady(topicId: topic.id);
+        } else {
+          if (poster == null || poster.isEmpty) {
+            throw StateError('R2 requiere portada manual');
+          }
+          await repo.setEditorialVideo(
+            topicId: topic.id,
+            videoUrl: upload.publicUrl,
+            videoPosterUrl: poster,
+            videoStatus: 'ready',
+            videoProvider: 'r2',
+            videoExternalId: upload.externalId,
+          );
+        }
       }
 
       if (!mounted) return;
@@ -458,7 +529,9 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
           content: Text(
             pending
                 ? 'Enviada a revisión de la Junta'
-                : 'Publicada en Para ti',
+                : videoProcessing
+                    ? 'Publicada · optimizando vídeo (HLS)'
+                    : 'Publicada en Para ti',
           ),
         ),
       );
@@ -488,36 +561,31 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
   @override
   Widget build(BuildContext context) {
     final isAdmin = ref.watch(isAdminProvider);
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottom),
-      child: SingleChildScrollView(
+    return PopScope(
+      canPop: !_saving,
+      child: ForumComposeSheetLayout(
+        header: ForumComposeSheetTitleBar(
+          closeEnabled: !_saving,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isAdmin ? 'Nueva publicación oficial' : 'Proponer publicación',
+                style: JuntaUi.cardTitle(),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Se publicará como $editorialPublicName',
+                style: JuntaUi.caption(),
+              ),
+            ],
+          ),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              isAdmin ? 'Nueva publicación oficial' : 'Proponer publicación',
-              style: JuntaUi.cardTitle(),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Se publicará como $editorialPublicName',
-              style: JuntaUi.caption(),
-            ),
-            const SizedBox(height: 14),
             TextField(
               controller: _titleController,
               textCapitalization: TextCapitalization.sentences,
@@ -556,7 +624,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
                 label: Text(
                   _videoBytes == null
                       ? 'Añadir imagen'
-                      : 'Portada del vídeo (obligatoria)',
+                      : 'Portada (opcional · Stream la genera)',
                 ),
               ),
             if (_coverBytes != null) ...[
@@ -599,7 +667,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
               OutlinedButton.icon(
                 onPressed: _saving ? null : _pickVideo,
                 icon: const Icon(Icons.videocam_outlined),
-                label: const Text('Añadir vídeo (R2, máx. 150 MB)'),
+                label: const Text('Añadir vídeo (HLS, máx. 500 MB / 10 min)'),
               ),
             if (_saving && _uploadProgress != null) ...[
               const SizedBox(height: 14),

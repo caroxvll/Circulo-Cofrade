@@ -52,6 +52,8 @@ SplitForumTopics splitForumTopics(List<ForumTopic> topics) {
   final community = <ForumTopic>[];
 
   for (final topic in topics) {
+    // Publicaciones oficiales: solo Para ti, no lista de temas del foro.
+    if (topic.isEditorial) continue;
     if (topic.isPinned) {
       if (topic.isListed) pinned.add(topic);
     } else {

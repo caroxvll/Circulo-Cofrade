@@ -43,7 +43,8 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
   var _failed = false;
   var _showControls = true;
   var _muted = false;
-  var _visible = false;
+  // Con autoplay asumimos visible hasta que VisibilityDetector diga lo contrario.
+  late var _visible = widget.autoPlay || !widget.pauseWhenOffscreen;
   var _userPaused = false;
   var _completed = false;
   var _wasPlaying = false;
@@ -59,11 +60,12 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
     )
       ..setLooping(false)
       ..addListener(_onVideoChanged)
-      ..initialize().then((_) {
+      ..initialize().then((_) async {
         if (!mounted) return;
-        _controller.setVolume(_muted ? 0 : 1);
+        await _controller.setVolume(_muted ? 0 : 1);
+        if (!mounted) return;
         setState(() => _ready = true);
-        _playAutomaticallyIfAllowed();
+        await _playAutomaticallyIfAllowed();
       }).catchError((_) {
         if (!mounted) return;
         setState(() => _failed = true);
@@ -94,7 +96,7 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
     });
   }
 
-  void _playAutomaticallyIfAllowed() {
+  Future<void> _playAutomaticallyIfAllowed() async {
     if (!_ready ||
         _inFullscreen ||
         !widget.autoPlay ||
@@ -103,8 +105,28 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
         (widget.pauseWhenOffscreen && !_visible)) {
       return;
     }
-    _controller.play();
-    setState(() => _showControls = false);
+    try {
+      await _controller.play();
+    } catch (_) {
+      // p.ej. política de autoplay del navegador
+    }
+    if (!mounted) return;
+
+    // Si el navegador bloqueó autoplay con sonido, reintentar muteado.
+    if (!_controller.value.isPlaying && !_muted) {
+      _muted = true;
+      await _controller.setVolume(0);
+      try {
+        await _controller.play();
+      } catch (_) {}
+      if (!mounted) return;
+    }
+
+    if (_controller.value.isPlaying) {
+      setState(() => _showControls = false);
+    } else {
+      setState(() => _showControls = true);
+    }
   }
 
   Future<void> _toggle() async {
@@ -595,12 +617,14 @@ String _formatVideoDuration(Duration duration) {
 }
 
 class _VideoBadge extends StatelessWidget {
-  const _VideoBadge({required this.playing});
+  const _VideoBadge({required this.playing, this.label});
 
   final bool playing;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
+    final text = label ?? (playing ? 'REPRODUCIENDO' : 'VÍDEO');
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.58),
@@ -612,13 +636,17 @@ class _VideoBadge extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              playing ? Icons.play_arrow_rounded : Icons.videocam_rounded,
+              label != null
+                  ? Icons.hourglass_top_rounded
+                  : playing
+                      ? Icons.play_arrow_rounded
+                      : Icons.videocam_rounded,
               color: Colors.white,
               size: 14,
             ),
             const SizedBox(width: 4),
             Text(
-              playing ? 'REPRODUCIENDO' : 'VÍDEO',
+              text,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 9.5,
@@ -638,10 +666,12 @@ class EditorialVideoPoster extends StatelessWidget {
   const EditorialVideoPoster({
     super.key,
     this.posterUrl,
+    this.processing = false,
     this.borderRadius = const BorderRadius.all(Radius.circular(10)),
   });
 
   final String? posterUrl;
+  final bool processing;
   final BorderRadius borderRadius;
 
   @override
@@ -668,20 +698,25 @@ class EditorialVideoPoster extends StatelessWidget {
                   color: Colors.black.withValues(alpha: 0.45),
                   shape: BoxShape.circle,
                 ),
-                child: const Padding(
-                  padding: EdgeInsets.all(10),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
                   child: Icon(
-                    Icons.play_arrow_rounded,
+                    processing
+                        ? Icons.hourglass_top_rounded
+                        : Icons.play_arrow_rounded,
                     color: Colors.white,
                     size: 32,
                   ),
                 ),
               ),
             ),
-            const Positioned(
+            Positioned(
               left: 10,
               top: 10,
-              child: _VideoBadge(playing: false),
+              child: _VideoBadge(
+                playing: false,
+                label: processing ? 'OPTIMIZANDO' : null,
+              ),
             ),
           ],
         ),

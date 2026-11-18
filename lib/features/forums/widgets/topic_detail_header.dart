@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -77,7 +78,8 @@ class TopicDetailHeader extends StatelessWidget {
       );
     }
 
-    final hasCover = _remoteCoverUrl(topic) != null || topic.hasReadyEditorialVideo;
+    final hasCover =
+        _remoteCoverUrl(topic) != null || topic.hasEditorialVideoMedia;
     final hasBody = topic.body.trim().isNotEmpty;
     final replyReactions = sortedReactionCounts(reactionBreakdown);
 
@@ -205,12 +207,13 @@ class _TopicEditorialBody extends StatelessWidget {
     final body = topic.body.trim();
     final hasBody = body.isNotEmpty;
     final hasVideo = topic.hasReadyEditorialVideo;
+    final hasProcessingVideo = topic.hasProcessingEditorialVideo;
 
-    if (coverUrl == null && !hasBody && !hasVideo) {
+    if (coverUrl == null && !hasBody && !hasVideo && !hasProcessingVideo) {
       return const SizedBox.shrink();
     }
 
-    if (!hasVideo && coverUrl == null) {
+    if (!hasVideo && !hasProcessingVideo && coverUrl == null) {
       return ForumPostContent(
         text: normalizeStoredText(body),
         style: TopicDetailTypography.body(),
@@ -229,20 +232,27 @@ class _TopicEditorialBody extends StatelessWidget {
             videoUrl: topic.videoUrl!,
             posterUrl: topic.editorialPosterUrl,
             autoPlay: true,
-            muted: false,
+            // Chrome/Safari bloquean autoplay con sonido.
+            muted: kIsWeb,
             pauseWhenOffscreen: true,
             openFullscreenOnTap: true,
           )
-        : ForumPostImage(
-            imageUrl: coverUrl!,
-            shareText: topic.title,
-            borderRadius: const BorderRadius.all(Radius.circular(10)),
-            maxPreviewHeight: isNoticiasForum(topic.forumId) ? 300 : 560,
-            adaptiveOrientation: !isNoticiasForum(topic.forumId),
-            fit: isNoticiasForum(topic.forumId)
-                ? BoxFit.cover
-                : BoxFit.contain,
-          );
+        : hasProcessingVideo
+            ? EditorialVideoPoster(
+                posterUrl: topic.editorialPosterUrl ?? coverUrl,
+                processing: true,
+              )
+            : ForumPostImage(
+                imageUrl: coverUrl!,
+                shareText: topic.title,
+                borderRadius: const BorderRadius.all(Radius.circular(10)),
+                maxPreviewHeight:
+                    isNoticiasForum(topic.forumId) ? 300 : 560,
+                adaptiveOrientation: !isNoticiasForum(topic.forumId),
+                fit: isNoticiasForum(topic.forumId)
+                    ? BoxFit.cover
+                    : BoxFit.contain,
+              );
 
     if (!hasBody) return media;
 
