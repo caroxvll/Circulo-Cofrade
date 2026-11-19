@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/supabase/supabase_bootstrap.dart';
 import '../../core/utils/local_day.dart';
+import '../../core/utils/minute_clock.dart';
 import '../calendar/calendar_provider.dart';
 import '../../shared/models/calendar_event.dart';
 import 'data/event_live_updates_repository.dart';
@@ -57,14 +58,18 @@ final todayCuaresmaAgendaProvider =
 });
 
 /// Los de hoy que aún se pueden seguir, para la banda de Para ti.
-final todayParaTiLiveEventsProvider =
-    FutureProvider.autoDispose<List<CalendarEvent>>((ref) async {
-  final events = await ref.watch(todayCuaresmaAgendaProvider.future);
-  final groups = groupTodayEnsayos(events);
-  return [...groups.live, ...groups.soon, ...groups.upcoming];
+/// Se reagrupan cada minuto, sin volver a pedir el día.
+final todayParaTiLiveEventsProvider = Provider<AsyncValue<List<CalendarEvent>>>((
+  ref,
+) {
+  final now = ref.watch(minuteClockProvider).asData?.value ?? DateTime.now();
+  return ref.watch(todayCuaresmaAgendaProvider).whenData((events) {
+    final groups = groupTodayEnsayos(events, now: now);
+    return [...groups.live, ...groups.soon, ...groups.upcoming];
+  });
 });
 
-/// Avisos de hoy de las citas con hilo. Al día siguiente ya no entran en Para ti.
+/// Avisos que el admin o la Junta han elegido hoy para Para ti.
 final todayCuaresmaLiveTweetsProvider =
     FutureProvider.autoDispose<List<EventLiveUpdate>>((ref) async {
   final events = await ref.watch(todayCuaresmaAgendaProvider.future);

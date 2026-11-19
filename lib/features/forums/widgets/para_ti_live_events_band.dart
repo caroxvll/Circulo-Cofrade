@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/minute_clock.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/event_type_icon.dart';
 import '../../../shared/models/calendar_event.dart';
@@ -18,12 +19,13 @@ class ParaTiLiveEventsBand extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final now = watchMinuteClock(ref);
     final events =
         ref.watch(todayParaTiLiveEventsProvider).asData?.value ??
         const <CalendarEvent>[];
     if (events.isEmpty) return const SizedBox.shrink();
 
-    final anyLive = events.any(_isLive);
+    final anyLive = events.any((event) => _isLive(event, now: now));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -53,7 +55,11 @@ class ParaTiLiveEventsBand extends ConsumerWidget {
         if (events.length == 1)
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
-            child: _LiveEventChip(event: events.first, expanded: true),
+            child: _LiveEventChip(
+              event: events.first,
+              expanded: true,
+              now: now,
+            ),
           )
         else
           SizedBox(
@@ -66,7 +72,7 @@ class ParaTiLiveEventsBand extends ConsumerWidget {
                 itemCount: events.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
-                  return _LiveEventChip(event: events[index]);
+                  return _LiveEventChip(event: events[index], now: now);
                 },
               ),
             ),
@@ -80,10 +86,12 @@ class ParaTiLiveEventsBand extends ConsumerWidget {
 class _LiveEventChip extends StatelessWidget {
   const _LiveEventChip({
     required this.event,
+    required this.now,
     this.expanded = false,
   });
 
   final CalendarEvent event;
+  final DateTime now;
   final bool expanded;
 
   static final _fill = Color.alphaBlend(
@@ -93,9 +101,9 @@ class _LiveEventChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final live = _isLive(event);
+    final live = _isLive(event, now: now);
     final name = _eventName(event);
-    final timing = _timingLabel(event);
+    final timing = _timingLabel(event, now: now);
     final accent = live ? AppColors.liveGreen : AppColors.burgundy;
 
     return Material(
@@ -199,8 +207,9 @@ class _LiveDot extends StatelessWidget {
   }
 }
 
-bool _isLive(CalendarEvent event) {
-  return calendarEventTiming(event)?.kind == CalendarEventTimingKind.inProgress;
+bool _isLive(CalendarEvent event, {required DateTime now}) {
+  return calendarEventTiming(event, now: now)?.kind ==
+      CalendarEventTimingKind.inProgress;
 }
 
 String _eventName(CalendarEvent event) {
@@ -220,8 +229,8 @@ String _typeLabel(EventType type) {
   };
 }
 
-String _timingLabel(CalendarEvent event) {
-  final timing = calendarEventTiming(event);
+String _timingLabel(CalendarEvent event, {required DateTime now}) {
+  final timing = calendarEventTiming(event, now: now);
   final time = event.time?.trim();
   if (timing == null) {
     return (time != null && time.isNotEmpty) ? time : 'Hoy';

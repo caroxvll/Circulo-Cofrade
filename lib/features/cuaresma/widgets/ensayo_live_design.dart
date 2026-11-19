@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/time_ago.dart';
+import '../../../core/widgets/cofradeo_avatar.dart';
+import '../../../core/widgets/street_place_text.dart';
 import '../../../core/widgets/event_type_icon.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../../calendar/calendar_provider.dart';
@@ -635,110 +637,210 @@ class EnsayoLiveUpdateTile extends StatelessWidget {
     super.key,
     required this.update,
     required this.onOpenMaps,
+    this.onDelete,
+    this.onToggleParaTi,
     this.isLatest = false,
   });
 
   final EventLiveUpdate update;
   final VoidCallback? onOpenMaps;
+  final VoidCallback? onDelete;
+  final VoidCallback? onToggleParaTi;
   final bool isLatest;
 
   @override
   Widget build(BuildContext context) {
     final hasMap = update.hasCoordinates || update.placeLabel != null;
+    final handle = update.authorHandle.startsWith('@')
+        ? update.authorHandle
+        : '@${update.authorHandle}';
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      padding: const EdgeInsets.only(bottom: 10),
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          color: isLatest
-              ? AppColors.burgundy.withValues(alpha: 0.03)
-              : AppColors.surfaceAlt,
-          borderRadius: BorderRadius.circular(14),
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isLatest
-                ? AppColors.burgundy.withValues(alpha: 0.22)
-                : AppColors.gold.withValues(alpha: 0.12),
+                ? AppColors.burgundy.withValues(alpha: 0.28)
+                : AppColors.border,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.textPrimary.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                if (isLatest) ...[
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.burgundy.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CofradeoAvatar(
+                imageUrl: update.authorAvatarUrl,
+                size: 40,
+                backgroundColor: AppColors.backgroundElevated,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            handle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TopicDetailTypography.body().copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              height: 1.1,
+                            ),
+                          ),
+                        ),
+                        if (isLatest) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.burgundy.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: Text(
+                              'Último',
+                              style: TopicDetailTypography.meta(
+                                color: AppColors.burgundy,
+                                fontWeight: FontWeight.w700,
+                              ).copyWith(fontSize: 10),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 8),
+                        Text(
+                          formatTimeAgo(update.createdAt),
+                          style: TopicDetailTypography.meta().copyWith(
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (onDelete != null)
+                          SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              tooltip: 'Eliminar aviso',
+                              onPressed: onDelete,
+                              icon: Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                    child: Text(
-                      'ÚLTIMO AVISO',
-                      style: TopicDetailTypography.meta(
-                        color: AppColors.burgundy,
-                        fontWeight: FontWeight.w700,
+                    const SizedBox(height: 4),
+                    Text(
+                      update.message,
+                      style: TopicDetailTypography.body().copyWith(
+                        fontSize: 15,
+                        height: 1.35,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(
-                  child: Text(
-                    update.authorHandle,
-                    style: TopicDetailTypography.authorHandle(),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Text(
-                  formatTimeAgo(update.createdAt),
-                  style: TopicDetailTypography.meta(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              update.message,
-              style: TopicDetailTypography.body(),
-            ),
-            if (hasMap && onOpenMaps != null) ...[
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: onOpenMaps,
-                borderRadius: BorderRadius.circular(6),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.map_outlined,
-                        size: 14,
-                        color: AppColors.burgundy,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        update.placeLabel ?? 'Ver en mapa',
-                        style: TopicDetailTypography.meta(
-                          color: AppColors.burgundy,
-                          fontWeight: FontWeight.w600,
+                    if (onToggleParaTi != null) ...[
+                      const SizedBox(height: 8),
+                      Tooltip(
+                        message: update.shownInParaTi
+                            ? 'Quitar de Para ti'
+                            : 'Mostrar en Para ti',
+                        child: InkWell(
+                          onTap: onToggleParaTi,
+                          borderRadius: BorderRadius.circular(99),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: update.shownInParaTi
+                                  ? AppColors.burgundy.withValues(alpha: 0.1)
+                                  : AppColors.backgroundElevated,
+                              borderRadius: BorderRadius.circular(99),
+                              border: Border.all(
+                                color: update.shownInParaTi
+                                    ? AppColors.burgundy.withValues(alpha: 0.28)
+                                    : AppColors.border,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  update.shownInParaTi
+                                      ? Icons.campaign
+                                      : Icons.campaign_outlined,
+                                  size: 14,
+                                  color: update.shownInParaTi
+                                      ? AppColors.burgundy
+                                      : AppColors.textMuted,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  update.shownInParaTi
+                                      ? 'En Para ti'
+                                      : 'Mostrar en Para ti',
+                                  style: TopicDetailTypography.meta(
+                                    color: update.shownInParaTi
+                                        ? AppColors.burgundy
+                                        : AppColors.textMuted,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ],
-                  ),
+                    if (hasMap && onOpenMaps != null) ...[
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: onOpenMaps,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.place_outlined,
+                                size: 15,
+                                color: AppColors.burgundy,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: StreetPlaceText(
+                                  placeLabel: update.placeLabel,
+                                  latitude: update.latitude,
+                                  longitude: update.longitude,
+                                  fallback: 'Ver en el mapa',
+                                  style: TopicDetailTypography.meta(
+                                    color: AppColors.burgundy,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -920,6 +1022,8 @@ class _EnsayoLocationAttachedChip extends StatelessWidget {
           Expanded(
             child: Text(
               'Ubicación añadida · $label',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TopicDetailTypography.meta(
                 color: _ensayoLiveGreen,
                 fontWeight: FontWeight.w600,

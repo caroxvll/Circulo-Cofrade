@@ -35,6 +35,21 @@ EventLiveUpdate addMockEventLiveUpdate({
   return update;
 }
 
+void removeMockEventLiveUpdate(String id) {
+  _mockLiveUpdates.removeWhere((update) => update.id == id);
+}
+
+DateTime? setMockShownInParaTi(String id, {required bool show}) {
+  final index = _mockLiveUpdates.indexWhere((update) => update.id == id);
+  if (index < 0) return null;
+  final at = show ? DateTime.now() : null;
+  _mockLiveUpdates[index] = _mockLiveUpdates[index].copyWith(
+    featuredAt: at,
+    clearFeatured: !show,
+  );
+  return at;
+}
+
 DateTime? mockLastPostAt({
   required String eventId,
   required String userId,

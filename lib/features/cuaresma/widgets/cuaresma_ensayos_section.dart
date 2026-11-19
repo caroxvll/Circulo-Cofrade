@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/minute_clock.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../../forums/topic_detail_typography.dart';
 import '../cuaresma_ensayos_provider.dart';
@@ -45,10 +46,11 @@ class _CuaresmaEnsayosPanelState extends ConsumerState<CuaresmaEnsayosPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final now = watchMinuteClock(ref);
     final ensayosAsync = ref.watch(todayEnsayosProvider);
 
     return ensayosAsync.when(
-      data: (ensayos) => _buildContent(ensayos),
+      data: (ensayos) => _buildContent(ensayos, now),
       skipLoadingOnReload: true,
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
@@ -64,8 +66,8 @@ class _CuaresmaEnsayosPanelState extends ConsumerState<CuaresmaEnsayosPanel> {
     );
   }
 
-  Widget _buildContent(List<CalendarEvent> ensayos) {
-    final groups = groupTodayEnsayos(ensayos);
+  Widget _buildContent(List<CalendarEvent> ensayos, DateTime now) {
+    final groups = groupTodayEnsayos(ensayos, now: now);
     final active = groups.featured;
     final pending = groups.compactList;
 

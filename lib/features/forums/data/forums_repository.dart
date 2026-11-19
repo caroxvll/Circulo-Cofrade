@@ -98,9 +98,11 @@ class ForumsRepository {
   }
 
   /// Publicaciones oficiales de Círculo Cofrade para Para ti.
+  ///
+  /// Se quedan unos meses: el hilo se va llenando y no se vacía al día siguiente.
   Future<List<ForumTopic>> fetchPublishedEditorialPosts({
-    int limit = 12,
-    Duration maxAge = const Duration(days: 14),
+    int limit = 48,
+    Duration maxAge = const Duration(days: 120),
   }) async {
     if (!_useRemote) return const [];
 
@@ -593,6 +595,7 @@ class ForumsRepository {
       iconKey: row['icon_key'] as String?,
       iconImageUrl: row['icon_image_url'] as String?,
       coverImageUrl: row['cover_image_url'] as String?,
+      galleryImageUrls: parseGalleryImageUrls(row['gallery_image_urls']),
       videoUrl: row['video_url'] as String?,
       videoPosterUrl: row['video_poster_url'] as String?,
       videoStatus: row['video_status'] as String?,
@@ -742,6 +745,43 @@ class ForumsRepository {
     final publicUrl = client.storage
         .from(_topicCoversBucket)
         .getPublicUrl(path);
+    return '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  /// Foto de una editorial. La 0 es la portada; el resto, el montón.
+  Future<String> uploadEditorialImage({
+    required String topicId,
+    required Uint8List bytes,
+    required int index,
+  }) async {
+    final client = _client;
+    if (client == null) throw const ForumsRemoteUnavailableException();
+
+    CompressedImage compressed;
+    try {
+      compressed = await compressImageForUploadAsync(
+        bytes,
+        maxBytes: maxTopicCoverBytes,
+      );
+    } on ImageTooLargeAfterCompressException {
+      throw const TopicCoverTooLargeException();
+    }
+
+    final path = index <= 0
+        ? '$topicId/cover.jpg'
+        : '$topicId/gallery-$index.jpg';
+
+    await client.storage.from(_topicCoversBucket).uploadBinary(
+          path,
+          compressed.bytes,
+          fileOptions: const FileOptions(
+            upsert: true,
+            contentType: 'image/jpeg',
+          ),
+        );
+
+    final publicUrl =
+        client.storage.from(_topicCoversBucket).getPublicUrl(path);
     return '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
   }
 
@@ -1041,6 +1081,9 @@ class ForumsRepository {
         iconKey: parsed.iconKey ?? previous.iconKey,
         iconImageUrl: parsed.iconImageUrl ?? previous.iconImageUrl,
         coverImageUrl: parsed.coverImageUrl ?? previous.coverImageUrl,
+        galleryImageUrls: record.containsKey('gallery_image_urls')
+            ? parsed.galleryImageUrls
+            : previous.galleryImageUrls,
         videoUrl: parsed.videoUrl ?? previous.videoUrl,
         videoPosterUrl: parsed.videoPosterUrl ?? previous.videoPosterUrl,
         videoStatus: parsed.videoStatus ?? previous.videoStatus,
