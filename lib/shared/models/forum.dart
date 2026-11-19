@@ -162,6 +162,18 @@ class ForumCategory {
   bool get isLocked => !isEnabled;
 }
 
+/// `text[]` de Postgres (o null si la columna aún no está).
+List<String> parseGalleryImageUrls(Object? raw) {
+  if (raw is! List) return const [];
+  final urls = <String>[];
+  for (final item in raw) {
+    final url = item is String ? item.trim() : '';
+    if (url.isEmpty) continue;
+    urls.add(url);
+  }
+  return urls;
+}
+
 class ForumTopic {
   const ForumTopic({
     required this.id,
@@ -191,6 +203,7 @@ class ForumTopic {
     this.iconKey,
     this.iconImageUrl,
     this.coverImageUrl,
+    this.galleryImageUrls = const [],
     this.videoUrl,
     this.videoPosterUrl,
     this.videoStatus,
@@ -243,6 +256,9 @@ class ForumTopic {
   /// Escudo / icono remoto (p. ej. tablones de hermandad).
   final String? iconImageUrl;
   final String? coverImageUrl;
+
+  /// Fotos detrás de la portada, en orden. La de delante es [coverImageUrl].
+  final List<String> galleryImageUrls;
 
   /// Vídeo editorial (HLS Stream o MP4 R2). Solo publicaciones oficiales.
   final String? videoUrl;
@@ -300,6 +316,21 @@ class ForumTopic {
     if (cover != null && cover.isNotEmpty) return cover;
     return null;
   }
+
+  /// Portada delante y el resto detrás, sin repetir ni usar un asset.
+  List<String> get editorialImageUrls {
+    final urls = <String>[];
+    final cover = coverImageUrl?.trim();
+    if (cover != null && cover.isNotEmpty && !cover.startsWith('assets/')) {
+      urls.add(cover);
+    }
+    for (final extra in galleryImageUrls) {
+      final url = extra.trim();
+      if (url.isEmpty || urls.contains(url)) continue;
+      urls.add(url);
+    }
+    return urls;
+  }
   /// Noticias es solo lectura editorial: sin comentarios.
   bool get acceptsReplies =>
       isPublished && !isClosed && forumId != 'noticias';
@@ -334,6 +365,7 @@ class ForumTopic {
     String? iconKey,
     String? iconImageUrl,
     String? coverImageUrl,
+    List<String>? galleryImageUrls,
     String? videoUrl,
     String? videoPosterUrl,
     String? videoStatus,
@@ -378,6 +410,7 @@ class ForumTopic {
       iconKey: iconKey ?? this.iconKey,
       iconImageUrl: iconImageUrl ?? this.iconImageUrl,
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      galleryImageUrls: galleryImageUrls ?? this.galleryImageUrls,
       videoUrl: videoUrl ?? this.videoUrl,
       videoPosterUrl: videoPosterUrl ?? this.videoPosterUrl,
       videoStatus: videoStatus ?? this.videoStatus,

@@ -15,7 +15,8 @@ import 'forums_provider.dart';
 
 const _circuloForumId = 'foro-cofradiero';
 
-/// Una pieza del río de Para ti. Como mucho [paraTiRiverLimit], de más nuevo a más viejo.
+/// Una pieza del río de Para ti.
+/// El directo de hoy se corta en [paraTiRiverLimit]. Las de Círculo Cofrade se acumulan.
 sealed class ParaTiRiverEntry {
   const ParaTiRiverEntry();
 
@@ -28,7 +29,7 @@ class ParaTiCuaresmaTweet extends ParaTiRiverEntry {
   final EventLiveUpdate update;
 
   @override
-  DateTime get at => update.createdAt;
+  DateTime get at => update.featuredAt ?? update.createdAt;
 }
 
 class ParaTiSsLive extends ParaTiRiverEntry {
@@ -106,7 +107,7 @@ final paraTiRiverProvider = Provider<ParaTiRiver>((ref) {
       (hot.hasValue || hot.hasError) &&
       (editorials.hasValue || editorials.hasError);
 
-  final entries = <ParaTiRiverEntry>[
+  final pulse = <ParaTiRiverEntry>[
     for (final update in tweets.asData?.value ?? const <EventLiveUpdate>[])
       ParaTiCuaresmaTweet(update),
     if (gateOpen)
@@ -114,12 +115,16 @@ final paraTiRiverProvider = Provider<ParaTiRiver>((ref) {
         ParaTiSsLive(update),
     if (hot.asData?.value case final topic?)
       ParaTiHotTopic(topic: topic.topic, activityAt: topic.activityAt),
+  ]..sort((a, b) => b.at.compareTo(a.at));
+
+  final entries = <ParaTiRiverEntry>[
+    ...pulse.take(paraTiRiverLimit),
     for (final topic in editorials.asData?.value ?? const <ForumTopic>[])
       ParaTiEditorial(topic),
   ]..sort((a, b) => b.at.compareTo(a.at));
 
   return ParaTiRiver(
-    entries: entries.take(paraTiRiverLimit).toList(growable: false),
+    entries: entries,
     settled: settled,
   );
 });

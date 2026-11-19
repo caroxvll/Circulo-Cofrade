@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/minute_clock.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/event_type_icon.dart';
 import '../../../shared/models/calendar_event.dart';
@@ -33,7 +34,7 @@ class EventCard extends ConsumerWidget {
     final logos = ref.watch(organizerLogosMapProvider).asData?.value;
     final organizer = resolvedOrganizerLabel(logos, event);
     final shieldUrl = resolvedOrganizerShieldUrl(logos, event);
-    final timing = calendarEventTiming(event);
+    final timing = calendarEventTiming(event, now: watchMinuteClock(ref));
     final time = eventThumbTime(event) == null
         ? null
         : _formatTimeCompact(eventThumbTime(event)!);

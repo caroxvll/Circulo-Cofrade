@@ -4,8 +4,12 @@ const editorialForumId = 'foro-cofradiero';
 const editorialPublicHandle = '@cofradeo';
 const editorialPublicName = 'Círculo Cofrade';
 
-/// Tope de cliente (Stream ~500 MB). R2 sin Stream sigue cortando en edge a 150.
+/// Tope de cliente. Stream lo recibe por tus (el POST simple corta en 200 MB).
+/// R2, si Stream no está activo, sigue cortando en 150 MB.
 const editorialVideoMaxBytes = 500 * 1024 * 1024;
+
+/// Fotos de una publicación de Para ti. La primera queda delante del montón.
+const editorialGalleryMaxImages = 4;
 
 /// Las editoriales se guardan en forum_topics (para detalle + comentarios),
 /// pero no deben listarse como temas del foro: viven en Para ti.

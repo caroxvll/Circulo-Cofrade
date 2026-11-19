@@ -9,7 +9,11 @@ const corsHeaders = {
 
 /** R2 (MP4 directo). */
 const MAX_BYTES_R2 = 150 * 1024 * 1024;
-/** Stream admite piezas más largas; el límite duro lo pone maxDurationSeconds. */
+/**
+ * Tope de la app. Stream recibe el archivo por tus: el POST simple corta en
+ * 200 MB y no se puede subir en el panel. La duración reservada va en
+ * maxDurationSeconds (Cloudflare admite hasta 36000 s).
+ */
 const MAX_BYTES_STREAM = 500 * 1024 * 1024;
 const MAX_DURATION_SECONDS = 10 * 60;
 
@@ -152,40 +156,44 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Publicación oficial no encontrada" }, 404);
     }
 
-    // ——— Cloudflare Stream (HLS + poster) ———
+    // ——— Cloudflare Stream (HLS + poster), subida tus ———
+    // El POST simple de Stream rechaza todo lo que pase de 200 MB. tus admite
+    // el tope de la app y el móvil manda el archivo a trozos, sin el token.
     if (useStream) {
+      const metadata = [
+        `maxDurationSeconds ${btoa(String(MAX_DURATION_SECONDS))}`,
+        `thumbnailtimestamppct ${btoa("0.05")}`,
+        `name ${btoa(`editorial-${topicId}`)}`,
+        `topicId ${btoa(topicId)}`,
+      ].join(",");
+
       const createRes = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/stream/direct_upload`,
+        `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/stream?direct_user=true`,
         {
           method: "POST",
           headers: {
             Authorization: `Bearer ${cfStreamToken}`,
-            "Content-Type": "application/json",
+            "Tus-Resumable": "1.0.0",
+            "Upload-Length": String(byteLength),
+            "Upload-Metadata": metadata,
           },
-          body: JSON.stringify({
-            maxDurationSeconds: MAX_DURATION_SECONDS,
-            requireSignedURLs: false,
-            thumbnailTimestampPct: 0.05,
-            meta: {
-              topicId,
-              source: "cofradeo-editorial",
-            },
-          }),
         },
       );
-      const createJson = await createRes.json();
-      if (!createRes.ok || !createJson?.success) {
-        console.error("stream direct_upload", createJson);
+
+      const location = createRes.headers.get("Location");
+      const uploadURL = location == null
+        ? null
+        : location.startsWith("http")
+        ? location
+        : new URL(location, "https://api.cloudflare.com").toString();
+      const uid = createRes.headers.get("stream-media-id");
+      if (!createRes.ok || !uploadURL || !uid) {
+        const detail = await createRes.text();
+        console.error("stream tus", createRes.status, detail);
         return jsonResponse(
           { error: "No se pudo preparar la subida a Stream" },
           502,
         );
-      }
-
-      const uploadURL = createJson.result?.uploadURL as string | undefined;
-      const uid = createJson.result?.uid as string | undefined;
-      if (!uploadURL || !uid) {
-        return jsonResponse({ error: "Respuesta Stream incompleta" }, 502);
       }
 
       const { hlsUrl, posterUrl } = streamPlaybackUrls(uid);
@@ -203,7 +211,7 @@ Deno.serve(async (req) => {
 
       return jsonResponse({
         mode: "stream",
-        uploadMethod: "POST",
+        uploadMethod: "TUS",
         uploadUrl: uploadURL,
         publicUrl: hlsUrl,
         posterUrl,

@@ -206,6 +206,23 @@ class AdminRepository {
     );
   }
 
+  /// Portada + fotos de detrás. [galleryImageUrls] no incluye la portada.
+  Future<void> setEditorialGallery({
+    required String topicId,
+    required String coverImageUrl,
+    required List<String> galleryImageUrls,
+  }) async {
+    if (_client == null) throw const AdminUnavailableException();
+    await _client.rpc(
+      'set_editorial_gallery',
+      params: {
+        'p_topic_id': topicId,
+        'p_cover_image_url': coverImageUrl,
+        'p_gallery_image_urls': galleryImageUrls,
+      },
+    );
+  }
+
   /// Presign Stream (POST) o R2 (PUT). Requiere Edge Function desplegada.
   Future<
       ({
@@ -611,6 +628,7 @@ class AdminRepository {
       iconKey: row['icon_key'] as String?,
       iconImageUrl: row['icon_image_url'] as String?,
       coverImageUrl: row['cover_image_url'] as String?,
+      galleryImageUrls: parseGalleryImageUrls(row['gallery_image_urls']),
       videoUrl: row['video_url'] as String?,
       videoPosterUrl: row['video_poster_url'] as String?,
       videoStatus: row['video_status'] as String?,

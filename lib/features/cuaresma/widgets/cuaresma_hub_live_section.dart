@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/minute_clock.dart';
 import '../../../core/widgets/event_type_icon.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../../calendar/calendar_provider.dart';
@@ -184,6 +185,7 @@ class CuaresmaHubLiveSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final now = watchMinuteClock(ref);
     final agendaAsync = ref.watch(todayCuaresmaAgendaProvider);
 
     return agendaAsync.when(
@@ -199,7 +201,7 @@ class CuaresmaHubLiveSection extends ConsumerWidget {
         ),
       ),
       data: (agenda) {
-        final groups = groupTodayEnsayos(agenda);
+        final groups = groupTodayEnsayos(agenda, now: now);
         final featured =
             agendaEventById(groups, focusEventId) ?? pickFeaturedEnsayo(groups);
         final activeOthers =

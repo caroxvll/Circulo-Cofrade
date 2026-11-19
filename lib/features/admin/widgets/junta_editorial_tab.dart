@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
@@ -16,6 +17,7 @@ import '../../../shared/models/forum.dart';
 import '../../forums/forums_provider.dart';
 import '../../forums/para_ti_pulse_provider.dart';
 import '../../forums/utils/editorial_post.dart';
+import '../../forums/widgets/editorial_photo_stack.dart';
 import '../../forums/widgets/forum_compose_field.dart';
 import '../../forums/widgets/forum_compose_sheet_header.dart';
 import '../../forums/widgets/forum_compose_sheet_layout.dart';
@@ -219,6 +221,16 @@ class _EditorialPostCard extends ConsumerWidget {
                     ),
                   ),
                 ),
+              ] else if (topic.editorialImageUrls.length > 1) ...[
+                const SizedBox(height: 10),
+                EditorialPhotoStack.network(
+                  urls: topic.editorialImageUrls,
+                  onTap: () => openEditorialPhotoGallery(
+                    context,
+                    topic.editorialImageUrls,
+                    shareText: topic.title,
+                  ),
+                ),
               ] else if (cover != null && cover.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 ClipRRect(
@@ -263,8 +275,7 @@ class _EditorialComposeSheet extends ConsumerStatefulWidget {
 class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
-  Uint8List? _coverBytes;
-  String? _coverMime;
+  final _photos = <Uint8List>[];
   Uint8List? _videoBytes;
   String? _videoMime;
   String? _videoName;
@@ -279,24 +290,52 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
     super.dispose();
   }
 
-  Future<void> _pickCover() async {
-    final file = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+  Future<void> _pickPhotos() async {
+    if (_videoBytes != null) {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+        maxWidth: 1920,
+      );
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _photos
+          ..clear()
+          ..add(bytes);
+      });
+      return;
+    }
+
+    final remaining = editorialGalleryMaxImages - _photos.length;
+    if (remaining <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Máximo 4 fotos')),
+      );
+      return;
+    }
+    final files = await ImagePicker().pickMultiImage(
       imageQuality: 88,
       maxWidth: 1920,
+      limit: remaining,
     );
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
-    final mime = switch (file.name.split('.').last.toLowerCase()) {
-      'png' => 'image/png',
-      'webp' => 'image/webp',
-      _ => 'image/jpeg',
-    };
+    if (files.isEmpty) return;
+    final next = <Uint8List>[];
+    for (final file in files) {
+      if (_photos.length + next.length >= editorialGalleryMaxImages) break;
+      next.add(await file.readAsBytes());
+    }
     if (!mounted) return;
-    setState(() {
-      _coverBytes = bytes;
-      _coverMime = mime;
-    });
+    setState(() => _photos.addAll(next));
+    if (files.length > next.length && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solo caben 4 fotos. La primera queda delante.'),
+        ),
+      );
+    }
   }
 
   Future<void> _pickVideo() async {
@@ -328,11 +367,20 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
       _ => 'video/mp4',
     };
     if (!mounted) return;
+    final hadPile = _photos.length > 1;
     setState(() {
       _videoBytes = bytes;
       _videoMime = mime;
       _videoName = file.name;
+      if (hadPile) _photos.clear();
     });
+    if (hadPile && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El vídeo va con una sola portada, no con el montón.'),
+        ),
+      );
+    }
   }
 
   Future<bool> _uploadVideoWithRetries({
@@ -350,7 +398,10 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
         _uploadProgress = 0;
       });
       try {
-        if (uploadMethod.toUpperCase() == 'POST') {
+        if (uploadMethod.toUpperCase() == 'TUS') {
+          final uploaded = await _uploadTus(uploadUrl: uploadUrl, bytes: bytes);
+          if (uploaded) return true;
+        } else if (uploadMethod.toUpperCase() == 'POST') {
           // Cloudflare Stream: multipart POST a uploadURL de un solo uso.
           final request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
           request.files.add(
@@ -413,6 +464,82 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
     return false;
   }
 
+  /// Subida a Stream por trozos. El POST simple se corta en 200 MB; tus no.
+  /// Cada trozo intermedio mide 50 MB (múltiplo de 256 KiB). El último puede ser menor.
+  Future<bool> _uploadTus({
+    required String uploadUrl,
+    required Uint8List bytes,
+  }) async {
+    const chunkSize = 50 * 1024 * 1024;
+    const maxChunkAttempts = 3;
+    var offset = await _tusOffset(uploadUrl);
+    if (offset < 0 || offset > bytes.length) return false;
+
+    while (offset < bytes.length) {
+      final end = offset + chunkSize < bytes.length
+          ? offset + chunkSize
+          : bytes.length;
+      var sent = false;
+      for (var attempt = 1; attempt <= maxChunkAttempts && offset < end; attempt++) {
+        if (!mounted) return false;
+        try {
+          final request = http.Request('PATCH', Uri.parse(uploadUrl))
+            ..headers['Tus-Resumable'] = '1.0.0'
+            ..headers['Upload-Offset'] = '$offset'
+            ..headers['Content-Type'] = 'application/offset+octet-stream'
+            ..bodyBytes = Uint8List.sublistView(bytes, offset, end);
+          final response = await request.send().timeout(
+                const Duration(minutes: 8),
+              );
+          await response.stream.drain<void>();
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            offset =
+                int.tryParse(response.headers['upload-offset'] ?? '') ?? end;
+            sent = true;
+            if (mounted && bytes.isNotEmpty) {
+              setState(() => _uploadProgress = offset / bytes.length);
+            }
+            break;
+          }
+          if (response.statusCode == 409) {
+            final resumed = await _tusOffset(uploadUrl);
+            if (resumed > offset) offset = resumed;
+            if (offset >= end) {
+              sent = true;
+              break;
+            }
+          } else if (response.statusCode < 500 &&
+              response.statusCode != 408 &&
+              response.statusCode != 429) {
+            return false;
+          }
+        } catch (_) {
+          // El siguiente intento retoma por el offset que Stream ya tenga.
+        }
+        if (!sent && attempt < maxChunkAttempts) {
+          await Future<void>.delayed(Duration(seconds: attempt * 2));
+          final resumed = await _tusOffset(uploadUrl);
+          if (resumed > offset) offset = resumed;
+        }
+      }
+      if (!sent || offset < end) return false;
+    }
+    return true;
+  }
+
+  Future<int> _tusOffset(String uploadUrl) async {
+    try {
+      final request = http.Request('HEAD', Uri.parse(uploadUrl))
+        ..headers['Tus-Resumable'] = '1.0.0';
+      final response = await request.send().timeout(const Duration(seconds: 20));
+      await response.stream.drain<void>();
+      if (response.statusCode < 200 || response.statusCode >= 300) return 0;
+      return int.tryParse(response.headers['upload-offset'] ?? '') ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   Future<void> _waitForStreamReady({
     required String topicId,
   }) async {
@@ -425,6 +552,24 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
     }
   }
 
+  String _publishErrorMessage(Object error) {
+    if (error is FunctionException) {
+      final details = error.details;
+      if (details is Map) {
+        final message = details['error']?.toString().trim() ?? '';
+        if (message.isNotEmpty) return message;
+      }
+      if (details is String && details.trim().isNotEmpty) return details.trim();
+    }
+    if (error is StateError && error.message.contains('portada')) {
+      return 'Sin Cloudflare Stream el vídeo necesita portada y no puede pasar de 150 MB.';
+    }
+    if (_uploadAttempt > 0) {
+      return 'No se pudo subir el vídeo tras $_uploadAttempt intentos.';
+    }
+    return 'No se pudo publicar. Revisa la conexión y la configuración.';
+  }
+
   Future<void> _submit() async {
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
@@ -434,7 +579,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
       );
       return;
     }
-    if (body.isEmpty && _coverBytes == null && _videoBytes == null) {
+    if (body.isEmpty && _photos.isEmpty && _videoBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Escribe un texto, añade una imagen o un vídeo'),
@@ -451,16 +596,31 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
       );
 
       String? coverUrl;
-      if (_coverBytes != null && _coverBytes!.isNotEmpty) {
-        coverUrl = await ref.read(forumsRepositoryProvider).uploadTopicCover(
+      if (_photos.isNotEmpty) {
+        final forums = ref.read(forumsRepositoryProvider);
+        final urls = <String>[];
+        for (var i = 0; i < _photos.length; i++) {
+          urls.add(
+            await forums.uploadEditorialImage(
               topicId: topic.id,
-              bytes: _coverBytes!,
-              mimeType: _coverMime ?? 'image/jpeg',
-            );
-        await repo.setEditorialCover(
-          topicId: topic.id,
-          coverImageUrl: coverUrl,
-        );
+              bytes: _photos[i],
+              index: i,
+            ),
+          );
+        }
+        coverUrl = urls.first;
+        if (urls.length == 1) {
+          await repo.setEditorialCover(
+            topicId: topic.id,
+            coverImageUrl: coverUrl,
+          );
+        } else {
+          await repo.setEditorialGallery(
+            topicId: topic.id,
+            coverImageUrl: coverUrl,
+            galleryImageUrls: urls.sublist(1),
+          );
+        }
       }
 
       var videoProcessing = false;
@@ -536,16 +696,10 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
         ),
       );
       Navigator.pop(context, true);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _uploadAttempt > 0
-                ? 'No se pudo subir el vídeo tras $_uploadAttempt intentos.'
-                : 'No se pudo publicar. Revisa la conexión y la configuración.',
-          ),
-        ),
+        SnackBar(content: Text(_publishErrorMessage(error))),
       );
     } finally {
       if (mounted) {
@@ -609,34 +763,108 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
                   'Redacta con párrafos, negrita, listas o citas…',
             ),
             const SizedBox(height: 12),
-            if (_coverBytes != null)
+            if (_photos.length > 1)
+              EditorialPhotoStack.memory(images: _photos)
+            else if (_photos.length == 1)
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: Image.memory(_coverBytes!, fit: BoxFit.cover),
+                  child: Image.memory(_photos.single, fit: BoxFit.cover),
                 ),
               )
             else
               OutlinedButton.icon(
-                onPressed: _saving ? null : _pickCover,
-                icon: const Icon(Icons.image_outlined),
+                onPressed: _saving ? null : _pickPhotos,
+                icon: Icon(
+                  _videoBytes == null
+                      ? Icons.photo_library_outlined
+                      : Icons.image_outlined,
+                ),
                 label: Text(
                   _videoBytes == null
-                      ? 'Añadir imagen'
+                      ? 'Añadir fotos'
                       : 'Portada (opcional · Stream la genera)',
                 ),
               ),
-            if (_coverBytes != null) ...[
+            if (_photos.isNotEmpty) ...[
+              if (_photos.length > 1) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Hasta 4. La primera queda delante.',
+                  style: JuntaUi.caption(),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 76,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _photos.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      return SizedBox(
+                        width: 76,
+                        height: 76,
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.memory(
+                                _photos[index],
+                                width: 76,
+                                height: 76,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              top: 2,
+                              right: 2,
+                              child: Material(
+                                color: Colors.black54,
+                                shape: const CircleBorder(),
+                                clipBehavior: Clip.antiAlias,
+                                child: InkWell(
+                                  onTap: _saving
+                                      ? null
+                                      : () => setState(
+                                            () => _photos.removeAt(index),
+                                          ),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(2),
+                                    child: Icon(
+                                      Icons.close,
+                                      size: 14,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
-              TextButton(
-                onPressed: _saving
-                    ? null
-                    : () => setState(() {
-                          _coverBytes = null;
-                          _coverMime = null;
-                        }),
-                child: const Text('Quitar imagen'),
+              Row(
+                children: [
+                  if (_videoBytes == null &&
+                      _photos.length < editorialGalleryMaxImages)
+                    TextButton(
+                      onPressed: _saving ? null : _pickPhotos,
+                      child: const Text('Añadir más'),
+                    ),
+                  TextButton(
+                    onPressed: _saving
+                        ? null
+                        : () => setState(_photos.clear),
+                    child: Text(
+                      _photos.length > 1 ? 'Quitar fotos' : 'Quitar imagen',
+                    ),
+                  ),
+                ],
               ),
             ],
             const SizedBox(height: 8),
@@ -663,7 +891,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
                   icon: const Icon(Icons.close),
                 ),
               )
-            else
+            else if (_photos.length <= 1)
               OutlinedButton.icon(
                 onPressed: _saving ? null : _pickVideo,
                 icon: const Icon(Icons.videocam_outlined),
