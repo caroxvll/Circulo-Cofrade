@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/minute_clock.dart';
+import '../../../core/utils/street_from_coordinates.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../../calendar/calendar_provider.dart'
@@ -162,17 +164,25 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
           timeLimit: Duration(seconds: 12),
         ),
       );
+      final street = await streetNameForCoordinates(
+        position.latitude,
+        position.longitude,
+      );
       if (!mounted) return;
       setState(() {
         _latitude = position.latitude;
         _longitude = position.longitude;
-        _placeLabel = 'Mi ubicación';
+        _placeLabel = street ?? 'Mi ubicación';
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ubicación añadida. Se enviará con tu aviso.'),
-            duration: Duration(seconds: 3),
+          SnackBar(
+            content: Text(
+              street == null
+                  ? 'Ubicación añadida. Se enviará con tu aviso.'
+                  : 'Ubicación añadida: $street',
+            ),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -253,6 +263,66 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
     }
   }
 
+  Future<void> _toggleParaTi(EventLiveUpdate update) async {
+    final show = !update.shownInParaTi;
+    try {
+      final featuredAt = await ref
+          .read(eventLiveUpdatesRepositoryProvider)
+          .setShownInParaTi(id: update.id, show: show);
+      ref.read(eventLiveUpdatesProvider(widget.eventId).notifier).upsert(
+            update.copyWith(featuredAt: featuredAt, clearFeatured: !show),
+          );
+      ref.invalidate(todayCuaresmaLiveTweetsProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(show ? 'Visible en Para ti' : 'Quitado de Para ti'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo actualizar Para ti')),
+      );
+    }
+  }
+
+  Future<void> _deleteUpdate(EventLiveUpdate update) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar aviso'),
+        content: const Text(
+          'Se quita del hilo de este evento. No se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await ref
+          .read(eventLiveUpdatesRepositoryProvider)
+          .deleteUpdate(update.id);
+      ref
+          .read(eventLiveUpdatesProvider(widget.eventId).notifier)
+          .removeById(update.id);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo eliminar el aviso')),
+      );
+    }
+  }
+
   Future<void> _openMaps(EventLiveUpdate update) async {
     final uri = update.hasCoordinates
         ? Uri.parse(
@@ -275,6 +345,7 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final now = watchMinuteClock(ref);
     final eventAsync = ref.watch(calendarEventByIdProvider(widget.eventId));
     final updatesAsync = ref.watch(eventLiveUpdatesProvider(widget.eventId));
     ref.watch(eventLiveUpdatesRealtimeProvider(widget.eventId));
@@ -337,8 +408,8 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
             return _ErrorState(onBack: () => context.pop());
           }
 
-          final isFinished = ensayoStatusLabel(event) == 'Finalizado';
-          final isLive = ensayoLiveAllowsPosting(event);
+          final isFinished = ensayoStatusLabel(event, now: now) == 'Finalizado';
+          final isLive = ensayoLiveAllowsPosting(event, now: now);
           final canPost = profile != null && !isSuspended && isLive;
 
           return Column(
@@ -385,6 +456,12 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
                                   update: updates[index],
                                   isLatest: index == 0,
                                   onOpenMaps: () => _openMaps(updates[index]),
+                                  onDelete: isStaff
+                                      ? () => _deleteUpdate(updates[index])
+                                      : null,
+                                  onToggleParaTi: isStaff
+                                      ? () => _toggleParaTi(updates[index])
+                                      : null,
                                 ),
                                 childCount: updates.length,
                               ),

@@ -25,7 +25,7 @@ class EventLiveUpdatesRepository {
 
     final rows = await client
         .from('event_live_updates')
-        .select('*, profiles!user_id(handle)')
+        .select('*, profiles!user_id(handle, avatar_url)')
         .eq('calendar_event_id', eventId)
         .order('created_at', ascending: false)
         .limit(liveJornadaCap);
@@ -35,7 +35,7 @@ class EventLiveUpdatesRepository {
         .toList();
   }
 
-  /// Avisos de hoy de varias citas, para el río de Para ti.
+  /// Avisos que el admin o la Junta han sacado hoy a Para ti.
   Future<List<EventLiveUpdate>> fetchForEvents(
     Iterable<String> eventIds, {
     int limit = paraTiRiverLimit,
@@ -47,10 +47,11 @@ class EventLiveUpdatesRepository {
     final since = startOfLocalDay().toUtc();
     final rows = await client
         .from('event_live_updates')
-        .select('*, profiles!user_id(handle)')
+        .select('*, profiles!user_id(handle, avatar_url)')
         .inFilter('calendar_event_id', ids)
-        .gte('created_at', since.toIso8601String())
-        .order('created_at', ascending: false)
+        .not('featured_at', 'is', null)
+        .gte('featured_at', since.toIso8601String())
+        .order('featured_at', ascending: false)
         .limit(limit);
 
     return (rows as List)
@@ -77,6 +78,7 @@ class EventLiveUpdatesRepository {
       return null;
     }
     final place = (row['place_label'] as String?)?.trim() ?? '';
+    final featuredAt = _featuredAtFrom(row, previous: previous);
     final handleCol = (row['author_handle'] as String?)?.trim();
     final handleRaw = (handleCol != null && handleCol.isNotEmpty)
         ? handleCol
@@ -87,11 +89,13 @@ class EventLiveUpdatesRepository {
       calendarEventId: eventId,
       userId: userId,
       authorHandle: handle,
+      authorAvatarUrl: previous?.authorAvatarUrl,
       message: (row['message'] as String?)?.trim() ?? '',
       createdAt: DateTime.parse(createdRaw).toLocal(),
       placeLabel: place.isEmpty ? null : place,
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
+      featuredAt: featuredAt,
     );
   }
 
@@ -155,10 +159,34 @@ class EventLiveUpdatesRepository {
           if (latitude != null) 'latitude': latitude,
           if (longitude != null) 'longitude': longitude,
         })
-        .select('*, profiles!user_id(handle)')
+        .select('*, profiles!user_id(handle, avatar_url)')
         .single();
 
     return updateFromRow(row);
+  }
+
+  /// Borra un aviso. Quien lo escribió ya puede; el admin y la Junta, con la policy.
+  Future<void> deleteUpdate(String id) async {
+    if (_client == null) {
+      removeMockEventLiveUpdate(id);
+      return;
+    }
+    await _client.from('event_live_updates').delete().eq('id', id);
+  }
+
+  /// Saca o quita un aviso de Para ti. Solo el admin y la Junta, vía RPC.
+  Future<DateTime?> setShownInParaTi({
+    required String id,
+    required bool show,
+  }) async {
+    if (_client == null) return setMockShownInParaTi(id, show: show);
+
+    final result = await _client.rpc(
+      'set_event_live_para_ti',
+      params: {'p_id': id, 'p_show': show},
+    );
+    if (!show || result == null) return null;
+    return DateTime.parse(result as String).toLocal();
   }
 
   EventLiveUpdate updateFromRow(Map<String, dynamic> row) {
@@ -169,18 +197,31 @@ class EventLiveUpdatesRepository {
         : (profile?['handle'] as String? ?? 'cofrade');
     final handle = handleRaw.startsWith('@') ? handleRaw : '@$handleRaw';
     final place = (row['place_label'] as String?)?.trim() ?? '';
+    final avatar = (profile?['avatar_url'] as String?)?.trim();
 
     return EventLiveUpdate(
       id: row['id'] as String,
       calendarEventId: row['calendar_event_id'] as String,
       userId: row['user_id'] as String,
       authorHandle: handle,
+      authorAvatarUrl: (avatar == null || avatar.isEmpty) ? null : avatar,
       message: row['message'] as String,
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
       placeLabel: place.isEmpty ? null : place,
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
+      featuredAt: _featuredAtFrom(row),
     );
+  }
+
+  DateTime? _featuredAtFrom(
+    Map<String, dynamic> row, {
+    EventLiveUpdate? previous,
+  }) {
+    if (!row.containsKey('featured_at')) return previous?.featuredAt;
+    final raw = row['featured_at'];
+    if (raw == null) return null;
+    return DateTime.parse(raw as String).toLocal();
   }
 
   static String? _normalizeHandle(String? raw) {

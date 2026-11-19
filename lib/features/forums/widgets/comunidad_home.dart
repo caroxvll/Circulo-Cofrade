@@ -12,6 +12,7 @@ import '../../../core/utils/time_ago.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
+import '../../../core/widgets/street_place_text.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/screen_title_row.dart';
 import '../../../core/widgets/search_quick_access_button.dart';
@@ -37,6 +38,7 @@ import '../para_ti_pulse_provider.dart';
 import '../data/mock_forums.dart';
 import '../mis_hermandades_provider.dart';
 import '../utils/editorial_post.dart';
+import 'editorial_photo_stack.dart';
 import 'editorial_video_player.dart';
 import 'forum_post_image.dart';
 import '../utils/forum_navigation.dart';
@@ -184,6 +186,7 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
 
   /// Para ti, de más nuevo a más viejo. Una noticia o una respuesta reciente
   /// pasa por delante de un comunicado de hermandad más antiguo.
+  /// Todo acumula el hilo. Noticias y Temas solo acotan, si alguien filtra.
   List<Widget> _forYouPieces(List<_Activity> visible, ParaTiRiver river) {
     if (_forYouFilter != _ForYouFilter.todo) {
       final sorted = [...visible]..sort((a, b) {
@@ -254,7 +257,7 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
           ),
     ]..sort((a, b) => b.at.compareTo(a.at));
 
-    return [for (final piece in ranked.take(24)) piece.child];
+    return [for (final piece in ranked) piece.child];
   }
 
   Widget _riverEntry(ParaTiRiverEntry entry) {
@@ -788,6 +791,7 @@ class _ParaTiEventTweet extends StatelessWidget {
         ? update.authorHandle
         : '@${update.authorHandle}';
     final place = update.placeLabel?.trim() ?? '';
+    final showPlace = place.isNotEmpty || update.hasCoordinates;
 
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -803,50 +807,71 @@ class _ParaTiEventTweet extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'EN DIRECTO',
-                    style: AppTypography.labelSmall(
-                      color: const Color(0xFF2E7D32),
-                    ).copyWith(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 10,
-                      letterSpacing: 0.6,
-                    ),
+                  CofradeoAvatar(
+                    imageUrl: update.authorAvatarUrl,
+                    size: 36,
+                    backgroundColor: AppColors.backgroundElevated,
                   ),
-                  const Spacer(),
-                  Text(
-                    formatTimeAgo(update.createdAt),
-                    style: AppTypography.labelSmall().copyWith(fontSize: 12),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                handle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.hermandadName().copyWith(
+                                  fontSize: 15,
+                                  height: 1.1,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              formatTimeAgo(update.createdAt),
+                              style: AppTypography.labelSmall().copyWith(
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'En directo',
+                          style: AppTypography.labelSmall(
+                            color: const Color(0xFF2E7D32),
+                          ).copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          update.message,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.bodyMedium(),
+                        ),
+                        if (showPlace) ...[
+                          const SizedBox(height: 4),
+                          StreetPlaceText(
+                            placeLabel: update.placeLabel,
+                            latitude: update.latitude,
+                            longitude: update.longitude,
+                            style: AppTypography.labelSmall(),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                handle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.hermandadName().copyWith(
-                  fontSize: 15,
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                update.message,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.bodyMedium(),
-              ),
-              if (place.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  place,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.labelSmall(),
-                ),
-              ],
             ],
           ),
         ),
@@ -888,25 +913,35 @@ class _ParaTiEditorialCard extends StatelessWidget {
       topic.excerpt.trim().isNotEmpty ? topic.excerpt : topic.body,
       maxLength: 180,
     );
-    final cover = topic.coverImageUrl?.trim();
+    final urls = topic.editorialImageUrls;
     final poster = topic.editorialPosterUrl;
     final isVideo = topic.hasEditorialVideoMedia;
     // Vídeo: poster ligero en el feed (sin inicializar el MP4/HLS).
     // Al abrir el tema se reproduce una sola vez en el detalle.
+    // Varias fotos: montón. Una sola: la foto de siempre.
     final Widget? media = isVideo
         ? EditorialVideoPoster(
             posterUrl: poster,
             processing: topic.hasProcessingEditorialVideo,
           )
-        : (cover == null || cover.isEmpty)
-            ? null
-            : ForumPostImage(
-                imageUrl: cover,
-                shareText: topic.title,
-                adaptiveOrientation: true,
-                maxPreviewHeight: 560,
-                showExpandHint: false,
-              );
+        : urls.length > 1
+            ? EditorialPhotoStack.network(
+                urls: urls,
+                onTap: () => openEditorialPhotoGallery(
+                  context,
+                  urls,
+                  shareText: topic.title,
+                ),
+              )
+            : urls.isEmpty
+                ? null
+                : ForumPostImage(
+                    imageUrl: urls.first,
+                    shareText: topic.title,
+                    adaptiveOrientation: true,
+                    maxPreviewHeight: 560,
+                    showExpandHint: false,
+                  );
 
     return _TimelinePost(
       onTap: () => context.push('/foros/${topic.forumId}/tema/${topic.id}'),

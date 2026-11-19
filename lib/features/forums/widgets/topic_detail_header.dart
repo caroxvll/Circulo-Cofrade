@@ -16,6 +16,7 @@ import '../utils/cofrade_gamification.dart';
 import '../utils/editorial_post.dart';
 import '../utils/reply_reactions.dart';
 import 'cofrade_rank_label.dart';
+import 'editorial_photo_stack.dart';
 import 'editorial_video_player.dart';
 import 'forum_post_image.dart';
 import 'hermandad_board_header.dart';
@@ -203,7 +204,8 @@ class _TopicEditorialBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final coverUrl = _remoteCoverUrl(topic);
+    final urls = topic.editorialImageUrls;
+    final coverUrl = urls.isEmpty ? null : urls.first;
     final body = topic.body.trim();
     final hasBody = body.isNotEmpty;
     final hasVideo = topic.hasReadyEditorialVideo;
@@ -242,17 +244,26 @@ class _TopicEditorialBody extends StatelessWidget {
                 posterUrl: topic.editorialPosterUrl ?? coverUrl,
                 processing: true,
               )
-            : ForumPostImage(
-                imageUrl: coverUrl!,
-                shareText: topic.title,
-                borderRadius: const BorderRadius.all(Radius.circular(10)),
-                maxPreviewHeight:
-                    isNoticiasForum(topic.forumId) ? 300 : 560,
-                adaptiveOrientation: !isNoticiasForum(topic.forumId),
-                fit: isNoticiasForum(topic.forumId)
-                    ? BoxFit.cover
-                    : BoxFit.contain,
-              );
+            : urls.length > 1
+                ? EditorialPhotoStack.network(
+                    urls: urls,
+                    onTap: () => openEditorialPhotoGallery(
+                      context,
+                      urls,
+                      shareText: topic.title,
+                    ),
+                  )
+                : ForumPostImage(
+                    imageUrl: coverUrl!,
+                    shareText: topic.title,
+                    borderRadius: const BorderRadius.all(Radius.circular(10)),
+                    maxPreviewHeight:
+                        isNoticiasForum(topic.forumId) ? 300 : 560,
+                    adaptiveOrientation: !isNoticiasForum(topic.forumId),
+                    fit: isNoticiasForum(topic.forumId)
+                        ? BoxFit.cover
+                        : BoxFit.contain,
+                  );
 
     if (!hasBody) return media;
 

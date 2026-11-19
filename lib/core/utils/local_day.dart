@@ -7,5 +7,6 @@ DateTime startOfLocalDay([DateTime? now]) {
 /// Tope del hilo dentro de una cita. Lo que no cabe sigue en la base.
 const liveJornadaCap = 240;
 
-/// Piezas que caben en el río de Para ti, de más nuevo a más viejo.
+/// Avisos de hoy y el tema que se mueve. Las de Círculo Cofrade no entran aquí:
+/// se acumulan en el hilo.
 const paraTiRiverLimit = 12;

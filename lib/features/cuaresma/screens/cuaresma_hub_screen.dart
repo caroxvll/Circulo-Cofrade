@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/minute_clock.dart';
 import '../../../core/widgets/cofradeo_bottom_nav.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../ads/models/sponsored_ad.dart';
@@ -33,6 +34,7 @@ class CuaresmaHubScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final now = watchMinuteClock(ref);
     final supabaseReady = ref.watch(supabaseReadyProvider);
     final topicKey = ForumTopicKey(forumId: forumId, topicId: topicId);
     ref.watch(topicViewTrackerProvider(topicKey));
@@ -63,7 +65,7 @@ class CuaresmaHubScreen extends ConsumerWidget {
         }
 
         final agenda = agendaAsync.asData?.value ?? const [];
-        final groups = groupTodayEnsayos(agenda);
+        final groups = groupTodayEnsayos(agenda, now: now);
         final topicsCount =
             cuaresmaCommunityTopics(topicsAsync.asData?.value ?? const []).length;
         final focusEventId = GoRouterState.of(context).uri.queryParameters['cita'];
