@@ -1,6 +1,7 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { AuthService } from '../../core/auth/auth.service';
 import {
   HISTORIA_KIND_OPTIONS,
   HistoriaKind,
@@ -28,25 +29,30 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
   private readonly historias = inject(HistoriasService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
 
   readonly kinds = HISTORIA_KIND_OPTIONS;
+  readonly isAdmin = this.auth.isAdmin;
   readonly publishLabel = (kind: HistoriaKind) =>
     this.historias.publishLabel(kind);
 
+  get publishesDirectly(): boolean {
+    return this.isAdmin();
+  }
+
   get primarySaveLabel(): string {
     if (this.saving()) {
-      return this.historiaId && this.status === 'published'
-        ? 'Guardando…'
-        : 'Publicando…';
+      if (this.status === 'published') return 'Guardando…';
+      return this.publishesDirectly ? 'Publicando…' : 'Enviando…';
     }
-    if (this.historiaId && this.status === 'published') {
-      return 'Guardar cambios';
-    }
-    return this.publishLabel(this.kind);
+    if (this.status === 'published') return 'Guardar cambios';
+    if (this.publishesDirectly) return this.publishLabel(this.kind);
+    return 'Enviar a revisión';
   }
 
   historiaId: string | null = null;
   status: HistoriaStatus = 'draft';
+  reviewNote: string | null = null;
   title = '';
   excerpt = '';
   kind: HistoriaKind = 'libro';
@@ -89,6 +95,7 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
       this.excerpt = row.excerpt;
       this.kind = row.kind;
       this.status = row.status;
+      this.reviewNote = row.reviewNote;
       this.coverUrl = row.coverImageUrl;
       this.scheduleLocal = this.toDatetimeLocal(row.scheduledAt);
       this.pages =
@@ -149,6 +156,9 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
   }
 
   async save(status: HistoriaStatus): Promise<void> {
+    if (!this.publishesDirectly && status === 'published' && this.status !== 'published') {
+      status = 'pending_review';
+    }
     this.error.set(null);
     if (this.title.trim().length < 3) {
       this.error.set('El título es demasiado corto.');

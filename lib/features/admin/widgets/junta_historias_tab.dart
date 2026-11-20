@@ -42,6 +42,92 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
     }
   }
 
+  Future<void> _refreshLists() async {
+    ref.invalidate(staffHistoriasProvider);
+    ref.invalidate(publishedHistoriasFeedProvider);
+    ref.invalidate(publishedHistoriasProvider);
+    ref.invalidate(myHistoriasProvider);
+  }
+
+  Future<void> _approve(Historia historia) async {
+    try {
+      await ref.read(historiasRepositoryProvider).setStatus(
+            historiaId: historia.id,
+            status: 'published',
+            clearReviewNote: true,
+          );
+      await _refreshLists();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('«${historia.title}» ya está en El Cronicón.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo aprobar')),
+      );
+    }
+  }
+
+  Future<void> _returnToAuthor(Historia historia) async {
+    final noteCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('¿Devolver «${historia.title}»?'),
+        content: TextField(
+          controller: noteCtrl,
+          maxLines: 3,
+          maxLength: 280,
+          decoration: const InputDecoration(
+            hintText: 'Motivo para el cronista (opcional)',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.burgundy,
+              foregroundColor: AppColors.textOnDark,
+            ),
+            child: const Text('Devolver'),
+          ),
+        ],
+      ),
+    );
+    final note = noteCtrl.text;
+    noteCtrl.dispose();
+    if (confirmed != true) return;
+    try {
+      await ref.read(historiasRepositoryProvider).setStatus(
+            historiaId: historia.id,
+            status: 'draft',
+            reviewNote: note,
+          );
+      await _refreshLists();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo devolver')),
+      );
+    }
+  }
+
+  Future<void> _edit(Historia historia) async {
+    final saved = await showHistoriaComposeSheet(
+      context,
+      existing: historia,
+    );
+    if (saved) {
+      await _refreshLists();
+      ref.invalidate(historiaByIdProvider(historia.id));
+    }
+  }
+
   Future<void> _hide(Historia historia) async {
     try {
       await ref.read(historiasRepositoryProvider).setStatus(
@@ -133,15 +219,11 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
             const SizedBox(height: JuntaUi.sectionGap),
             const JuntaInfoBanner(
               text:
-                  'El admin puede escribir sin sello. El de Cronista se concede '
-                  'desde el perfil de cada persona; no es la cuenta verificada.',
+                  'El cronista envía el libro o artículo a revisión. '
+                  'Tú lo apruebas y sale en El Cronicón. El admin puede publicar al momento. '
+                  'El sello de Cronista se concede desde el perfil; no es la cuenta verificada.',
             ),
             const SizedBox(height: 16),
-            const JuntaSectionHeader(
-              title: 'Publicadas',
-              subtitle: 'Oculta o borra si hace falta.',
-            ),
-            const SizedBox(height: 10),
             books.when(
               loading: () => const Padding(
                 padding: EdgeInsets.all(24),
@@ -153,31 +235,59 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
                 onRetry: () => ref.invalidate(staffHistoriasProvider),
               ),
               data: (items) {
+                final pending = items
+                    .where((item) => item.isPendingReview)
+                    .toList(growable: false);
+                final rest = items
+                    .where((item) => !item.isPendingReview)
+                    .toList(growable: false);
                 if (items.isEmpty) {
                   return const JuntaEmptyPanel(
                     icon: Icons.auto_stories_outlined,
                     message: 'Todavía no hay obras en El Cronicón',
-                    subtitle: 'Escribe la primera o concede el sello de Cronista.',
+                    subtitle:
+                        'Escribe la primera o concede el sello de Cronista.',
                   );
                 }
                 return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final historia in items) ...[
+                    const JuntaSectionHeader(
+                      title: 'Pendientes de revisión',
+                      subtitle:
+                          'Lo que envían los cronistas. Aprueba para que salga, o devuélvelo.',
+                    ),
+                    const SizedBox(height: 10),
+                    if (pending.isEmpty)
+                      Text(
+                        'Nada en cola.',
+                        style: JuntaUi.caption(),
+                      )
+                    else
+                      for (final historia in pending) ...[
+                        _StaffHistoriaCard(
+                          historia: historia,
+                          onOpen: () =>
+                              context.push('/historias/${historia.id}'),
+                          onEdit: () => _edit(historia),
+                          onApprove: () => _approve(historia),
+                          onReturn: () => _returnToAuthor(historia),
+                          onDelete: () => _delete(historia),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    const SizedBox(height: JuntaUi.sectionGap),
+                    const JuntaSectionHeader(
+                      title: 'Publicadas y taller',
+                      subtitle: 'Oculta o borra si hace falta.',
+                    ),
+                    const SizedBox(height: 10),
+                    for (final historia in rest) ...[
                       _StaffHistoriaCard(
                         historia: historia,
-                        onOpen: () => context.push('/historias/${historia.id}'),
-                        onEdit: () async {
-                          final saved = await showHistoriaComposeSheet(
-                            context,
-                            existing: historia,
-                          );
-                          if (saved) {
-                            ref.invalidate(staffHistoriasProvider);
-                            ref.invalidate(publishedHistoriasFeedProvider);
-                            ref.invalidate(publishedHistoriasProvider);
-                            ref.invalidate(historiaByIdProvider(historia.id));
-                          }
-                        },
+                        onOpen: () =>
+                            context.push('/historias/${historia.id}'),
+                        onEdit: () => _edit(historia),
                         onToggle: () => _hide(historia),
                         onDelete: () => _delete(historia),
                       ),
@@ -219,15 +329,19 @@ class _StaffHistoriaCard extends StatelessWidget {
     required this.historia,
     required this.onOpen,
     required this.onEdit,
-    required this.onToggle,
     required this.onDelete,
+    this.onToggle,
+    this.onApprove,
+    this.onReturn,
   });
 
   final Historia historia;
   final VoidCallback onOpen;
   final VoidCallback onEdit;
-  final VoidCallback onToggle;
   final VoidCallback onDelete;
+  final VoidCallback? onToggle;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReturn;
 
   @override
   Widget build(BuildContext context) {
@@ -250,10 +364,15 @@ class _StaffHistoriaCard extends StatelessWidget {
             children: [
               TextButton(onPressed: onOpen, child: const Text('Leer')),
               TextButton(onPressed: onEdit, child: const Text('Editar')),
-              TextButton(
-                onPressed: onToggle,
-                child: Text(historia.isPublished ? 'Ocultar' : 'Publicar'),
-              ),
+              if (onApprove != null)
+                TextButton(onPressed: onApprove, child: const Text('Aprobar')),
+              if (onReturn != null)
+                TextButton(onPressed: onReturn, child: const Text('Devolver')),
+              if (onToggle != null)
+                TextButton(
+                  onPressed: onToggle,
+                  child: Text(historia.isPublished ? 'Ocultar' : 'Publicar'),
+                ),
               TextButton(
                 onPressed: onDelete,
                 child: const Text('Borrar'),

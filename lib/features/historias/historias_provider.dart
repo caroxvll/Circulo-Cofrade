@@ -8,6 +8,7 @@ import '../profile/profile_provider.dart';
 import '../search/follows_provider.dart';
 import 'data/historias_repository.dart';
 import 'models/historia.dart';
+import 'models/historia_reading_progress.dart';
 
 export 'data/historias_repository.dart' show historiasHubConfigKey;
 
@@ -151,4 +152,16 @@ final canPublishHistoriasProvider = Provider<bool>((ref) {
   final profile = ref.watch(currentUserProfileProvider).asData?.value;
   if (profile?.isSuspended == true) return false;
   return profile?.isChronicler == true || ref.watch(isAdminProvider);
+});
+
+final historiaReadingPageProvider =
+    FutureProvider.family<int, String>((ref, historiaId) async {
+  ref.watch(currentUserProvider);
+  return ref.watch(historiasRepositoryProvider).loadReadingPage(historiaId);
+});
+
+final continueReadingProvider =
+    FutureProvider<List<HistoriaContinueItem>>((ref) async {
+  ref.watch(currentUserProvider);
+  return ref.watch(historiasRepositoryProvider).fetchContinueReading();
 });

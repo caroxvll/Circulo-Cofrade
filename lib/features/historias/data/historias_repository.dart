@@ -4,23 +4,30 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/utils/image_upload_compress.dart';
 import '../models/historia.dart';
+import '../models/historia_reading_progress.dart';
+import 'historia_reading_store.dart';
 
 const historiasHubConfigKey = 'historias_hub';
 
 class HistoriasRepository {
-  HistoriasRepository({SupabaseClient? client}) : _client = client;
+  HistoriasRepository({
+    SupabaseClient? client,
+    HistoriaReadingStore? readingStore,
+  })  : _client = client,
+        _readingStore = readingStore ?? HistoriaReadingStore();
 
   final SupabaseClient? _client;
+  final HistoriaReadingStore _readingStore;
 
   static const _coversBucket = 'historia-covers';
   static const shelfPageSize = 24;
   static const _historiaSelect =
       'id, author_id, title, excerpt, kind, cover_image_url, pages, status, '
-      'scheduled_at, comment_count, created_at, '
+      'scheduled_at, review_note, comment_count, created_at, '
       'profiles!author_id (handle, display_name, avatar_url)';
   static const _historiaListSelect =
       'id, author_id, title, excerpt, kind, cover_image_url, status, '
-      'scheduled_at, comment_count, created_at, '
+      'scheduled_at, review_note, comment_count, created_at, '
       'profiles!author_id (handle, display_name, avatar_url)';
   static const _commentSelect =
       'id, historia_id, user_id, body, created_at, '
@@ -282,13 +289,21 @@ class HistoriasRepository {
   Future<void> setStatus({
     required String historiaId,
     required String status,
+    String? reviewNote,
+    bool clearReviewNote = false,
   }) async {
     final client = _client;
     if (client == null) throw const HistoriasUnavailableException();
-    await client.from('historias').update({
+    final payload = <String, dynamic>{
       'status': status,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', historiaId);
+    };
+    if (clearReviewNote) {
+      payload['review_note'] = null;
+    } else if (reviewNote != null) {
+      payload['review_note'] = reviewNote.trim();
+    }
+    await client.from('historias').update(payload).eq('id', historiaId);
   }
 
   Future<void> deleteHistoria(String historiaId) async {
@@ -349,6 +364,129 @@ class HistoriasRepository {
     await client.from('historia_comments').delete().eq('id', commentId);
   }
 
+  String? get _userId => _client?.auth.currentUser?.id;
+
+  Future<int> loadReadingPage(String historiaId) async {
+    final userId = _userId;
+    if (userId == null) return 0;
+    final local = await _readingStore.load(userId, historiaId);
+    try {
+      final client = _client;
+      if (client != null) {
+        final row = await client
+            .from('historia_reading_progress')
+            .select('page, page_count, updated_at')
+            .eq('user_id', userId)
+            .eq('historia_id', historiaId)
+            .maybeSingle();
+        final remote = HistoriaReadingMark.tryParse(historiaId, {
+          ...?row,
+          'pageCount': row?['page_count'],
+        });
+        if (remote != null &&
+            (local == null || !remote.updatedAt.isBefore(local.updatedAt))) {
+          await _readingStore.save(userId, remote);
+          return remote.page;
+        }
+      }
+    } catch (_) {}
+    return local?.page ?? 0;
+  }
+
+  Future<void> saveReadingProgress({
+    required String historiaId,
+    required int page,
+    required int pageCount,
+  }) async {
+    final userId = _userId;
+    if (userId == null) return;
+    final mark = HistoriaReadingMark(
+      historiaId: historiaId,
+      page: page,
+      pageCount: pageCount < 1 ? 1 : pageCount,
+      updatedAt: DateTime.now(),
+    );
+    await _readingStore.save(userId, mark);
+    final client = _client;
+    if (client == null) return;
+    try {
+      if (!mark.isInProgress) {
+        await client
+            .from('historia_reading_progress')
+            .delete()
+            .eq('user_id', userId)
+            .eq('historia_id', historiaId);
+        return;
+      }
+      await client.from('historia_reading_progress').upsert({
+        'user_id': userId,
+        'historia_id': historiaId,
+        'page': mark.page,
+        'page_count': mark.pageCount,
+        'updated_at': mark.updatedAt.toUtc().toIso8601String(),
+      });
+    } catch (_) {}
+  }
+
+  Future<List<HistoriaContinueItem>> fetchContinueReading({int limit = 12}) async {
+    final userId = _userId;
+    if (userId == null) return const [];
+    final local = await _readingStore.loadAll(userId);
+    final byId = <String, HistoriaReadingMark>{
+      for (final mark in local.values)
+        if (mark.isInProgress) mark.historiaId: mark,
+    };
+    try {
+      final client = _client;
+      if (client != null) {
+        final rows = await client
+            .from('historia_reading_progress')
+            .select('page, page_count, updated_at, historia_id')
+            .eq('user_id', userId)
+            .order('updated_at', ascending: false)
+            .limit(40);
+        for (final row in rows) {
+          final historiaId = row['historia_id'] as String?;
+          if (historiaId == null) continue;
+          final remote = HistoriaReadingMark.tryParse(historiaId, {
+            ...row,
+            'pageCount': row['page_count'],
+          });
+          if (remote == null) continue;
+          final localMark = byId[historiaId];
+          if (localMark == null || !remote.updatedAt.isBefore(localMark.updatedAt)) {
+            byId[historiaId] = remote;
+            await _readingStore.save(userId, remote);
+          }
+        }
+      }
+    } catch (_) {}
+
+    final inProgress = byId.values.where((m) => m.isInProgress).toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    if (inProgress.isEmpty) return const [];
+    final sliced = inProgress.take(limit).toList();
+    final historias = await fetchByIds(sliced.map((m) => m.historiaId));
+    final map = {for (final item in historias) item.id: item};
+    return [
+      for (final mark in sliced)
+        if (map[mark.historiaId] != null)
+          HistoriaContinueItem(historia: map[mark.historiaId]!, mark: mark),
+    ];
+  }
+
+  Future<List<Historia>> fetchByIds(Iterable<String> ids) async {
+    final client = _client;
+    final list = ids.toSet().toList();
+    if (client == null || list.isEmpty) return const [];
+    final rows = await client
+        .from('historias')
+        .select(_historiaListSelect)
+        .inFilter('id', list)
+        .eq('status', 'published');
+    return rows.map(_fromRow).toList();
+  }
+
   Map<String, dynamic> _payload({
     required String title,
     required String excerpt,
@@ -395,6 +533,9 @@ class HistoriasRepository {
       'pages': cleanPages.map((p) => p.toJson()).toList(),
     };
     if (status != null) payload['status'] = status;
+    if (status == 'pending_review' || status == 'published') {
+      payload['review_note'] = null;
+    }
     if (status == 'scheduled') {
       final when = scheduledAt;
       if (when == null ||
@@ -429,6 +570,7 @@ class HistoriasRepository {
       scheduledAt: row['scheduled_at'] == null
           ? null
           : DateTime.parse(row['scheduled_at'] as String).toLocal(),
+      reviewNote: row['review_note'] as String?,
       commentCount: row['comment_count'] as int? ?? 0,
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
     );

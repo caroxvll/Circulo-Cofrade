@@ -10,6 +10,7 @@ import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../forums/widgets/forum_compose_sheet_header.dart';
 import '../../forums/widgets/forum_compose_sheet_layout.dart';
 import '../../forums/widgets/scheduled_post_datetime_picker.dart';
+import '../../permissions/permissions_provider.dart';
 import '../data/historias_repository.dart';
 import '../historias_provider.dart';
 import '../models/historia.dart';
@@ -363,7 +364,18 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
         scheduledAt: status == 'scheduled' ? _scheduledAt : null,
       );
       _invalidateLists(historiaId: historia.id);
-      if (mounted) Navigator.pop(context, true);
+      if (!mounted) return;
+      final message = switch (status) {
+        'pending_review' =>
+          'Enviado a revisión. La Junta lo lee antes de que salga.',
+        'draft' => 'Borrador guardado.',
+        'scheduled' => 'Quedó programado.',
+        _ => widget.existing?.isPublished == true
+            ? 'Cambios guardados.'
+            : 'Publicado en El Cronicón.',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      Navigator.pop(context, true);
     } on HistoriasValidationException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -385,9 +397,13 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
     }
   }
 
+  bool get _publishesDirectly =>
+      ref.watch(isAdminProvider) || ref.watch(isJuntaMemberProvider);
+
   @override
   Widget build(BuildContext context) {
     final editing = widget.existing != null;
+    final reviewNote = widget.existing?.reviewNote?.trim();
     return ForumComposeSheetLayout(
       header: ForumComposeSheetTitleBar(
         closeEnabled: !_saving,
@@ -408,6 +424,29 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
             _kind.blurb,
             style: AppTypography.bodyMedium(),
           ),
+          if (!_publishesDirectly) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Cuando lo envíes, la Junta lo lee antes de que salga en El Cronicón.',
+              style: AppTypography.bodyMedium(color: AppColors.textSecondary),
+            ),
+          ],
+          if (reviewNote != null && reviewNote.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.goldPale.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  'La Junta lo devolvió: $reviewNote',
+                  style: AppTypography.bodyMedium(),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -596,47 +635,56 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
             ),
             child: const Text('Guardar borrador'),
           ),
-          const SizedBox(height: 8),
-          if (_schedule) ...[
-            ScheduledPostDatetimePicker(
-              scheduledAt: _scheduledAt,
-              onChanged: (when) => setState(() => _scheduledAt = when),
-              actionLabel: 'Sale',
-            ),
+          if (_publishesDirectly) ...[
             const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: _saving ? null : () => _save(status: 'scheduled'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.burgundy,
-                side: const BorderSide(color: AppColors.burgundy),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+            if (_schedule) ...[
+              ScheduledPostDatetimePicker(
+                scheduledAt: _scheduledAt,
+                onChanged: (when) => setState(() => _scheduledAt = when),
+                actionLabel: 'Sale',
               ),
-              child: Text('Programar ${_kind.label.toLowerCase()}'),
-            ),
-            TextButton(
-              onPressed: _saving
-                  ? null
-                  : () => setState(() => _schedule = false),
-              child: const Text('Publicar ahora, sin fecha'),
-            ),
-          ] else
-            OutlinedButton(
-              onPressed: _saving
-                  ? null
-                  : () => setState(() {
-                        _schedule = true;
-                        _scheduledAt = _defaultScheduleAt();
-                      }),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.burgundy,
-                side: const BorderSide(color: AppColors.burgundy),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: _saving ? null : () => _save(status: 'scheduled'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.burgundy,
+                  side: const BorderSide(color: AppColors.burgundy),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text('Programar ${_kind.label.toLowerCase()}'),
               ),
-              child: const Text('Programar'),
-            ),
+              TextButton(
+                onPressed: _saving
+                    ? null
+                    : () => setState(() => _schedule = false),
+                child: const Text('Publicar ahora, sin fecha'),
+              ),
+            ] else
+              OutlinedButton(
+                onPressed: _saving
+                    ? null
+                    : () => setState(() {
+                          _schedule = true;
+                          _scheduledAt = _defaultScheduleAt();
+                        }),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.burgundy,
+                  side: const BorderSide(color: AppColors.burgundy),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Programar'),
+              ),
+          ],
           const SizedBox(height: 8),
           FilledButton(
-            onPressed: _saving ? null : () => _save(status: 'published'),
+            onPressed: _saving
+                ? null
+                : () => _save(
+                      status: _publishesDirectly ||
+                              widget.existing?.isPublished == true
+                          ? 'published'
+                          : 'pending_review',
+                    ),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.burgundy,
               foregroundColor: AppColors.textOnDark,
@@ -654,7 +702,9 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
                 : Text(
                     widget.existing?.isPublished == true
                         ? 'Guardar cambios'
-                        : _kind.publishLabel,
+                        : _publishesDirectly
+                            ? _kind.publishLabel
+                            : 'Enviar a revisión',
                   ),
           ),
         ],
