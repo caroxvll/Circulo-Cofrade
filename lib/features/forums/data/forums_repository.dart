@@ -122,6 +122,28 @@ class ForumsRepository {
         .toList();
   }
 
+  /// Noticias oficiales publicadas desde un evento de Cuaresma.
+  Future<List<ForumTopic>> fetchPublishedEditorialsForEvent(
+    String eventId,
+  ) async {
+    final id = eventId.trim();
+    if (!_useRemote || id.isEmpty) return const [];
+
+    final rows = await _client!
+        .from('forum_topics')
+        .select('*, $_profileAuthorSelect')
+        .eq('is_editorial', true)
+        .eq('status', 'published')
+        .eq('calendar_event_id', id)
+        .order('created_at', ascending: false)
+        .limit(12);
+
+    return rows
+        .where((row) => !_isAuthorSuspended(row))
+        .map(_topicFromRow)
+        .toList();
+  }
+
   /// El tema con la actividad más reciente, si sigue caliente.
   ///
   /// La actividad es la respuesta más nueva o, si no hay, la creación del tema.
@@ -613,7 +635,14 @@ class ForumsRepository {
       newsGroupId: (row['news_group_id'] as String?)?.trim().isEmpty ?? true
           ? null
           : (row['news_group_id'] as String).trim(),
+      calendarEventId: _calendarEventIdFromRow(row),
     );
+  }
+
+  String? _calendarEventIdFromRow(Map<String, dynamic> row) {
+    final id = (row['calendar_event_id'] as String?)?.trim();
+    if (id == null || id.isEmpty) return null;
+    return id;
   }
 
   String? _viaAuthorHandleFromRow(Map<String, dynamic> row) {

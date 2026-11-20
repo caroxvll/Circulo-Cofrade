@@ -1,6 +1,11 @@
 import { Routes } from '@angular/router';
 import { adminGuard } from './core/auth/admin.guard';
-import { authGuard, guestGuard, hermandadGuard } from './core/auth/auth.guard';
+import {
+  authGuard,
+  cronistaGuard,
+  guestGuard,
+  hermandadGuard,
+} from './core/auth/auth.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'app/resumen' },
@@ -66,6 +71,37 @@ export const routes: Routes = [
           import(
             './pages/hermandad-portal/settings/hermandad-settings.component'
           ).then((m) => m.HermandadSettingsPageComponent),
+      },
+    ],
+  },
+  {
+    path: 'cronista',
+    canActivate: [cronistaGuard],
+    loadComponent: () =>
+      import('./layout/cronista-shell.component').then(
+        (m) => m.CronistaShellComponent,
+      ),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./pages/cronista/cronista-home.component').then(
+            (m) => m.CronistaHomePageComponent,
+          ),
+      },
+      {
+        path: 'escribir',
+        loadComponent: () =>
+          import('./pages/cronista/cronista-editor.component').then(
+            (m) => m.CronistaEditorPageComponent,
+          ),
+      },
+      {
+        path: 'escribir/:id',
+        loadComponent: () =>
+          import('./pages/cronista/cronista-editor.component').then(
+            (m) => m.CronistaEditorPageComponent,
+          ),
       },
     ],
   },

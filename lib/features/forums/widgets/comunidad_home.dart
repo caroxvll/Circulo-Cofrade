@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/forum_text_format.dart';
 import '../../../core/utils/image_decode_cache.dart';
+import '../../../core/utils/minute_clock.dart';
 import '../../../core/utils/time_ago.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
@@ -22,10 +23,14 @@ import '../../../shared/models/user_profile.dart';
 import '../../../shared/models/forum.dart';
 import '../../admin/widgets/junta_editorial_tab.dart';
 import '../../auth/auth_provider.dart';
+import '../../cuaresma/cuaresma_ensayos_provider.dart';
 import '../../cuaresma/models/event_live_update.dart';
 import '../../cuaresma/utils/cuaresma_topic.dart';
+import '../../cuaresma/utils/ensayos_day_groups.dart';
 import '../../notifications/widgets/notifications_bell_button.dart';
 import '../../permissions/permissions_provider.dart';
+import '../../historias/historias_provider.dart';
+import '../../historias/widgets/historias_shelf_tab.dart';
 import '../../quiz/quiz_provider.dart';
 import '../../semana_santa/models/ss_live_update.dart';
 import '../../semana_santa/widgets/ss_forums_live_chip.dart';
@@ -78,21 +83,37 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
 
   @override
   Widget build(BuildContext context) {
+    final historiasOn =
+        ref.watch(historiasHubEnabledProvider).asData?.value == true;
+    final labels = [
+      'Para ti',
+      'Siguiendo',
+      'Foros',
+      if (historiasOn) 'Historias',
+    ];
+    if (_tab >= labels.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _tab = 0);
+      });
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const _ComunidadHeader(),
         _ComunidadTabs(
-          index: _tab,
+          index: _tab.clamp(0, labels.length - 1),
+          labels: labels,
           onChanged: (index) => setState(() => _tab = index),
         ),
-        Expanded(child: _tabBody(context)),
+        Expanded(child: _tabBody(context, historiasOn: historiasOn)),
       ],
     );
   }
 
-  Widget _tabBody(BuildContext context) {
+  Widget _tabBody(BuildContext context, {required bool historiasOn}) {
     if (_tab == 0) return _forYouBody(context);
+    if (historiasOn && _tab == 3) return const HistoriasShelfTab();
     return CustomScrollView(
       physics: _scrollPhysics,
       slivers: [
@@ -722,21 +743,22 @@ class _ComunidadHeader extends StatelessWidget {
 class _ComunidadTabs extends StatelessWidget {
   const _ComunidadTabs({
     required this.index,
+    required this.labels,
     required this.onChanged,
   });
 
   final int index;
+  final List<String> labels;
   final ValueChanged<int> onChanged;
-
-  static const _labels = ['Para ti', 'Siguiendo', 'Foros'];
 
   @override
   Widget build(BuildContext context) {
+    final compact = labels.length > 3;
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
       child: Row(
         children: [
-          for (var i = 0; i < _labels.length; i++)
+          for (var i = 0; i < labels.length; i++)
             Expanded(
               child: InkWell(
                 onTap: () => onChanged(i),
@@ -746,7 +768,7 @@ class _ComunidadTabs extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        _labels[i],
+                        labels[i],
                         style: AppTypography.bodyMedium(
                           color: index == i
                               ? AppColors.burgundy
@@ -754,7 +776,7 @@ class _ComunidadTabs extends StatelessWidget {
                         ).copyWith(
                           fontWeight:
                               index == i ? FontWeight.w700 : FontWeight.w500,
-                          fontSize: 14.5,
+                          fontSize: compact ? 13 : 14.5,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -998,7 +1020,18 @@ class _ParaTiEditorialCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _Chip(label: isVideo ? 'Vídeo · Círculo Cofrade' : 'Círculo Cofrade'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _Chip(
+                label: isVideo ? 'Vídeo · Círculo Cofrade' : 'Círculo Cofrade',
+              ),
+              if (topic.calendarEventId case final eventId?)
+                _EditorialLiveLink(eventId: eventId),
+            ],
+          ),
           const SizedBox(height: 8),
           _PulsePostFace(
             title: topic.title,
@@ -2813,6 +2846,47 @@ class _SurfaceCard extends StatelessWidget {
               highlightColor: AppColors.gold.withValues(alpha: 0.05),
               child: body,
             ),
+    );
+  }
+}
+
+class _EditorialLiveLink extends ConsumerWidget {
+  const _EditorialLiveLink({required this.eventId});
+
+  final String eventId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final now = watchMinuteClock(ref);
+    final events = ref.watch(todayCuaresmaAgendaProvider).asData?.value;
+    if (events == null) return const SizedBox.shrink();
+    final isLive = groupTodayEnsayos(events, now: now)
+        .live
+        .any((event) => event.id == eventId);
+    if (!isLive) return const SizedBox.shrink();
+
+    return Material(
+      color: const Color(0x142E7D32),
+      borderRadius: BorderRadius.circular(99),
+      child: InkWell(
+        onTap: () => context.push(
+          '/foros/foro-cofradiero/tema/$cuaresmaTopicId/ensayo/$eventId',
+        ),
+        borderRadius: BorderRadius.circular(99),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Text(
+            'EN DIRECTO',
+            style: AppTypography.labelSmall(
+              color: const Color(0xFF2E7D32),
+            ).copyWith(
+              fontWeight: FontWeight.w800,
+              fontSize: 10,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

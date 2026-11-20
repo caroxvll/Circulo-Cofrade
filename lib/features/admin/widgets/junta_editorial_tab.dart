@@ -24,7 +24,11 @@ import '../../forums/widgets/forum_compose_sheet_layout.dart';
 import '../admin_provider.dart';
 import '../junta_ui.dart';
 
-Future<bool> showEditorialComposeSheet(BuildContext context) async {
+Future<bool> showEditorialComposeSheet(
+  BuildContext context, {
+  String? calendarEventId,
+  String? initialTitle,
+}) async {
   return await showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
@@ -35,7 +39,10 @@ Future<bool> showEditorialComposeSheet(BuildContext context) async {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
-        builder: (context) => const _EditorialComposeSheet(),
+        builder: (context) => _EditorialComposeSheet(
+          calendarEventId: calendarEventId,
+          initialTitle: initialTitle,
+        ),
       ) ??
       false;
 }
@@ -265,7 +272,13 @@ class _EditorialPostCard extends ConsumerWidget {
 }
 
 class _EditorialComposeSheet extends ConsumerStatefulWidget {
-  const _EditorialComposeSheet();
+  const _EditorialComposeSheet({
+    this.calendarEventId,
+    this.initialTitle,
+  });
+
+  final String? calendarEventId;
+  final String? initialTitle;
 
   @override
   ConsumerState<_EditorialComposeSheet> createState() =>
@@ -282,6 +295,13 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
   var _saving = false;
   double? _uploadProgress;
   var _uploadAttempt = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final title = widget.initialTitle?.trim() ?? '';
+    if (title.isNotEmpty) _titleController.text = title;
+  }
 
   @override
   void dispose() {
@@ -593,6 +613,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
       final topic = await repo.createEditorialPost(
         title: title,
         body: body.isEmpty ? title : body,
+        calendarEventId: widget.calendarEventId,
       );
 
       String? coverUrl;

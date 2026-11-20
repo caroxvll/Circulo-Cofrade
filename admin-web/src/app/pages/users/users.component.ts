@@ -25,7 +25,14 @@ export class UsersPageComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly busyId = signal<string | null>(null);
   readonly filter = signal<
-    'all' | 'admin' | 'brotherhood' | 'suspended' | 'noticias' | 'calendario' | 'moderador'
+    | 'all'
+    | 'admin'
+    | 'brotherhood'
+    | 'suspended'
+    | 'noticias'
+    | 'calendario'
+    | 'moderador'
+    | 'cronista'
   >('all');
   readonly editingUser = signal<AdminUserRow | null>(null);
   readonly editSaving = signal(false);
@@ -47,7 +54,7 @@ export class UsersPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [stats, users, publisherIds, calendarIds, moderatorIds] =
+      const [stats, users, publisherIds, calendarIds, moderatorIds, chroniclerIds] =
         await Promise.all([
           this.community.fetchSignupStats(),
           this.community.searchUsers(this.search),
@@ -56,10 +63,17 @@ export class UsersPageComponent implements OnInit {
             .fetchCalendarContributorIds()
             .catch(() => new Set<string>()),
           this.community.fetchForumModeratorIds().catch(() => new Set<string>()),
+          this.community.fetchChroniclerIds().catch(() => new Set<string>()),
         ]);
       this.stats.set(stats);
       this.users.set(
-        this.withAccess(users, publisherIds, calendarIds, moderatorIds),
+        this.withAccess(
+          users,
+          publisherIds,
+          calendarIds,
+          moderatorIds,
+          chroniclerIds,
+        ),
       );
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo cargar');
@@ -72,16 +86,24 @@ export class UsersPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [users, publisherIds, calendarIds, moderatorIds] = await Promise.all([
-        this.community.searchUsers(this.search),
-        this.community.fetchNewsPublisherIds().catch(() => new Set<string>()),
-        this.community
-          .fetchCalendarContributorIds()
-          .catch(() => new Set<string>()),
-        this.community.fetchForumModeratorIds().catch(() => new Set<string>()),
-      ]);
+      const [users, publisherIds, calendarIds, moderatorIds, chroniclerIds] =
+        await Promise.all([
+          this.community.searchUsers(this.search),
+          this.community.fetchNewsPublisherIds().catch(() => new Set<string>()),
+          this.community
+            .fetchCalendarContributorIds()
+            .catch(() => new Set<string>()),
+          this.community.fetchForumModeratorIds().catch(() => new Set<string>()),
+          this.community.fetchChroniclerIds().catch(() => new Set<string>()),
+        ]);
       this.users.set(
-        this.withAccess(users, publisherIds, calendarIds, moderatorIds),
+        this.withAccess(
+          users,
+          publisherIds,
+          calendarIds,
+          moderatorIds,
+          chroniclerIds,
+        ),
       );
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Error de búsqueda');
@@ -105,6 +127,8 @@ export class UsersPageComponent implements OnInit {
         return list.filter((u) => u.calendarContributor || u.forumModerator);
       case 'moderador':
         return list.filter((u) => u.forumModerator);
+      case 'cronista':
+        return list.filter((u) => u.isChronicler);
       default:
         return list;
     }
@@ -161,13 +185,38 @@ export class UsersPageComponent implements OnInit {
     publisherIds: Set<string>,
     calendarIds: Set<string>,
     moderatorIds: Set<string>,
+    chroniclerIds: Set<string>,
   ): AdminUserRow[] {
     return users.map((user) => ({
       ...user,
       newsPublisher: publisherIds.has(user.id),
       calendarContributor: calendarIds.has(user.id),
       forumModerator: moderatorIds.has(user.id),
+      isChronicler: chroniclerIds.has(user.id),
     }));
+  }
+
+  async toggleChronicler(user: AdminUserRow): Promise<void> {
+    const next = !user.isChronicler;
+    const question = next
+      ? `¿Hacer cronista a @${user.handle}? Podrá escribir Historias en la web y en la app. No es la verificación de cuenta.`
+      : `¿Quitar el sello de cronista a @${user.handle}? Las historias ya publicadas siguen.`;
+    if (!confirm(question)) return;
+    this.busyId.set(user.id);
+    try {
+      await this.community.setChronicler(user.id, next);
+      this.users.update((list) =>
+        list.map((u) => (u.id === user.id ? { ...u, isChronicler: next } : u)),
+      );
+    } catch (err) {
+      this.error.set(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo actualizar. ¿Ejecutaste historias.sql?',
+      );
+    } finally {
+      this.busyId.set(null);
+    }
   }
 
   async toggleCalendarContributor(user: AdminUserRow): Promise<void> {

@@ -9,6 +9,7 @@ import '../../../core/utils/image_decode_cache.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../../core/widgets/chronicler_badge.dart';
 import '../../../core/widgets/verified_account_badge.dart';
 import '../../../shared/models/user_profile.dart';
 import '../../calendar/calendar_contributors_provider.dart';
@@ -199,6 +200,10 @@ class ProfileHeader extends ConsumerWidget {
                     const SizedBox(width: 5),
                     const _NewsPublisherMark(size: 15),
                   ],
+                  if (profile.isChronicler) ...[
+                    const SizedBox(width: 4),
+                    const ChroniclerIcon(size: 15),
+                  ],
                   if (forumModerator && !profile.isVerified && !profile.isAdmin) ...[
                     const SizedBox(width: 4),
                     const _ModeratorMark(size: 15),
@@ -243,7 +248,8 @@ class ProfileHeader extends ConsumerWidget {
               if (profile.address.isNotEmpty ||
                   roleChip != null ||
                   newsMark ||
-                  forumModerator) ...[
+                  forumModerator ||
+                  profile.isChronicler) ...[
                 SizedBox(height: compact ? 4 : 6),
                 Wrap(
                   alignment: WrapAlignment.center,
@@ -268,6 +274,12 @@ class ProfileHeader extends ConsumerWidget {
                         ],
                       ),
                     if (roleChip != null) roleChip,
+                    if (profile.isChronicler)
+                      const _RoleChip(
+                        label: 'Cronista',
+                        icon: Icons.auto_stories_rounded,
+                        tone: _RoleChipTone.gold,
+                      ),
                     if (newsMark)
                       const _RoleChip(
                         label: 'Noticias',
