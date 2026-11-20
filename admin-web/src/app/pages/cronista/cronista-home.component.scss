@@ -1,0 +1,104 @@
+.desk {
+  max-width: 920px;
+}
+
+.desk-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-family: 'Cormorant Garamond', var(--font-serif);
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+}
+
+.lead,
+.muted {
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 52ch;
+}
+
+.write-btn {
+  flex-shrink: 0;
+  background: var(--burgundy);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 11px;
+}
+
+.empty,
+.error-box {
+  padding: 24px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.shelf {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 18px;
+}
+
+.book {
+  text-decoration: none;
+  color: inherit;
+  display: grid;
+  gap: 8px;
+}
+
+.cover {
+  aspect-ratio: 3 / 4;
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, transparent 30%, #2a0f0c 100%),
+    #3a1a16;
+  background-size: cover;
+  background-position: center;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  color: #fff;
+  box-shadow: 4px 10px 22px rgba(36, 18, 14, 0.28);
+}
+
+.cover span {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.cover strong {
+  font-family: 'Cormorant Garamond', var(--font-serif);
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.book p,
+.book small {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}

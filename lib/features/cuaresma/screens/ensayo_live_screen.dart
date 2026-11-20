@@ -7,12 +7,16 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/utils/minute_clock.dart';
 import '../../../core/utils/street_from_coordinates.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../../shared/models/calendar_event.dart';
+import '../../../shared/models/forum.dart';
 import '../../calendar/calendar_provider.dart'
     show calendarEventByIdProvider, calendarRepositoryProvider;
+import '../../admin/widgets/junta_editorial_tab.dart';
+import '../../forums/para_ti_pulse_provider.dart';
 import '../../forums/topic_detail_typography.dart';
 import '../../permissions/permissions_provider.dart';
 import '../../profile/profile_provider.dart';
@@ -72,9 +76,22 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
 
   Future<void> _refresh() async {
     ref.invalidate(calendarEventByIdProvider(widget.eventId));
+    ref.invalidate(eventEditorialPostsProvider(widget.eventId));
     await ref
         .read(eventLiveUpdatesProvider(widget.eventId).notifier)
         .reload(quiet: true);
+  }
+
+  Future<void> _publishNews(CalendarEvent event) async {
+    final created = await showEditorialComposeSheet(
+      context,
+      calendarEventId: event.id,
+      initialTitle: event.title,
+    );
+    if (!created || !mounted) return;
+    ref.invalidate(eventEditorialPostsProvider(widget.eventId));
+    ref.invalidate(publishedEditorialPostsProvider);
+    ref.invalidate(paraTiRiverProvider);
   }
 
   Future<void> _toggleLiveForce(
@@ -423,6 +440,13 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
                       SliverToBoxAdapter(
+                        child: _EventNewsStrip(
+                          eventId: widget.eventId,
+                          isStaff: isStaff,
+                          onPublish: () => _publishNews(event),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                           child: EnsayoLiveSectionHeader(
@@ -510,6 +534,122 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _EventNewsStrip extends ConsumerWidget {
+  const _EventNewsStrip({
+    required this.eventId,
+    required this.isStaff,
+    required this.onPublish,
+  });
+
+  final String eventId;
+  final bool isStaff;
+  final VoidCallback onPublish;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final posts = ref.watch(eventEditorialPostsProvider(eventId));
+    final items = posts.asData?.value ?? const <ForumTopic>[];
+    if (!isStaff && items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (isStaff)
+            OutlinedButton.icon(
+              onPressed: onPublish,
+              icon: const Icon(Icons.campaign_outlined, size: 18),
+              label: const Text('Publicar noticia'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.burgundy,
+                side: BorderSide(
+                  color: AppColors.burgundy.withValues(alpha: 0.35),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          if (items.isNotEmpty) ...[
+            if (isStaff) const SizedBox(height: 10),
+            for (final topic in items) ...[
+              _EventNewsTile(topic: topic),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EventNewsTile extends StatelessWidget {
+  const _EventNewsTile({required this.topic});
+
+  final ForumTopic topic;
+
+  @override
+  Widget build(BuildContext context) {
+    final cover = topic.editorialPosterUrl;
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => context.push('/foros/${topic.forumId}/tema/${topic.id}'),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Row(
+            children: [
+              if (cover != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CofradeoNetworkImage(
+                    url: cover,
+                    width: 56,
+                    height: 56,
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'CÍRCULO COFRADE',
+                      style: TopicDetailTypography.meta(
+                        color: AppColors.burgundy,
+                        fontWeight: FontWeight.w700,
+                      ).copyWith(fontSize: 10, letterSpacing: 0.4),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      topic.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TopicDetailTypography.body().copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: AppColors.textMuted),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -14,6 +14,8 @@ export interface AdminUserRow {
   calendarContributor: boolean;
   /** Modera al menos un foro. */
   forumModerator: boolean;
+  /** Puede publicar en Historias. */
+  isChronicler: boolean;
   suspendedAt: string | null;
   suspendedReason: string | null;
   createdAt: string;
@@ -359,6 +361,26 @@ export class CommunityService {
       assigned_by: session.user?.id ?? null,
       assigned_at: new Date().toISOString(),
     });
+    if (error) throw error;
+  }
+
+  async fetchChroniclerIds(): Promise<Set<string>> {
+    const { data, error } = await getSupabase()
+      .from('profiles')
+      .select('id')
+      .eq('is_chronicler', true);
+    if (error) throw error;
+    return new Set((data ?? []).map((row) => String(row.id)));
+  }
+
+  async setChronicler(profileId: string, chronicler: boolean): Promise<void> {
+    const { error } = await getSupabase()
+      .from('profiles')
+      .update({
+        is_chronicler: chronicler,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', profileId);
     if (error) throw error;
   }
 
@@ -1047,6 +1069,7 @@ export class CommunityService {
       newsPublisher: false,
       calendarContributor: false,
       forumModerator: false,
+      isChronicler: false,
       suspendedAt: (row['suspended_at'] as string | null) ?? null,
       suspendedReason: (row['suspended_reason'] as string | null) ?? null,
       createdAt: String(row['created_at'] ?? ''),

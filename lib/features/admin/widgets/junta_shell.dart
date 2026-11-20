@@ -15,6 +15,7 @@ import 'junta_hermandades_tab.dart';
 import 'junta_moderation_panels.dart';
 import 'junta_moderators_tab.dart';
 import 'junta_pending_events_tab.dart';
+import 'junta_historias_tab.dart';
 import 'junta_pillars_tab.dart';
 import 'junta_quiz_tab.dart';
 import 'junta_rejected_topics_panel.dart';
@@ -478,6 +479,7 @@ class _JuntaModuleBody extends StatelessWidget {
       JuntaModule.hermandades => const JuntaHermandadesTab(),
       JuntaModule.seasonActs => const JuntaSeasonActsTab(),
       JuntaModule.forums => const JuntaPillarsTab(),
+      JuntaModule.historias => const JuntaHistoriasTab(),
       JuntaModule.season => const JuntaCountdownTab(),
       JuntaModule.ads => const AdminAdsTab(),
       JuntaModule.quiz => const JuntaQuizTab(),

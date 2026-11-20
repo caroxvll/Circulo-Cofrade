@@ -1,0 +1,48 @@
+<section class="desk">
+  <header class="desk-head">
+    <div>
+      <p class="eyebrow">Tu taller</p>
+      <h1>Libros, crónicas y anécdotas</h1>
+      <p class="lead">
+        Escribe con calma en el ordenador. También puedes hacerlo en el móvil, en
+        Comunidad → Historias. Las fotos van dentro de cada página.
+      </p>
+    </div>
+    <a routerLink="/cronista/escribir" class="write-btn">Nueva historia</a>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <p class="muted">Cargando tu estantería…</p>
+  } @else if (items().length === 0) {
+    <div class="empty">
+      <p>Aún no has publicado nada.</p>
+      <a routerLink="/cronista/escribir">Escribe la primera página</a>
+    </div>
+  } @else {
+    <ul class="shelf">
+      @for (item of items(); track item.id) {
+        <li>
+          <a class="book" [routerLink]="['/cronista/escribir', item.id]">
+            <div
+              class="cover"
+              [style.background-image]="
+                item.coverImageUrl ? 'url(' + item.coverImageUrl + ')' : null
+              "
+            >
+              <span>{{ kindLabel(item.kind) }}</span>
+              <strong>{{ item.title }}</strong>
+            </div>
+            <p>{{ item.excerpt || 'Sin entradilla' }}</p>
+            <small>
+              {{ statusLabel(item.status) }} · {{ item.pages.length }} pág.
+            </small>
+          </a>
+        </li>
+      }
+    </ul>
+  }
+</section>

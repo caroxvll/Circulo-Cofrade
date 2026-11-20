@@ -42,6 +42,7 @@
       <option value="noticias">Pueden publicar noticias</option>
       <option value="calendario">Pueden proponer calendario</option>
       <option value="moderador">Moderadores de foro</option>
+      <option value="cronista">Cronistas</option>
     </select>
   </div>
 
@@ -100,6 +101,9 @@
                 @if (user.forumModerator) {
                   <span class="pill">moderador</span>
                 }
+                @if (user.isChronicler) {
+                  <span class="pill">cronista</span>
+                }
               </td>
               <td>
                 <div>{{ timeAgo(user.createdAt) }}</div>
@@ -137,6 +141,14 @@
                   (click)="toggleVerified(user)"
                 >
                   {{ user.verified ? 'Quitar verif.' : 'Verificar' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-soft"
+                  [disabled]="busyId() === user.id"
+                  (click)="toggleChronicler(user)"
+                >
+                  {{ user.isChronicler ? 'Quitar cronista' : 'Hacer cronista' }}
                 </button>
                 <button
                   type="button"
@@ -216,6 +228,9 @@
             @if (user.forumModerator) {
               <span class="pill">moderador</span>
             }
+            @if (user.isChronicler) {
+              <span class="pill">cronista</span>
+            }
             <span class="sub">Alta · {{ timeAgo(user.createdAt) }}</span>
           </div>
 
@@ -247,6 +262,14 @@
               (click)="toggleVerified(user)"
             >
               {{ user.verified ? 'Quitar verif.' : 'Verificar' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="busyId() === user.id"
+              (click)="toggleChronicler(user)"
+            >
+              {{ user.isChronicler ? 'Quitar cronista' : 'Hacer cronista' }}
             </button>
             <button
               type="button"

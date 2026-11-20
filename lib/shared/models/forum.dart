@@ -219,6 +219,7 @@ class ForumTopic {
     this.rejectedAt,
     this.relatedForumId,
     this.newsGroupId,
+    this.calendarEventId,
   });
 
   final String id;
@@ -286,6 +287,9 @@ class ForumTopic {
 
   /// Noticias unificadas a mano. Null = ficha suelta.
   final String? newsGroupId;
+
+  /// Evento de Cuaresma del que sale esta noticia. Null si es suelta.
+  final String? calendarEventId;
 
   bool get isPublished => status == TopicStatus.published;
   bool get isPending => status == TopicStatus.pending;
@@ -381,6 +385,7 @@ class ForumTopic {
     DateTime? rejectedAt,
     String? relatedForumId,
     Object? newsGroupId = _keepNewsGroup,
+    String? calendarEventId,
   }) {
     return ForumTopic(
       id: id ?? this.id,
@@ -428,6 +433,7 @@ class ForumTopic {
       newsGroupId: identical(newsGroupId, _keepNewsGroup)
           ? this.newsGroupId
           : newsGroupId as String?,
+      calendarEventId: calendarEventId ?? this.calendarEventId,
     );
   }
 }

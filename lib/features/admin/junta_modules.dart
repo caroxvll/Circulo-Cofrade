@@ -14,6 +14,7 @@ enum JuntaModule {
   hermandades,
   seasonActs,
   forums,
+  historias,
   season,
   ads,
   quiz,
@@ -32,6 +33,7 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.hermandades => 'Hermandades',
     JuntaModule.seasonActs => 'Actos de temporada',
     JuntaModule.forums => 'Foros y apariencia',
+    JuntaModule.historias => 'Historias',
     JuntaModule.season => 'Temporada',
     JuntaModule.ads => 'Patrocinios',
     JuntaModule.quiz => 'Pregunta en vivo',
@@ -49,6 +51,7 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.hermandades => 'Hermandades',
     JuntaModule.seasonActs => 'Actos',
     JuntaModule.forums => 'Foros',
+    JuntaModule.historias => 'Historias',
     JuntaModule.season => 'Temporada',
     JuntaModule.ads => 'Patrocinios',
     JuntaModule.quiz => 'Quiz',
@@ -66,6 +69,7 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.hermandades => Icons.church_outlined,
     JuntaModule.seasonActs => Icons.timeline_outlined,
     JuntaModule.forums => Icons.forum_outlined,
+    JuntaModule.historias => Icons.auto_stories_outlined,
     JuntaModule.season => Icons.calendar_month_outlined,
     JuntaModule.ads => Icons.campaign_outlined,
     JuntaModule.quiz => Icons.quiz_outlined,
@@ -83,7 +87,8 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.moderators ||
     JuntaModule.hermandades ||
     JuntaModule.seasonActs ||
-    JuntaModule.forums =>
+    JuntaModule.forums ||
+    JuntaModule.historias =>
       JuntaNavSection.community,
     JuntaModule.season || JuntaModule.ads || JuntaModule.quiz =>
       JuntaNavSection.platform,
@@ -95,6 +100,7 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.hermandades ||
     JuntaModule.seasonActs ||
     JuntaModule.forums ||
+    JuntaModule.historias ||
     JuntaModule.season ||
     JuntaModule.ads =>
       true,
