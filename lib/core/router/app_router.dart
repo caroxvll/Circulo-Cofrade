@@ -18,6 +18,7 @@ import '../../features/semana_santa/models/ss_live_update.dart';
 import '../../features/semana_santa/utils/semana_santa_topic.dart';
 import '../../features/quiz/screens/quiz_play_screen.dart';
 import '../../features/quiz/screens/quiz_ranking_screen.dart';
+import '../../features/historias/screens/historia_author_screen.dart';
 import '../../features/historias/screens/historia_reader_screen.dart';
 import '../../features/forums/topic_detail_screen.dart';
 import '../../features/forums/mis_hermandades_screen.dart';
@@ -307,6 +308,15 @@ final routerProvider = Provider<GoRouter>((ref) {
                 pageBuilder: (context, state) => cofradeoFadePage(
                   state: state,
                   child: const QuizRankingScreen(),
+                ),
+              ),
+              GoRoute(
+                path: '/historias/autor/:authorId',
+                pageBuilder: (context, state) => cofradeoFadePage(
+                  state: state,
+                  child: HistoriaAuthorScreen(
+                    authorId: state.pathParameters['authorId']!,
+                  ),
                 ),
               ),
               GoRoute(

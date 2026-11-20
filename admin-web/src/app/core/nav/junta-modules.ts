@@ -174,8 +174,8 @@ export const JUNTA_MODULES: JuntaModuleDef[] = [
   },
   {
     id: 'historias',
-    label: 'Historias',
-    shortLabel: 'Historias',
+    label: 'El Cronicón',
+    shortLabel: 'El Cronicón',
     route: '/cronista',
     section: 'community',
     adminOnly: true,

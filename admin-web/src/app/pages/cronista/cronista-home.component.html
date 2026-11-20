@@ -1,15 +1,28 @@
 <section class="desk">
   <header class="desk-head">
     <div>
-      <p class="eyebrow">Tu taller</p>
-      <h1>Libros, crónicas y anécdotas</h1>
+      <p class="eyebrow">Círculo Cofrade</p>
+      <h1>El Cronicón</h1>
       <p class="lead">
-        Escribe con calma en el ordenador. También puedes hacerlo en el móvil, en
-        Comunidad → Historias. Las fotos van dentro de cada página.
+        Entre incienso y memoria. Escribe aquí o en el móvil,
+        en Comunidad → El Cronicón.
       </p>
     </div>
-    <a routerLink="/cronista/escribir" class="write-btn">Nueva historia</a>
+    <a routerLink="/cronista/escribir" class="write-btn">Escribir</a>
   </header>
+
+  <div class="publish-kinds">
+    @for (item of kinds; track item.id) {
+      <a
+        class="publish-card"
+        [routerLink]="['/cronista/escribir']"
+        [queryParams]="{ tipo: item.id }"
+      >
+        <strong>Publicar {{ item.label.toLowerCase() }}</strong>
+        <p>{{ item.blurb }}</p>
+      </a>
+    }
+  </div>
 
   @if (error()) {
     <div class="error-box">{{ error() }}</div>
@@ -17,11 +30,6 @@
 
   @if (loading()) {
     <p class="muted">Cargando tu estantería…</p>
-  } @else if (items().length === 0) {
-    <div class="empty">
-      <p>Aún no has publicado nada.</p>
-      <a routerLink="/cronista/escribir">Escribe la primera página</a>
-    </div>
   } @else {
     <ul class="shelf">
       @for (item of items(); track item.id) {
@@ -38,7 +46,7 @@
             </div>
             <p>{{ item.excerpt || 'Sin entradilla' }}</p>
             <small>
-              {{ statusLabel(item.status) }} · {{ item.pages.length }} pág.
+              {{ statusLabel(item.status) }} · {{ item.pages.length }} pág. · Editar
             </small>
           </a>
         </li>

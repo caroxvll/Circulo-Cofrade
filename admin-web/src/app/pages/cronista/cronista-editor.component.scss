@@ -65,25 +65,44 @@ textarea {
 }
 
 .kinds {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.kind {
+.kind-card {
+  display: grid;
+  gap: 6px;
+  text-align: left;
   border: 1px solid var(--border-strong);
   background: #fff;
-  border-radius: 999px;
-  padding: 6px 12px;
+  border-radius: 14px;
+  padding: 12px 14px;
   font: inherit;
-  font-weight: 700;
   cursor: pointer;
 }
 
-.kind.on {
+.kind-card strong {
+  color: var(--burgundy);
+  font-size: 0.98rem;
+}
+
+.kind-card span {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+.kind-card.on {
   background: var(--gold-soft);
   border-color: var(--gold);
-  color: var(--burgundy);
+}
+
+@media (max-width: 720px) {
+  .kinds {
+    grid-template-columns: 1fr;
+  }
 }
 
 .cover-pick input[type='file'] {

@@ -14,7 +14,7 @@ export interface AdminUserRow {
   calendarContributor: boolean;
   /** Modera al menos un foro. */
   forumModerator: boolean;
-  /** Puede publicar en Historias. */
+  /** Puede publicar en El Cronicón. */
   isChronicler: boolean;
   suspendedAt: string | null;
   suspendedReason: string | null;
