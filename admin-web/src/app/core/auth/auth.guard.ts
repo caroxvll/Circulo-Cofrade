@@ -50,7 +50,7 @@ export const hermandadGuard: CanActivateFn = async () => {
   return true;
 };
 
-/** Escritorio de cronista. El admin se queda en Junta. */
+/** Escritorio de cronista. El admin también puede escribir. */
 export const cronistaGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);
@@ -59,19 +59,16 @@ export const cronistaGuard: CanActivateFn = async () => {
   if (!auth.session()) {
     return router.createUrlTree(['/login']);
   }
-  if (auth.isAdmin()) {
-    return router.createUrlTree(['/app/resumen']);
+  if (auth.isAdmin() || auth.isChronicler()) {
+    return true;
   }
-  if (!auth.isChronicler()) {
-    if (auth.isHermandadAccount()) {
-      return router.createUrlTree(['/hermandad']);
-    }
-    await auth.signOut();
-    return router.createUrlTree(['/login'], {
-      queryParams: { denied: '1' },
-    });
+  if (auth.isHermandadAccount()) {
+    return router.createUrlTree(['/hermandad']);
   }
-  return true;
+  await auth.signOut();
+  return router.createUrlTree(['/login'], {
+    queryParams: { denied: '1' },
+  });
 };
 
 export const guestGuard: CanActivateFn = async () => {

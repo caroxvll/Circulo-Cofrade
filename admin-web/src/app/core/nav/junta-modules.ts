@@ -14,6 +14,7 @@ export type JuntaModuleId =
   | 'hermandades'
   | 'season-acts'
   | 'forums'
+  | 'historias'
   | 'season'
   | 'ads'
   | 'companies'
@@ -167,6 +168,15 @@ export const JUNTA_MODULES: JuntaModuleDef[] = [
     label: 'Foros y apariencia',
     shortLabel: 'Foros',
     route: '/app/foros',
+    section: 'community',
+    adminOnly: true,
+    comingSoon: false,
+  },
+  {
+    id: 'historias',
+    label: 'Historias',
+    shortLabel: 'Historias',
+    route: '/cronista',
     section: 'community',
     adminOnly: true,
     comingSoon: false,

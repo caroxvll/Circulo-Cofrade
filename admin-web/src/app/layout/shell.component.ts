@@ -39,6 +39,8 @@ const NAV_ICON_PATHS: Record<JuntaModuleId, string> = {
     'M4 12h3l2-6 3 12 2-6h6M4 19h16',
   forums:
     'M8 6h13v10H8zm0 0H5a2 2 0 0 0-2 2v8l3-2h2m3-8v2m0 3h.01',
+  historias:
+    'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15Z',
   season:
     'M12 3v2m0 14v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M3 12h2m14 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z',
   ads:

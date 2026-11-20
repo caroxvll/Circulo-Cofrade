@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../historias/historias_provider.dart';
 import '../../historias/models/historia.dart';
+import '../../historias/widgets/historia_compose_sheet.dart';
 import '../admin_provider.dart';
 import '../junta_ui.dart';
 
@@ -98,76 +99,98 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
     final hubOn = hubAsync.asData?.value ?? false;
     final books = ref.watch(staffHistoriasProvider);
 
-    return ListView(
-      padding: JuntaUi.listPadding,
+    return Stack(
       children: [
-        const JuntaSectionHeader(
-          title: 'Apartado Historias',
-          subtitle:
-              'Apagado, nadie ve la pestaña en Comunidad. Enciéndelo cuando '
-              'haya cronistas listos para publicar.',
+        ListView(
+          padding: JuntaUi.listPadding,
+          children: [
+            const JuntaSectionHeader(
+              title: 'Apartado Historias',
+              subtitle:
+                  'Apagado, la gente no ve la pestaña. Tú sí: puedes escribir '
+                  'aunque esté oculto. Enciéndelo cuando haya cronistas.',
+            ),
+            const SizedBox(height: 4),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                hubOn ? 'Visible en Comunidad' : 'Oculto',
+                style: JuntaUi.body(color: AppColors.textPrimary),
+              ),
+              subtitle: Text(
+                hubOn
+                    ? 'La gente ve Historias junto a Para ti, Siguiendo y Foros.'
+                    : 'La pestaña no aparece hasta que la actives.',
+                style: JuntaUi.caption(),
+              ),
+              value: hubOn,
+              activeThumbColor: AppColors.burgundy,
+              onChanged: _savingHub ? null : _setHub,
+            ),
+            const SizedBox(height: JuntaUi.sectionGap),
+            const JuntaInfoBanner(
+              text:
+                  'El admin puede escribir sin sello. El de Cronista se concede '
+                  'desde el perfil de cada persona; no es la cuenta verificada.',
+            ),
+            const SizedBox(height: 16),
+            const JuntaSectionHeader(
+              title: 'Publicadas',
+              subtitle: 'Oculta o borra si hace falta.',
+            ),
+            const SizedBox(height: 10),
+            books.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (_, _) => JuntaEmptyPanel(
+                icon: Icons.error_outline,
+                message: 'No se pudieron cargar las historias.',
+                onRetry: () => ref.invalidate(staffHistoriasProvider),
+              ),
+              data: (items) {
+                if (items.isEmpty) {
+                  return const JuntaEmptyPanel(
+                    icon: Icons.auto_stories_outlined,
+                    message: 'Todavía no hay historias',
+                    subtitle: 'Escribe la primera o concede el sello de Cronista.',
+                  );
+                }
+                return Column(
+                  children: [
+                    for (final historia in items) ...[
+                      _StaffHistoriaCard(
+                        historia: historia,
+                        onOpen: () => context.push('/historias/${historia.id}'),
+                        onToggle: () => _hide(historia),
+                        onDelete: () => _delete(historia),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 72),
+          ],
         ),
-        const SizedBox(height: 4),
-        SwitchListTile.adaptive(
-          contentPadding: EdgeInsets.zero,
-          title: Text(
-            hubOn ? 'Visible en Comunidad' : 'Oculto',
-            style: JuntaUi.body(color: AppColors.textPrimary),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton.extended(
+            onPressed: () async {
+              final created = await showHistoriaComposeSheet(context);
+              if (created) {
+                ref.invalidate(staffHistoriasProvider);
+                ref.invalidate(publishedHistoriasProvider);
+              }
+            },
+            backgroundColor: AppColors.burgundy,
+            foregroundColor: AppColors.textOnDark,
+            icon: const Icon(Icons.auto_stories_outlined),
+            label: const Text('Escribir'),
           ),
-          subtitle: Text(
-            hubOn
-                ? 'La gente ve Historias junto a Para ti, Siguiendo y Foros.'
-                : 'La pestaña no aparece hasta que la actives.',
-            style: JuntaUi.caption(),
-          ),
-          value: hubOn,
-          activeThumbColor: AppColors.burgundy,
-          onChanged: _savingHub ? null : _setHub,
-        ),
-        const SizedBox(height: JuntaUi.sectionGap),
-        const JuntaInfoBanner(
-          text:
-              'El sello de Cronista se concede desde el perfil de cada persona '
-              '(Acciones de la Junta). No es la cuenta verificada.',
-        ),
-        const SizedBox(height: 16),
-        const JuntaSectionHeader(
-          title: 'Publicadas',
-          subtitle: 'Oculta o borra si hace falta.',
-        ),
-        const SizedBox(height: 10),
-        books.when(
-          loading: () => const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (_, _) => JuntaEmptyPanel(
-            icon: Icons.error_outline,
-            message: 'No se pudieron cargar las historias.',
-            onRetry: () => ref.invalidate(staffHistoriasProvider),
-          ),
-          data: (items) {
-            if (items.isEmpty) {
-              return const JuntaEmptyPanel(
-                icon: Icons.auto_stories_outlined,
-                message: 'Todavía no hay historias',
-                subtitle: 'Concede el sello de Cronista y activa el apartado.',
-              );
-            }
-            return Column(
-              children: [
-                for (final historia in items) ...[
-                  _StaffHistoriaCard(
-                    historia: historia,
-                    onOpen: () => context.push('/historias/${historia.id}'),
-                    onToggle: () => _hide(historia),
-                    onDelete: () => _delete(historia),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-              ],
-            );
-          },
         ),
       ],
     );
