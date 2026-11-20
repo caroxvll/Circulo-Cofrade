@@ -49,6 +49,7 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
             status: historia.isPublished ? 'hidden' : 'published',
           );
       ref.invalidate(staffHistoriasProvider);
+      ref.invalidate(publishedHistoriasFeedProvider);
       ref.invalidate(publishedHistoriasProvider);
     } catch (_) {
       if (!mounted) return;
@@ -84,6 +85,7 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
     try {
       await ref.read(historiasRepositoryProvider).deleteHistoria(historia.id);
       ref.invalidate(staffHistoriasProvider);
+      ref.invalidate(publishedHistoriasFeedProvider);
       ref.invalidate(publishedHistoriasProvider);
     } catch (_) {
       if (!mounted) return;
@@ -105,10 +107,11 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
           padding: JuntaUi.listPadding,
           children: [
             const JuntaSectionHeader(
-              title: 'Apartado Historias',
+              title: 'El Cronicón',
               subtitle:
-                  'Apagado, la gente no ve la pestaña. Tú sí: puedes escribir '
-                  'aunque esté oculto. Enciéndelo cuando haya cronistas.',
+                  'El sello de Círculo Cofrade para libros y artículos. '
+                  'Apagado, la gente no ve la pestaña. Tú sí puedes escribir. '
+                  'Enciéndelo cuando haya cronistas.',
             ),
             const SizedBox(height: 4),
             SwitchListTile.adaptive(
@@ -119,7 +122,7 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
               ),
               subtitle: Text(
                 hubOn
-                    ? 'La gente ve Historias junto a Para ti, Siguiendo y Foros.'
+                    ? 'La gente ve El Cronicón junto a Para ti, Siguiendo y Foros.'
                     : 'La pestaña no aparece hasta que la actives.',
                 style: JuntaUi.caption(),
               ),
@@ -153,7 +156,7 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
                 if (items.isEmpty) {
                   return const JuntaEmptyPanel(
                     icon: Icons.auto_stories_outlined,
-                    message: 'Todavía no hay historias',
+                    message: 'Todavía no hay obras en El Cronicón',
                     subtitle: 'Escribe la primera o concede el sello de Cronista.',
                   );
                 }
@@ -163,6 +166,18 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
                       _StaffHistoriaCard(
                         historia: historia,
                         onOpen: () => context.push('/historias/${historia.id}'),
+                        onEdit: () async {
+                          final saved = await showHistoriaComposeSheet(
+                            context,
+                            existing: historia,
+                          );
+                          if (saved) {
+                            ref.invalidate(staffHistoriasProvider);
+                            ref.invalidate(publishedHistoriasFeedProvider);
+                            ref.invalidate(publishedHistoriasProvider);
+                            ref.invalidate(historiaByIdProvider(historia.id));
+                          }
+                        },
                         onToggle: () => _hide(historia),
                         onDelete: () => _delete(historia),
                       ),
@@ -180,16 +195,18 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
           bottom: 16,
           child: FloatingActionButton.extended(
             onPressed: () async {
-              final created = await showHistoriaComposeSheet(context);
+              final created = await showHistoriaPublishSheet(context);
               if (created) {
                 ref.invalidate(staffHistoriasProvider);
+                ref.invalidate(publishedHistoriasFeedProvider);
                 ref.invalidate(publishedHistoriasProvider);
+                ref.invalidate(myHistoriasProvider);
               }
             },
             backgroundColor: AppColors.burgundy,
             foregroundColor: AppColors.textOnDark,
             icon: const Icon(Icons.auto_stories_outlined),
-            label: const Text('Escribir'),
+            label: const Text('Publicar'),
           ),
         ),
       ],
@@ -201,12 +218,14 @@ class _StaffHistoriaCard extends StatelessWidget {
   const _StaffHistoriaCard({
     required this.historia,
     required this.onOpen,
+    required this.onEdit,
     required this.onToggle,
     required this.onDelete,
   });
 
   final Historia historia;
   final VoidCallback onOpen;
+  final VoidCallback onEdit;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
 
@@ -221,8 +240,7 @@ class _StaffHistoriaCard extends StatelessWidget {
           Text(historia.title, style: JuntaUi.cardTitle()),
           const SizedBox(height: 4),
           Text(
-            '${historia.kind.label} · ${historia.authorHandle} · '
-            '${historia.pageCount} pág. · '
+                            '${historia.kind.label} · ${historia.authorHandle} · '
             '${historia.isPublished ? 'publicada' : historia.isDraft ? 'borrador' : 'oculta'}',
             style: JuntaUi.caption(),
           ),
@@ -231,6 +249,7 @@ class _StaffHistoriaCard extends StatelessWidget {
             spacing: 8,
             children: [
               TextButton(onPressed: onOpen, child: const Text('Leer')),
+              TextButton(onPressed: onEdit, child: const Text('Editar')),
               TextButton(
                 onPressed: onToggle,
                 child: Text(historia.isPublished ? 'Ocultar' : 'Publicar'),

@@ -61,7 +61,7 @@ class UserProfile {
   final String? avatarUrl;
   final bool isVerified;
 
-  /// Cronista: puede publicar en Historias. Distinto de la cuenta verificada.
+  /// Cronista: puede publicar en El Cronicón. Distinto de la cuenta verificada.
   final bool isChronicler;
   final UserRole role;
   final bool isSuspended;

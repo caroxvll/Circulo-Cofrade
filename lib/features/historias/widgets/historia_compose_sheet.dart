@@ -6,13 +6,59 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/pick_gallery_image.dart';
+import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../forums/widgets/forum_compose_sheet_header.dart';
 import '../../forums/widgets/forum_compose_sheet_layout.dart';
 import '../data/historias_repository.dart';
 import '../historias_provider.dart';
 import '../models/historia.dart';
 
-Future<bool> showHistoriaComposeSheet(BuildContext context) async {
+Future<bool> showHistoriaPublishSheet(
+  BuildContext context, {
+  Historia? existing,
+  HistoriaKind? kind,
+}) async {
+  if (existing != null) {
+    return showHistoriaComposeSheet(context, existing: existing);
+  }
+  final picked = kind ?? await showHistoriaKindPicker(context);
+  if (picked == null || !context.mounted) return false;
+  return showHistoriaComposeSheet(context, initialKind: picked);
+}
+
+Future<HistoriaKind?> showHistoriaKindPicker(BuildContext context) {
+  return showModalBottomSheet<HistoriaKind>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: AppColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => const _HistoriaKindPicker(),
+  );
+}
+
+Future<bool> showHistoriaComposeSheet(
+  BuildContext context, {
+  HistoriaKind? initialKind,
+  Historia? existing,
+}) async {
+  var ready = existing;
+  if (ready != null && ready.pages.isEmpty) {
+    ready = await ProviderScope.containerOf(context)
+        .read(historiasRepositoryProvider)
+        .fetchById(ready.id);
+    if (ready == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo abrir para editar.')),
+        );
+      }
+      return false;
+    }
+  }
+  if (!context.mounted) return false;
   return await showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
@@ -23,13 +69,133 @@ Future<bool> showHistoriaComposeSheet(BuildContext context) async {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
-        builder: (_) => const _HistoriaComposeSheet(),
+        builder: (_) => _HistoriaComposeSheet(
+          initialKind: initialKind ?? ready?.kind ?? HistoriaKind.libro,
+          existing: ready,
+        ),
       ) ??
       false;
 }
 
+IconData historiaKindIcon(HistoriaKind kind) => switch (kind) {
+      HistoriaKind.libro => Icons.menu_book_outlined,
+      HistoriaKind.articulo => Icons.article_outlined,
+    };
+
+class _HistoriaKindPicker extends StatelessWidget {
+  const _HistoriaKindPicker();
+
+  @override
+  Widget build(BuildContext context) {
+    return ForumComposeSheetLayout(
+      header: ForumComposeSheetTitleBar(
+        title: Text(
+          '¿Qué quieres publicar?',
+          style: AppTypography.titleLarge(),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'En El Cronicón. Libro o artículo: elige el formato y luego escribes.',
+            style: AppTypography.bodyMedium(),
+          ),
+          const SizedBox(height: 16),
+          for (final kind in HistoriaKind.values) ...[
+            _KindOptionTile(
+              kind: kind,
+              headline: kind.publishLabel,
+              selected: false,
+              showChevron: true,
+              onTap: () => Navigator.pop(context, kind),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _KindOptionTile extends StatelessWidget {
+  const _KindOptionTile({
+    required this.kind,
+    required this.headline,
+    required this.selected,
+    required this.onTap,
+    this.showChevron = false,
+  });
+
+  final HistoriaKind kind;
+  final String headline;
+  final bool selected;
+  final VoidCallback? onTap;
+  final bool showChevron;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.goldPale : AppColors.backgroundElevated,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: selected
+              ? AppColors.gold
+              : AppColors.gold.withValues(alpha: 0.25),
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+          child: Row(
+            children: [
+              Icon(
+                historiaKindIcon(kind),
+                color: AppColors.burgundy,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      headline,
+                      style: AppTypography.titleLarge().copyWith(fontSize: 17),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      kind.blurb,
+                      style: AppTypography.bodyMedium(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (showChevron)
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.goldDark.withValues(alpha: 0.8),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _HistoriaComposeSheet extends ConsumerStatefulWidget {
-  const _HistoriaComposeSheet();
+  const _HistoriaComposeSheet({
+    required this.initialKind,
+    this.existing,
+  });
+
+  final HistoriaKind initialKind;
+  final Historia? existing;
 
   @override
   ConsumerState<_HistoriaComposeSheet> createState() =>
@@ -37,14 +203,36 @@ class _HistoriaComposeSheet extends ConsumerStatefulWidget {
 }
 
 class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
-  final _title = TextEditingController();
-  final _excerpt = TextEditingController();
-  final _pages = <_PageDraft>[_PageDraft()];
-  HistoriaKind _kind = HistoriaKind.cronica;
+  late final TextEditingController _title;
+  late final TextEditingController _excerpt;
+  late final List<_PageDraft> _pages;
+  late HistoriaKind _kind;
   Uint8List? _coverBytes;
   String _coverExtension = 'jpg';
   String _coverType = 'image/jpeg';
-  var _publishing = false;
+  String? _existingCoverUrl;
+  var _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _kind = widget.initialKind;
+    _title = TextEditingController(text: existing?.title ?? '');
+    _excerpt = TextEditingController(text: existing?.excerpt ?? '');
+    _existingCoverUrl = existing?.coverImageUrl;
+    final pages = existing?.pages ?? const <HistoriaPage>[];
+    _pages = pages.isEmpty
+        ? [_PageDraft()]
+        : pages
+            .map(
+              (page) => _PageDraft()
+                ..body.text = page.body
+                ..caption.text = page.caption ?? ''
+                ..imageUrl = page.imageUrl,
+            )
+            .toList();
+  }
 
   @override
   void dispose() {
@@ -89,28 +277,41 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
     });
   }
 
-  Future<void> _publish() async {
-    if (_publishing) return;
-    setState(() => _publishing = true);
+  void _invalidateLists({String? historiaId}) {
+    ref.invalidate(publishedHistoriasFeedProvider);
+    ref.invalidate(publishedHistoriasProvider);
+    ref.invalidate(myHistoriasProvider);
+    ref.invalidate(staffHistoriasProvider);
+    ref.invalidate(publishedHistoriasByAuthorProvider);
+    if (historiaId != null) {
+      ref.invalidate(historiaByIdProvider(historiaId));
+    }
+  }
+
+  Future<void> _save({required String status}) async {
+    if (_saving) return;
+    setState(() => _saving = true);
     final repo = ref.read(historiasRepositoryProvider);
     try {
-      final historia = await repo.create(
+      var historia = widget.existing;
+      historia ??= await repo.create(
         title: _title.text,
         excerpt: _excerpt.text,
         kind: _kind,
+        status: status,
         pages: _pages
             .map(
               (p) => HistoriaPage(
-                body: p.body.text.trim().isEmpty && p.imageBytes != null
-                    ? ' '
-                    : p.body.text,
+                body: p.body.text.trim().isEmpty && p.hasImage ? ' ' : p.body.text,
+                imageUrl: p.imageUrl,
+                caption: p.caption.text,
               ),
             )
             .toList(),
       );
       final pages = <HistoriaPage>[];
       for (final draft in _pages) {
-        String? imageUrl;
+        var imageUrl = draft.imageUrl;
         final bytes = draft.imageBytes;
         if (bytes != null) {
           imageUrl = await repo.uploadPageImage(
@@ -129,7 +330,7 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
           ),
         );
       }
-      var coverUrl = historia.coverImageUrl;
+      var coverUrl = _existingCoverUrl ?? historia.coverImageUrl;
       final cover = _coverBytes;
       if (cover != null) {
         coverUrl = await repo.uploadCover(
@@ -145,10 +346,11 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
         title: _title.text,
         excerpt: _excerpt.text,
         kind: _kind,
+        status: status,
         pages: pages,
         coverImageUrl: coverUrl,
       );
-      ref.invalidate(publishedHistoriasProvider);
+      _invalidateLists(historiaId: historia.id);
       if (mounted) Navigator.pop(context, true);
     } on HistoriasValidationException catch (e) {
       if (mounted) {
@@ -161,44 +363,29 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'No se pudo publicar. ¿Ejecutaste historias.sql y tienes sello de Cronista?',
+              'No se pudo guardar. Revisa que el SQL de Historias esté ejecutado.',
             ),
           ),
         );
       }
     } finally {
-      if (mounted) setState(() => _publishing = false);
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final editing = widget.existing != null;
     return ForumComposeSheetLayout(
       header: ForumComposeSheetTitleBar(
-        closeEnabled: !_publishing,
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Nueva historia',
-                style: AppTypography.titleLarge(),
-              ),
-            ),
-            TextButton(
-              onPressed: _publishing ? null : _publish,
-              child: _publishing
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(
-                      'Publicar',
-                      style: AppTypography.bodyMedium(color: AppColors.burgundy)
-                          .copyWith(fontWeight: FontWeight.w700),
-                    ),
-            ),
-          ],
+        closeEnabled: !_saving,
+        title: Text(
+          editing
+              ? (widget.existing!.isDraft
+                  ? 'Seguir escribiendo'
+                  : 'Editar ${_kind.label.toLowerCase()}')
+              : _kind.composeTitle,
+          style: AppTypography.titleLarge(),
         ),
       ),
       child: Column(
@@ -206,14 +393,39 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Se lee como un libro: portada, páginas y comentarios en la ficha.',
+            _kind.blurb,
             style: AppTypography.bodyMedium(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final kind in HistoriaKind.values)
+                ChoiceChip(
+                  label: Text(kind.label),
+                  selected: _kind == kind,
+                  showCheckmark: false,
+                  onSelected: _saving
+                      ? null
+                      : (_) => setState(() => _kind = kind),
+                  selectedColor: AppColors.goldPale,
+                  avatar: Icon(
+                    historiaKindIcon(kind),
+                    size: 16,
+                    color: AppColors.burgundy,
+                  ),
+                  labelStyle: AppTypography.labelSmall(
+                    color: AppColors.burgundy,
+                  ).copyWith(fontWeight: FontWeight.w700),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
           Align(
             alignment: Alignment.centerLeft,
             child: GestureDetector(
-              onTap: _publishing ? null : _pickCover,
+              onTap: _saving ? null : _pickCover,
               child: SizedBox(
                 width: 132,
                 height: 176,
@@ -225,54 +437,15 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
                       color: AppColors.gold.withValues(alpha: 0.45),
                     ),
                   ),
-                  child: _coverBytes == null
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.auto_stories_outlined,
-                              size: 32,
-                              color: AppColors.goldDark.withValues(alpha: 0.8),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Portada',
-                              style: AppTypography.labelSmall(
-                                color: AppColors.goldDark,
-                              ),
-                            ),
-                          ],
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(_coverBytes!, fit: BoxFit.cover),
-                        ),
+                  child: _coverPreview(),
                 ),
               ),
             ),
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final kind in HistoriaKind.values)
-                ChoiceChip(
-                  label: Text(kind.label),
-                  selected: _kind == kind,
-                  onSelected: _publishing
-                      ? null
-                      : (_) => setState(() => _kind = kind),
-                  selectedColor: AppColors.goldPale,
-                  labelStyle: AppTypography.labelSmall(
-                    color: AppColors.burgundy,
-                  ).copyWith(fontWeight: FontWeight.w700),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
           TextField(
             controller: _title,
-            enabled: !_publishing,
+            enabled: !_saving,
             maxLength: 80,
             style: AppTypography.newsHeadline(),
             decoration: const InputDecoration(
@@ -283,7 +456,7 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
           ),
           TextField(
             controller: _excerpt,
-            enabled: !_publishing,
+            enabled: !_saving,
             maxLength: 280,
             maxLines: 3,
             style: AppTypography.bodyMedium(color: AppColors.textSecondary),
@@ -303,7 +476,7 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
                 const Spacer(),
                 if (_pages.length > 1)
                   IconButton(
-                    onPressed: _publishing ? null : () => _removePage(i),
+                    onPressed: _saving ? null : () => _removePage(i),
                     icon: const Icon(Icons.remove_circle_outline, size: 18),
                     color: AppColors.textMuted,
                   ),
@@ -311,7 +484,7 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
             ),
             TextField(
               controller: _pages[i].body,
-              enabled: !_publishing,
+              enabled: !_saving,
               maxLines: 8,
               minLines: 5,
               maxLength: 3500,
@@ -338,40 +511,49 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
             Row(
               children: [
                 OutlinedButton.icon(
-                  onPressed:
-                      _publishing ? null : () => _pickPageImage(i),
+                  onPressed: _saving ? null : () => _pickPageImage(i),
                   icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
                   label: Text(
-                    _pages[i].imageBytes == null ? 'Foto' : 'Cambiar foto',
+                    _pages[i].hasImage ? 'Cambiar foto' : 'Foto',
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.burgundy,
                   ),
                 ),
-                if (_pages[i].imageBytes != null) ...[
+                if (_pages[i].hasImage) ...[
                   const SizedBox(width: 8),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(6),
-                    child: Image.memory(
-                      _pages[i].imageBytes!,
+                    child: SizedBox(
                       width: 56,
                       height: 56,
-                      fit: BoxFit.cover,
+                      child: _pages[i].imageBytes != null
+                          ? Image.memory(
+                              _pages[i].imageBytes!,
+                              fit: BoxFit.cover,
+                            )
+                          : CofradeoNetworkImage(
+                              url: _pages[i].imageUrl!,
+                              fit: BoxFit.cover,
+                            ),
                     ),
                   ),
                   IconButton(
-                    onPressed: _publishing
+                    onPressed: _saving
                         ? null
-                        : () => setState(() => _pages[i].imageBytes = null),
+                        : () => setState(() {
+                              _pages[i].imageBytes = null;
+                              _pages[i].imageUrl = null;
+                            }),
                     icon: const Icon(Icons.close, size: 18),
                   ),
                 ],
               ],
             ),
-            if (_pages[i].imageBytes != null)
+            if (_pages[i].hasImage)
               TextField(
                 controller: _pages[i].caption,
-                enabled: !_publishing,
+                enabled: !_saving,
                 maxLength: 120,
                 style: AppTypography.bookCaption(),
                 decoration: const InputDecoration(
@@ -384,7 +566,7 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
           ],
           if (_pages.length < 30)
             OutlinedButton.icon(
-              onPressed: _publishing ? null : _addPage,
+              onPressed: _saving ? null : _addPage,
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Añadir página'),
               style: OutlinedButton.styleFrom(
@@ -392,8 +574,74 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
                 side: const BorderSide(color: AppColors.burgundy),
               ),
             ),
+          const SizedBox(height: 18),
+          OutlinedButton(
+            onPressed: _saving ? null : () => _save(status: 'draft'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.burgundy,
+              side: const BorderSide(color: AppColors.burgundy),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: const Text('Guardar borrador'),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: _saving ? null : () => _save(status: 'published'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.burgundy,
+              foregroundColor: AppColors.textOnDark,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    widget.existing?.isPublished == true
+                        ? 'Guardar cambios'
+                        : _kind.publishLabel,
+                  ),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _coverPreview() {
+    if (_coverBytes != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.memory(_coverBytes!, fit: BoxFit.cover),
+      );
+    }
+    final url = _existingCoverUrl?.trim();
+    if (url != null && url.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: CofradeoNetworkImage(url: url, fit: BoxFit.cover),
+      );
+    }
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.auto_stories_outlined,
+          size: 32,
+          color: AppColors.goldDark.withValues(alpha: 0.8),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Portada',
+          style: AppTypography.labelSmall(
+            color: AppColors.goldDark,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -402,8 +650,11 @@ class _PageDraft {
   final body = TextEditingController();
   final caption = TextEditingController();
   Uint8List? imageBytes;
+  String? imageUrl;
   String imageExtension = 'jpg';
   String imageType = 'image/jpeg';
+
+  bool get hasImage => imageBytes != null || (imageUrl ?? '').trim().isNotEmpty;
 
   void dispose() {
     body.dispose();

@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
+  HISTORIA_KIND_OPTIONS,
   HistoriaKind,
   HistoriaPage,
   HistoriaStatus,
@@ -28,16 +29,27 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  readonly kinds: { id: HistoriaKind; label: string }[] = [
-    { id: 'cronica', label: 'Crónica' },
-    { id: 'anecdota', label: 'Anécdota' },
-    { id: 'libro', label: 'Libro' },
-  ];
+  readonly kinds = HISTORIA_KIND_OPTIONS;
+  readonly publishLabel = (kind: HistoriaKind) =>
+    this.historias.publishLabel(kind);
+
+  get primarySaveLabel(): string {
+    if (this.saving()) {
+      return this.historiaId && this.status === 'published'
+        ? 'Guardando…'
+        : 'Publicando…';
+    }
+    if (this.historiaId && this.status === 'published') {
+      return 'Guardar cambios';
+    }
+    return this.publishLabel(this.kind);
+  }
 
   historiaId: string | null = null;
+  status: HistoriaStatus = 'draft';
   title = '';
   excerpt = '';
-  kind: HistoriaKind = 'cronica';
+  kind: HistoriaKind = 'libro';
   coverFile: File | null = null;
   coverPreview: string | null = null;
   coverUrl: string | null = null;
@@ -51,6 +63,11 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
     if (id) {
       this.historiaId = id;
       void this.load(id);
+      return;
+    }
+    const tipo = this.route.snapshot.queryParamMap.get('tipo');
+    if (tipo === 'libro' || tipo === 'articulo') {
+      this.kind = tipo;
     }
   }
 
@@ -69,6 +86,7 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
       this.title = row.title;
       this.excerpt = row.excerpt;
       this.kind = row.kind;
+      this.status = row.status;
       this.coverUrl = row.coverImageUrl;
       this.pages =
         row.pages.length > 0

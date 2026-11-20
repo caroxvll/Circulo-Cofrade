@@ -13,8 +13,13 @@ class HistoriasRepository {
   final SupabaseClient? _client;
 
   static const _coversBucket = 'historia-covers';
+  static const shelfPageSize = 24;
   static const _historiaSelect =
       'id, author_id, title, excerpt, kind, cover_image_url, pages, status, '
+      'comment_count, created_at, '
+      'profiles!author_id (handle, display_name, avatar_url)';
+  static const _historiaListSelect =
+      'id, author_id, title, excerpt, kind, cover_image_url, status, '
       'comment_count, created_at, '
       'profiles!author_id (handle, display_name, avatar_url)';
   static const _commentSelect =
@@ -43,14 +48,28 @@ class HistoriasRepository {
     }
   }
 
-  Future<List<Historia>> fetchPublished() async {
+  Future<List<Historia>> fetchPublished({
+    int offset = 0,
+    int limit = shelfPageSize,
+    HistoriaKind? kind,
+    Iterable<String>? authorIds,
+  }) async {
     final client = _client;
     if (client == null) return [];
-    final rows = await client
+    if (authorIds != null && authorIds.isEmpty) return [];
+    var query = client
         .from('historias')
-        .select(_historiaSelect)
-        .eq('status', 'published')
-        .order('created_at', ascending: false);
+        .select(_historiaListSelect)
+        .eq('status', 'published');
+    if (kind != null) {
+      query = query.eq('kind', kind.dbValue);
+    }
+    if (authorIds != null) {
+      query = query.inFilter('author_id', authorIds.toList());
+    }
+    final rows = await query
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit - 1);
     return rows.map(_fromRow).toList();
   }
 
@@ -59,8 +78,9 @@ class HistoriasRepository {
     if (client == null) return [];
     final rows = await client
         .from('historias')
-        .select(_historiaSelect)
-        .order('created_at', ascending: false);
+        .select(_historiaListSelect)
+        .order('created_at', ascending: false)
+        .range(0, 99);
     return rows.map(_fromRow).toList();
   }
 
@@ -76,13 +96,26 @@ class HistoriasRepository {
     return _fromRow(row);
   }
 
+  Future<List<Historia>> fetchPublishedByAuthor(String authorId) async {
+    final client = _client;
+    if (client == null) return [];
+    final rows = await client
+        .from('historias')
+        .select(_historiaListSelect)
+        .eq('status', 'published')
+        .eq('author_id', authorId)
+        .order('created_at', ascending: false)
+        .range(0, 79);
+    return rows.map(_fromRow).toList();
+  }
+
   Future<List<Historia>> fetchMine() async {
     final client = _client;
     final userId = client?.auth.currentUser?.id;
     if (client == null || userId == null) return [];
     final rows = await client
         .from('historias')
-        .select(_historiaSelect)
+        .select(_historiaListSelect)
         .eq('author_id', userId)
         .order('updated_at', ascending: false);
     return rows.map(_fromRow).toList();
@@ -92,7 +125,7 @@ class HistoriasRepository {
     required String title,
     required String excerpt,
     required List<HistoriaPage> pages,
-    HistoriaKind kind = HistoriaKind.cronica,
+    HistoriaKind kind = HistoriaKind.articulo,
     String status = 'published',
     String? coverImageUrl,
   }) async {
@@ -127,7 +160,7 @@ class HistoriasRepository {
     required String title,
     required String excerpt,
     required List<HistoriaPage> pages,
-    HistoriaKind kind = HistoriaKind.cronica,
+    HistoriaKind kind = HistoriaKind.articulo,
     String? status,
     String? coverImageUrl,
   }) async {
@@ -247,14 +280,21 @@ class HistoriasRepository {
     await client.from('historias').delete().eq('id', historiaId);
   }
 
-  Future<List<HistoriaComment>> fetchComments(String historiaId) async {
+  static const commentsPageSize = 30;
+
+  Future<List<HistoriaComment>> fetchComments(
+    String historiaId, {
+    int offset = 0,
+    int limit = commentsPageSize,
+  }) async {
     final client = _client;
     if (client == null) return [];
     final rows = await client
         .from('historia_comments')
         .select(_commentSelect)
         .eq('historia_id', historiaId)
-        .order('created_at', ascending: true);
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit - 1);
     return rows.map(_commentFromRow).toList();
   }
 

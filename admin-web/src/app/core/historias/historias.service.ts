@@ -1,8 +1,25 @@
 import { Injectable } from '@angular/core';
 import { getSupabase } from '../supabase.client';
 
-export type HistoriaKind = 'libro' | 'anecdota' | 'cronica';
+export type HistoriaKind = 'libro' | 'articulo';
 export type HistoriaStatus = 'published' | 'hidden' | 'draft';
+
+export const HISTORIA_KIND_OPTIONS: {
+  id: HistoriaKind;
+  label: string;
+  blurb: string;
+}[] = [
+  {
+    id: 'libro',
+    label: 'Libro',
+    blurb: 'Un relato largo. Varias páginas, se lee como un libro.',
+  },
+  {
+    id: 'articulo',
+    label: 'Artículo',
+    blurb: 'Una pieza más corta: un tema, un momento, lo que ocurrió.',
+  },
+];
 
 export interface HistoriaPage {
   body: string;
@@ -26,8 +43,10 @@ export interface HistoriaRow {
 
 const SELECT =
   'id, author_id, title, excerpt, kind, cover_image_url, pages, status, comment_count, created_at, updated_at';
+const LIST_SELECT =
+  'id, author_id, title, excerpt, kind, cover_image_url, status, comment_count, created_at, updated_at';
 
-const KIND_SET = new Set<HistoriaKind>(['libro', 'anecdota', 'cronica']);
+const KIND_SET = new Set<HistoriaKind>(['libro', 'articulo']);
 
 @Injectable({ providedIn: 'root' })
 export class HistoriasService {
@@ -35,7 +54,7 @@ export class HistoriasService {
     const userId = await this.requireUserId();
     const { data, error } = await getSupabase()
       .from('historias')
-      .select(SELECT)
+      .select(LIST_SELECT)
       .eq('author_id', userId)
       .order('updated_at', { ascending: false });
     if (error) throw error;
@@ -141,14 +160,18 @@ export class HistoriasService {
   }
 
   kindLabel(kind: HistoriaKind): string {
-    switch (kind) {
-      case 'libro':
-        return 'Libro';
-      case 'anecdota':
-        return 'Anécdota';
-      default:
-        return 'Crónica';
-    }
+    return HISTORIA_KIND_OPTIONS.find((item) => item.id === kind)?.label ?? 'Artículo';
+  }
+
+  kindBlurb(kind: HistoriaKind): string {
+    return (
+      HISTORIA_KIND_OPTIONS.find((item) => item.id === kind)?.blurb ??
+      HISTORIA_KIND_OPTIONS[1].blurb
+    );
+  }
+
+  publishLabel(kind: HistoriaKind): string {
+    return `Publicar ${this.kindLabel(kind).toLowerCase()}`;
   }
 
   statusLabel(status: HistoriaStatus): string {
@@ -163,10 +186,10 @@ export class HistoriasService {
   }
 
   private mapRow(row: Record<string, unknown>): HistoriaRow {
-    const kindRaw = String(row['kind'] ?? 'cronica');
+    const kindRaw = String(row['kind'] ?? 'articulo');
     const kind = KIND_SET.has(kindRaw as HistoriaKind)
       ? (kindRaw as HistoriaKind)
-      : 'cronica';
+      : 'articulo';
     const statusRaw = String(row['status'] ?? 'published');
     const status: HistoriaStatus =
       statusRaw === 'draft' || statusRaw === 'hidden' ? statusRaw : 'published';

@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  HISTORIA_KIND_OPTIONS,
   HistoriaRow,
   HistoriasService,
 } from '../../core/historias/historias.service';
@@ -18,6 +19,7 @@ export class CronistaHomePageComponent implements OnInit {
   readonly items = signal<HistoriaRow[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly kinds = HISTORIA_KIND_OPTIONS;
   readonly kindLabel = (kind: HistoriaRow['kind']) => this.historias.kindLabel(kind);
   readonly statusLabel = (status: HistoriaRow['status']) =>
     this.historias.statusLabel(status);

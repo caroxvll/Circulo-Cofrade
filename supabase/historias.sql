@@ -66,8 +66,8 @@ create table if not exists public.historias (
   title text not null check (char_length(trim(title)) between 3 and 80),
   excerpt text not null default '' check (char_length(excerpt) <= 280),
   cover_image_url text,
-  kind text not null default 'cronica'
-    check (kind in ('libro', 'anecdota', 'cronica')),
+  kind text not null default 'articulo'
+    check (kind in ('libro', 'articulo')),
   pages jsonb not null
     check (
       jsonb_typeof(pages) = 'array'
@@ -275,12 +275,19 @@ alter table public.historias
   );
 
 alter table public.historias
-  add column if not exists kind text not null default 'cronica';
+  add column if not exists kind text not null default 'articulo';
+
+update public.historias
+set kind = 'articulo'
+where kind is distinct from 'libro';
+
+alter table public.historias
+  alter column kind set default 'articulo';
 
 alter table public.historias drop constraint if exists historias_kind_check;
 alter table public.historias
   add constraint historias_kind_check
-  check (kind in ('libro', 'anecdota', 'cronica'));
+  check (kind in ('libro', 'articulo'));
 
 alter table public.historias drop constraint if exists historias_status_check;
 alter table public.historias

@@ -199,7 +199,7 @@ export class UsersPageComponent implements OnInit {
   async toggleChronicler(user: AdminUserRow): Promise<void> {
     const next = !user.isChronicler;
     const question = next
-      ? `¿Hacer cronista a @${user.handle}? Podrá escribir Historias en la web y en la app. No es la verificación de cuenta.`
+      ? `¿Hacer cronista a @${user.handle}? Podrá escribir en El Cronicón, en la web y en la app. No es la verificación de cuenta.`
       : `¿Quitar el sello de cronista a @${user.handle}? Las historias ya publicadas siguen.`;
     if (!confirm(question)) return;
     this.busyId.set(user.id);

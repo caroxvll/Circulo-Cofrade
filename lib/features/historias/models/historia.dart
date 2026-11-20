@@ -1,20 +1,34 @@
 enum HistoriaKind {
   libro,
-  anecdota,
-  cronica;
+  articulo;
 
   static HistoriaKind fromDb(String? raw) => switch (raw) {
         'libro' => HistoriaKind.libro,
-        'anecdota' => HistoriaKind.anecdota,
-        _ => HistoriaKind.cronica,
+        _ => HistoriaKind.articulo,
       };
 
   String get dbValue => name;
 
   String get label => switch (this) {
         HistoriaKind.libro => 'Libro',
-        HistoriaKind.anecdota => 'Anécdota',
-        HistoriaKind.cronica => 'Crónica',
+        HistoriaKind.articulo => 'Artículo',
+      };
+
+  String get blurb => switch (this) {
+        HistoriaKind.libro =>
+          'Un relato largo. Varias páginas, se lee como un libro.',
+        HistoriaKind.articulo =>
+          'Una pieza más corta: un tema, un momento, lo que ocurrió.',
+      };
+
+  String get composeTitle => switch (this) {
+        HistoriaKind.libro => 'Nuevo libro',
+        HistoriaKind.articulo => 'Nuevo artículo',
+      };
+
+  String get publishLabel => switch (this) {
+        HistoriaKind.libro => 'Publicar libro',
+        HistoriaKind.articulo => 'Publicar artículo',
       };
 }
 
@@ -71,7 +85,7 @@ class Historia {
     required this.pages,
     required this.commentCount,
     required this.createdAt,
-    this.kind = HistoriaKind.cronica,
+    this.kind = HistoriaKind.articulo,
     this.authorAvatarUrl,
     this.coverImageUrl,
     this.status = 'published',
@@ -95,6 +109,12 @@ class Historia {
 
   bool get isPublished => status == 'published';
   bool get isDraft => status == 'draft';
+
+  String get atHandle {
+    final raw = authorHandle.trim();
+    if (raw.isEmpty) return '@cofrade';
+    return raw.startsWith('@') ? raw : '@$raw';
+  }
 }
 
 class HistoriaComment {

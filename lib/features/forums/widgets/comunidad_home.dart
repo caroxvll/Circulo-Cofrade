@@ -29,6 +29,7 @@ import '../../cuaresma/utils/cuaresma_topic.dart';
 import '../../cuaresma/utils/ensayos_day_groups.dart';
 import '../../notifications/widgets/notifications_bell_button.dart';
 import '../../permissions/permissions_provider.dart';
+import '../../historias/cronicon_brand.dart';
 import '../../historias/historias_provider.dart';
 import '../../historias/widgets/historias_shelf_tab.dart';
 import '../../quiz/quiz_provider.dart';
@@ -90,7 +91,7 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
       'Para ti',
       'Siguiendo',
       'Foros',
-      if (historiasOn) 'Historias',
+      if (historiasOn) CroniconBrand.tab,
     ];
     if (_tab >= labels.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -770,6 +771,9 @@ class _ComunidadTabs extends StatelessWidget {
                     children: [
                       Text(
                         labels[i],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                         style: AppTypography.bodyMedium(
                           color: index == i
                               ? AppColors.burgundy
@@ -777,7 +781,7 @@ class _ComunidadTabs extends StatelessWidget {
                         ).copyWith(
                           fontWeight:
                               index == i ? FontWeight.w700 : FontWeight.w500,
-                          fontSize: compact ? 13 : 14.5,
+                          fontSize: compact ? 12.5 : 14.5,
                         ),
                       ),
                       const SizedBox(height: 8),

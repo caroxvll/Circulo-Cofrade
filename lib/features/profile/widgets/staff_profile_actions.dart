@@ -101,9 +101,9 @@ class _StaffProfileActionsBarState
         ),
         content: Text(
           chronicler
-              ? 'Podrá publicar en Historias. No es la verificación de cuenta: '
+              ? 'Podrá publicar en El Cronicón. No es la verificación de cuenta: '
                   'es un sello aparte, solo para este apartado.'
-              : 'Dejará de poder publicar historias nuevas. Las ya publicadas siguen.',
+              : 'Dejará de poder publicar obras nuevas. Las ya publicadas siguen.',
         ),
         actions: [
           TextButton(
