@@ -13,7 +13,7 @@ import { AuthService } from '../core/auth/auth.service';
 const NAV = [
   {
     id: 'home',
-    label: 'Mis historias',
+    label: 'El Cronicón',
     route: '/cronista',
     exact: true,
     iconPath:

@@ -108,7 +108,7 @@ abstract final class AppTypography {
         letterSpacing: 0.05,
       );
 
-  /// Cuerpo de página en Historias (serifa de libro).
+  /// Cuerpo de página en El Cronicón (serifa de libro).
   static TextStyle bookBody({Color? color}) => GoogleFonts.ebGaramond(
         fontSize: 19.5,
         fontWeight: FontWeight.w400,

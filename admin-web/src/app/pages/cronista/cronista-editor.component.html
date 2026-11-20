@@ -1,8 +1,16 @@
 <section class="editor">
   <header class="editor-head">
     <div>
-      <p class="eyebrow">{{ historiaId ? 'Editar' : 'Nueva' }}</p>
-      <h1>{{ historiaId ? 'Seguir escribiendo' : 'Abrir un libro en blanco' }}</h1>
+      <p class="eyebrow">El Cronicón · {{ historiaId ? 'Editar' : 'Nueva' }}</p>
+      <h1>
+        {{
+          historiaId
+            ? 'Seguir escribiendo'
+            : kind === 'libro'
+              ? 'Nuevo libro'
+              : 'Nuevo artículo'
+        }}
+      </h1>
     </div>
     <a routerLink="/cronista" class="back">Volver</a>
   </header>
@@ -10,23 +18,24 @@
   @if (loading()) {
     <p class="muted">Abriendo el manuscrito…</p>
   } @else {
-    <label class="field">
-      Título
-      <input [(ngModel)]="title" maxlength="80" placeholder="Cómo se llamará" />
-    </label>
-
     <div class="kinds">
       @for (item of kinds; track item.id) {
         <button
           type="button"
-          class="kind"
+          class="kind-card"
           [class.on]="kind === item.id"
           (click)="kind = item.id"
         >
-          {{ item.label }}
+          <strong>Publicar {{ item.label.toLowerCase() }}</strong>
+          <span>{{ item.blurb }}</span>
         </button>
       }
     </div>
+
+    <label class="field">
+      Título
+      <input [(ngModel)]="title" maxlength="80" placeholder="Cómo se llamará" />
+    </label>
 
     <label class="field">
       Entradilla
@@ -95,12 +104,20 @@
       <div class="error-box">{{ error() }}</div>
     }
 
+    <label class="field">
+      Programar salida
+      <input type="datetime-local" [(ngModel)]="scheduleLocal" />
+    </label>
+
     <footer class="actions">
       <button type="button" class="ghost" [disabled]="saving()" (click)="save('draft')">
         Guardar borrador
       </button>
+      <button type="button" class="ghost" [disabled]="saving()" (click)="save('scheduled')">
+        Programar
+      </button>
       <button type="button" class="primary" [disabled]="saving()" (click)="save('published')">
-        {{ saving() ? 'Publicando…' : 'Publicar en Historias' }}
+        {{ primarySaveLabel }}
       </button>
     </footer>
   }

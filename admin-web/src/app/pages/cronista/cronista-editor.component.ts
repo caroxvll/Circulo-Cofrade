@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
+  HISTORIA_KIND_OPTIONS,
   HistoriaKind,
   HistoriaPage,
   HistoriaStatus,
@@ -28,19 +29,31 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  readonly kinds: { id: HistoriaKind; label: string }[] = [
-    { id: 'cronica', label: 'Crónica' },
-    { id: 'anecdota', label: 'Anécdota' },
-    { id: 'libro', label: 'Libro' },
-  ];
+  readonly kinds = HISTORIA_KIND_OPTIONS;
+  readonly publishLabel = (kind: HistoriaKind) =>
+    this.historias.publishLabel(kind);
+
+  get primarySaveLabel(): string {
+    if (this.saving()) {
+      return this.historiaId && this.status === 'published'
+        ? 'Guardando…'
+        : 'Publicando…';
+    }
+    if (this.historiaId && this.status === 'published') {
+      return 'Guardar cambios';
+    }
+    return this.publishLabel(this.kind);
+  }
 
   historiaId: string | null = null;
+  status: HistoriaStatus = 'draft';
   title = '';
   excerpt = '';
-  kind: HistoriaKind = 'cronica';
+  kind: HistoriaKind = 'libro';
   coverFile: File | null = null;
   coverPreview: string | null = null;
   coverUrl: string | null = null;
+  scheduleLocal = '';
   pages: PageDraft[] = [this.emptyPage()];
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
@@ -51,7 +64,13 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
     if (id) {
       this.historiaId = id;
       void this.load(id);
+      return;
     }
+    const tipo = this.route.snapshot.queryParamMap.get('tipo');
+    if (tipo === 'libro' || tipo === 'articulo') {
+      this.kind = tipo;
+    }
+    this.scheduleLocal = this.toDatetimeLocal(null);
   }
 
   ngOnDestroy(): void {
@@ -69,7 +88,9 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
       this.title = row.title;
       this.excerpt = row.excerpt;
       this.kind = row.kind;
+      this.status = row.status;
       this.coverUrl = row.coverImageUrl;
+      this.scheduleLocal = this.toDatetimeLocal(row.scheduledAt);
       this.pages =
         row.pages.length > 0
           ? row.pages.map((page) => ({
@@ -140,6 +161,15 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
       this.error.set('Añade al menos una página con texto o foto.');
       return;
     }
+    if (status === 'scheduled') {
+      const when = this.scheduleLocal
+        ? new Date(this.scheduleLocal)
+        : null;
+      if (!when || Number.isNaN(when.getTime()) || when.getTime() < Date.now() + 5 * 60 * 1000) {
+        this.error.set('Elige un momento al menos 5 minutos más adelante.');
+        return;
+      }
+    }
 
     this.saving.set(true);
     try {
@@ -158,6 +188,7 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
           pages: firstPages,
           status,
           coverImageUrl: this.coverUrl,
+          scheduledAt: this.scheduledIso(status),
         });
         id = created.id;
         this.historiaId = id;
@@ -188,6 +219,7 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
         pages,
         status,
         coverImageUrl,
+        scheduledAt: this.scheduledIso(status),
       });
       await this.router.navigateByUrl('/cronista');
     } catch (err) {
@@ -199,6 +231,22 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  private scheduledIso(status: HistoriaStatus): string | null {
+    if (status !== 'scheduled' || !this.scheduleLocal) return null;
+    const when = new Date(this.scheduleLocal);
+    if (Number.isNaN(when.getTime())) return null;
+    return when.toISOString();
+  }
+
+  private toDatetimeLocal(iso: string | null): string {
+    const source = iso ? new Date(iso) : new Date(Date.now() + 2 * 60 * 60 * 1000);
+    if (Number.isNaN(source.getTime())) {
+      return this.toDatetimeLocal(null);
+    }
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${source.getFullYear()}-${pad(source.getMonth() + 1)}-${pad(source.getDate())}T${pad(source.getHours())}:${pad(source.getMinutes())}`;
   }
 
   private emptyPage(): PageDraft {

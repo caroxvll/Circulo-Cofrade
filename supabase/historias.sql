@@ -66,15 +66,16 @@ create table if not exists public.historias (
   title text not null check (char_length(trim(title)) between 3 and 80),
   excerpt text not null default '' check (char_length(excerpt) <= 280),
   cover_image_url text,
-  kind text not null default 'cronica'
-    check (kind in ('libro', 'anecdota', 'cronica')),
+  kind text not null default 'articulo'
+    check (kind in ('libro', 'articulo')),
   pages jsonb not null
     check (
       jsonb_typeof(pages) = 'array'
       and jsonb_array_length(pages) between 1 and 30
     ),
   status text not null default 'published'
-    check (status in ('published', 'hidden', 'draft')),
+    check (status in ('published', 'hidden', 'draft', 'scheduled')),
+  scheduled_at timestamptz,
   comment_count int not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -83,6 +84,10 @@ create table if not exists public.historias (
 create index if not exists historias_published_idx
   on public.historias (created_at desc)
   where status = 'published';
+
+create index if not exists historias_due_idx
+  on public.historias (scheduled_at)
+  where status = 'scheduled';
 
 create table if not exists public.historia_comments (
   id uuid primary key default gen_random_uuid(),
@@ -275,16 +280,49 @@ alter table public.historias
   );
 
 alter table public.historias
-  add column if not exists kind text not null default 'cronica';
+  add column if not exists kind text not null default 'articulo';
+
+update public.historias
+set kind = 'articulo'
+where kind is distinct from 'libro';
+
+alter table public.historias
+  alter column kind set default 'articulo';
 
 alter table public.historias drop constraint if exists historias_kind_check;
 alter table public.historias
   add constraint historias_kind_check
-  check (kind in ('libro', 'anecdota', 'cronica'));
+  check (kind in ('libro', 'articulo'));
+
+alter table public.historias
+  add column if not exists scheduled_at timestamptz;
 
 alter table public.historias drop constraint if exists historias_status_check;
 alter table public.historias
   add constraint historias_status_check
-  check (status in ('published', 'hidden', 'draft'));
+  check (status in ('published', 'hidden', 'draft', 'scheduled'));
+
+create or replace function public.publish_due_historias()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  n integer;
+begin
+  update public.historias
+  set
+    status = 'published',
+    updated_at = now()
+  where status = 'scheduled'
+    and scheduled_at is not null
+    and scheduled_at <= now();
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+
+grant execute on function public.publish_due_historias() to authenticated;
 
 notify pgrst, 'reload schema';
