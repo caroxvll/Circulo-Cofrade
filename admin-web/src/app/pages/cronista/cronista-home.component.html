@@ -28,6 +28,28 @@
     <div class="error-box">{{ error() }}</div>
   }
 
+  @if (isAdmin() && pending().length) {
+    <section class="review-queue">
+      <h2>Pendientes de revisión</h2>
+      <p class="muted">Los cronistas las enviaron. Aprueba para que salgan en El Cronicón.</p>
+      <ul>
+        @for (item of pending(); track item.id) {
+          <li>
+            <div>
+              <strong>{{ item.title }}</strong>
+              <small>{{ kindLabel(item.kind) }} · {{ authorLine(item) }}</small>
+            </div>
+            <div class="review-actions">
+              <a [routerLink]="['/cronista/escribir', item.id]">Abrir</a>
+              <button type="button" (click)="approve(item)">Aprobar</button>
+              <button type="button" class="ghost" (click)="returnToAuthor(item)">Devolver</button>
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
   @if (loading()) {
     <p class="muted">Cargando tu estantería…</p>
   } @else {

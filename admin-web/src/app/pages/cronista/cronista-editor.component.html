@@ -104,18 +104,32 @@
       <div class="error-box">{{ error() }}</div>
     }
 
-    <label class="field">
-      Programar salida
-      <input type="datetime-local" [(ngModel)]="scheduleLocal" />
-    </label>
+    @if (!publishesDirectly) {
+      <p class="muted">
+        Cuando lo envíes, la Junta lo lee antes de que salga en El Cronicón.
+      </p>
+    }
+
+    @if (reviewNote) {
+      <div class="error-box">La Junta lo devolvió: {{ reviewNote }}</div>
+    }
+
+    @if (publishesDirectly) {
+      <label class="field">
+        Programar salida
+        <input type="datetime-local" [(ngModel)]="scheduleLocal" />
+      </label>
+    }
 
     <footer class="actions">
       <button type="button" class="ghost" [disabled]="saving()" (click)="save('draft')">
         Guardar borrador
       </button>
-      <button type="button" class="ghost" [disabled]="saving()" (click)="save('scheduled')">
-        Programar
-      </button>
+      @if (publishesDirectly) {
+        <button type="button" class="ghost" [disabled]="saving()" (click)="save('scheduled')">
+          Programar
+        </button>
+      }
       <button type="button" class="primary" [disabled]="saving()" (click)="save('published')">
         {{ primarySaveLabel }}
       </button>

@@ -85,6 +85,82 @@ h1 {
   }
 }
 
+.review-queue {
+  margin-bottom: 28px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+}
+
+.review-queue h2 {
+  margin: 0 0 4px;
+  font-family: 'Cormorant Garamond', var(--font-serif);
+  font-size: 1.35rem;
+  color: var(--burgundy);
+}
+
+.review-queue ul {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.review-queue li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-strong);
+}
+
+.review-queue li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.review-queue strong {
+  display: block;
+}
+
+.review-queue small {
+  color: var(--text-secondary);
+}
+
+.review-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.review-actions a,
+.review-actions button {
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border-radius: 9px;
+  padding: 6px 10px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.review-actions a,
+.review-actions button:not(.ghost) {
+  background: var(--burgundy);
+  color: #fff;
+  border: 0;
+}
+
+.review-actions button.ghost {
+  background: transparent;
+  color: var(--burgundy);
+  border: 1px solid var(--burgundy);
+}
+
 .empty,
 .error-box {
   padding: 24px;

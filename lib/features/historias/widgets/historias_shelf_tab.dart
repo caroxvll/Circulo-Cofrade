@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
+import '../../permissions/permissions_provider.dart';
 import '../../search/follows_provider.dart';
 import '../cronicon_brand.dart';
 import '../historias_provider.dart';
@@ -134,6 +135,7 @@ class _HistoriasShelfTabState extends ConsumerState<HistoriasShelfTab> {
             RefreshIndicator(
               onRefresh: () async {
                 ref.invalidate(publishedHistoriasFeedProvider(_query));
+                ref.invalidate(continueReadingProvider);
                 if (canPublish) ref.invalidate(myHistoriasProvider);
                 await ref.read(publishedHistoriasFeedProvider(_query).future);
               },
@@ -151,6 +153,7 @@ class _HistoriasShelfTabState extends ConsumerState<HistoriasShelfTab> {
                           onWorkshop: _openWorkshop,
                         ),
                       ),
+                      const SliverToBoxAdapter(child: _ContinueReadingRow()),
                       SliverToBoxAdapter(
                         child: _KindFilterBar(
                           selected: _filter,
@@ -247,7 +250,9 @@ class _HistoriasShelfTabState extends ConsumerState<HistoriasShelfTab> {
                   backgroundColor: AppColors.burgundy,
                   foregroundColor: AppColors.textOnDark,
                   icon: const Icon(Icons.auto_stories_outlined),
-                  label: const Text('Publicar'),
+                  label: Text(
+                    ref.watch(isJuntaMemberProvider) ? 'Publicar' : 'Escribir',
+                  ),
                 ),
               ),
           ],
@@ -331,6 +336,70 @@ class _FeaturedWork extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ContinueReadingRow extends ConsumerWidget {
+  const _ContinueReadingRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(continueReadingProvider);
+    final items = async.asData?.value ?? const [];
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Continuar leyendo', style: AppTypography.sectionTitle()),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 210,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return SizedBox(
+                  width: 108,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      HistoriaCoverCard(
+                        historia: item.historia,
+                        width: 108,
+                        showMeta: false,
+                        readingProgress: item.fraction,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        item.historia.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.hermandadName().copyWith(
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        item.progressLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.labelSmall(color: AppColors.goldDark)
+                            .copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -544,7 +613,7 @@ class _WorkshopSheet extends StatelessWidget {
             Text('Tu taller', style: AppTypography.titleLarge()),
             const SizedBox(height: 4),
             Text(
-              'En ${CroniconBrand.name}. Edita un borrador o una obra ya publicada; el resto ve el sello.',
+              'En ${CroniconBrand.name}. Los borradores y lo enviado a revisión están aquí; lo publicado lo ve todo el mundo.',
               style: AppTypography.bodyMedium(),
             ),
             const SizedBox(height: 12),
