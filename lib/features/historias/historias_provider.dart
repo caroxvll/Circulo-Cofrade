@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/supabase/supabase_bootstrap.dart';
 import '../auth/auth_provider.dart';
+import '../permissions/permissions_provider.dart';
 import '../profile/profile_provider.dart';
 import 'data/historias_repository.dart';
 import 'models/historia.dart';
@@ -39,5 +40,6 @@ final canPublishHistoriasProvider = Provider<bool>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) return false;
   final profile = ref.watch(currentUserProfileProvider).asData?.value;
-  return profile?.isChronicler == true && profile?.isSuspended != true;
+  if (profile?.isSuspended == true) return false;
+  return profile?.isChronicler == true || ref.watch(isAdminProvider);
 });

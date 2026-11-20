@@ -84,7 +84,8 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
   @override
   Widget build(BuildContext context) {
     final historiasOn =
-        ref.watch(historiasHubEnabledProvider).asData?.value == true;
+        ref.watch(historiasHubEnabledProvider).asData?.value == true ||
+            ref.watch(isAdminProvider);
     final labels = [
       'Para ti',
       'Siguiendo',

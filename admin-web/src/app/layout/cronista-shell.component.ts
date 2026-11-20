@@ -41,6 +41,7 @@ export class CronistaShellComponent {
 
   readonly menuOpen = signal(false);
   readonly profile = this.auth.profile;
+  readonly isAdmin = this.auth.isAdmin;
   readonly nav = NAV;
 
   constructor() {

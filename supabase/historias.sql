@@ -23,6 +23,17 @@ as $$
   );
 $$;
 
+create or replace function public.can_publish_historia(p_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.is_chronicler(p_user_id)
+      or public.is_admin_user(p_user_id);
+$$;
+
 create or replace function public.prevent_profile_chronicler_self_change()
 returns trigger
 language plpgsql
@@ -131,7 +142,7 @@ create policy "Cronista publica historia"
   to authenticated
   with check (
     auth.uid() = author_id
-    and public.is_chronicler(auth.uid())
+    and public.can_publish_historia(auth.uid())
   );
 
 drop policy if exists "Autor o Junta edita historia" on public.historias;
@@ -203,7 +214,7 @@ create policy "Cronista sube portada historia"
   to authenticated
   with check (
     bucket_id = 'historia-covers'
-    and public.is_chronicler(auth.uid())
+    and public.can_publish_historia(auth.uid())
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
@@ -214,7 +225,7 @@ create policy "Cronista actualiza portada historia"
   using (
     bucket_id = 'historia-covers'
     and (
-      public.is_chronicler(auth.uid())
+      public.can_publish_historia(auth.uid())
       and (storage.foldername(name))[1] = auth.uid()::text
       or public.is_junta_member(auth.uid())
     )
@@ -223,6 +234,7 @@ create policy "Cronista actualiza portada historia"
 grant select, insert, update, delete on public.historias to authenticated;
 grant select, insert, delete on public.historia_comments to authenticated;
 grant execute on function public.is_chronicler(uuid) to authenticated;
+grant execute on function public.can_publish_historia(uuid) to authenticated;
 
 -- Si ya se ejecutó una versión con pages text[]: pasar a jsonb con fotos.
 -- ALTER ... USING no admite subconsultas; to_jsonb(text[]) sí.

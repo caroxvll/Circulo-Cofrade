@@ -48,9 +48,18 @@
         <div class="who-copy">
           <strong>{{ profile()?.displayName || 'Cronista' }}</strong>
           <span>{{ '@' + (profile()?.handle || '—') }}</span>
-          <em class="ok">Cronista</em>
+          @if (isAdmin()) {
+            <em class="ok">Admin</em>
+          } @else {
+            <em class="ok">Cronista</em>
+          }
         </div>
       </div>
+      @if (isAdmin()) {
+        <a routerLink="/app/resumen" class="btn-out" (click)="closeMenu()">
+          Volver a Junta
+        </a>
+      }
       <button type="button" class="btn-out" (click)="logout()">Salir</button>
     </div>
   </aside>
@@ -72,7 +81,7 @@
         <h1 class="topbar-title">Escritorio del cronista</h1>
       </div>
       <div class="topbar-actions">
-        <span class="status-pill ok">Sello de cronista</span>
+        <span class="status-pill ok">{{ isAdmin() ? 'Admin' : 'Sello de cronista' }}</span>
         <a routerLink="/cronista/escribir" class="top-cta" (click)="closeMenu()">
           Escribir
         </a>
