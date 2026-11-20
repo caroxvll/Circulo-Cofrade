@@ -47,6 +47,41 @@ function extensionFor(contentType: string): string {
   }
 }
 
+function uidFromStreamLocation(url: string): string | null {
+  try {
+    const parts = new URL(url).pathname.split("/").filter(Boolean);
+    const last = parts[parts.length - 1] ?? "";
+    return /^[a-z0-9]{16,}$/i.test(last) ? last : null;
+  } catch {
+    return null;
+  }
+}
+
+function streamPrepareError(status: number, body: string): string {
+  let raw = "";
+  try {
+    const parsed = JSON.parse(body) as {
+      errors?: Array<{ message?: string }>;
+    };
+    raw = parsed.errors?.[0]?.message?.trim() ?? "";
+  } catch {
+    raw = body.replace(/\s+/g, " ").trim().slice(0, 160);
+  }
+  const lower = raw.toLowerCase();
+  if (status === 401 || status === 403 || lower.includes("authentication")) {
+    return "El token de Stream no vale o el id de cuenta no coincide.";
+  }
+  if (
+    lower.includes("storage") ||
+    lower.includes("quota") ||
+    lower.includes("duration")
+  ) {
+    return "Stream no tiene minutos libres para reservar este vídeo.";
+  }
+  if (raw) return `Stream ha rechazado la subida: ${raw}`;
+  return "No se pudo preparar la subida a Stream";
+}
+
 function streamPlaybackUrls(uid: string) {
   const base = `https://videodelivery.net/${uid}`;
   return {
@@ -160,11 +195,12 @@ Deno.serve(async (req) => {
     // El POST simple de Stream rechaza todo lo que pase de 200 MB. tus admite
     // el tope de la app y el móvil manda el archivo a trozos, sin el token.
     if (useStream) {
+      // Solo claves que Stream admite. topicId iba fuera de la lista y
+      // Cloudflare rechazaba toda la petición.
       const metadata = [
-        `maxDurationSeconds ${btoa(String(MAX_DURATION_SECONDS))}`,
+        `maxdurationseconds ${btoa(String(MAX_DURATION_SECONDS))}`,
         `thumbnailtimestamppct ${btoa("0.05")}`,
         `name ${btoa(`editorial-${topicId}`)}`,
-        `topicId ${btoa(topicId)}`,
       ].join(",");
 
       const createRes = await fetch(
@@ -186,12 +222,14 @@ Deno.serve(async (req) => {
         : location.startsWith("http")
         ? location
         : new URL(location, "https://api.cloudflare.com").toString();
-      const uid = createRes.headers.get("stream-media-id");
+      const uid =
+        createRes.headers.get("stream-media-id") ??
+        (uploadURL ? uidFromStreamLocation(uploadURL) : null);
       if (!createRes.ok || !uploadURL || !uid) {
         const detail = await createRes.text();
         console.error("stream tus", createRes.status, detail);
         return jsonResponse(
-          { error: "No se pudo preparar la subida a Stream" },
+          { error: streamPrepareError(createRes.status, detail) },
           502,
         );
       }
