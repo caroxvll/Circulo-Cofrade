@@ -104,9 +104,17 @@
       <div class="error-box">{{ error() }}</div>
     }
 
+    <label class="field">
+      Programar salida
+      <input type="datetime-local" [(ngModel)]="scheduleLocal" />
+    </label>
+
     <footer class="actions">
       <button type="button" class="ghost" [disabled]="saving()" (click)="save('draft')">
         Guardar borrador
+      </button>
+      <button type="button" class="ghost" [disabled]="saving()" (click)="save('scheduled')">
+        Programar
       </button>
       <button type="button" class="primary" [disabled]="saving()" (click)="save('published')">
         {{ primarySaveLabel }}

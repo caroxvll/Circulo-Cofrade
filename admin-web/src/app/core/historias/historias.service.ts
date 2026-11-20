@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { getSupabase } from '../supabase.client';
 
 export type HistoriaKind = 'libro' | 'articulo';
-export type HistoriaStatus = 'published' | 'hidden' | 'draft';
+export type HistoriaStatus = 'published' | 'hidden' | 'draft' | 'scheduled';
 
 export const HISTORIA_KIND_OPTIONS: {
   id: HistoriaKind;
@@ -36,21 +36,31 @@ export interface HistoriaRow {
   coverImageUrl: string | null;
   pages: HistoriaPage[];
   status: HistoriaStatus;
+  scheduledAt: string | null;
   commentCount: number;
   createdAt: string;
   updatedAt: string;
 }
 
 const SELECT =
-  'id, author_id, title, excerpt, kind, cover_image_url, pages, status, comment_count, created_at, updated_at';
+  'id, author_id, title, excerpt, kind, cover_image_url, pages, status, scheduled_at, comment_count, created_at, updated_at';
 const LIST_SELECT =
-  'id, author_id, title, excerpt, kind, cover_image_url, status, comment_count, created_at, updated_at';
+  'id, author_id, title, excerpt, kind, cover_image_url, status, scheduled_at, comment_count, created_at, updated_at';
 
 const KIND_SET = new Set<HistoriaKind>(['libro', 'articulo']);
 
 @Injectable({ providedIn: 'root' })
 export class HistoriasService {
+  async publishDue(): Promise<void> {
+    try {
+      await getSupabase().rpc('publish_due_historias');
+    } catch {
+      /* SQL de programación aún no ejecutado */
+    }
+  }
+
   async fetchMine(): Promise<HistoriaRow[]> {
+    await this.publishDue();
     const userId = await this.requireUserId();
     const { data, error } = await getSupabase()
       .from('historias')
@@ -62,6 +72,7 @@ export class HistoriasService {
   }
 
   async fetchById(id: string): Promise<HistoriaRow | null> {
+    await this.publishDue();
     const { data, error } = await getSupabase()
       .from('historias')
       .select(SELECT)
@@ -79,6 +90,7 @@ export class HistoriasService {
     pages: HistoriaPage[];
     status: HistoriaStatus;
     coverImageUrl?: string | null;
+    scheduledAt?: string | null;
   }): Promise<HistoriaRow> {
     const userId = await this.requireUserId();
     const { data, error } = await getSupabase()
@@ -91,6 +103,7 @@ export class HistoriasService {
         pages: input.pages,
         status: input.status,
         cover_image_url: input.coverImageUrl ?? null,
+        scheduled_at: input.status === 'scheduled' ? input.scheduledAt ?? null : null,
       })
       .select(SELECT)
       .single();
@@ -107,6 +120,7 @@ export class HistoriasService {
       pages: HistoriaPage[];
       status: HistoriaStatus;
       coverImageUrl?: string | null;
+      scheduledAt?: string | null;
     },
   ): Promise<HistoriaRow> {
     const { data, error } = await getSupabase()
@@ -118,6 +132,7 @@ export class HistoriasService {
         pages: input.pages,
         status: input.status,
         cover_image_url: input.coverImageUrl ?? null,
+        scheduled_at: input.status === 'scheduled' ? input.scheduledAt ?? null : null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -180,6 +195,8 @@ export class HistoriasService {
         return 'Borrador';
       case 'hidden':
         return 'Oculta';
+      case 'scheduled':
+        return 'Programada';
       default:
         return 'Publicada';
     }
@@ -192,7 +209,11 @@ export class HistoriasService {
       : 'articulo';
     const statusRaw = String(row['status'] ?? 'published');
     const status: HistoriaStatus =
-      statusRaw === 'draft' || statusRaw === 'hidden' ? statusRaw : 'published';
+      statusRaw === 'draft' ||
+      statusRaw === 'hidden' ||
+      statusRaw === 'scheduled'
+        ? statusRaw
+        : 'published';
     return {
       id: String(row['id']),
       authorId: String(row['author_id']),
@@ -202,6 +223,8 @@ export class HistoriasService {
       coverImageUrl: (row['cover_image_url'] as string | null) ?? null,
       pages: this.parsePages(row['pages']),
       status,
+      scheduledAt:
+        typeof row['scheduled_at'] === 'string' ? row['scheduled_at'] : null,
       commentCount: Number(row['comment_count'] ?? 0),
       createdAt: String(row['created_at'] ?? ''),
       updatedAt: String(row['updated_at'] ?? row['created_at'] ?? ''),

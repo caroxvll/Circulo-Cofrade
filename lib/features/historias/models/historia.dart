@@ -89,6 +89,7 @@ class Historia {
     this.authorAvatarUrl,
     this.coverImageUrl,
     this.status = 'published',
+    this.scheduledAt,
   });
 
   final String id;
@@ -102,6 +103,7 @@ class Historia {
   final String? coverImageUrl;
   final List<HistoriaPage> pages;
   final String status;
+  final DateTime? scheduledAt;
   final int commentCount;
   final DateTime createdAt;
 
@@ -109,6 +111,22 @@ class Historia {
 
   bool get isPublished => status == 'published';
   bool get isDraft => status == 'draft';
+  bool get isScheduled => status == 'scheduled';
+
+  String get visibilityLabel {
+    if (isPublished) return 'Publicada';
+    if (isDraft) return 'Borrador';
+    if (isScheduled) {
+      final at = scheduledAt;
+      if (at == null) return 'Programada';
+      final day = at.day.toString().padLeft(2, '0');
+      final month = at.month.toString().padLeft(2, '0');
+      final hour = at.hour.toString().padLeft(2, '0');
+      final minute = at.minute.toString().padLeft(2, '0');
+      return 'Programada · $day/$month $hour:$minute';
+    }
+    return 'Oculta';
+  }
 
   String get atHandle {
     final raw = authorHandle.trim();

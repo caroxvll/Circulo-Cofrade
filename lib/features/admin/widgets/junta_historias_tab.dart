@@ -241,7 +241,7 @@ class _StaffHistoriaCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
                             '${historia.kind.label} · ${historia.authorHandle} · '
-            '${historia.isPublished ? 'publicada' : historia.isDraft ? 'borrador' : 'oculta'}',
+            '${historia.visibilityLabel.toLowerCase()}',
             style: JuntaUi.caption(),
           ),
           const SizedBox(height: 10),

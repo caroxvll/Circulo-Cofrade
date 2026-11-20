@@ -16,11 +16,11 @@ class HistoriasRepository {
   static const shelfPageSize = 24;
   static const _historiaSelect =
       'id, author_id, title, excerpt, kind, cover_image_url, pages, status, '
-      'comment_count, created_at, '
+      'scheduled_at, comment_count, created_at, '
       'profiles!author_id (handle, display_name, avatar_url)';
   static const _historiaListSelect =
       'id, author_id, title, excerpt, kind, cover_image_url, status, '
-      'comment_count, created_at, '
+      'scheduled_at, comment_count, created_at, '
       'profiles!author_id (handle, display_name, avatar_url)';
   static const _commentSelect =
       'id, historia_id, user_id, body, created_at, '
@@ -32,6 +32,14 @@ class HistoriasRepository {
   static const _maxPageChars = 3500;
 
   bool get isAvailable => _client != null;
+
+  Future<void> publishDue() async {
+    final client = _client;
+    if (client == null) return;
+    try {
+      await client.rpc('publish_due_historias');
+    } catch (_) {}
+  }
 
   Future<bool> isHubEnabled() async {
     final client = _client;
@@ -57,6 +65,7 @@ class HistoriasRepository {
     final client = _client;
     if (client == null) return [];
     if (authorIds != null && authorIds.isEmpty) return [];
+    await publishDue();
     var query = client
         .from('historias')
         .select(_historiaListSelect)
@@ -76,6 +85,7 @@ class HistoriasRepository {
   Future<List<Historia>> fetchAllForStaff() async {
     final client = _client;
     if (client == null) return [];
+    await publishDue();
     final rows = await client
         .from('historias')
         .select(_historiaListSelect)
@@ -87,6 +97,7 @@ class HistoriasRepository {
   Future<Historia?> fetchById(String id) async {
     final client = _client;
     if (client == null) return null;
+    await publishDue();
     final row = await client
         .from('historias')
         .select(_historiaSelect)
@@ -99,6 +110,7 @@ class HistoriasRepository {
   Future<List<Historia>> fetchPublishedByAuthor(String authorId) async {
     final client = _client;
     if (client == null) return [];
+    await publishDue();
     final rows = await client
         .from('historias')
         .select(_historiaListSelect)
@@ -113,6 +125,7 @@ class HistoriasRepository {
     final client = _client;
     final userId = client?.auth.currentUser?.id;
     if (client == null || userId == null) return [];
+    await publishDue();
     final rows = await client
         .from('historias')
         .select(_historiaListSelect)
@@ -128,6 +141,7 @@ class HistoriasRepository {
     HistoriaKind kind = HistoriaKind.articulo,
     String status = 'published',
     String? coverImageUrl,
+    DateTime? scheduledAt,
   }) async {
     final client = _client;
     if (client == null) throw const HistoriasUnavailableException();
@@ -141,6 +155,7 @@ class HistoriasRepository {
       kind: kind,
       status: status,
       coverImageUrl: coverImageUrl,
+      scheduledAt: scheduledAt,
     );
 
     final row = await client
@@ -163,6 +178,7 @@ class HistoriasRepository {
     HistoriaKind kind = HistoriaKind.articulo,
     String? status,
     String? coverImageUrl,
+    DateTime? scheduledAt,
   }) async {
     final client = _client;
     if (client == null) throw const HistoriasUnavailableException();
@@ -173,6 +189,7 @@ class HistoriasRepository {
       kind: kind,
       status: status,
       coverImageUrl: coverImageUrl,
+      scheduledAt: scheduledAt,
     );
     payload['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
@@ -339,6 +356,7 @@ class HistoriasRepository {
     required HistoriaKind kind,
     String? status,
     String? coverImageUrl,
+    DateTime? scheduledAt,
   }) {
     final cleanTitle = title.trim();
     final cleanExcerpt = excerpt.trim();
@@ -377,6 +395,18 @@ class HistoriasRepository {
       'pages': cleanPages.map((p) => p.toJson()).toList(),
     };
     if (status != null) payload['status'] = status;
+    if (status == 'scheduled') {
+      final when = scheduledAt;
+      if (when == null ||
+          !when.isAfter(DateTime.now().add(const Duration(minutes: 5)))) {
+        throw const HistoriasValidationException(
+          'Elige un momento al menos 5 minutos más adelante.',
+        );
+      }
+      payload['scheduled_at'] = when.toUtc().toIso8601String();
+    } else if (status != null) {
+      payload['scheduled_at'] = null;
+    }
     final cover = coverImageUrl?.trim() ?? '';
     if (cover.isNotEmpty) payload['cover_image_url'] = cover;
     return payload;
@@ -396,6 +426,9 @@ class HistoriasRepository {
       coverImageUrl: row['cover_image_url'] as String?,
       pages: HistoriaPage.parseList(row['pages']),
       status: row['status'] as String? ?? 'published',
+      scheduledAt: row['scheduled_at'] == null
+          ? null
+          : DateTime.parse(row['scheduled_at'] as String).toLocal(),
       commentCount: row['comment_count'] as int? ?? 0,
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
     );

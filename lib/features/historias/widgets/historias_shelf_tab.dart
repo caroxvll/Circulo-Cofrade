@@ -568,7 +568,7 @@ class _WorkshopSheet extends StatelessWidget {
                       contentPadding: EdgeInsets.zero,
                       title: Text(historia.title),
                       subtitle: Text(
-                        '${historia.kind.label} · ${historia.isDraft ? 'Borrador' : historia.isPublished ? 'Publicada' : 'Oculta'}',
+                        '${historia.kind.label} · ${historia.visibilityLabel}',
                       ),
                       onTap: () => onEdit(historia),
                       trailing: Row(

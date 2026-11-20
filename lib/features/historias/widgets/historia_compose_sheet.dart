@@ -9,6 +9,7 @@ import '../../../core/utils/pick_gallery_image.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../forums/widgets/forum_compose_sheet_header.dart';
 import '../../forums/widgets/forum_compose_sheet_layout.dart';
+import '../../forums/widgets/scheduled_post_datetime_picker.dart';
 import '../data/historias_repository.dart';
 import '../historias_provider.dart';
 import '../models/historia.dart';
@@ -212,6 +213,8 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
   String _coverType = 'image/jpeg';
   String? _existingCoverUrl;
   var _saving = false;
+  var _schedule = false;
+  late DateTime _scheduledAt;
 
   @override
   void initState() {
@@ -221,6 +224,8 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
     _title = TextEditingController(text: existing?.title ?? '');
     _excerpt = TextEditingController(text: existing?.excerpt ?? '');
     _existingCoverUrl = existing?.coverImageUrl;
+    _schedule = existing?.isScheduled == true;
+    _scheduledAt = existing?.scheduledAt ?? _defaultScheduleAt();
     final pages = existing?.pages ?? const <HistoriaPage>[];
     _pages = pages.isEmpty
         ? [_PageDraft()]
@@ -288,6 +293,11 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
     }
   }
 
+  DateTime _defaultScheduleAt() {
+    final soon = DateTime.now().add(const Duration(hours: 2));
+    return DateTime(soon.year, soon.month, soon.day, soon.hour);
+  }
+
   Future<void> _save({required String status}) async {
     if (_saving) return;
     setState(() => _saving = true);
@@ -299,6 +309,7 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
         excerpt: _excerpt.text,
         kind: _kind,
         status: status,
+        scheduledAt: status == 'scheduled' ? _scheduledAt : null,
         pages: _pages
             .map(
               (p) => HistoriaPage(
@@ -349,6 +360,7 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
         status: status,
         pages: pages,
         coverImageUrl: coverUrl,
+        scheduledAt: status == 'scheduled' ? _scheduledAt : null,
       );
       _invalidateLists(historiaId: historia.id);
       if (mounted) Navigator.pop(context, true);
@@ -584,6 +596,44 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
             ),
             child: const Text('Guardar borrador'),
           ),
+          const SizedBox(height: 8),
+          if (_schedule) ...[
+            ScheduledPostDatetimePicker(
+              scheduledAt: _scheduledAt,
+              onChanged: (when) => setState(() => _scheduledAt = when),
+              actionLabel: 'Sale',
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: _saving ? null : () => _save(status: 'scheduled'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.burgundy,
+                side: const BorderSide(color: AppColors.burgundy),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: Text('Programar ${_kind.label.toLowerCase()}'),
+            ),
+            TextButton(
+              onPressed: _saving
+                  ? null
+                  : () => setState(() => _schedule = false),
+              child: const Text('Publicar ahora, sin fecha'),
+            ),
+          ] else
+            OutlinedButton(
+              onPressed: _saving
+                  ? null
+                  : () => setState(() {
+                        _schedule = true;
+                        _scheduledAt = _defaultScheduleAt();
+                      }),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.burgundy,
+                side: const BorderSide(color: AppColors.burgundy),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text('Programar'),
+            ),
           const SizedBox(height: 8),
           FilledButton(
             onPressed: _saving ? null : () => _save(status: 'published'),
