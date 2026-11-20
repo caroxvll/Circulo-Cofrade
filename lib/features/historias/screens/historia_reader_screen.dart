@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +15,7 @@ import '../../permissions/permissions_provider.dart';
 import '../cronicon_brand.dart';
 import '../historias_provider.dart';
 import '../models/historia.dart';
+import '../models/historia_reading_progress.dart';
 import '../widgets/cronicon_mark.dart';
 import '../widgets/historia_comments_sheet.dart';
 import '../widgets/historia_compose_sheet.dart';
@@ -28,6 +31,7 @@ class HistoriaReaderScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(historiaByIdProvider(historiaId));
+    final progress = ref.watch(historiaReadingPageProvider(historiaId));
 
     return async.when(
       loading: () => const Scaffold(
@@ -45,12 +49,23 @@ class HistoriaReaderScreen extends ConsumerWidget {
             body: const Center(child: Text('Esta obra ya no está.')),
           );
         }
+        if (!progress.hasValue && !progress.hasError) {
+          return const Scaffold(
+            backgroundColor: _desk,
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final startPage = clampHistoriaResumePage(
+          progress.asData?.value ?? 0,
+          historia.pages.length,
+        );
         return _BookReader(
           key: ValueKey(
             '${historia.id}|${historia.title}|${historia.coverImageUrl}|'
             '${historia.pages.map((p) => '${p.body.length}:${p.imageUrl}').join(',')}',
           ),
           historia: historia,
+          initialPage: startPage,
         );
       },
     );
@@ -58,18 +73,83 @@ class HistoriaReaderScreen extends ConsumerWidget {
 }
 
 class _BookReader extends ConsumerStatefulWidget {
-  const _BookReader({super.key, required this.historia});
+  const _BookReader({
+    super.key,
+    required this.historia,
+    this.initialPage = 0,
+  });
 
   final Historia historia;
+  final int initialPage;
 
   @override
   ConsumerState<_BookReader> createState() => _BookReaderState();
 }
 
-class _BookReaderState extends ConsumerState<_BookReader> {
-  var _page = 0;
+class _BookReaderState extends ConsumerState<_BookReader>
+    with WidgetsBindingObserver {
+  late int _page = widget.initialPage;
+  final _flip = PageFlipController();
+  Timer? _saveTimer;
 
   Historia get historia => widget.historia;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (widget.initialPage > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+        if (!mounted) return;
+        _flip.goToPage(widget.initialPage);
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused) {
+      unawaited(_persist(_page));
+    }
+  }
+
+  @override
+  void deactivate() {
+    _saveTimer?.cancel();
+    unawaited(_persist(_page));
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _saveTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onFlipped(int page) {
+    setState(() => _page = page);
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 450), () {
+      unawaited(_persist(page));
+    });
+  }
+
+  Future<void> _persist(int page) async {
+    try {
+      final repo = ref.read(historiasRepositoryProvider);
+      final container = ProviderScope.containerOf(context, listen: false);
+      await repo.saveReadingProgress(
+        historiaId: historia.id,
+        page: page,
+        pageCount: historia.pages.length,
+      );
+      container.invalidate(continueReadingProvider);
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,9 +179,11 @@ class _BookReaderState extends ConsumerState<_BookReader> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(10, 48, 10, 36),
               child: PageFlipWidget(
+                controller: _flip,
                 backgroundColor: _paper,
                 duration: const Duration(milliseconds: 520),
-                onPageFlipped: (page) => setState(() => _page = page),
+                initialIndex: widget.initialPage,
+                onPageFlipped: _onFlipped,
                 lastPage: _ColophonPage(
                   historia: historia,
                   others: others,

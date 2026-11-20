@@ -90,6 +90,7 @@ class Historia {
     this.coverImageUrl,
     this.status = 'published',
     this.scheduledAt,
+    this.reviewNote,
   });
 
   final String id;
@@ -104,6 +105,7 @@ class Historia {
   final List<HistoriaPage> pages;
   final String status;
   final DateTime? scheduledAt;
+  final String? reviewNote;
   final int commentCount;
   final DateTime createdAt;
 
@@ -112,10 +114,16 @@ class Historia {
   bool get isPublished => status == 'published';
   bool get isDraft => status == 'draft';
   bool get isScheduled => status == 'scheduled';
+  bool get isPendingReview => status == 'pending_review';
 
   String get visibilityLabel {
     if (isPublished) return 'Publicada';
-    if (isDraft) return 'Borrador';
+    if (isPendingReview) return 'En revisión';
+    if (isDraft) {
+      final note = reviewNote?.trim();
+      if (note != null && note.isNotEmpty) return 'Devuelta';
+      return 'Borrador';
+    }
     if (isScheduled) {
       final at = scheduledAt;
       if (at == null) return 'Programada';

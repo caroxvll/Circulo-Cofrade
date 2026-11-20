@@ -2,7 +2,12 @@ import { Injectable } from '@angular/core';
 import { getSupabase } from '../supabase.client';
 
 export type HistoriaKind = 'libro' | 'articulo';
-export type HistoriaStatus = 'published' | 'hidden' | 'draft' | 'scheduled';
+export type HistoriaStatus =
+  | 'published'
+  | 'hidden'
+  | 'draft'
+  | 'scheduled'
+  | 'pending_review';
 
 export const HISTORIA_KIND_OPTIONS: {
   id: HistoriaKind;
@@ -37,15 +42,18 @@ export interface HistoriaRow {
   pages: HistoriaPage[];
   status: HistoriaStatus;
   scheduledAt: string | null;
+  reviewNote: string | null;
   commentCount: number;
   createdAt: string;
   updatedAt: string;
+  authorHandle?: string;
+  authorDisplayName?: string;
 }
 
 const SELECT =
-  'id, author_id, title, excerpt, kind, cover_image_url, pages, status, scheduled_at, comment_count, created_at, updated_at';
+  'id, author_id, title, excerpt, kind, cover_image_url, pages, status, scheduled_at, review_note, comment_count, created_at, updated_at';
 const LIST_SELECT =
-  'id, author_id, title, excerpt, kind, cover_image_url, status, scheduled_at, comment_count, created_at, updated_at';
+  'id, author_id, title, excerpt, kind, cover_image_url, status, scheduled_at, review_note, comment_count, created_at, updated_at';
 
 const KIND_SET = new Set<HistoriaKind>(['libro', 'articulo']);
 
@@ -69,6 +77,35 @@ export class HistoriasService {
       .order('updated_at', { ascending: false });
     if (error) throw error;
     return (data ?? []).map((row) => this.mapRow(row as Record<string, unknown>));
+  }
+
+  async fetchPendingReview(): Promise<HistoriaRow[]> {
+    const { data, error } = await getSupabase()
+      .from('historias')
+      .select(`${LIST_SELECT}, profiles!author_id (handle, display_name)`)
+      .eq('status', 'pending_review')
+      .order('updated_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((row) => this.mapRow(row as Record<string, unknown>));
+  }
+
+  async setStatus(
+    id: string,
+    status: HistoriaStatus,
+    opts?: { reviewNote?: string | null },
+  ): Promise<void> {
+    const payload: Record<string, unknown> = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+    if (opts && 'reviewNote' in opts) {
+      payload['review_note'] = opts.reviewNote;
+    }
+    const { error } = await getSupabase()
+      .from('historias')
+      .update(payload)
+      .eq('id', id);
+    if (error) throw error;
   }
 
   async fetchById(id: string): Promise<HistoriaRow | null> {
@@ -123,18 +160,22 @@ export class HistoriasService {
       scheduledAt?: string | null;
     },
   ): Promise<HistoriaRow> {
+    const payload: Record<string, unknown> = {
+      title: input.title.trim(),
+      excerpt: input.excerpt.trim(),
+      kind: input.kind,
+      pages: input.pages,
+      status: input.status,
+      cover_image_url: input.coverImageUrl ?? null,
+      scheduled_at: input.status === 'scheduled' ? input.scheduledAt ?? null : null,
+      updated_at: new Date().toISOString(),
+    };
+    if (input.status === 'pending_review' || input.status === 'published') {
+      payload['review_note'] = null;
+    }
     const { data, error } = await getSupabase()
       .from('historias')
-      .update({
-        title: input.title.trim(),
-        excerpt: input.excerpt.trim(),
-        kind: input.kind,
-        pages: input.pages,
-        status: input.status,
-        cover_image_url: input.coverImageUrl ?? null,
-        scheduled_at: input.status === 'scheduled' ? input.scheduledAt ?? null : null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq('id', id)
       .select(SELECT)
       .single();
@@ -197,6 +238,8 @@ export class HistoriasService {
         return 'Oculta';
       case 'scheduled':
         return 'Programada';
+      case 'pending_review':
+        return 'En revisión';
       default:
         return 'Publicada';
     }
@@ -211,9 +254,15 @@ export class HistoriasService {
     const status: HistoriaStatus =
       statusRaw === 'draft' ||
       statusRaw === 'hidden' ||
-      statusRaw === 'scheduled'
+      statusRaw === 'scheduled' ||
+      statusRaw === 'pending_review'
         ? statusRaw
         : 'published';
+    const profileRaw = row['profiles'];
+    const profile =
+      profileRaw && typeof profileRaw === 'object'
+        ? (profileRaw as Record<string, unknown>)
+        : null;
     return {
       id: String(row['id']),
       authorId: String(row['author_id']),
@@ -225,9 +274,17 @@ export class HistoriasService {
       status,
       scheduledAt:
         typeof row['scheduled_at'] === 'string' ? row['scheduled_at'] : null,
+      reviewNote:
+        typeof row['review_note'] === 'string' ? row['review_note'] : null,
       commentCount: Number(row['comment_count'] ?? 0),
       createdAt: String(row['created_at'] ?? ''),
       updatedAt: String(row['updated_at'] ?? row['created_at'] ?? ''),
+      authorHandle:
+        typeof profile?.['handle'] === 'string' ? profile['handle'] : undefined,
+      authorDisplayName:
+        typeof profile?.['display_name'] === 'string'
+          ? profile['display_name']
+          : undefined,
     };
   }
 

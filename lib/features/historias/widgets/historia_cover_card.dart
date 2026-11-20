@@ -14,6 +14,7 @@ class HistoriaCoverCard extends StatelessWidget {
     this.width,
     this.showMeta = true,
     this.showAuthor = true,
+    this.readingProgress,
   });
 
   static const metaHeight = 44.0;
@@ -22,6 +23,7 @@ class HistoriaCoverCard extends StatelessWidget {
   final double? width;
   final bool showMeta;
   final bool showAuthor;
+  final double? readingProgress;
 
   static int columnsFor(double width) {
     if (width >= 1100) return 4;
@@ -49,7 +51,10 @@ class HistoriaCoverCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final plate = _CoverPlate(historia: historia);
+    final plate = _CoverPlate(
+      historia: historia,
+      readingProgress: readingProgress,
+    );
     final meta = showMeta
         ? SizedBox(
             height: metaHeight,
@@ -114,13 +119,15 @@ class HistoriaCoverCard extends StatelessWidget {
 }
 
 class _CoverPlate extends StatelessWidget {
-  const _CoverPlate({required this.historia});
+  const _CoverPlate({required this.historia, this.readingProgress});
 
   final Historia historia;
+  final double? readingProgress;
 
   @override
   Widget build(BuildContext context) {
     final cover = historia.coverImageUrl?.trim();
+    final progress = readingProgress;
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(4),
@@ -134,22 +141,39 @@ class _CoverPlate extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(4),
-        child: cover != null && cover.isNotEmpty
-            ? LayoutBuilder(
-                builder: (context, constraints) {
-                  final side = constraints.maxWidth.isFinite
-                      ? constraints.maxWidth
-                      : 180.0;
-                  return CofradeoNetworkImage(
-                    url: cover,
-                    fit: BoxFit.cover,
-                    width: constraints.maxWidth,
-                    height: constraints.maxHeight,
-                    cacheSize: side,
-                  );
-                },
-              )
-            : _GeneratedCover(historia: historia),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: cover != null && cover.isNotEmpty
+                  ? LayoutBuilder(
+                      builder: (context, constraints) {
+                        final side = constraints.maxWidth.isFinite
+                            ? constraints.maxWidth
+                            : 180.0;
+                        return CofradeoNetworkImage(
+                          url: cover,
+                          fit: BoxFit.cover,
+                          width: constraints.maxWidth,
+                          height: constraints.maxHeight,
+                          cacheSize: side,
+                        );
+                      },
+                    )
+                  : _GeneratedCover(historia: historia),
+            ),
+            if (progress != null && progress > 0)
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: LinearProgressIndicator(
+                  value: progress.clamp(0, 1),
+                  minHeight: 4,
+                  backgroundColor: Colors.black.withValues(alpha: 0.35),
+                  color: AppColors.gold,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
