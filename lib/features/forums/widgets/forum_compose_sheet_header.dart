@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_colors.dart';
 
@@ -35,7 +36,13 @@ class ForumComposeSheetCloseButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      onPressed: enabled ? () => Navigator.pop(context) : null,
+      onPressed: enabled
+          ? () {
+              FocusManager.instance.primaryFocus?.unfocus();
+              SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+              Navigator.pop(context);
+            }
+          : null,
       tooltip: 'Cerrar',
       icon: const Icon(Icons.close_rounded, color: AppColors.burgundy),
       visualDensity: VisualDensity.compact,
