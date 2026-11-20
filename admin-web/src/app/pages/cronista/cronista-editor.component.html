@@ -1,0 +1,107 @@
+<section class="editor">
+  <header class="editor-head">
+    <div>
+      <p class="eyebrow">{{ historiaId ? 'Editar' : 'Nueva' }}</p>
+      <h1>{{ historiaId ? 'Seguir escribiendo' : 'Abrir un libro en blanco' }}</h1>
+    </div>
+    <a routerLink="/cronista" class="back">Volver</a>
+  </header>
+
+  @if (loading()) {
+    <p class="muted">Abriendo el manuscrito…</p>
+  } @else {
+    <label class="field">
+      Título
+      <input [(ngModel)]="title" maxlength="80" placeholder="Cómo se llamará" />
+    </label>
+
+    <div class="kinds">
+      @for (item of kinds; track item.id) {
+        <button
+          type="button"
+          class="kind"
+          [class.on]="kind === item.id"
+          (click)="kind = item.id"
+        >
+          {{ item.label }}
+        </button>
+      }
+    </div>
+
+    <label class="field">
+      Entradilla
+      <textarea
+        [(ngModel)]="excerpt"
+        maxlength="280"
+        rows="2"
+        placeholder="Lo que se lee en la estantería"
+      ></textarea>
+    </label>
+
+    <label class="cover-pick">
+      <span>Portada</span>
+      <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onCover($event)" />
+      @if (coverPreview || coverUrl) {
+        <img [src]="coverPreview || coverUrl" alt="" />
+      }
+    </label>
+
+    @for (page of pages; track $index; let i = $index) {
+      <article class="leaf">
+        <header>
+          <strong>Página {{ i + 1 }}</strong>
+          @if (pages.length > 1) {
+            <button type="button" class="link" (click)="removePage(i)">Quitar</button>
+          }
+        </header>
+        <textarea
+          class="page-body"
+          [(ngModel)]="pages[i].body"
+          [ngModelOptions]="{ standalone: true }"
+          rows="8"
+          maxlength="3500"
+          placeholder="Escribe como en un libro. La letra en la app es EB Garamond."
+        ></textarea>
+        <div class="photo-row">
+          <label class="photo-btn">
+            {{ page.preview || page.imageUrl ? 'Cambiar foto' : 'Meter una foto' }}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              (change)="onPageImage(i, $event)"
+            />
+          </label>
+          @if (page.preview || page.imageUrl) {
+            <img [src]="page.preview || page.imageUrl" alt="" />
+            <button type="button" class="link" (click)="clearPageImage(i)">Quitar foto</button>
+          }
+        </div>
+        @if (page.preview || page.imageUrl) {
+          <input
+            [(ngModel)]="pages[i].caption"
+            [ngModelOptions]="{ standalone: true }"
+            maxlength="120"
+            placeholder="Pie de foto"
+          />
+        }
+      </article>
+    }
+
+    <button type="button" class="ghost" (click)="addPage()" [disabled]="pages.length >= 30">
+      Añadir página
+    </button>
+
+    @if (error()) {
+      <div class="error-box">{{ error() }}</div>
+    }
+
+    <footer class="actions">
+      <button type="button" class="ghost" [disabled]="saving()" (click)="save('draft')">
+        Guardar borrador
+      </button>
+      <button type="button" class="primary" [disabled]="saving()" (click)="save('published')">
+        {{ saving() ? 'Publicando…' : 'Publicar en Historias' }}
+      </button>
+    </footer>
+  }
+</section>

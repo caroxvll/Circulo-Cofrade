@@ -173,6 +173,7 @@ class AdminRepository {
     required String body,
     String? excerpt,
     String? coverImageUrl,
+    String? calendarEventId,
   }) async {
     if (_client == null) throw const AdminUnavailableException();
 
@@ -183,6 +184,8 @@ class AdminRepository {
         'p_body': body.trim(),
         'p_excerpt': excerpt?.trim(),
         'p_cover_image_url': coverImageUrl?.trim(),
+        if (calendarEventId != null && calendarEventId.trim().isNotEmpty)
+          'p_calendar_event_id': calendarEventId.trim(),
       },
     );
 
@@ -387,6 +390,21 @@ class AdminRepository {
         .from('profiles')
         .update({
           'verified': verified,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', profileId);
+  }
+
+  Future<void> setProfileChronicler({
+    required String profileId,
+    required bool chronicler,
+  }) async {
+    if (_client == null) throw const AdminUnavailableException();
+
+    await _client!
+        .from('profiles')
+        .update({
+          'is_chronicler': chronicler,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', profileId);
@@ -643,6 +661,11 @@ class AdminRepository {
           : DateTime.parse(row['edited_at'] as String),
       rejectionReason: (row['rejection_reason'] as String?)?.trim(),
       rejectedAt: rejectedAt,
+      calendarEventId: () {
+        final id = (row['calendar_event_id'] as String?)?.trim();
+        if (id == null || id.isEmpty) return null;
+        return id;
+      }(),
     );
   }
 

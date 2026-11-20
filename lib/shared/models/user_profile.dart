@@ -28,6 +28,7 @@ class UserProfile {
     required this.website,
     this.avatarUrl,
     this.isVerified = false,
+    this.isChronicler = false,
     this.role = UserRole.member,
     this.isSuspended = false,
     this.suspendedReason,
@@ -59,6 +60,9 @@ class UserProfile {
 
   final String? avatarUrl;
   final bool isVerified;
+
+  /// Cronista: puede publicar en Historias. Distinto de la cuenta verificada.
+  final bool isChronicler;
   final UserRole role;
   final bool isSuspended;
   final String? suspendedReason;

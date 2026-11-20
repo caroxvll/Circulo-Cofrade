@@ -22,7 +22,7 @@
           height="72"
         />
       </div>
-      <p class="brand-eyebrow">Portal hermandades</p>
+      <p class="brand-eyebrow">Hermandades y cronistas</p>
       <h1 class="brand-name">Círculo Cofrade</h1>
       <div class="brand-ornament" aria-hidden="true">
         <span></span>
@@ -32,7 +32,8 @@
       <p class="brand-line">El espacio oficial de tu hermandad</p>
       <p class="brand-copy">
         Comunica, gestiona y mantén informada a tu comunidad desde un único
-        lugar, en un entorno privado y verificado.
+        lugar. Si eres cronista, entra con tu cuenta de Cofradeo y escribe
+        libros, crónicas y anécdotas.
       </p>
       <ul class="brand-features">
         <li>
@@ -113,9 +114,12 @@
     <section class="auth-panel">
       @if (view() === 'login') {
         <header class="auth-head">
-          <p class="auth-kicker">Solo hermandades</p>
+          <p class="auth-kicker">Hermandades y cronistas</p>
           <h2>Bienvenida</h2>
-          <p>Entra con la cuenta oficial verificada de tu hermandad.</p>
+          <p>
+            Entra con la cuenta oficial de tu hermandad o con tu perfil de
+            cronista.
+          </p>
         </header>
 
         @if (!configured) {

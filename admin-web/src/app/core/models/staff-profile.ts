@@ -10,6 +10,8 @@ export interface StaffProfile {
   avatarUrl: string | null;
   accountType: AccountType;
   verified: boolean;
+  /** Cronista: escribe Historias. Distinto de la cuenta verificada. */
+  isChronicler: boolean;
   /** Color de acento del panel hermandad (#RRGGBB), si lo personalizó. */
   panelAccent: string | null;
 }
@@ -41,4 +43,11 @@ export function canAccessHermandadPortal(opts: {
   verified?: boolean;
 }): boolean {
   return isBrotherhoodAccount(opts.accountType) && opts.verified === true;
+}
+
+/** Escritorio web de Historias. */
+export function canAccessCronistaPortal(opts: {
+  isChronicler?: boolean;
+}): boolean {
+  return opts.isChronicler === true;
 }

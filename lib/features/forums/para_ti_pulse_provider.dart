@@ -90,6 +90,14 @@ final publishedEditorialPostsProvider =
   return ref.watch(forumsRepositoryProvider).fetchPublishedEditorialPosts();
 });
 
+/// Noticias de Círculo Cofrade ligadas a un evento. Siguen ahí al cerrar el directo.
+final eventEditorialPostsProvider = FutureProvider.autoDispose
+    .family<List<ForumTopic>, String>((ref, eventId) async {
+  return ref
+      .watch(forumsRepositoryProvider)
+      .fetchPublishedEditorialsForEvent(eventId);
+});
+
 /// Río de Para ti: avisos de hoy, directo de Semana Santa y el tema que se mueve.
 final paraTiRiverProvider = Provider<ParaTiRiver>((ref) {
   ref.watch(ssLiveRealtimeProvider);

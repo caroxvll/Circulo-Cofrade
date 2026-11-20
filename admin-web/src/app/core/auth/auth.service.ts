@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import {
   StaffProfile,
   StaffRole,
+  canAccessCronistaPortal,
   canAccessHermandadPortal,
   canAccessJunta,
   isAdminRole,
@@ -46,10 +47,16 @@ export class AuthService {
       verified: this.profileSignal()?.verified,
     }),
   );
+  readonly isChronicler = computed(() =>
+    canAccessCronistaPortal({
+      isChronicler: this.profileSignal()?.isChronicler,
+    }),
+  );
   /** Admin tiene prioridad si alguien fuera ambas cosas. */
   readonly homePath = computed(() => {
     if (this.canAccess()) return '/app/resumen';
     if (this.isHermandadAccount()) return '/hermandad';
+    if (this.isChronicler()) return '/cronista';
     return '/login';
   });
 
@@ -118,7 +125,7 @@ export class AuthService {
     const [profileResult, modResult] = await Promise.all([
       supabase
         .from('profiles')
-        .select(`${baseSelect}, panel_accent`)
+        .select(`${baseSelect}, panel_accent, is_chronicler`)
         .eq('id', userId)
         .maybeSingle(),
       supabase
@@ -130,10 +137,10 @@ export class AuthService {
     let profileRow: Record<string, unknown> | null =
       (profileResult.data as Record<string, unknown> | null) ?? null;
     let profileError = profileResult.error;
-    // Si aún no se ejecutó hermandad_panel_accent.sql, no romper el login.
+    // Columnas nuevas (acento, cronista) no deben romper el login.
     if (
       profileError &&
-      /panel_accent|schema cache|column/i.test(profileError.message)
+      /panel_accent|is_chronicler|schema cache|column/i.test(profileError.message)
     ) {
       const fallback = await supabase
         .from('profiles')
@@ -166,6 +173,7 @@ export class AuthService {
           avatarUrl: (profileRow['avatar_url'] as string | null) ?? null,
           accountType: String(profileRow['account_type'] ?? 'cofrade'),
           verified: Boolean(profileRow['verified']),
+          isChronicler: Boolean(profileRow['is_chronicler']),
           panelAccent,
         }
       : {
@@ -176,6 +184,7 @@ export class AuthService {
           avatarUrl: null,
           accountType: 'cofrade',
           verified: false,
+          isChronicler: false,
           panelAccent: null,
         };
 
@@ -206,7 +215,7 @@ export class AuthService {
         await this.applySession(session);
       }
 
-      if (this.isAdmin() || this.isHermandadAccount()) {
+      if (this.isAdmin() || this.isHermandadAccount() || this.isChronicler()) {
         return;
       }
 
@@ -220,7 +229,7 @@ export class AuthService {
       }
 
       throw new Error(
-        'Esta cuenta no tiene acceso. Usa la cuenta oficial verificada de tu hermandad.',
+        'Esta cuenta no tiene acceso. Entra con la cuenta oficial de tu hermandad o con tu perfil de cronista.',
       );
     } finally {
       this.suppressAuthStateApply = false;

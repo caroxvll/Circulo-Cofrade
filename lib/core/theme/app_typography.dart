@@ -108,6 +108,24 @@ abstract final class AppTypography {
         letterSpacing: 0.05,
       );
 
+  /// Cuerpo de página en Historias (serifa de libro).
+  static TextStyle bookBody({Color? color}) => GoogleFonts.ebGaramond(
+        fontSize: 19.5,
+        fontWeight: FontWeight.w400,
+        color: color ?? AppColors.textPrimary,
+        height: 1.78,
+        letterSpacing: 0.15,
+      );
+
+  /// Pie de foto dentro del libro.
+  static TextStyle bookCaption({Color? color}) => GoogleFonts.ebGaramond(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        fontStyle: FontStyle.italic,
+        color: color ?? AppColors.textSecondary,
+        height: 1.4,
+      );
+
   static TextStyle bodyLarge({Color? color}) => GoogleFonts.inter(
         fontSize: 16,
         fontWeight: FontWeight.w400,

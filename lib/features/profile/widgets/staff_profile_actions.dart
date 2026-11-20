@@ -8,6 +8,7 @@ import '../../admin/admin_provider.dart';
 import '../../calendar/calendar_contributors_provider.dart';
 import '../../forums/news_publishers_provider.dart';
 import '../../moderation/moderation_provider.dart';
+import '../profile_provider.dart';
 
 class StaffProfileActionsBar extends ConsumerStatefulWidget {
   const StaffProfileActionsBar({super.key, required this.profile});
@@ -79,6 +80,74 @@ class _StaffProfileActionsBarState
           const SnackBar(
             content: Text(
               'No se pudo actualizar la verificación. ¿Ejecutaste profile_verification.sql?',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setChronicler(bool chronicler) async {
+    final profile = widget.profile;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          chronicler
+              ? '¿Hacer cronista a ${profile.handle}?'
+              : '¿Quitar el sello de cronista a ${profile.handle}?',
+        ),
+        content: Text(
+          chronicler
+              ? 'Podrá publicar en Historias. No es la verificación de cuenta: '
+                  'es un sello aparte, solo para este apartado.'
+              : 'Dejará de poder publicar historias nuevas. Las ya publicadas siguen.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.burgundy,
+              foregroundColor: AppColors.textOnDark,
+            ),
+            child: Text(chronicler ? 'Hacer cronista' : 'Quitar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await ref.read(adminRepositoryProvider).setProfileChronicler(
+            profileId: profile.id,
+            chronicler: chronicler,
+          );
+      invalidateAuthorVisibility(ref, profileId: profile.id);
+      ref.invalidate(currentUserProfileProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              chronicler
+                  ? '${profile.handle} ya es cronista'
+                  : 'Sello de cronista retirado a ${profile.handle}',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se pudo actualizar. ¿Ejecutaste historias.sql?',
             ),
           ),
         );
@@ -335,6 +404,27 @@ class _StaffProfileActionsBarState
             ),
             label: Text(
               profile.isVerified ? 'Quitar verificación' : 'Verificar cuenta',
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _busy
+                ? null
+                : () => _setChronicler(!profile.isChronicler),
+            icon: Icon(
+              profile.isChronicler
+                  ? Icons.auto_stories
+                  : Icons.auto_stories_outlined,
+              size: 18,
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.burgundy,
+              side: const BorderSide(color: AppColors.burgundy),
+            ),
+            label: Text(
+              profile.isChronicler
+                  ? 'Quitar sello de Cronista'
+                  : 'Hacer Cronista',
             ),
           ),
           const SizedBox(height: 8),
