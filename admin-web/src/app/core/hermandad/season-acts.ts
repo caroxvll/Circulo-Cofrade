@@ -1,6 +1,23 @@
 export type SeasonActKind = 'iguala' | 'ensayos' | 'muda' | 'desarma';
 export type SeasonActStatus = 'empty' | 'upcoming' | 'done' | 'mixed';
 
+export type SeasonPaso = 'ambos' | 'cristo' | 'virgen';
+export type MudaRetranqueoMode = 'with_retranqueo' | 'split' | 'muda_only';
+
+export interface HermandadSeasonProfile {
+  igualaSplit: boolean;
+  ensayoSplit: boolean;
+  ensayoCount: number;
+  mudaMode: MudaRetranqueoMode;
+}
+
+export const DEFAULT_SEASON_PROFILE: HermandadSeasonProfile = {
+  igualaSplit: false,
+  ensayoSplit: false,
+  ensayoCount: 1,
+  mudaMode: 'muda_only',
+};
+
 export interface SeasonActEvent {
   id: string;
   title: string;
@@ -8,6 +25,9 @@ export interface SeasonActEvent {
   eventType: string;
   createdBy?: string | null;
   organizerLabel?: string | null;
+  paso?: SeasonPaso;
+  seasonN?: number | null;
+  withRetranqueo?: boolean;
 }
 
 export interface SeasonActMilestone {
@@ -15,6 +35,8 @@ export interface SeasonActMilestone {
   label: string;
   status: SeasonActStatus;
   count: number;
+  filledSlots: number;
+  requiredSlots: number;
   statusLabel: string;
   events: SeasonActEvent[];
 }
@@ -24,6 +46,7 @@ export interface SeasonActsSnapshot {
   hermandadName: string;
   topicId?: string;
   profileId?: string | null;
+  processionDay?: string | null;
   hasAccount: boolean;
   milestones: SeasonActMilestone[];
   filledCount: number;
@@ -41,11 +64,40 @@ export const SEASON_ACT_KINDS: ReadonlyArray<{
 }> = [
   { kind: 'iguala', label: 'Igualá', eventTypes: ['iguala'], publishKindId: 'iguala' },
   { kind: 'ensayos', label: 'Ensayos', eventTypes: ['ensayo'], publishKindId: 'ensayo' },
-  { kind: 'muda', label: 'Muda', eventTypes: ['muda'], publishKindId: 'muda' },
+  { kind: 'muda', label: 'Muda', eventTypes: ['muda', 'retranqueo'], publishKindId: 'muda' },
   { kind: 'desarma', label: 'Desarmá', eventTypes: ['desarma'], publishKindId: 'desarma' },
 ];
 
-export const SEASON_ACT_DB_TYPES = ['iguala', 'ensayo', 'muda', 'desarma'] as const;
+export const SEASON_ACT_DB_TYPES = [
+  'iguala',
+  'ensayo',
+  'muda',
+  'retranqueo',
+  'desarma',
+] as const;
+
+function coversPaso(eventPaso: SeasonPaso | undefined, needed: SeasonPaso): boolean {
+  const paso = eventPaso ?? 'ambos';
+  if (needed === 'ambos') return true;
+  return paso === 'ambos' || paso === needed;
+}
+
+function ensayoFilled(events: SeasonActEvent[], n: number): number {
+  if (!events.length) return 0;
+  const numbered = new Set(
+    events
+      .map((e) => e.seasonN)
+      .filter((v): v is number => typeof v === 'number' && v > 0),
+  );
+  if (!numbered.size) return Math.min(n, events.length);
+  return Math.min(n, numbered.size);
+}
+
+function mudaLabel(mode: MudaRetranqueoMode): string {
+  if (mode === 'with_retranqueo') return 'Muda+retr.';
+  if (mode === 'split') return 'Muda / retr.';
+  return 'Muda';
+}
 
 export function currentSeasonActsYear(now = new Date()): number {
   return now.getFullYear();
@@ -137,15 +189,132 @@ function statusLabel(
   return last ? `Hecho · ${formatDay(last)}` : 'Hecho';
 }
 
+function slotsFor(
+  kind: SeasonActKind,
+  events: SeasonActEvent[],
+  profile: HermandadSeasonProfile,
+): { filled: number; required: number; detail: string | null } {
+  if (kind === 'iguala') {
+    if (!profile.igualaSplit) {
+      return { filled: events.length ? 1 : 0, required: 1, detail: null };
+    }
+    const cristo = events.some((e) => coversPaso(e.paso, 'cristo'));
+    const virgen = events.some((e) => coversPaso(e.paso, 'virgen'));
+    return {
+      filled: (cristo ? 1 : 0) + (virgen ? 1 : 0),
+      required: 2,
+      detail:
+        cristo && virgen
+          ? null
+          : `${cristo ? 'Cristo' : 'falta Cristo'} · ${virgen ? 'Virgen' : 'falta Virgen'}`,
+    };
+  }
+  if (kind === 'ensayos') {
+    const n = Math.min(12, Math.max(1, profile.ensayoCount));
+    if (!profile.ensayoSplit) {
+      const filled = ensayoFilled(events, n);
+      return {
+        filled,
+        required: n,
+        detail: n > 1 ? `${filled}/${n} ensayos` : null,
+      };
+    }
+    const cristo = ensayoFilled(
+      events.filter((e) => coversPaso(e.paso, 'cristo')),
+      n,
+    );
+    const virgen = ensayoFilled(
+      events.filter((e) => coversPaso(e.paso, 'virgen')),
+      n,
+    );
+    return {
+      filled: cristo + virgen,
+      required: n * 2,
+      detail: `Cristo ${cristo}/${n} · Virgen ${virgen}/${n}`,
+    };
+  }
+  if (kind === 'muda') {
+    const mudas = events.filter((e) => e.eventType === 'muda');
+    const retrs = events.filter((e) => e.eventType === 'retranqueo');
+    if (profile.mudaMode === 'muda_only') {
+      return { filled: mudas.length ? 1 : 0, required: 1, detail: null };
+    }
+    if (profile.mudaMode === 'with_retranqueo') {
+      const combined = mudas.some((e) => e.withRetranqueo);
+      const sameDay = mudas.some((m) =>
+        retrs.some(
+          (r) =>
+            new Date(m.startsAt).toDateString() ===
+            new Date(r.startsAt).toDateString(),
+        ),
+      );
+      if (combined || sameDay) {
+        return { filled: 1, required: 1, detail: 'Muda y retranqueo' };
+      }
+      if (mudas.length) return { filled: 0, required: 1, detail: 'Muda · falta retranqueo' };
+      if (retrs.length) return { filled: 0, required: 1, detail: 'Retranqueo · falta muda' };
+      return { filled: 0, required: 1, detail: null };
+    }
+    const hasMuda = mudas.length > 0;
+    const hasRetr = retrs.length > 0;
+    return {
+      filled: (hasMuda ? 1 : 0) + (hasRetr ? 1 : 0),
+      required: 2,
+      detail:
+        hasMuda && hasRetr
+          ? null
+          : `${hasMuda ? 'Muda' : 'falta muda'} · ${hasRetr ? 'Retranqueo' : 'falta retranqueo'}`,
+    };
+  }
+  return { filled: events.length ? 1 : 0, required: 1, detail: null };
+}
+
+function foldQuery(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+export function filterSeasonActsSnapshots(
+  rows: SeasonActsSnapshot[],
+  query: string,
+  processionDay: string | null,
+): SeasonActsSnapshot[] {
+  const q = foldQuery(query);
+  return rows.filter((row) => {
+    if (processionDay && row.processionDay !== processionDay) return false;
+    if (!q) return true;
+    return (
+      foldQuery(row.hermandadName).includes(q) ||
+      foldQuery(row.processionDay ?? '').includes(q)
+    );
+  });
+}
+
+export function hermandadDayShortLabel(day: string): string {
+  return day
+    .replace('Viernes de Dolores', 'V. Dolores')
+    .replace('Sábado de Pasión', 'S. Pasión')
+    .replace('Domingo de Ramos', 'D. Ramos')
+    .replace('Domingo de Resurrección', 'Resurrección')
+    .replace('Miércoles Santo', 'Mié. Santo')
+    .replace('Sábado Santo', 'Sáb. Santo');
+}
+
 export function buildSeasonActsSnapshot(input: {
   year: number;
   hermandadName: string;
   events: SeasonActEvent[];
   topicId?: string;
   profileId?: string | null;
+  processionDay?: string | null;
   hasAccount?: boolean;
+  profile?: HermandadSeasonProfile;
 }): SeasonActsSnapshot {
   const hasAccount = input.hasAccount ?? true;
+  const profile = input.profile ?? DEFAULT_SEASON_PROFILE;
   const own = input.events
     .filter((e) =>
       eventBelongsToHermandad(e, input.hermandadName, input.profileId),
@@ -157,21 +326,39 @@ export function buildSeasonActsSnapshot(input: {
     );
 
   const milestones: SeasonActMilestone[] = SEASON_ACT_KINDS.map((def) => {
-    const matched = own.filter((e) => def.eventTypes.includes(e.eventType));
-    const status = statusFor(def.kind, matched);
+    const types =
+      def.kind === 'muda' && profile.mudaMode === 'muda_only'
+        ? ['muda']
+        : [...def.eventTypes];
+    const matched = own.filter((e) => types.includes(e.eventType));
+    const slots = slotsFor(def.kind, matched, profile);
+    let status = statusFor(def.kind, matched);
+    if (slots.filled > 0 && slots.filled < slots.required) status = 'mixed';
+    const complete = slots.filled >= slots.required && slots.required > 0;
     return {
       kind: def.kind,
-      label: def.label,
-      status,
+      label: def.kind === 'muda' ? mudaLabel(profile.mudaMode) : def.label,
+      status: complete ? status : slots.filled === 0 ? 'empty' : status,
       count: matched.length,
-      statusLabel: statusLabel(def.kind, status, matched),
+      filledSlots: slots.filled,
+      requiredSlots: slots.required,
+      statusLabel:
+        slots.detail ||
+        (slots.filled === 0
+          ? slots.required > 1
+            ? `0/${slots.required}`
+            : 'Sin publicar'
+          : statusLabel(def.kind, status, matched)),
       events: matched,
     };
   });
 
-  const filledCount = milestones.filter((m) => m.status !== 'empty').length;
+  const filledCount = milestones.filter(
+    (m) => m.filledSlots >= m.requiredSlots && m.requiredSlots > 0,
+  ).length;
+  const started = milestones.some((m) => m.count > 0 || m.filledSlots > 0);
   const totalCount = milestones.length;
-  const isEmpty = filledCount === 0;
+  const isEmpty = !started;
   const isComplete = filledCount === totalCount;
 
   let coverageLabel = `${filledCount}/${totalCount}`;
@@ -184,6 +371,7 @@ export function buildSeasonActsSnapshot(input: {
     hermandadName: input.hermandadName,
     topicId: input.topicId,
     profileId: input.profileId,
+    processionDay: input.processionDay ?? null,
     hasAccount,
     milestones,
     filledCount,

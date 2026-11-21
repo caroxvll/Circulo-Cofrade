@@ -93,6 +93,17 @@ export const PUBLISH_KINDS: readonly PublishKind[] = [
     needsDate: true,
   },
   {
+    id: 'retranqueo',
+    label: 'Retranqueo',
+    hint: 'Tablón y, si quieres, calendario.',
+    officialCategory: 'acto',
+    boardDefault: true,
+    calendarDefault: true,
+    calendarType: 'retranqueo',
+    noticiasDefault: false,
+    needsDate: true,
+  },
+  {
     id: 'desarma',
     label: 'Desarma',
     hint: 'Tablón y, si quieres, calendario.',
@@ -625,6 +636,10 @@ export class HermandadPortalService {
     createdBy: string;
     /** Comunicado oficial que originó el evento (si hay). */
     sourceReplyId?: string | null;
+    hermandadTopicId?: string | null;
+    paso?: 'ambos' | 'cristo' | 'virgen';
+    seasonN?: number | null;
+    withRetranqueo?: boolean;
   }): Promise<void> {
     const organizerLabel = input.organizerLabel.trim();
     const customIconUrl = input.customIconUrl?.trim() || '';
@@ -642,6 +657,10 @@ export class HermandadPortalService {
       created_by: input.createdBy,
       status: 'published',
       source_reply_id: input.sourceReplyId?.trim() || null,
+      hermandad_topic_id: input.hermandadTopicId?.trim() || null,
+      paso: input.paso ?? 'ambos',
+      season_n: input.seasonN ?? null,
+      with_retranqueo: input.withRetranqueo === true,
     });
     if (error) throw error;
 
@@ -790,6 +809,9 @@ export class HermandadPortalService {
       coverImageUrl?: string | null;
       customIconUrl?: string | null;
       organizerLabel?: string | null;
+      paso?: 'ambos' | 'cristo' | 'virgen';
+      seasonN?: number | null;
+      withRetranqueo?: boolean;
     } | null;
   }): Promise<string> {
     const content = input.body.trim();
@@ -825,6 +847,9 @@ export class HermandadPortalService {
         calendar_cover_image_url: cal?.coverImageUrl?.trim() || null,
         calendar_custom_icon_url: cal?.customIconUrl?.trim() || null,
         calendar_organizer_label: cal?.organizerLabel?.trim() || null,
+        calendar_paso: cal ? (cal.paso ?? 'ambos') : null,
+        calendar_season_n: cal?.seasonN ?? null,
+        calendar_with_retranqueo: cal?.withRetranqueo === true,
       })
       .select('id')
       .single();
@@ -869,6 +894,66 @@ export class HermandadPortalService {
       })
       .eq('id', id)
       .eq('status', 'scheduled');
+    if (error) throw error;
+  }
+
+  async fetchSeasonProfile(topicId: string): Promise<{
+    igualaSplit: boolean;
+    ensayoSplit: boolean;
+    ensayoCount: number;
+    mudaMode: 'with_retranqueo' | 'split' | 'muda_only';
+  }> {
+    try {
+      const { data, error } = await getSupabase()
+        .from('hermandad_season_profile')
+        .select('iguala_split, ensayo_split, ensayo_count, muda_mode')
+        .eq('topic_id', topicId)
+        .maybeSingle();
+      if (error || !data) {
+        return {
+          igualaSplit: false,
+          ensayoSplit: false,
+          ensayoCount: 1,
+          mudaMode: 'muda_only',
+        };
+      }
+      const mode = String(data['muda_mode'] ?? 'muda_only');
+      return {
+        igualaSplit: data['iguala_split'] === true,
+        ensayoSplit: data['ensayo_split'] === true,
+        ensayoCount: Number(data['ensayo_count'] ?? 1) || 1,
+        mudaMode:
+          mode === 'with_retranqueo' || mode === 'split'
+            ? mode
+            : 'muda_only',
+      };
+    } catch {
+      return {
+        igualaSplit: false,
+        ensayoSplit: false,
+        ensayoCount: 1,
+        mudaMode: 'muda_only',
+      };
+    }
+  }
+
+  async saveSeasonProfile(
+    topicId: string,
+    profile: {
+      igualaSplit: boolean;
+      ensayoSplit: boolean;
+      ensayoCount: number;
+      mudaMode: 'with_retranqueo' | 'split' | 'muda_only';
+    },
+  ): Promise<void> {
+    const { error } = await getSupabase().from('hermandad_season_profile').upsert({
+      topic_id: topicId,
+      iguala_split: profile.igualaSplit,
+      ensayo_split: profile.ensayoSplit,
+      ensayo_count: profile.ensayoCount,
+      muda_mode: profile.mudaMode,
+      updated_at: new Date().toISOString(),
+    });
     if (error) throw error;
   }
 

@@ -4,14 +4,31 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../forums/hermandad_season_acts_provider.dart';
+import '../../forums/utils/hermandad_board_display.dart';
 import '../../forums/utils/hermandad_season_acts.dart';
+import '../../forums/widgets/hermandad_season_profile_sheet.dart';
 import '../junta_ui.dart';
 
-class JuntaSeasonActsTab extends ConsumerWidget {
+class JuntaSeasonActsTab extends ConsumerStatefulWidget {
   const JuntaSeasonActsTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<JuntaSeasonActsTab> createState() =>
+      _JuntaSeasonActsTabState();
+}
+
+class _JuntaSeasonActsTabState extends ConsumerState<JuntaSeasonActsTab> {
+  final _search = TextEditingController();
+  String? _day;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final async = ref.watch(hermandadSeasonActsCoverageProvider);
 
     return RefreshIndicator(
@@ -39,20 +56,60 @@ class JuntaSeasonActsTab extends ConsumerWidget {
             ),
           ],
         ),
-        data: (coverage) => _CoverageList(coverage: coverage),
+        data: (coverage) => _CoverageList(
+          coverage: coverage,
+          query: _search.text,
+          selectedDay: _day,
+          searchController: _search,
+          onQueryChanged: (_) => setState(() {}),
+          onClearQuery: () {
+            _search.clear();
+            setState(() {});
+          },
+          onDayChanged: (day) => setState(() => _day = day),
+        ),
       ),
     );
   }
 }
 
 class _CoverageList extends StatelessWidget {
-  const _CoverageList({required this.coverage});
+  const _CoverageList({
+    required this.coverage,
+    required this.query,
+    required this.selectedDay,
+    required this.searchController,
+    required this.onQueryChanged,
+    required this.onClearQuery,
+    required this.onDayChanged,
+  });
 
   final HermandadSeasonActsCoverage coverage;
+  final String query;
+  final String? selectedDay;
+  final TextEditingController searchController;
+  final ValueChanged<String> onQueryChanged;
+  final VoidCallback onClearQuery;
+  final ValueChanged<String?> onDayChanged;
 
   @override
   Widget build(BuildContext context) {
-    final rows = coverage.rows;
+    final filtered = filterSeasonActsCoverage(
+      rows: coverage.rows,
+      query: query,
+      processionDay: selectedDay,
+    );
+    final visible = HermandadSeasonActsCoverage(
+      year: coverage.year,
+      rows: filtered,
+    );
+    final dayCounts = <String, int>{};
+    for (final row in coverage.rows) {
+      final day = row.processionDay;
+      if (day == null || day.isEmpty) continue;
+      dayCounts[day] = (dayCounts[day] ?? 0) + 1;
+    }
+
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: JuntaUi.listPadding,
@@ -63,26 +120,168 @@ class _CoverageList extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Igualá, ensayos, muda y desarmá por hermandad. '
-          'Sirve para ver a quién falta meter datos.',
+          'Checks según cómo monta cada casa la temporada. '
+          'Busca por hermandad o filtra por día de estación.',
           style: JuntaUi.body(),
         ),
-        const SizedBox(height: 14),
-        _SummaryChips(coverage: coverage),
+        const SizedBox(height: 12),
+        TextField(
+          controller: searchController,
+          onChanged: onQueryChanged,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: 'Buscar hermandad…',
+            prefixIcon: const Icon(Icons.search, size: 18),
+            suffixIcon: query.trim().isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Limpiar',
+                    onPressed: onClearQuery,
+                    icon: const Icon(Icons.close, size: 18),
+                  ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            hintStyle: JuntaUi.caption(),
+          ),
+          style: JuntaUi.body(color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 36,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              _DayChip(
+                label: 'Todos',
+                count: coverage.rows.length,
+                selected: selectedDay == null,
+                onTap: () => onDayChanged(null),
+              ),
+              const SizedBox(width: 6),
+              for (final day in hermandadDirectoryDays) ...[
+                _DayChip(
+                  label: hermandadDayShortLabel(day),
+                  count: dayCounts[day] ?? 0,
+                  selected: selectedDay == day,
+                  onTap: () => onDayChanged(
+                    selectedDay == day ? null : day,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ),
+        if (selectedDay != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            selectedDay!,
+            style: JuntaUi.caption(color: AppColors.burgundy).copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        _SummaryChips(coverage: visible),
         const SizedBox(height: 16),
-        if (rows.isEmpty)
+        if (coverage.rows.isEmpty)
           const JuntaEmptyPanel(
             icon: Icons.church_outlined,
             message: 'Sin tablones de hermandad',
             subtitle:
                 'Cuando haya hermandades en el directorio, saldrán aquí.',
           )
+        else if (filtered.isEmpty)
+          JuntaEmptyPanel(
+            icon: Icons.search_off_outlined,
+            message: 'Ninguna hermandad coincide',
+            subtitle: selectedDay == null
+                ? 'Prueba con otro nombre.'
+                : 'Nada en ${hermandadDayShortLabel(selectedDay!)} con esa búsqueda.',
+          )
         else
-          for (final row in rows) ...[
-            _CoverageRow(snapshot: row),
+          for (final row in filtered) ...[
+            _CoverageRow(
+              snapshot: row,
+              onConfigure: row.topicId == null
+                  ? null
+                  : () => showHermandadSeasonProfileSheet(
+                        context,
+                        topicId: row.topicId!,
+                        hermandadName: row.hermandadName,
+                      ),
+            ),
             const SizedBox(height: 8),
           ],
       ],
+    );
+  }
+}
+
+class _DayChip extends StatelessWidget {
+  const _DayChip({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.burgundy : AppColors.textSecondary;
+    return Material(
+      color: selected
+          ? AppColors.burgundy.withValues(alpha: 0.12)
+          : AppColors.surface,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? AppColors.burgundy.withValues(alpha: 0.45)
+                  : AppColors.border,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: JuntaUi.caption(color: color).copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+              if (count > 0) ...[
+                const SizedBox(width: 4),
+                Text(
+                  '$count',
+                  style: JuntaUi.caption(color: color).copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -155,9 +354,10 @@ class _StatChip extends StatelessWidget {
 }
 
 class _CoverageRow extends StatelessWidget {
-  const _CoverageRow({required this.snapshot});
+  const _CoverageRow({required this.snapshot, this.onConfigure});
 
   final HermandadSeasonActsSnapshot snapshot;
+  final VoidCallback? onConfigure;
 
   Color get _badgeColor {
     if (!snapshot.hasAccount) return AppColors.textMuted;
@@ -168,6 +368,7 @@ class _CoverageRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final day = snapshot.processionDay;
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(JuntaUi.cardRadius),
@@ -189,11 +390,33 @@ class _CoverageRow extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        snapshot.hermandadName,
-                        style: JuntaUi.cardTitle(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            snapshot.hermandadName,
+                            style: JuntaUi.cardTitle(),
+                          ),
+                          if (day != null && day.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              day,
+                              style: JuntaUi.caption(
+                                color: hermandadDayAccentColor(day),
+                              ).copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
+                    if (onConfigure != null)
+                      IconButton(
+                        tooltip: 'Ajustar temporada',
+                        onPressed: onConfigure,
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.tune_rounded, size: 18),
+                        color: AppColors.burgundy,
+                      ),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -217,7 +440,10 @@ class _CoverageRow extends StatelessWidget {
                   children: [
                     for (final milestone in snapshot.milestones)
                       Expanded(
-                        child: _MiniMilestone(milestone: milestone),
+                        child: _MiniMilestone(
+                          milestone: milestone,
+                          label: milestone.kind.shortLabelFor(snapshot.profile),
+                        ),
                       ),
                   ],
                 ),
@@ -231,29 +457,34 @@ class _CoverageRow extends StatelessWidget {
 }
 
 class _MiniMilestone extends StatelessWidget {
-  const _MiniMilestone({required this.milestone});
+  const _MiniMilestone({required this.milestone, required this.label});
 
   final HermandadSeasonActMilestone milestone;
+  final String label;
 
   Color get _color => switch (milestone.status) {
-    HermandadSeasonActStatus.empty => AppColors.textMuted,
-    HermandadSeasonActStatus.upcoming => AppColors.goldDark,
-    HermandadSeasonActStatus.done => const Color(0xFF2E7D32),
-    HermandadSeasonActStatus.mixed => AppColors.burgundy,
-  };
+        HermandadSeasonActStatus.empty => AppColors.textMuted,
+        HermandadSeasonActStatus.upcoming => AppColors.goldDark,
+        HermandadSeasonActStatus.done => const Color(0xFF2E7D32),
+        HermandadSeasonActStatus.mixed => AppColors.burgundy,
+      };
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Icon(
-          milestone.isFilled ? Icons.check_circle : Icons.radio_button_unchecked,
+          milestone.isFilled
+              ? Icons.check_circle
+              : milestone.hasAny
+                  ? Icons.timelapse
+                  : Icons.radio_button_unchecked,
           size: 16,
           color: _color,
         ),
         const SizedBox(height: 4),
         Text(
-          milestone.kind.shortLabel,
+          label,
           textAlign: TextAlign.center,
           style: JuntaUi.caption(color: AppColors.textPrimary).copyWith(
             fontWeight: FontWeight.w600,

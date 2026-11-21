@@ -21,6 +21,8 @@ export type CalendarEventType =
   | 'via_crucis_consejo'
   | 'evento';
 
+export type SeasonPaso = 'ambos' | 'cristo' | 'virgen';
+
 export interface CalendarEventRow {
   id: string;
   title: string;
@@ -41,6 +43,9 @@ export interface CalendarEventRow {
   createdByHandle: string | null;
   createdAt: string;
   updatedAt: string | null;
+  paso: SeasonPaso;
+  seasonN: number | null;
+  withRetranqueo: boolean;
 }
 
 export interface CalendarEventInput {
@@ -56,6 +61,9 @@ export interface CalendarEventInput {
   organizerLabel?: string | null;
   customIconUrl?: string | null;
   coverImageUrl?: string | null;
+  paso?: SeasonPaso;
+  seasonN?: number | null;
+  withRetranqueo?: boolean;
   /** Solo en create: por defecto published (admin). */
   status?: CalendarEventStatus;
 }
@@ -101,6 +109,28 @@ export function eventTypeLabel(type: string | null | undefined): string {
 
 export function eventTypeCellLabel(type: CalendarEventType): string {
   return CALENDAR_EVENT_TYPES.find((t) => t.value === type)?.cellLabel ?? 'Evento';
+}
+
+export function seasonActDayLabel(input: {
+  eventType: CalendarEventType;
+  paso?: SeasonPaso;
+  seasonN?: number | null;
+  withRetranqueo?: boolean;
+}): string {
+  const pasoBit =
+    input.paso === 'cristo' ? ' Cristo' : input.paso === 'virgen' ? ' Virgen' : '';
+  if (input.eventType === 'ensayo') {
+    const n = input.seasonN;
+    const label = n ? `${n}º ensayo` : 'Ensayo';
+    return `${label}${pasoBit}`.trim();
+  }
+  if (input.eventType === 'iguala') return `Igualá${pasoBit}`.trim();
+  if (input.eventType === 'muda') {
+    return input.withRetranqueo ? 'Muda y retranqueo' : `Muda${pasoBit}`.trim();
+  }
+  if (input.eventType === 'retranqueo') return `Retranqueo${pasoBit}`.trim();
+  if (input.eventType === 'desarma') return 'Desarmá';
+  return '';
 }
 
 /** Tramo del mismo día. `end` vacío = solo hora de inicio. */

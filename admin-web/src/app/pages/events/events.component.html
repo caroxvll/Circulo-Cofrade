@@ -235,6 +235,47 @@
         </select>
       </label>
 
+      @if (showSeasonPaso) {
+        <div>
+          <p class="form-hint">Paso</p>
+          <div class="range-chips">
+            @for (opt of pasoOpts; track opt.id) {
+              <button
+                type="button"
+                class="chip"
+                [class.active]="formPaso === opt.id"
+                (click)="formPaso = opt.id"
+              >
+                {{ opt.label }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+      @if (showEnsayoN) {
+        <div>
+          <p class="form-hint">Qué ensayo es</p>
+          <div class="range-chips">
+            @for (n of ensayoNs; track n) {
+              <button
+                type="button"
+                class="chip"
+                [class.active]="formEnsayoN === n"
+                (click)="formEnsayoN = n"
+              >
+                {{ n }}º ensayo
+              </button>
+            }
+          </div>
+        </div>
+      }
+      @if (showRetranqueo) {
+        <label class="switch-line">
+          <input type="checkbox" [(ngModel)]="formWithRetranqueo" />
+          Incluye retranqueo el mismo día
+        </label>
+      }
+
       <label>
         Título
         <input [(ngModel)]="formTitle" maxlength="120" placeholder="Nombre del evento" />

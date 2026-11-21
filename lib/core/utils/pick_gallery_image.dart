@@ -20,11 +20,13 @@ class GalleryImage {
 /// Abre la galería de fotos, no el explorador de archivos.
 Future<GalleryImage?> pickGalleryImage({
   double maxWidth = 2400,
+  double maxHeight = 2400,
   int imageQuality = 85,
 }) async {
   final file = await ImagePicker().pickImage(
     source: ImageSource.gallery,
     maxWidth: maxWidth,
+    maxHeight: maxHeight,
     imageQuality: imageQuality,
   );
   if (file == null) return null;

@@ -42,8 +42,6 @@ class EditorialPhotoStack extends StatelessWidget {
   final List<ImageProvider> providers;
   final VoidCallback? onTap;
 
-  static const _blush = Color(0xFFF6E8E6);
-
   @override
   Widget build(BuildContext context) {
     if (providers.isEmpty) return const SizedBox.shrink();
@@ -51,47 +49,52 @@ class EditorialPhotoStack extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final cardW = width * 0.68;
+        final cardW = width * 0.72;
         final cardH = cardW * 1.18;
         final shown = providers.length > 3 ? 3 : providers.length;
+        final fan = width * 0.05;
         final pile = SizedBox(
-          height: cardH + 100,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 30, 14, 24),
-            child: Stack(
-              alignment: Alignment.center,
-              clipBehavior: Clip.none,
-              children: [
-                if (shown >= 3)
+          height: cardH + 36,
+          width: width,
+          child: Center(
+            child: SizedBox(
+              width: cardW + fan * 2,
+              height: cardH + 20,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  if (shown >= 3)
+                    _placed(
+                      providers[2],
+                      cardW: cardW,
+                      cardH: cardH,
+                      angle: -0.07,
+                      offset: Offset(-fan, 6),
+                    ),
+                  if (shown >= 2)
+                    _placed(
+                      providers[1],
+                      cardW: cardW,
+                      cardH: cardH,
+                      angle: 0.08,
+                      offset: Offset(fan, -6),
+                    ),
                   _placed(
-                    providers[2],
+                    providers[0],
                     cardW: cardW,
                     cardH: cardH,
-                    angle: -0.08,
-                    offset: Offset(-width * 0.06, 8),
+                    angle: -0.01,
+                    offset: Offset.zero,
                   ),
-                if (shown >= 2)
-                  _placed(
-                    providers[1],
-                    cardW: cardW,
-                    cardH: cardH,
-                    angle: 0.085,
-                    offset: Offset(width * 0.07, -8),
-                  ),
-                _placed(
-                  providers[0],
-                  cardW: cardW,
-                  cardH: cardH,
-                  angle: -0.012,
-                  offset: const Offset(0, 10),
-                ),
-                if (providers.length > 1)
-                  Positioned(
-                    right: 2,
-                    bottom: 0,
-                    child: _CountBadge(count: providers.length),
-                  ),
-              ],
+                  if (providers.length > 1)
+                    Positioned(
+                      right: 10,
+                      bottom: 10,
+                      child: _CountBadge(count: providers.length),
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -100,12 +103,15 @@ class EditorialPhotoStack extends StatelessWidget {
           button: onTap != null,
           label: providers.length > 1 ? '${providers.length} fotos' : 'Foto',
           child: Material(
-            color: _blush,
-            borderRadius: BorderRadius.circular(28),
-            clipBehavior: Clip.antiAlias,
+            color: Colors.transparent,
             child: onTap == null
                 ? pile
-                : InkWell(onTap: onTap, child: pile),
+                : InkWell(
+                    onTap: onTap,
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    child: pile,
+                  ),
           ),
         );
       },

@@ -222,6 +222,9 @@ class HermandadScheduledCalendar {
     this.coverImageUrl,
     this.customIconUrl,
     this.organizerLabel,
+    this.paso,
+    this.seasonNumber,
+    this.withRetranqueo = false,
   });
 
   final String eventType;
@@ -231,6 +234,9 @@ class HermandadScheduledCalendar {
   final String? coverImageUrl;
   final String? customIconUrl;
   final String? organizerLabel;
+  final String? paso;
+  final int? seasonNumber;
+  final bool withRetranqueo;
 
   Map<String, dynamic> get columns => {
         'calendar_event_type': eventType,
@@ -240,6 +246,9 @@ class HermandadScheduledCalendar {
         'calendar_cover_image_url': coverImageUrl?.trim(),
         'calendar_custom_icon_url': customIconUrl?.trim(),
         'calendar_organizer_label': organizerLabel?.trim(),
+        'calendar_paso': paso ?? 'ambos',
+        'calendar_season_n': ?seasonNumber,
+        'calendar_with_retranqueo': withRetranqueo,
       };
 }
 

@@ -92,6 +92,7 @@ class CalendarRepository {
       EventType.iguala,
       EventType.ensayo,
       EventType.muda,
+      EventType.retranqueo,
       EventType.desarma,
     };
 
@@ -111,7 +112,10 @@ class CalendarRepository {
         .from('calendar_events')
         .select('*, profiles!created_by(handle, display_name)')
         .eq('status', 'published')
-        .inFilter('event_type', const ['iguala', 'ensayo', 'muda', 'desarma'])
+        .inFilter(
+          'event_type',
+          const ['iguala', 'ensayo', 'muda', 'retranqueo', 'desarma'],
+        )
         .gte('starts_at', start.toUtc().toIso8601String())
         .lt('starts_at', end.toUtc().toIso8601String())
         .order('starts_at', ascending: true);
@@ -193,6 +197,9 @@ class CalendarRepository {
     List<EventTimeSlot>? timeSlots,
     String? sourceReplyId,
     String? status,
+    SeasonPaso paso = SeasonPaso.ambos,
+    int? seasonNumber,
+    bool withRetranqueo = false,
   }) async {
     if (_client == null) throw CalendarRemoteUnavailableException();
 
@@ -217,6 +224,9 @@ class CalendarRepository {
           'created_by': userId,
           'source_reply_id': ?sourceReplyId,
           'status': ?status,
+          'paso': paso.dbValue,
+          'season_n': ?seasonNumber,
+          'with_retranqueo': withRetranqueo,
         })
         .select('*, profiles!created_by(handle, display_name)')
         .single();
@@ -241,6 +251,9 @@ class CalendarRepository {
     String? coverImageUrl,
     String? admissionLabel,
     List<EventTimeSlot>? timeSlots,
+    SeasonPaso paso = SeasonPaso.ambos,
+    int? seasonNumber,
+    bool withRetranqueo = false,
   }) async {
     if (_client == null) throw CalendarRemoteUnavailableException();
 
@@ -257,6 +270,9 @@ class CalendarRepository {
       'cover_image_url': coverImageUrl ?? '',
       'admission_label': _admissionOrNull(admissionLabel),
       'time_slots': _slotsPayload(timeSlots),
+      'paso': paso.dbValue,
+      'season_n': seasonNumber,
+      'with_retranqueo': withRetranqueo,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
     if (clearHermandadTopicId) {
@@ -843,6 +859,9 @@ class CalendarRepository {
       viewCount: row['view_count'] as int? ?? 0,
       admissionLabel: _admissionOrNull(row['admission_label'] as String?),
       slots: EventTimeSlot.listFrom(row['time_slots']),
+      paso: SeasonPaso.fromDb(row['paso'] as String?),
+      seasonNumber: (row['season_n'] as num?)?.toInt(),
+      withRetranqueo: row['with_retranqueo'] == true,
     );
   }
 

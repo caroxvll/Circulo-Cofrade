@@ -54,6 +54,12 @@ const hermandadPublishKinds = <HermandadPublishKind>[
     calendarEventType: 'muda',
   ),
   HermandadPublishKind(
+    id: 'retranqueo',
+    label: 'Retranqueo',
+    officialCategory: 'acto',
+    calendarEventType: 'retranqueo',
+  ),
+  HermandadPublishKind(
     id: 'desarma',
     label: 'Desarma',
     officialCategory: 'acto',

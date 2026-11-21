@@ -19,6 +19,8 @@ import '../../auth/auth_provider.dart';
 import '../../auth/email_verification_gate.dart';
 import '../../permissions/permissions_provider.dart';
 import '../../profile/profile_provider.dart';
+import '../../forums/hermandad_season_acts_provider.dart';
+import '../../forums/utils/hermandad_season_profile.dart';
 import '../calendar_provider.dart';
 import '../data/calendar_repository.dart';
 import '../utils/calendar_event_utils.dart';
@@ -148,6 +150,14 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   bool get _isEditing => widget.existing?.id != null;
   TimeOfDay? _firstEnd;
   final List<({TimeOfDay start, TimeOfDay? end})> _extraSlots = [];
+  SeasonPaso _paso = SeasonPaso.ambos;
+  var _ensayoN = 1;
+  var _withRetranqueo = false;
+
+  bool get _showSeasonPaso =>
+      _type == EventType.iguala || _type == EventType.ensayo;
+  bool get _showEnsayoN => _type == EventType.ensayo;
+  bool get _showRetranqueo => _type == EventType.muda;
 
   @override
   void initState() {
@@ -176,6 +186,9 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               minute: int.tryParse(parts[1]) ?? 0,
             )
           : const TimeOfDay(hour: 12, minute: 0);
+      _paso = existing.paso;
+      _ensayoN = existing.seasonNumber ?? 1;
+      _withRetranqueo = existing.withRetranqueo;
       if (existing.slots.isNotEmpty) {
         final first = existing.slots.first;
         _time = _timeFromClock(first.start) ?? _time;
@@ -306,6 +319,111 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       time: _time,
       onAdjusted: (adjusted) => _time = adjusted,
     );
+  }
+
+  HermandadSeasonProfile _seasonProfile() {
+    final topicId = _hermandadTopicId?.trim();
+    if (topicId == null || topicId.isEmpty) {
+      return HermandadSeasonProfile.defaults;
+    }
+    return ref.watch(hermandadSeasonProfileProvider(topicId)).asData?.value ??
+        HermandadSeasonProfile.defaults;
+  }
+
+  String _seasonAwareDayLabel() {
+    final extra = seasonActDayLabel(
+      typeDb: _type.dbValue,
+      paso: _paso,
+      seasonN: _type == EventType.ensayo ? _ensayoN : null,
+      withRetranqueo: _type == EventType.muda && _withRetranqueo,
+    );
+    if (extra.isNotEmpty) return extra;
+    return _type.cellLabel;
+  }
+
+  int? get _seasonNumber => _type == EventType.ensayo ? _ensayoN : null;
+  bool get _seasonRetranqueo => _type == EventType.muda && _withRetranqueo;
+
+  List<Widget> _seasonActFields() {
+    final profile = _seasonProfile();
+    final topicId = _hermandadTopicId?.trim();
+    final linked = topicId != null && topicId.isNotEmpty;
+    final ensayoMax = (linked ? profile.ensayoCount : 8).clamp(1, 8);
+    final showRetr = _showRetranqueo &&
+        (!linked || profile.mudaMode != MudaRetranqueoMode.mudaOnly);
+    if (!_showSeasonPaso && !_showEnsayoN && !showRetr) {
+      return const [];
+    }
+
+    return [
+      const SizedBox(height: 12),
+      if (_showSeasonPaso) ...[
+        Text(
+          'Paso',
+          style: AppTypography.labelSmall(color: AppColors.goldDark)
+              .copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final paso in SeasonPaso.values)
+              ChoiceChip(
+                label: Text(paso.shortLabel),
+                selected: _paso == paso,
+                onSelected: _submitting
+                    ? null
+                    : (_) => setState(() => _paso = paso),
+                selectedColor: AppColors.goldPale,
+              ),
+          ],
+        ),
+      ],
+      if (_showEnsayoN) ...[
+        const SizedBox(height: 10),
+        Text(
+          'Qué ensayo es',
+          style: AppTypography.labelSmall(color: AppColors.goldDark)
+              .copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (var n = 1; n <= ensayoMax; n++)
+              ChoiceChip(
+                label: Text(ordinalEnsayo(n)),
+                selected: _ensayoN == n,
+                onSelected: _submitting
+                    ? null
+                    : (_) => setState(() => _ensayoN = n),
+                selectedColor: AppColors.goldPale,
+              ),
+          ],
+        ),
+      ],
+      if (showRetr)
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          activeThumbColor: AppColors.burgundy,
+          title: Text(
+            'Incluye retranqueo',
+            style: AppTypography.bodyMedium(color: AppColors.textPrimary)
+                .copyWith(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          subtitle: Text(
+            profile.mudaMode == MudaRetranqueoMode.withRetranqueo
+                ? 'El mismo día. Cierra el check de muda y retranqueo.'
+                : 'Márcalo si retranqueáis el mismo día.',
+            style: AppTypography.bodyMedium(color: AppColors.textSecondary)
+                .copyWith(fontSize: 12),
+          ),
+          value: _withRetranqueo,
+          onChanged: _submitting
+              ? null
+              : (value) => setState(() => _withRetranqueo = value),
+        ),
+    ];
   }
 
   @override
@@ -675,7 +793,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           subtitle: subtitle,
           type: _type,
           startsAt: _startsAt,
-          dayLabel: _type.cellLabel,
+          dayLabel: _seasonAwareDayLabel(),
           location: location,
           organizerLabel: organizer,
           hermandadTopicId: hermandadId,
@@ -684,6 +802,9 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           coverImageUrl: coverImageUrl,
           admissionLabel: admission,
           timeSlots: slots,
+          paso: _paso,
+          seasonNumber: _seasonNumber,
+          withRetranqueo: _seasonRetranqueo,
         );
       } else {
         await repo.createEvent(
@@ -692,7 +813,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           subtitle: subtitle,
           type: _type,
           startsAt: _startsAt,
-          dayLabel: _type.cellLabel,
+          dayLabel: _seasonAwareDayLabel(),
           location: location,
           organizerLabel: organizer,
           hermandadTopicId: hermandadId,
@@ -701,6 +822,9 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           coverImageUrl: coverImageUrl,
           admissionLabel: admission,
           timeSlots: slots,
+          paso: _paso,
+          seasonNumber: _seasonNumber,
+          withRetranqueo: _seasonRetranqueo,
         );
       }
 
@@ -791,7 +915,14 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               items: EventType.values
                   .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
                   .toList(),
-              onChanged: _submitting ? null : (v) => setState(() => _type = v!),
+              onChanged: _submitting
+                  ? null
+                  : (v) => setState(() {
+                        _type = v!;
+                        if (_type != EventType.muda) {
+                          _withRetranqueo = false;
+                        }
+                      }),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -819,6 +950,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
                 label: const Text('Elegir hermandad'),
               ),
             ),
+            ..._seasonActFields(),
             const SizedBox(height: 12),
             _IconPickerSection(
               type: _type,

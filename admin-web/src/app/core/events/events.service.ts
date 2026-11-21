@@ -10,8 +10,10 @@ import {
   CalendarEventType,
   EventLiveForceState,
   OrganizerLogo,
+  SeasonPaso,
   eventTypeCellLabel,
   parseTimeSlots,
+  seasonActDayLabel,
 } from './events.models';
 
 @Injectable({ providedIn: 'root' })
@@ -28,7 +30,7 @@ export class EventsService {
     let req = getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
+        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)',
       )
       .limit(limit);
 
@@ -90,7 +92,7 @@ export class EventsService {
         status: input.status ?? 'published',
       })
       .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
+        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)',
       )
       .single();
     if (error) throw error;
@@ -108,7 +110,7 @@ export class EventsService {
       })
       .eq('id', eventId)
       .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, profiles!created_by(handle)',
+        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)',
       )
       .single();
     if (error) throw error;
@@ -229,19 +231,34 @@ export class EventsService {
         : input.endsAt
           ? new Date(input.endsAt).toISOString()
           : null;
+    const isEnsayo = type === 'ensayo';
+    const isMuda = type === 'muda';
+    const seasonLabel = seasonActDayLabel({
+      eventType: type,
+      paso: input.paso,
+      seasonN: isEnsayo ? input.seasonN : null,
+      withRetranqueo: isMuda && input.withRetranqueo,
+    });
     return {
       title: input.title.trim(),
       subtitle: input.subtitle.trim(),
       event_type: type,
       starts_at: new Date(input.startsAt).toISOString(),
       ...(endsAt !== undefined ? { ends_at: endsAt } : {}),
-      day_label: (input.dayLabel?.trim() || eventTypeCellLabel(type)).trim(),
+      day_label: (
+        input.dayLabel?.trim() ||
+        seasonLabel ||
+        eventTypeCellLabel(type)
+      ).trim(),
       location: (input.location ?? '').trim(),
       admission_label: emptyToNull(input.admissionLabel),
       time_slots: normalizeSlots(input.timeSlots),
       organizer_label: (input.organizerLabel ?? '').trim(),
       custom_icon_url: (input.customIconUrl ?? '').trim(),
       cover_image_url: (input.coverImageUrl ?? '').trim(),
+      paso: input.paso ?? 'ambos',
+      season_n: isEnsayo ? (input.seasonN ?? 1) : null,
+      with_retranqueo: isMuda && input.withRetranqueo === true,
     };
   }
 
@@ -302,6 +319,9 @@ export class EventsService {
       createdByHandle: profiles?.handle ?? null,
       createdAt: String(row['created_at'] ?? ''),
       updatedAt: (row['updated_at'] as string | null) ?? null,
+      paso: parsePaso(row['paso']),
+      seasonN: (row['season_n'] as number | null) ?? null,
+      withRetranqueo: row['with_retranqueo'] === true,
     };
   }
 }
@@ -321,6 +341,10 @@ function emptyToNull(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
   return trimmed;
+}
+
+function parsePaso(raw: unknown): SeasonPaso {
+  return raw === 'cristo' || raw === 'virgen' ? raw : 'ambos';
 }
 
 function startOfLocalDayIso(): string {

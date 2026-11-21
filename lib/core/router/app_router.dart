@@ -325,6 +325,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                   state: state,
                   child: HistoriaReaderScreen(
                     historiaId: state.pathParameters['historiaId']!,
+                    resumePage: int.tryParse(
+                      state.uri.queryParameters['p'] ?? '',
+                    ),
                   ),
                 ),
               ),
