@@ -24,9 +24,14 @@ const _paper = Color(0xFFFBF6EA);
 const _desk = Color(0xFFE4D2B8);
 
 class HistoriaReaderScreen extends ConsumerWidget {
-  const HistoriaReaderScreen({super.key, required this.historiaId});
+  const HistoriaReaderScreen({
+    super.key,
+    required this.historiaId,
+    this.resumePage,
+  });
 
   final String historiaId;
+  final int? resumePage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -49,19 +54,21 @@ class HistoriaReaderScreen extends ConsumerWidget {
             body: const Center(child: Text('Esta obra ya no está.')),
           );
         }
-        if (!progress.hasValue && !progress.hasError) {
+        if (resumePage == null &&
+            !progress.hasValue &&
+            !progress.hasError) {
           return const Scaffold(
             backgroundColor: _desk,
             body: Center(child: CircularProgressIndicator()),
           );
         }
         final startPage = clampHistoriaResumePage(
-          progress.asData?.value ?? 0,
+          resumePage ?? progress.asData?.value ?? 0,
           historia.pages.length,
         );
         return _BookReader(
           key: ValueKey(
-            '${historia.id}|${historia.title}|${historia.coverImageUrl}|'
+            '${historia.id}|$startPage|${historia.title}|${historia.coverImageUrl}|'
             '${historia.pages.map((p) => '${p.body.length}:${p.imageUrl}').join(',')}',
           ),
           historia: historia,
@@ -99,10 +106,8 @@ class _BookReaderState extends ConsumerState<_BookReader>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     if (widget.initialPage > 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await Future<void>.delayed(const Duration(milliseconds: 80));
-        if (!mounted) return;
-        _flip.goToPage(widget.initialPage);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_jumpToSavedPage());
       });
     }
   }
@@ -138,6 +143,16 @@ class _BookReaderState extends ConsumerState<_BookReader>
     });
   }
 
+  Future<void> _jumpToSavedPage() async {
+    final target = widget.initialPage;
+    if (target <= 0) return;
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    if (!mounted) return;
+    _flip.goToPage(target);
+    currentPage.value = -1;
+    if (mounted) setState(() => _page = target);
+  }
+
   Future<void> _persist(int page) async {
     try {
       final repo = ref.read(historiasRepositoryProvider);
@@ -148,6 +163,7 @@ class _BookReaderState extends ConsumerState<_BookReader>
         pageCount: historia.pages.length,
       );
       container.invalidate(continueReadingProvider);
+      container.invalidate(historiaReadingPageProvider(historia.id));
     } catch (_) {}
   }
 
@@ -182,7 +198,7 @@ class _BookReaderState extends ConsumerState<_BookReader>
                 controller: _flip,
                 backgroundColor: _paper,
                 duration: const Duration(milliseconds: 520),
-                initialIndex: widget.initialPage,
+                initialIndex: 0,
                 onPageFlipped: _onFlipped,
                 lastPage: _ColophonPage(
                   historia: historia,
@@ -294,7 +310,11 @@ class _CoverLeaf extends StatelessWidget {
     return ColoredBox(
       color: const Color(0xFF3A1A16),
       child: cover != null && cover.isNotEmpty
-          ? CofradeoNetworkImage(url: cover, fit: BoxFit.cover)
+          ? CofradeoNetworkImage(
+              url: cover,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+            )
           : _TitlePage(historia: historia),
     );
   }
@@ -410,33 +430,38 @@ class _PaperLeaf extends StatelessWidget {
   Widget build(BuildContext context) {
     final imageUrl = page.imageUrl?.trim();
     final caption = page.caption?.trim();
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
     return ColoredBox(
       color: _paper,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(26, 32, 26, 36),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 28, 22, 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (imageUrl != null && imageUrl.isNotEmpty) ...[
-              CofradeoNetworkImage(
-                url: imageUrl,
-                fit: BoxFit.cover,
-                height: 210,
-              ),
-              if (caption != null && caption.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  caption,
-                  textAlign: TextAlign.center,
-                  style: AppTypography.bookCaption(),
+            if (hasImage) ...[
+              Expanded(
+                flex: page.hasText ? 5 : 8,
+                child: _PagePicture(
+                  url: imageUrl,
+                  caption: caption,
                 ),
-              ],
-              const SizedBox(height: 20),
+              ),
+              if (page.hasText) const SizedBox(height: 14),
             ],
             if (page.hasText)
-              dropCap
-                  ? _DropCapText(page.body)
-                  : Text(page.body, style: AppTypography.bookBody()),
+              Expanded(
+                flex: hasImage ? 5 : 8,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: dropCap
+                      ? _DropCapText(page.body)
+                      : Text(
+                          page.body,
+                          style: AppTypography.bookBody(),
+                          overflow: TextOverflow.fade,
+                        ),
+                ),
+              ),
           ],
         ),
       ),
@@ -527,6 +552,41 @@ class _ColophonPage extends StatelessWidget {
   }
 }
 
+class _PagePicture extends StatelessWidget {
+  const _PagePicture({required this.url, this.caption});
+
+  final String url;
+  final String? caption;
+
+  @override
+  Widget build(BuildContext context) {
+    final note = caption?.trim();
+    return Column(
+      children: [
+        Expanded(
+          child: SizedBox.expand(
+            child: CofradeoNetworkImage(
+              url: url,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+            ),
+          ),
+        ),
+        if (note != null && note.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            note,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.bookCaption(),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _DropCapText extends StatelessWidget {
   const _DropCapText(this.body);
 
@@ -553,6 +613,7 @@ class _DropCapText extends StatelessWidget {
           TextSpan(text: rest, style: AppTypography.bookBody()),
         ],
       ),
+      overflow: TextOverflow.fade,
     );
   }
 }

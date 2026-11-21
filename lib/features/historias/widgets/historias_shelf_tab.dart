@@ -375,6 +375,7 @@ class _ContinueReadingRow extends ConsumerWidget {
                         width: 108,
                         showMeta: false,
                         readingProgress: item.fraction,
+                        resumePage: item.mark.page,
                       ),
                       const SizedBox(height: 8),
                       Text(

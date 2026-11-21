@@ -1,25 +1,33 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
   CommunityService,
+  HERMANDAD_DIRECTORY_DAYS,
   HermandadAssignment,
   HermandadTopicOption,
   parseHermandadTopicTitle,
 } from '../../core/community/community.service';
 import { getSupabase } from '../../core/supabase.client';
 import {
+  DEFAULT_SEASON_PROFILE,
+  HermandadSeasonProfile,
+  MudaRetranqueoMode,
   SeasonActEvent,
   SeasonActsSnapshot,
+  SeasonPaso,
   SEASON_ACT_DB_TYPES,
   buildSeasonActsSnapshot,
   currentSeasonActsYear,
+  filterSeasonActsSnapshots,
+  hermandadDayShortLabel,
   seasonActsRange,
 } from '../../core/hermandad/season-acts';
 
 @Component({
   selector: 'app-season-acts-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, FormsModule],
   templateUrl: './season-acts.component.html',
   styleUrl: './season-acts.component.scss',
 })
@@ -30,19 +38,37 @@ export class SeasonActsPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly rows = signal<SeasonActsSnapshot[]>([]);
+  readonly query = signal('');
+  readonly dayFilter = signal<string | null>(null);
+  readonly stationDays = HERMANDAD_DIRECTORY_DAYS;
+  readonly shortDayLabel = hermandadDayShortLabel;
+
+  readonly filteredRows = computed(() =>
+    filterSeasonActsSnapshots(this.rows(), this.query(), this.dayFilter()),
+  );
 
   readonly missingAccount = computed(() =>
-    this.rows().filter((r) => !r.hasAccount),
+    this.filteredRows().filter((r) => !r.hasAccount),
   );
   readonly emptyActs = computed(() =>
-    this.rows().filter((r) => r.hasAccount && r.isEmpty),
+    this.filteredRows().filter((r) => r.hasAccount && r.isEmpty),
   );
   readonly partial = computed(() =>
-    this.rows().filter((r) => r.hasAccount && !r.isEmpty && !r.isComplete),
+    this.filteredRows().filter((r) => r.hasAccount && !r.isEmpty && !r.isComplete),
   );
   readonly complete = computed(() =>
-    this.rows().filter((r) => r.hasAccount && r.isComplete),
+    this.filteredRows().filter((r) => r.hasAccount && r.isComplete),
   );
+
+  readonly dayCounts = computed(() => {
+    const counts = new Map<string, number>();
+    for (const row of this.rows()) {
+      const key = row.processionDay ?? '';
+      if (!key) continue;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  });
 
   ngOnInit(): void {
     void this.reload();
@@ -52,12 +78,13 @@ export class SeasonActsPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [topics, assignments, events] = await Promise.all([
+      const [topics, assignments, events, profiles] = await Promise.all([
         this.community.fetchHermandadBoardTopics(),
         this.community.fetchHermandadAssignments(),
         this.fetchSeasonActEvents(),
+        this.fetchSeasonProfiles(),
       ]);
-      this.rows.set(this.buildRows(topics, assignments, events));
+      this.rows.set(this.buildRows(topics, assignments, events, profiles));
     } catch (err) {
       this.error.set(
         err instanceof Error
@@ -73,7 +100,9 @@ export class SeasonActsPageComponent implements OnInit {
     const range = seasonActsRange(this.year);
     const { data, error } = await getSupabase()
       .from('calendar_events')
-      .select('id, title, starts_at, event_type, created_by, organizer_label')
+      .select(
+        'id, title, starts_at, event_type, created_by, organizer_label, paso, season_n, with_retranqueo',
+      )
       .eq('status', 'published')
       .in('event_type', [...SEASON_ACT_DB_TYPES])
       .gte('starts_at', range.fromIso)
@@ -88,13 +117,49 @@ export class SeasonActsPageComponent implements OnInit {
       eventType: String(row['event_type'] ?? ''),
       createdBy: (row['created_by'] as string | null) ?? null,
       organizerLabel: (row['organizer_label'] as string | null) ?? null,
+      paso: (row['paso'] as SeasonPaso | null) ?? 'ambos',
+      seasonN: (row['season_n'] as number | null) ?? null,
+      withRetranqueo: row['with_retranqueo'] === true,
     }));
+  }
+
+  private async fetchSeasonProfiles(): Promise<Map<string, HermandadSeasonProfile>> {
+    try {
+      const { data, error } = await getSupabase()
+        .from('hermandad_season_profile')
+        .select('topic_id, iguala_split, ensayo_split, ensayo_count, muda_mode');
+      if (error) return new Map();
+      return new Map(
+        (data ?? []).map((row) => {
+          const mode = String(row['muda_mode'] ?? 'muda_only') as MudaRetranqueoMode;
+          const profile: HermandadSeasonProfile = {
+            igualaSplit: row['iguala_split'] === true,
+            ensayoSplit: row['ensayo_split'] === true,
+            ensayoCount: Number(row['ensayo_count'] ?? 1) || 1,
+            mudaMode:
+              mode === 'with_retranqueo' || mode === 'split' ? mode : 'muda_only',
+          };
+          return [String(row['topic_id']), profile] as const;
+        }),
+      );
+    } catch {
+      return new Map();
+    }
+  }
+
+  setDayFilter(day: string | null): void {
+    this.dayFilter.set(day);
+  }
+
+  countForDay(day: string): number {
+    return this.dayCounts().get(day) ?? 0;
   }
 
   private buildRows(
     topics: HermandadTopicOption[],
     assignments: HermandadAssignment[],
     events: SeasonActEvent[],
+    profiles: Map<string, HermandadSeasonProfile>,
   ): SeasonActsSnapshot[] {
     const profileByTopic = new Map(
       assignments.map((a) => [a.topicId, a.profileId] as const),
@@ -111,7 +176,9 @@ export class SeasonActsPageComponent implements OnInit {
         events,
         topicId: topic.id,
         profileId,
+        processionDay: parsed.processionDay,
         hasAccount: profileId != null,
+        profile: profiles.get(topic.id) ?? DEFAULT_SEASON_PROFILE,
       });
     });
 

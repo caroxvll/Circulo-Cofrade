@@ -112,6 +112,42 @@
             />
           </label>
         </div>
+        @if (kindId === 'iguala' || kindId === 'ensayo') {
+          <div class="chips" style="margin-top: 10px">
+            @for (opt of pasoOpts; track opt.id) {
+              <button
+                type="button"
+                class="chip"
+                [class.on]="paso === opt.id"
+                (click)="paso = opt.id"
+              >
+                {{ opt.label }}
+              </button>
+            }
+          </div>
+        }
+        @if (kindId === 'ensayo') {
+          <div class="chips" style="margin-top: 8px">
+            @for (n of ensayoNs; track n) {
+              @if (n <= ensayoCount) {
+                <button
+                  type="button"
+                  class="chip"
+                  [class.on]="ensayoN === n"
+                  (click)="ensayoN = n"
+                >
+                  {{ n }}º ensayo
+                </button>
+              }
+            }
+          </div>
+        }
+        @if (kindId === 'muda') {
+          <label class="switch-line" style="margin-top: 10px">
+            <input type="checkbox" [(ngModel)]="withRetranqueo" />
+            <span>Incluye retranqueo el mismo día</span>
+          </label>
+        }
       }
 
       <label class="field">

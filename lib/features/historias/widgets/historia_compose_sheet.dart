@@ -14,6 +14,7 @@ import '../../permissions/permissions_provider.dart';
 import '../data/historias_repository.dart';
 import '../historias_provider.dart';
 import '../models/historia.dart';
+import '../utils/historia_page_limits.dart';
 
 Future<bool> showHistoriaPublishSheet(
   BuildContext context, {
@@ -238,6 +239,13 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
                 ..imageUrl = page.imageUrl,
             )
             .toList();
+    for (final page in _pages) {
+      page.body.addListener(_onDraftChanged);
+    }
+  }
+
+  void _onDraftChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -251,7 +259,11 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
   }
 
   Future<void> _pickCover() async {
-    final image = await pickGalleryImage(maxWidth: 1600, imageQuality: 88);
+    final image = await pickGalleryImage(
+      maxWidth: 1800,
+      maxHeight: 1800,
+      imageQuality: 88,
+    );
     if (image == null || !mounted) return;
     setState(() {
       _coverBytes = image.bytes;
@@ -262,7 +274,8 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
 
   void _addPage() {
     if (_pages.length >= 30) return;
-    setState(() => _pages.add(_PageDraft()));
+    final page = _PageDraft()..body.addListener(_onDraftChanged);
+    setState(() => _pages.add(page));
   }
 
   void _removePage(int index) {
@@ -274,7 +287,11 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
   }
 
   Future<void> _pickPageImage(int index) async {
-    final image = await pickGalleryImage(maxWidth: 1600, imageQuality: 88);
+    final image = await pickGalleryImage(
+      maxWidth: 1800,
+      maxHeight: 1800,
+      imageQuality: 88,
+    );
     if (image == null || !mounted) return;
     setState(() {
       _pages[index].imageBytes = image.bytes;
@@ -301,6 +318,21 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
 
   Future<void> _save({required String status}) async {
     if (_saving) return;
+    for (final page in _pages) {
+      final max = historiaPageWordLimit(hasImage: page.hasImage);
+      final words = countHistoriaWords(page.body.text);
+      if (words > max) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Una hoja se pasa ($words de $max palabras). '
+              'Parte el texto en otra página para que quepa sin scroll.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
     setState(() => _saving = true);
     final repo = ref.read(historiasRepositoryProvider);
     try {
@@ -538,10 +570,11 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
               enabled: !_saving,
               maxLines: 8,
               minLines: 5,
-              maxLength: 3500,
               style: AppTypography.bookBody(),
               decoration: InputDecoration(
                 hintText: 'Escribe esta página…',
+                helperText: _pageWordHelper(_pages[i]),
+                helperMaxLines: 2,
                 filled: true,
                 fillColor: const Color(0xFFF7F1E6),
                 border: OutlineInputBorder(
@@ -560,6 +593,7 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
             ),
             const SizedBox(height: 8),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 OutlinedButton.icon(
                   onPressed: _saving ? null : () => _pickPageImage(i),
@@ -573,20 +607,25 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
                 ),
                 if (_pages[i].hasImage) ...[
                   const SizedBox(width: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: SizedBox(
-                      width: 56,
-                      height: 56,
-                      child: _pages[i].imageBytes != null
-                          ? Image.memory(
-                              _pages[i].imageBytes!,
-                              fit: BoxFit.cover,
-                            )
-                          : CofradeoNetworkImage(
-                              url: _pages[i].imageUrl!,
-                              fit: BoxFit.cover,
-                            ),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: 132,
+                      maxHeight: 132,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: ColoredBox(
+                        color: const Color(0xFF3A1A16),
+                        child: _pages[i].imageBytes != null
+                            ? Image.memory(
+                                _pages[i].imageBytes!,
+                                fit: BoxFit.contain,
+                              )
+                            : CofradeoNetworkImage(
+                                url: _pages[i].imageUrl!,
+                                fit: BoxFit.contain,
+                              ),
+                      ),
                     ),
                   ),
                   IconButton(
@@ -712,18 +751,31 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
     );
   }
 
+  String _pageWordHelper(_PageDraft page) {
+    final max = historiaPageWordLimit(hasImage: page.hasImage);
+    final words = countHistoriaWords(page.body.text);
+    final hint = historiaPageWordHint(hasImage: page.hasImage);
+    return '$words / $max palabras. $hint';
+  }
+
   Widget _coverPreview() {
     if (_coverBytes != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.memory(_coverBytes!, fit: BoxFit.cover),
+        child: ColoredBox(
+          color: const Color(0xFF3A1A16),
+          child: Image.memory(_coverBytes!, fit: BoxFit.contain),
+        ),
       );
     }
     final url = _existingCoverUrl?.trim();
     if (url != null && url.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: CofradeoNetworkImage(url: url, fit: BoxFit.cover),
+        child: ColoredBox(
+          color: const Color(0xFF3A1A16),
+          child: CofradeoNetworkImage(url: url, fit: BoxFit.contain),
+        ),
       );
     }
     return Column(

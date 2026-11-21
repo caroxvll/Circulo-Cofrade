@@ -5,6 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../hermandad_season_acts_provider.dart';
 import '../utils/hermandad_season_acts.dart';
+import '../utils/hermandad_season_profile.dart';
+import 'hermandad_season_profile_sheet.dart';
 import 'reply_compose_sheet.dart';
 
 /// Línea de temporada: igualá → ensayos → muda → desarmá.
@@ -35,6 +37,22 @@ class HermandadSeasonActsCard extends ConsumerWidget {
         snapshot: snapshot,
         canPublish: canPublish,
         onPublish: (kind) => _publishKind(context, ref, kind),
+        onConfigure: canPublish
+            ? () async {
+                final saved = await showHermandadSeasonProfileSheet(
+                  context,
+                  topicId: topicId,
+                  hermandadName: snapshot.hermandadName,
+                );
+                if (saved) {
+                  ref.invalidate(
+                    hermandadSeasonActsProvider(
+                      (topicId: topicId, title: topicTitle),
+                    ),
+                  );
+                }
+              }
+            : null,
       ),
     );
   }
@@ -42,20 +60,22 @@ class HermandadSeasonActsCard extends ConsumerWidget {
   Future<void> _publishKind(
     BuildContext context,
     WidgetRef ref,
-    HermandadSeasonActKind kind,
-  ) async {
-    final publishId = switch (kind) {
-      HermandadSeasonActKind.iguala => 'iguala',
-      HermandadSeasonActKind.ensayos => 'ensayo',
-      HermandadSeasonActKind.muda => 'muda',
-      HermandadSeasonActKind.desarma => 'desarma',
-    };
+    HermandadSeasonActKind kind, {
+    String? publishId,
+  }) async {
+    final id = publishId ??
+        switch (kind) {
+          HermandadSeasonActKind.iguala => 'iguala',
+          HermandadSeasonActKind.ensayos => 'ensayo',
+          HermandadSeasonActKind.muda => 'muda',
+          HermandadSeasonActKind.desarma => 'desarma',
+        };
     await showReplyComposeSheet(
       context,
       ref,
       forumId: forumId,
       topicId: topicId,
-      initialOfficialCategory: publishId,
+      initialOfficialCategory: id,
     );
   }
 }
@@ -65,11 +85,13 @@ class _SeasonActsBody extends StatelessWidget {
     required this.snapshot,
     required this.canPublish,
     required this.onPublish,
+    this.onConfigure,
   });
 
   final HermandadSeasonActsSnapshot snapshot;
   final bool canPublish;
   final ValueChanged<HermandadSeasonActKind> onPublish;
+  final VoidCallback? onConfigure;
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +133,7 @@ class _SeasonActsBody extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Igualá, ensayos, muda y desarmá',
+                      'Igualá, ensayos, ${snapshot.profile.mudaMode.shortLabel.toLowerCase()} y desarmá',
                       style:
                           AppTypography.hermandadName().copyWith(fontSize: 16),
                     ),
@@ -125,6 +147,13 @@ class _SeasonActsBody extends StatelessWidget {
                   ],
                 ),
               ),
+              if (onConfigure != null)
+                IconButton(
+                  tooltip: 'Cómo es vuestra temporada',
+                  onPressed: onConfigure,
+                  icon: const Icon(Icons.tune_rounded),
+                  color: AppColors.burgundy,
+                ),
               _CoverageRing(
                 filled: snapshot.filledCount,
                 total: snapshot.totalCount,
@@ -134,6 +163,7 @@ class _SeasonActsBody extends StatelessWidget {
           const SizedBox(height: 14),
           _MilestonesTrack(
             milestones: snapshot.milestones,
+            profile: snapshot.profile,
             canPublish: canPublish,
             onPublish: onPublish,
           ),
@@ -151,7 +181,7 @@ class _SeasonActsBody extends StatelessWidget {
                       color: AppColors.burgundy,
                     ),
                     label: Text(
-                      'Publicar ${item.kind.shortLabel.toLowerCase()}',
+                      'Publicar ${item.kind.shortLabelFor(snapshot.profile).toLowerCase()}',
                     ),
                     onPressed: () => onPublish(item.kind),
                     backgroundColor: AppColors.backgroundElevated,
@@ -207,11 +237,13 @@ class _CoverageRing extends StatelessWidget {
 class _MilestonesTrack extends StatelessWidget {
   const _MilestonesTrack({
     required this.milestones,
+    required this.profile,
     required this.canPublish,
     required this.onPublish,
   });
 
   final List<HermandadSeasonActMilestone> milestones;
+  final HermandadSeasonProfile profile;
   final bool canPublish;
   final ValueChanged<HermandadSeasonActKind> onPublish;
 
@@ -265,7 +297,10 @@ class _MilestonesTrack extends StatelessWidget {
           children: [
             for (final milestone in milestones)
               Expanded(
-                child: _MilestoneLabels(milestone: milestone),
+                child: _MilestoneLabels(
+                  milestone: milestone,
+                  profile: profile,
+                ),
               ),
           ],
         ),
@@ -332,9 +367,13 @@ class _MilestoneDot extends StatelessWidget {
 }
 
 class _MilestoneLabels extends StatelessWidget {
-  const _MilestoneLabels({required this.milestone});
+  const _MilestoneLabels({
+    required this.milestone,
+    required this.profile,
+  });
 
   final HermandadSeasonActMilestone milestone;
+  final HermandadSeasonProfile profile;
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +383,7 @@ class _MilestoneLabels extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            milestone.kind.shortLabel,
+            milestone.kind.shortLabelFor(profile),
             textAlign: TextAlign.center,
             style: AppTypography.labelSmall(
               color: AppColors.textPrimary,

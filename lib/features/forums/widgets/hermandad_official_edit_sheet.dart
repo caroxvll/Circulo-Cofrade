@@ -34,6 +34,7 @@ Future<void> showHermandadOfficialEditSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     isDismissible: true,
     enableDrag: true,
     backgroundColor: AppColors.background,
@@ -207,12 +208,11 @@ class _HermandadOfficialEditSheetState
   @override
   Widget build(BuildContext context) {
     return ForumComposeSheetLayout(
+      header: HermandadOfficialComposeHeader(closeEnabled: !_submitting),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          HermandadOfficialComposeHeader(closeEnabled: !_submitting),
-          const SizedBox(height: 6),
           Text(
             'Editar comunicado publicado',
             style: TopicDetailTypography.meta(color: AppColors.textMuted),
