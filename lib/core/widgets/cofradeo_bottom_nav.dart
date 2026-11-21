@@ -45,7 +45,7 @@ double cofradeoSheetMaxHeight(BuildContext context) {
   final topInset = media.viewPadding.top > media.padding.top
       ? media.viewPadding.top
       : media.padding.top;
-  final topGap = topInset + 88;
+  final topGap = topInset + 112;
   final available = media.size.height - topGap - media.viewInsets.bottom;
   if (available < 280) return 280;
   return available;

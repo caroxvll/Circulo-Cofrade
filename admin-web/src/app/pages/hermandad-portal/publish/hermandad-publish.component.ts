@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import {
+  HermandadPortalService,
   PUBLISH_KINDS,
   PublishDestinations,
   PublishKindId,
@@ -20,6 +21,7 @@ import { HermandadPortalStore } from '../../../core/hermandad/hermandad-portal.s
 export class HermandadPublishPageComponent implements OnInit {
   private readonly auth = inject(AuthService);
   readonly store = inject(HermandadPortalStore);
+  private readonly portal = inject(HermandadPortalService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -41,6 +43,16 @@ export class HermandadPublishPageComponent implements OnInit {
   destNoticias = false;
   timing: 'now' | 'later' = 'now';
   scheduleAtLocal = '';
+  paso: 'ambos' | 'cristo' | 'virgen' = 'ambos';
+  ensayoN = 1;
+  withRetranqueo = false;
+  ensayoCount = 3;
+  readonly pasoOpts = [
+    { id: 'ambos' as const, label: 'Los dos pasos' },
+    { id: 'cristo' as const, label: 'Cristo' },
+    { id: 'virgen' as const, label: 'Virgen' },
+  ];
+  readonly ensayoNs = [1, 2, 3, 4, 5, 6];
 
   get activeKind() {
     return publishKindById(this.kindId);
@@ -53,6 +65,11 @@ export class HermandadPublishPageComponent implements OnInit {
   private async ensureLoaded(): Promise<void> {
     await this.store.ensureLoaded();
     this.topicId = this.store.activeTopicId() ?? '';
+    if (this.topicId) {
+      const profile = await this.portal.fetchSeasonProfile(this.topicId);
+      this.ensayoCount = profile.ensayoCount;
+      this.withRetranqueo = profile.mudaMode === 'with_retranqueo';
+    }
     const kindParam = this.route.snapshot.queryParamMap.get('kind');
     if (kindParam && PUBLISH_KINDS.some((k) => k.id === kindParam)) {
       this.kindId = kindParam as PublishKindId;
@@ -154,6 +171,9 @@ export class HermandadPublishPageComponent implements OnInit {
         imageFile: this.imageFile,
         scheduleAtLocal:
           this.timing === 'later' ? this.scheduleAtLocal || null : null,
+        paso: this.paso,
+        seasonN: this.kindId === 'ensayo' ? this.ensayoN : null,
+        withRetranqueo: this.kindId === 'muda' && this.withRetranqueo,
       });
       this.title = '';
       this.body = '';

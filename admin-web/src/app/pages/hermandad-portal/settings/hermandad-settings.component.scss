@@ -434,6 +434,30 @@
   cursor: pointer;
 }
 
+.season-field {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.season-field select {
+  min-height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 0 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  background: #fff;
+}
+
 .save-btn {
   min-height: 36px;
   padding: 0 14px;

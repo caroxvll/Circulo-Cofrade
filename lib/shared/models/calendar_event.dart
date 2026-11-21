@@ -1,5 +1,37 @@
 /// Tipos de actividad en el calendario cofrade.
 
+/// Paso del misterio en igualá, ensayo, muda…
+enum SeasonPaso {
+  ambos,
+  cristo,
+  virgen;
+
+  static SeasonPaso fromDb(String? raw) => switch (raw) {
+        'cristo' => SeasonPaso.cristo,
+        'virgen' => SeasonPaso.virgen,
+        _ => SeasonPaso.ambos,
+      };
+
+  String get dbValue => name;
+
+  String get label => switch (this) {
+        SeasonPaso.ambos => 'Los dos pasos',
+        SeasonPaso.cristo => 'Cristo',
+        SeasonPaso.virgen => 'Virgen',
+      };
+
+  String get shortLabel => switch (this) {
+        SeasonPaso.ambos => 'Ambos',
+        SeasonPaso.cristo => 'Cristo',
+        SeasonPaso.virgen => 'Virgen',
+      };
+
+  bool covers(SeasonPaso needed) {
+    if (needed == SeasonPaso.ambos) return true;
+    return this == SeasonPaso.ambos || this == needed;
+  }
+}
+
 enum EventType {
   procesion('Procesiones'),
 
@@ -263,6 +295,9 @@ class CalendarEvent {
     this.viewCount = 0,
     this.admissionLabel,
     this.slots = const [],
+    this.paso = SeasonPaso.ambos,
+    this.seasonNumber,
+    this.withRetranqueo = false,
   });
 
   final String? id;
@@ -312,6 +347,15 @@ class CalendarEvent {
   /// Tramos del mismo día. Vacío = solo vale [time].
   final List<EventTimeSlot> slots;
 
+  /// Cristo, Virgen o los dos.
+  final SeasonPaso paso;
+
+  /// 1º, 2º… ensayo. Null si no aplica.
+  final int? seasonNumber;
+
+  /// La muda incluye retranqueo el mismo día.
+  final bool withRetranqueo;
+
   String? get admissionChip {
     final text = admissionLabel?.trim() ?? '';
     if (text.isEmpty) return null;
@@ -353,6 +397,10 @@ class CalendarEvent {
     String? admissionLabel,
     bool clearAdmissionLabel = false,
     List<EventTimeSlot>? slots,
+    SeasonPaso? paso,
+    int? seasonNumber,
+    bool clearSeasonNumber = false,
+    bool? withRetranqueo,
   }) {
     return CalendarEvent(
       id: id ?? this.id,
@@ -379,6 +427,9 @@ class CalendarEvent {
           ? null
           : (admissionLabel ?? this.admissionLabel),
       slots: slots ?? this.slots,
+      paso: paso ?? this.paso,
+      seasonNumber: clearSeasonNumber ? null : (seasonNumber ?? this.seasonNumber),
+      withRetranqueo: withRetranqueo ?? this.withRetranqueo,
     );
   }
 }

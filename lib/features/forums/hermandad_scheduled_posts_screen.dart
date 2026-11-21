@@ -277,6 +277,7 @@ class _DraftPostCard extends ConsumerWidget {
     final updated = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: AppColors.background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -295,6 +296,7 @@ class _DraftPostCard extends ConsumerWidget {
     final updated = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: AppColors.background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -403,6 +405,7 @@ class _ScheduledPostCard extends ConsumerWidget {
     final updated = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: AppColors.background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -612,12 +615,11 @@ class _PendingPostEditSheetState extends ConsumerState<_PendingPostEditSheet> {
   @override
   Widget build(BuildContext context) {
     return ForumComposeSheetLayout(
+      header: HermandadOfficialComposeHeader(closeEnabled: !_submitting),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          HermandadOfficialComposeHeader(closeEnabled: !_submitting),
-          const SizedBox(height: 6),
           Text(
             _title,
             style: AppTypography.bodyMedium(color: AppColors.textMuted),

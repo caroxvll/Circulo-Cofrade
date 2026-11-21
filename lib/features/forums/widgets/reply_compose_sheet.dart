@@ -21,7 +21,9 @@ import '../hermandad_scheduled_posts_provider.dart';
 import '../hermandad_scheduled_posts_screen.dart';
 import '../utils/forum_navigation.dart';
 import '../utils/hermandad_board_display.dart';
+import '../hermandad_season_acts_provider.dart';
 import '../utils/hermandad_publish_kinds.dart';
+import '../utils/hermandad_season_profile.dart';
 import '../utils/official_post_categories.dart';
 import '../topic_detail_typography.dart';
 import 'forum_compose_field.dart';
@@ -136,6 +138,7 @@ Future<void> showReplyComposeSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     isDismissible: true,
     enableDrag: true,
     backgroundColor: AppColors.surface,
@@ -180,6 +183,9 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
   String _kindId = 'noticia';
   String _officialCategory = 'noticia';
   bool _alsoCalendar = false;
+  SeasonPaso _paso = SeasonPaso.ambos;
+  int _ensayoN = 1;
+  bool _withRetranqueo = false;
   late DateTime _eventStartsAt;
   final _locationController = TextEditingController();
   String? _error;
@@ -293,14 +299,18 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
   HermandadScheduledCalendar? _scheduledCalendar({String? imageUrl}) {
     if (!_wantsCalendar) return null;
     final place = _calendarPlace();
+    final type = hermandadPublishKindById(_kindId).calendarEventType!;
     return HermandadScheduledCalendar(
-      eventType: hermandadPublishKindById(_kindId).calendarEventType!,
+      eventType: type,
       startsAt: _eventStartsAt,
       location: _locationController.text.trim(),
       title: place.title,
       coverImageUrl: imageUrl,
       customIconUrl: place.iconUrl,
       organizerLabel: place.organizer,
+      paso: _paso.dbValue,
+      seasonNumber: type == 'ensayo' ? _ensayoN : null,
+      withRetranqueo: type == 'muda' && _withRetranqueo,
     );
   }
 
@@ -344,13 +354,25 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
           startsAt: _eventStartsAt,
           location: _locationController.text.trim(),
           organizerLabel: place.organizer,
+          hermandadTopicId: widget.topicId,
           customIconUrl: place.iconUrl,
           coverImageUrl: imageUrl,
           sourceReplyId: replyId,
           status: 'published',
+          dayLabel: seasonActDayLabel(
+            typeDb: kind.calendarEventType ?? '',
+            paso: _paso,
+            seasonN: kind.calendarEventType == 'ensayo' ? _ensayoN : null,
+            withRetranqueo: _withRetranqueo,
+          ),
+          paso: _paso,
+          seasonNumber: kind.calendarEventType == 'ensayo' ? _ensayoN : null,
+          withRetranqueo:
+              kind.calendarEventType == 'muda' && _withRetranqueo,
         );
     ref.invalidate(calendarEventsProvider);
     ref.invalidate(calendarUpcomingProvider);
+    ref.read(calendarEventsEpochProvider.notifier).bump();
   }
 
   Future<void> _submit() async {
@@ -499,14 +521,9 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
       padding: socialReply
           ? const EdgeInsets.fromLTRB(14, 0, 12, 0)
           : const EdgeInsets.fromLTRB(20, 0, 12, 0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (useRichEditor)
-            HermandadOfficialComposeHeader(closeEnabled: !_submitting)
-          else
-            ValueListenableBuilder<TextEditingValue>(
+      header: useRichEditor
+          ? HermandadOfficialComposeHeader(closeEnabled: !_submitting)
+          : ValueListenableBuilder<TextEditingValue>(
               valueListenable: _controller,
               builder: (context, value, _) {
                 final canSubmit = value.text.trim().isNotEmpty;
@@ -530,7 +547,10 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
                 );
               },
             ),
-          SizedBox(height: socialReply ? 6 : 10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           if (useRichEditor) ...[
             HermandadPublishKindPicker(
               kindId: _kindId,
@@ -591,6 +611,7 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
                     ),
                   ),
                 ),
+                ..._seasonActFields(),
               ],
             ],
             const SizedBox(height: 10),
@@ -701,6 +722,87 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
         ],
       ),
     );
+  }
+
+  List<Widget> _seasonActFields() {
+    final type = hermandadPublishKindById(_kindId).calendarEventType;
+    final profile = ref
+            .watch(hermandadSeasonProfileProvider(widget.topicId))
+            .asData
+            ?.value ??
+        HermandadSeasonProfile.defaults;
+    final showPaso = type == 'iguala' || type == 'ensayo';
+    final showN = type == 'ensayo';
+    final showRetr = type == 'muda' &&
+        profile.mudaMode != MudaRetranqueoMode.mudaOnly;
+    if (!showPaso && !showN && !showRetr) return const [];
+
+    return [
+      const SizedBox(height: 12),
+      if (showPaso) ...[
+        Text(
+          'Paso',
+          style: AppTypography.labelSmall(color: AppColors.goldDark)
+              .copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final paso in SeasonPaso.values)
+              ChoiceChip(
+                label: Text(paso.shortLabel),
+                selected: _paso == paso,
+                onSelected: (_) => setState(() => _paso = paso),
+                selectedColor: AppColors.goldPale,
+              ),
+          ],
+        ),
+      ],
+      if (showN) ...[
+        const SizedBox(height: 10),
+        Text(
+          'Qué ensayo es',
+          style: AppTypography.labelSmall(color: AppColors.goldDark)
+              .copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (var n = 1; n <= profile.ensayoCount.clamp(1, 8); n++)
+              ChoiceChip(
+                label: Text(ordinalEnsayo(n)),
+                selected: _ensayoN == n,
+                onSelected: (_) => setState(() => _ensayoN = n),
+                selectedColor: AppColors.goldPale,
+              ),
+          ],
+        ),
+      ],
+      if (showRetr) ...[
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          activeThumbColor: AppColors.burgundy,
+          title: Text(
+            'Incluye retranqueo',
+            style: AppTypography.bodyMedium(color: AppColors.textPrimary)
+                .copyWith(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          subtitle: Text(
+            profile.mudaMode == MudaRetranqueoMode.withRetranqueo
+                ? 'El mismo día. Cierra el check de muda y retranqueo.'
+                : 'Márcalo solo si retranqueáis el mismo día.',
+            style: AppTypography.bodyMedium(color: AppColors.textSecondary)
+                .copyWith(fontSize: 12),
+          ),
+          value: _withRetranqueo,
+          onChanged: _submitting
+              ? null
+              : (value) => setState(() => _withRetranqueo = value),
+        ),
+      ],
+    ];
   }
 
   String _submitButtonLabel(bool isHermandadBoard, bool canPostOfficial) {

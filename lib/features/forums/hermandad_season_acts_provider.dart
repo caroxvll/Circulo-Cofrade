@@ -6,10 +6,23 @@ import '../auth/auth_provider.dart';
 import '../calendar/calendar_provider.dart';
 import '../permissions/permissions_provider.dart'
     show permissionsRepositoryProvider;
+import '../../core/supabase/supabase_bootstrap.dart';
+import 'data/hermandad_season_profile_store.dart';
 import 'utils/hermandad_board_display.dart';
 import 'utils/hermandad_season_acts.dart';
+import 'utils/hermandad_season_profile.dart';
 
 final seasonActsYearProvider = Provider<int>((ref) => currentSeasonActsYear());
+
+final hermandadSeasonProfileStoreProvider =
+    Provider<HermandadSeasonProfileStore>((ref) {
+  return HermandadSeasonProfileStore(client: SupabaseBootstrap.client);
+});
+
+final hermandadSeasonProfileProvider = FutureProvider.autoDispose
+    .family<HermandadSeasonProfile, String>((ref, topicId) {
+  return ref.watch(hermandadSeasonProfileStoreProvider).fetch(topicId);
+});
 
 final seasonActsEventsProvider =
     FutureProvider.autoDispose<List<CalendarEvent>>((ref) async {
@@ -56,12 +69,17 @@ final hermandadSeasonActsProvider = FutureProvider.autoDispose
     } catch (_) {}
   }
 
+  final seasonProfile =
+      await ref.watch(hermandadSeasonProfileProvider(key.topicId).future);
+
   return buildHermandadSeasonActsSnapshot(
     year: year,
     hermandadName: name,
     allSeasonEvents: events,
     topicId: key.topicId,
     profileId: profileId,
+    processionDay: parsed.processionDay,
+    profile: seasonProfile,
   );
 });
 
@@ -83,6 +101,8 @@ final hermandadSeasonActsCoverageProvider =
   final events = await repo.fetchSeasonActs(year: year);
   final topics = await permissions.fetchHermandadBoardTopics();
   final assignments = await permissions.fetchHermandadAssignments();
+  final profiles =
+      await ref.watch(hermandadSeasonProfileStoreProvider).fetchAll();
 
   final profileByTopic = <String, String>{
     for (final a in assignments) a.topicId: a.profileId,
@@ -102,7 +122,9 @@ final hermandadSeasonActsCoverageProvider =
         allSeasonEvents: events,
         topicId: topic.id,
         profileId: profileId,
+        processionDay: parsed.processionDay,
         hasAccount: profileId != null,
+        profile: profiles[topic.id] ?? HermandadSeasonProfile.defaults,
       ),
     );
   }

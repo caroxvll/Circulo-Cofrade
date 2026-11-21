@@ -210,5 +210,54 @@
         }
       </div>
     </article>
+
+    <article class="card identity">
+      <h2>Temporada</h2>
+      <p class="card-lead">
+        Cómo montáis igualá, ensayos, muda y retranqueo. Así se marcan los checks
+        en el tablón y en la Junta.
+      </p>
+      <label class="season-field">
+        Igualá
+        <select [(ngModel)]="igualaSplit" name="igualaSplit">
+          <option [ngValue]="false">Los dos pasos juntos</option>
+          <option [ngValue]="true">Cristo y Virgen por separado</option>
+        </select>
+      </label>
+      <label class="season-field">
+        Ensayos
+        <select [(ngModel)]="ensayoSplit" name="ensayoSplit">
+          <option [ngValue]="false">Juntos</option>
+          <option [ngValue]="true">Cristo y Virgen por separado</option>
+        </select>
+      </label>
+      <label class="season-field">
+        Número de ensayos{{ ensayoSplit ? ' de cada paso' : '' }}
+        <select [(ngModel)]="ensayoCount" name="ensayoCount">
+          @for (n of [1, 2, 3, 4, 5, 6]; track n) {
+            <option [ngValue]="n">{{ n }}</option>
+          }
+        </select>
+      </label>
+      <label class="season-field">
+        Muda y retranqueo
+        <select [(ngModel)]="mudaMode" name="mudaMode">
+          <option value="with_retranqueo">Muda con retranqueo el mismo día</option>
+          <option value="split">Muda un día y retranqueo otro</option>
+          <option value="muda_only">Solo muda</option>
+        </select>
+      </label>
+      @if (seasonError()) {
+        <p class="persist-msg warn">{{ seasonError() }}</p>
+      }
+      <button
+        type="button"
+        class="save-btn"
+        [disabled]="seasonSaving() || !topicId()"
+        (click)="saveSeason()"
+      >
+        {{ seasonSaving() ? 'Guardando…' : 'Guardar temporada' }}
+      </button>
+    </article>
   </div>
 </section>

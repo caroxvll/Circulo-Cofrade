@@ -45,6 +45,7 @@ class _ForumComposeSheetLayoutState extends State<ForumComposeSheetLayout> {
               child: widget.header,
             ),
           Flexible(
+            fit: FlexFit.loose,
             child: SingleChildScrollView(
               padding: widget.padding.copyWith(
                 bottom: cofradeoSheetBottomPadding(context, extra: 12),

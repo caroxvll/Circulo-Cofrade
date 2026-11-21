@@ -4,8 +4,8 @@
       <p class="eyebrow">Comunidad · solo admin</p>
       <h1>Actos de temporada {{ year }}</h1>
       <p class="lead">
-        Cobertura de igualá, ensayos, muda y desarmá por hermandad. Sirve para
-        ver a quién falta meter datos.
+        Checks según cómo monta cada casa la temporada. Busca por hermandad o
+        filtra por día de estación.
       </p>
     </div>
     <div class="queue-toolbar">
@@ -19,6 +19,52 @@
     <div class="error-box">{{ error() }}</div>
   }
 
+  <label class="inline-search">
+    <input
+      [ngModel]="query()"
+      (ngModelChange)="query.set($event)"
+      placeholder="Buscar hermandad…"
+      type="search"
+      autocomplete="off"
+    />
+  </label>
+
+  <div class="day-filter" role="tablist" aria-label="Filtrar por día">
+    <button
+      type="button"
+      class="day-chip"
+      [class.on]="dayFilter() === null"
+      (click)="setDayFilter(null)"
+    >
+      Todos
+      <span class="n">{{ rows().length }}</span>
+    </button>
+    @for (day of stationDays; track day) {
+      <button
+        type="button"
+        class="day-chip"
+        [class.on]="dayFilter() === day"
+        [title]="day"
+        (click)="setDayFilter(dayFilter() === day ? null : day)"
+      >
+        {{ shortDayLabel(day) }}
+        @if (countForDay(day) > 0) {
+          <span class="n">{{ countForDay(day) }}</span>
+        }
+      </button>
+    }
+  </div>
+
+  @if (dayFilter(); as activeDay) {
+    <p class="filter-hint">
+      Mostrando <strong>{{ activeDay }}</strong>
+      · {{ filteredRows().length }} hermandad{{ filteredRows().length === 1 ? '' : 'es' }}
+      <button type="button" class="btn btn-ghost linkish" (click)="setDayFilter(null)">
+        Quitar filtro
+      </button>
+    </p>
+  }
+
   <div class="summary">
     <span class="chip muted">{{ missingAccount().length }} sin cuenta</span>
     <span class="chip danger">{{ emptyActs().length }} vacías</span>
@@ -30,13 +76,18 @@
     <div class="empty-box">Cargando cobertura…</div>
   } @else if (!rows().length) {
     <div class="empty-box">No hay tablones de hermandad todavía.</div>
+  } @else if (!filteredRows().length) {
+    <div class="empty-box">Ninguna hermandad coincide con ese filtro.</div>
   } @else {
     <div class="coverage-list">
-      @for (row of rows(); track row.topicId) {
+      @for (row of filteredRows(); track row.topicId) {
         <article class="coverage-card">
           <header>
             <div>
               <h3>{{ row.hermandadName }}</h3>
+              @if (row.processionDay) {
+                <p class="day-pill">{{ row.processionDay }}</p>
+              }
               @if (row.topicId) {
                 <a [routerLink]="['/app/hermandades']" class="sub-link">Ver en hermandades</a>
               }

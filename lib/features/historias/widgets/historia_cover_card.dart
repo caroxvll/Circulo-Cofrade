@@ -15,6 +15,7 @@ class HistoriaCoverCard extends StatelessWidget {
     this.showMeta = true,
     this.showAuthor = true,
     this.readingProgress,
+    this.resumePage,
   });
 
   static const metaHeight = 44.0;
@@ -24,6 +25,8 @@ class HistoriaCoverCard extends StatelessWidget {
   final bool showMeta;
   final bool showAuthor;
   final double? readingProgress;
+  /// Índice del page-flip al abrir (portada = 0).
+  final int? resumePage;
 
   static int columnsFor(double width) {
     if (width >= 1100) return 4;
@@ -111,7 +114,13 @@ class HistoriaCoverCard extends StatelessWidget {
     }
 
     return InkWell(
-      onTap: () => context.push('/historias/${historia.id}'),
+      onTap: () {
+        final page = resumePage;
+        final path = page != null && page > 0
+            ? '/historias/${historia.id}?p=$page'
+            : '/historias/${historia.id}';
+        context.push(path);
+      },
       borderRadius: BorderRadius.circular(4),
       child: card,
     );

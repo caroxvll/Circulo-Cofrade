@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -38,7 +40,8 @@ class EditorialVideoPlayer extends StatefulWidget {
 }
 
 class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
-  late final VideoPlayerController _controller;
+  late VideoPlayerController _controller;
+  var _alive = true;
   var _ready = false;
   var _failed = false;
   var _showControls = true;
@@ -54,26 +57,70 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
   void initState() {
     super.initState();
     _muted = widget.muted;
-    _controller = VideoPlayerController.networkUrl(
-      Uri.parse(widget.videoUrl),
+    _controller = _createController();
+    unawaited(_initializePlayer());
+  }
+
+  VideoPlayerController _createController() {
+    final url = widget.videoUrl.trim();
+    final hls = url.contains('.m3u8') ||
+        url.contains('videodelivery.net') ||
+        url.contains('cloudflarestream.com');
+    return VideoPlayerController.networkUrl(
+      Uri.parse(url),
+      formatHint: hls ? VideoFormat.hls : null,
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     )
       ..setLooping(false)
-      ..addListener(_onVideoChanged)
-      ..initialize().then((_) async {
-        if (!mounted) return;
-        await _controller.setVolume(_muted ? 0 : 1);
-        if (!mounted) return;
-        setState(() => _ready = true);
-        await _playAutomaticallyIfAllowed();
-      }).catchError((_) {
-        if (!mounted) return;
-        setState(() => _failed = true);
+      ..addListener(_onVideoChanged);
+  }
+
+  Future<void> _recycleController() async {
+    if (!_alive) return;
+    final old = _controller;
+    old.removeListener(_onVideoChanged);
+    _controller = _createController();
+    await old.dispose();
+  }
+
+  Future<void> _initializePlayer({bool retry = true}) async {
+    if (!_alive) return;
+    try {
+      await _controller.initialize();
+      if (!_alive) return;
+      await _controller.setVolume(_muted ? 0 : 1);
+      if (!_alive) return;
+      setState(() {
+        _ready = true;
+        _failed = false;
       });
+      await _playAutomaticallyIfAllowed();
+    } catch (error) {
+      debugPrint('Editorial video failed: $error ${widget.videoUrl}');
+      if (retry && _alive) {
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        if (!_alive) return;
+        await _recycleController();
+        if (!_alive) return;
+        await _initializePlayer(retry: false);
+        return;
+      }
+      if (!_alive) return;
+      setState(() => _failed = true);
+    }
+  }
+
+  Future<void> _retryPlayback() async {
+    if (!_alive) return;
+    setState(() => _failed = false);
+    await _recycleController();
+    if (!_alive) return;
+    await _initializePlayer();
   }
 
   @override
   void dispose() {
+    _alive = false;
     _controller.removeListener(_onVideoChanged);
     _controller.dispose();
     super.dispose();
@@ -257,10 +304,41 @@ class _EditorialVideoPlayerState extends State<EditorialVideoPlayer> {
                   ),
                 ),
               if (_failed)
-                const Center(
-                  child: Icon(
-                    Icons.error_outline,
-                    color: AppColors.textMuted,
+                Positioned(
+                  right: 10,
+                  bottom: 10,
+                  child: Material(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(999),
+                    child: InkWell(
+                      onTap: () => unawaited(_retryPlayback()),
+                      borderRadius: BorderRadius.circular(999),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.replay_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Vídeo',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 )
               else if (!_ready)

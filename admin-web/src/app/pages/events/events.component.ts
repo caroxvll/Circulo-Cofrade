@@ -7,6 +7,7 @@ import {
   CalendarEventRow,
   CalendarEventType,
   OrganizerLogo,
+  SeasonPaso,
   eventTypeLabel,
   scheduleLabel,
 } from '../../core/events/events.models';
@@ -62,6 +63,26 @@ export class EventsPageComponent implements OnInit {
   formExtraSlots: { start: string; end: string }[] = [];
   formCoverUrl = '';
   formIconUrl = '';
+  formPaso: SeasonPaso = 'ambos';
+  formEnsayoN = 1;
+  formWithRetranqueo = false;
+
+  readonly pasoOpts: { id: SeasonPaso; label: string }[] = [
+    { id: 'ambos', label: 'Ambos' },
+    { id: 'cristo', label: 'Cristo' },
+    { id: 'virgen', label: 'Virgen' },
+  ];
+  readonly ensayoNs = [1, 2, 3, 4, 5, 6, 7, 8];
+
+  get showSeasonPaso(): boolean {
+    return this.formType === 'iguala' || this.formType === 'ensayo';
+  }
+  get showEnsayoN(): boolean {
+    return this.formType === 'ensayo';
+  }
+  get showRetranqueo(): boolean {
+    return this.formType === 'muda';
+  }
 
   readonly eventTypes = CALENDAR_EVENT_TYPES;
   readonly typeLabel = eventTypeLabel;
@@ -198,6 +219,9 @@ export class EventsPageComponent implements OnInit {
       : '';
     this.formCoverUrl = event.coverImageUrl ?? '';
     this.formIconUrl = event.customIconUrl ?? '';
+    this.formPaso = event.paso ?? 'ambos';
+    this.formEnsayoN = event.seasonN ?? 1;
+    this.formWithRetranqueo = event.withRetranqueo === true;
     this.showForm.set(true);
     void this.reloadOrganizers(event.organizerLabel ?? '');
   }
@@ -278,6 +302,9 @@ export class EventsPageComponent implements OnInit {
     this.formExtraSlots = [];
     this.formCoverUrl = '';
     this.formIconUrl = '';
+    this.formPaso = 'ambos';
+    this.formEnsayoN = 1;
+    this.formWithRetranqueo = false;
     this.organizerSearch = '';
     this.selectedOrganizerKey.set(null);
   }
@@ -360,6 +387,9 @@ export class EventsPageComponent implements OnInit {
         organizerLabel,
         coverImageUrl,
         customIconUrl,
+        paso: this.formPaso,
+        seasonN: this.formType === 'ensayo' ? this.formEnsayoN : null,
+        withRetranqueo: this.formType === 'muda' && this.formWithRetranqueo,
         status: 'published' as const,
       };
       const editing = this.editing();

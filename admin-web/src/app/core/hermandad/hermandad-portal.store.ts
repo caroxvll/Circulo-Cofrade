@@ -296,6 +296,9 @@ export class HermandadPortalStore {
     imageFile?: File | null;
     /** Si se indica, se programa en el tablón en vez de publicar ya. */
     scheduleAtLocal?: string | null;
+    paso?: 'ambos' | 'cristo' | 'virgen';
+    seasonN?: number | null;
+    withRetranqueo?: boolean;
   }): Promise<'published' | 'scheduled'> {
     const profile = this.auth.profile();
     if (!profile) throw new Error('Sesión no válida');
@@ -356,7 +359,7 @@ export class HermandadPortalStore {
         category: kind.officialCategory as OfficialCategory,
         scheduledAtIso: new Date(scheduleAt).toISOString(),
         imageUrl,
-        calendar: wantsCalendar
+            calendar: wantsCalendar
           ? {
               eventType: kind.calendarType!,
               startsAtIso: new Date(input.startsAtLocal!).toISOString(),
@@ -365,6 +368,9 @@ export class HermandadPortalStore {
               coverImageUrl: imageUrl,
               customIconUrl: crestUrl,
               organizerLabel: organizer,
+              paso: input.paso ?? 'ambos',
+              seasonN: input.seasonN ?? null,
+              withRetranqueo: input.withRetranqueo === true,
             }
           : null,
       });
@@ -391,6 +397,10 @@ export class HermandadPortalStore {
             customIconUrl: crestUrl,
             createdBy: profile.id,
             sourceReplyId: createdReplyId,
+            hermandadTopicId: input.topicId,
+            paso: input.paso ?? 'ambos',
+            seasonN: input.seasonN ?? null,
+            withRetranqueo: input.withRetranqueo === true,
           });
         } catch (err) {
           // No dejar noticia sin su evento: revertir el post.

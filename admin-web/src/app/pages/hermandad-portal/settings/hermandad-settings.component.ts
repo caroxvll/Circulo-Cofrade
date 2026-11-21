@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../core/auth/auth.service';
+import { HermandadPortalService } from '../../../core/hermandad/hermandad-portal.service';
 import { HermandadPortalStore } from '../../../core/hermandad/hermandad-portal.store';
 import {
   COFRADEO_ACCENT,
@@ -20,6 +21,7 @@ export class HermandadSettingsPageComponent implements OnInit {
   private readonly auth = inject(AuthService);
   readonly store = inject(HermandadPortalStore);
   readonly theme = inject(HermandadThemeService);
+  private readonly portal = inject(HermandadPortalService);
 
   readonly presets = HERMANDAD_COLOR_PRESETS;
 
@@ -29,6 +31,12 @@ export class HermandadSettingsPageComponent implements OnInit {
   readonly brandingBusy = signal(false);
   readonly brandingError = signal<string | null>(null);
   readonly brandingOk = signal<string | null>(null);
+  igualaSplit = false;
+  ensayoSplit = false;
+  ensayoCount = 1;
+  mudaMode: 'with_retranqueo' | 'split' | 'muda_only' = 'muda_only';
+  readonly seasonSaving = signal(false);
+  readonly seasonError = signal<string | null>(null);
 
   readonly profile = this.auth.profile;
 
@@ -71,7 +79,41 @@ export class HermandadSettingsPageComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    void this.store.ensureLoaded();
+    void this.store.ensureLoaded().then(() => this.loadSeason());
+  }
+
+  private async loadSeason(): Promise<void> {
+    const topicId = this.topicId();
+    if (!topicId) return;
+    const profile = await this.portal.fetchSeasonProfile(topicId);
+    this.igualaSplit = profile.igualaSplit;
+    this.ensayoSplit = profile.ensayoSplit;
+    this.ensayoCount = profile.ensayoCount;
+    this.mudaMode = profile.mudaMode;
+  }
+
+  async saveSeason(): Promise<void> {
+    const topicId = this.topicId();
+    if (!topicId) return;
+    this.seasonSaving.set(true);
+    this.seasonError.set(null);
+    try {
+      await this.portal.saveSeasonProfile(topicId, {
+        igualaSplit: this.igualaSplit,
+        ensayoSplit: this.ensayoSplit,
+        ensayoCount: this.ensayoCount,
+        mudaMode: this.mudaMode,
+      });
+      this.flashSaved();
+    } catch (err) {
+      this.seasonError.set(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo guardar. ¿Ejecutaste hermandad_season_profile.sql?',
+      );
+    } finally {
+      this.seasonSaving.set(false);
+    }
   }
 
   async onAssetPicked(kind: 'cover' | 'escudo', event: Event): Promise<void> {

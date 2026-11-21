@@ -91,6 +91,25 @@ Color hermandadDayAccentColor(String? day) {
   };
 }
 
+/// Etiqueta corta para filtros: `V. Dolores`, `D. Ramos`, `Madrugá`…
+String hermandadDayShortLabel(String day) {
+  return switch (day) {
+    'Viernes de Dolores' => 'V. Dolores',
+    'Sábado de Pasión' => 'S. Pasión',
+    'Domingo de Ramos' => 'D. Ramos',
+    'Lunes Santo' => 'Lunes Santo',
+    'Martes Santo' => 'Martes Santo',
+    'Miércoles Santo' => 'Mié. Santo',
+    'Jueves Santo' => 'Jueves Santo',
+    'Madrugá' => 'Madrugá',
+    'Viernes Santo' => 'Viernes Santo',
+    'Sábado Santo' => 'Sáb. Santo',
+    'Domingo de Resurrección' => 'Resurrección',
+    hermandadGloriasCategory => 'Glorias',
+    _ => day,
+  };
+}
+
 /// Offset en días respecto al Domingo de Resurrección.
 int hermandadStationOffsetFromEaster(String day) {
   return switch (day) {
