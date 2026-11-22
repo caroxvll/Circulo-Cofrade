@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import { HermandadPortalStore } from '../../../core/hermandad/hermandad-portal.store';
 import {
@@ -13,8 +13,12 @@ import {
 } from '../../../core/events/events.models';
 import {
   SEASON_ACT_KINDS,
+  SeasonActEvent,
+  SeasonActMilestone,
+  SeasonPasoSlot,
   buildSeasonActsSnapshot,
   currentSeasonActsYear,
+  eventsForPasoSlot,
 } from '../../../core/hermandad/season-acts';
 import { formatTimeAgo } from '../../../core/utils/date';
 import { ConfirmDialogService } from '../../../shared/confirm-dialog/confirm-dialog.service';
@@ -34,6 +38,11 @@ export class HermandadHomePageComponent implements OnInit {
   readonly store = inject(HermandadPortalStore);
   private readonly api = inject(HermandadPortalService);
   private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly router = inject(Router);
+  readonly picker = signal<{
+    title: string;
+    events: SeasonActEvent[];
+  } | null>(null);
 
   readonly profile = this.auth.profile;
   readonly timeAgo = formatTimeAgo;
@@ -126,22 +135,78 @@ export class HermandadHomePageComponent implements OnInit {
   readonly seasonActs = computed(() =>
     buildSeasonActsSnapshot({
       year: currentSeasonActsYear(),
-      hermandadName: this.displayName(),
+      hermandadName: this.board()?.hermandadName || this.displayName(),
       events: this.store.seasonActEvents(),
       topicId: this.board()?.topicId,
       profileId: this.profile()?.id ?? null,
       hasAccount: true,
+      profile: this.store.seasonProfile(),
     }),
   );
 
   readonly missingSeasonActs = computed(() =>
-    this.seasonActs().milestones.filter((m) => m.status === 'empty'),
+    this.seasonActs().milestones.filter(
+      (m) => m.filledSlots < m.requiredSlots,
+    ),
   );
 
   publishKindForMissing(kind: string): string {
     return (
       SEASON_ACT_KINDS.find((k) => k.kind === kind)?.publishKindId ?? 'ensayo'
     );
+  }
+
+  openMilestoneEvents(milestone: SeasonActMilestone): void {
+    this.openEvents(milestone.events, milestone.label);
+  }
+
+  openSlotEvents(
+    milestone: SeasonActMilestone,
+    slot: SeasonPasoSlot,
+    event: Event,
+  ): void {
+    event.stopPropagation();
+    if (!slot.filled) return;
+    this.openEvents(
+      eventsForPasoSlot(milestone.events, slot),
+      `${milestone.label} ${slot.label}`,
+    );
+  }
+
+  openEvents(events: SeasonActEvent[], title: string): void {
+    const usable = events.filter((e) => e.id);
+    if (!usable.length) return;
+    if (usable.length === 1) {
+      this.goToEvent(usable[0].id);
+      return;
+    }
+    this.picker.set({ title, events: usable });
+  }
+
+  goToEvent(eventId: string): void {
+    this.picker.set(null);
+    void this.router.navigate(['/hermandad/calendario'], {
+      queryParams: { edit: eventId },
+    });
+  }
+
+  closePicker(): void {
+    this.picker.set(null);
+  }
+
+  formatEventWhen(event: SeasonActEvent): string {
+    const when = new Date(event.startsAt).toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'short',
+    });
+    const paso =
+      event.paso === 'cristo'
+        ? 'Cristo'
+        : event.paso === 'virgen'
+          ? 'Virgen'
+          : 'Ambos';
+    const n = event.seasonN ? ` · ${event.seasonN}º` : '';
+    return `${when} · ${paso}${n}`;
   }
 
   ngOnInit(): void {

@@ -4,8 +4,8 @@
       <p class="eyebrow">Comunidad · solo admin</p>
       <h1>Actos de temporada {{ year }}</h1>
       <p class="lead">
-        Checks según cómo monta cada casa la temporada. Busca por hermandad o
-        filtra por día de estación.
+      Cristo, Virgen o ambas en igualá y ensayos. Busca por hermandad o
+      filtra por día y por paso.
       </p>
     </div>
     <div class="queue-toolbar">
@@ -55,11 +55,40 @@
     }
   </div>
 
-  @if (dayFilter(); as activeDay) {
+  <div class="day-filter" role="tablist" aria-label="Filtrar por paso">
+    @for (filter of pasoFilters; track filter.id) {
+      <button
+        type="button"
+        class="day-chip"
+        [class.on]="pasoFilter() === filter.id"
+        (click)="setPasoFilter(pasoFilter() === filter.id ? null : filter.id)"
+      >
+        {{ filter.label }}
+        @if (countForPaso(filter.id) > 0) {
+          <span class="n">{{ countForPaso(filter.id) }}</span>
+        }
+      </button>
+    }
+  </div>
+
+  @if (dayFilter() || pasoFilter(); as active) {
     <p class="filter-hint">
-      Mostrando <strong>{{ activeDay }}</strong>
+      Mostrando
+      @if (dayFilter(); as activeDay) {
+        <strong>{{ activeDay }}</strong>
+      }
+      @if (dayFilter() && pasoFilter()) {
+        ·
+      }
+      @if (pasoFilter(); as paso) {
+        <strong>{{ pasoFilterLabel(paso) }}</strong>
+      }
       · {{ filteredRows().length }} hermandad{{ filteredRows().length === 1 ? '' : 'es' }}
-      <button type="button" class="btn btn-ghost linkish" (click)="setDayFilter(null)">
+      <button
+        type="button"
+        class="btn btn-ghost linkish"
+        (click)="setDayFilter(null); setPasoFilter(null)"
+      >
         Quitar filtro
       </button>
     </p>
@@ -104,10 +133,28 @@
           </header>
           <div class="milestones">
             @for (m of row.milestones; track m.kind) {
-              <div class="milestone" [attr.data-status]="m.status">
+              <button
+                type="button"
+                class="milestone"
+                [attr.data-status]="m.status"
+                [disabled]="m.count === 0"
+                [title]="m.count ? 'Ver o editar el acto' : ''"
+                (click)="openMilestoneEvents(row, m)"
+              >
                 <strong>{{ m.label }}</strong>
                 <span>{{ m.status === 'empty' ? '—' : m.statusLabel }}</span>
-              </div>
+                @if (m.pasoSlots.length) {
+                  <div class="paso-slots">
+                    @for (slot of m.pasoSlots; track slot.label) {
+                      <em
+                        [class.on]="slot.filled"
+                        [class.clickable]="slot.filled"
+                        (click)="openSlotEvents(row, m, slot, $event)"
+                      >{{ pasoChipLabel(slot) }}</em>
+                    }
+                  </div>
+                }
+              </button>
             }
           </div>
         </article>
@@ -115,3 +162,32 @@
     </div>
   }
 </section>
+
+@if (picker(); as pick) {
+  <div class="event-picker-backdrop" (click)="closePicker()">
+    <div
+      class="event-picker"
+      role="dialog"
+      aria-modal="true"
+      (click)="$event.stopPropagation()"
+    >
+      <header>
+        <h2>{{ pick.title }}</h2>
+        <p>Elige el acto para verlo o editarlo.</p>
+      </header>
+      <ul>
+        @for (ev of pick.events; track ev.id) {
+          <li>
+            <button type="button" (click)="goToEvent(ev.id)">
+              <strong>{{ ev.title }}</strong>
+              <span>{{ formatEventWhen(ev) }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+      <button type="button" class="btn btn-ghost" (click)="closePicker()">
+        Cancelar
+      </button>
+    </div>
+  </div>
+}

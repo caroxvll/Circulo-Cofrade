@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   CommunityService,
   HERMANDAD_DIRECTORY_DAYS,
@@ -17,11 +17,17 @@ import {
   SeasonActsSnapshot,
   SeasonPaso,
   SEASON_ACT_DB_TYPES,
+  SEASON_ACT_PASO_FILTERS,
+  SeasonActPasoFilter,
   buildSeasonActsSnapshot,
   currentSeasonActsYear,
+  eventsForPasoSlot,
   filterSeasonActsSnapshots,
   hermandadDayShortLabel,
+  matchesPasoFilter,
   seasonActsRange,
+  SeasonActMilestone,
+  SeasonPasoSlot,
 } from '../../core/hermandad/season-acts';
 
 @Component({
@@ -33,6 +39,7 @@ import {
 })
 export class SeasonActsPageComponent implements OnInit {
   private readonly community = inject(CommunityService);
+  private readonly router = inject(Router);
 
   readonly year = currentSeasonActsYear();
   readonly loading = signal(true);
@@ -40,11 +47,22 @@ export class SeasonActsPageComponent implements OnInit {
   readonly rows = signal<SeasonActsSnapshot[]>([]);
   readonly query = signal('');
   readonly dayFilter = signal<string | null>(null);
+  readonly pasoFilter = signal<SeasonActPasoFilter | null>(null);
   readonly stationDays = HERMANDAD_DIRECTORY_DAYS;
   readonly shortDayLabel = hermandadDayShortLabel;
+  readonly pasoFilters = SEASON_ACT_PASO_FILTERS;
+  readonly picker = signal<{
+    title: string;
+    events: SeasonActEvent[];
+  } | null>(null);
 
   readonly filteredRows = computed(() =>
-    filterSeasonActsSnapshots(this.rows(), this.query(), this.dayFilter()),
+    filterSeasonActsSnapshots(
+      this.rows(),
+      this.query(),
+      this.dayFilter(),
+      this.pasoFilter(),
+    ),
   );
 
   readonly missingAccount = computed(() =>
@@ -101,7 +119,7 @@ export class SeasonActsPageComponent implements OnInit {
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, starts_at, event_type, created_by, organizer_label, paso, season_n, with_retranqueo',
+        'id, title, starts_at, event_type, created_by, organizer_label, hermandad_topic_id, paso, season_n, with_retranqueo',
       )
       .eq('status', 'published')
       .in('event_type', [...SEASON_ACT_DB_TYPES])
@@ -117,6 +135,7 @@ export class SeasonActsPageComponent implements OnInit {
       eventType: String(row['event_type'] ?? ''),
       createdBy: (row['created_by'] as string | null) ?? null,
       organizerLabel: (row['organizer_label'] as string | null) ?? null,
+      hermandadTopicId: (row['hermandad_topic_id'] as string | null) ?? null,
       paso: (row['paso'] as SeasonPaso | null) ?? 'ambos',
       seasonN: (row['season_n'] as number | null) ?? null,
       withRetranqueo: row['with_retranqueo'] === true,
@@ -153,6 +172,77 @@ export class SeasonActsPageComponent implements OnInit {
 
   countForDay(day: string): number {
     return this.dayCounts().get(day) ?? 0;
+  }
+
+  countForPaso(filter: SeasonActPasoFilter): number {
+    return this.rows().filter((row) => matchesPasoFilter(row, filter)).length;
+  }
+
+  setPasoFilter(filter: SeasonActPasoFilter | null): void {
+    this.pasoFilter.set(filter);
+  }
+
+  pasoChipLabel(slot: { label: string; hint?: string | null }): string {
+    return slot.hint ? `${slot.label} ${slot.hint}` : slot.label;
+  }
+
+  pasoFilterLabel(id: SeasonActPasoFilter | null): string {
+    return this.pasoFilters.find((f) => f.id === id)?.label ?? '';
+  }
+
+  openMilestoneEvents(row: SeasonActsSnapshot, milestone: SeasonActMilestone): void {
+    this.openEvents(
+      milestone.events,
+      `${row.hermandadName} · ${milestone.label}`,
+    );
+  }
+
+  openSlotEvents(
+    row: SeasonActsSnapshot,
+    milestone: SeasonActMilestone,
+    slot: SeasonPasoSlot,
+    event: Event,
+  ): void {
+    event.stopPropagation();
+    if (!slot.filled) return;
+    this.openEvents(
+      eventsForPasoSlot(milestone.events, slot),
+      `${row.hermandadName} · ${milestone.label} ${slot.label}`,
+    );
+  }
+
+  openEvents(events: SeasonActEvent[], title: string): void {
+    const usable = events.filter((e) => e.id);
+    if (!usable.length) return;
+    if (usable.length === 1) {
+      this.goToEvent(usable[0].id);
+      return;
+    }
+    this.picker.set({ title, events: usable });
+  }
+
+  goToEvent(eventId: string): void {
+    this.picker.set(null);
+    void this.router.navigateByUrl(`/app/eventos?edit=${encodeURIComponent(eventId)}`);
+  }
+
+  closePicker(): void {
+    this.picker.set(null);
+  }
+
+  formatEventWhen(event: SeasonActEvent): string {
+    const when = new Date(event.startsAt).toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'short',
+    });
+    const paso =
+      event.paso === 'cristo'
+        ? 'Cristo'
+        : event.paso === 'virgen'
+          ? 'Virgen'
+          : 'Ambos';
+    const n = event.seasonN ? ` · ${event.seasonN}º` : '';
+    return `${when} · ${paso}${n}`;
   }
 
   private buildRows(

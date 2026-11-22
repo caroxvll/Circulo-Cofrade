@@ -1,5 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { AuthService } from '../auth/auth.service';
+import { parseHermandadTopicTitle } from '../community/community.service';
+import { organizerMatchesHermandadName } from '../hermandad/season-acts';
 import { getSupabase } from '../supabase.client';
 import {
   CALENDAR_EVENT_TYPES,
@@ -16,6 +18,9 @@ import {
   seasonActDayLabel,
 } from './events.models';
 
+const EVENT_SELECT =
+  'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)';
+
 @Injectable({ providedIn: 'root' })
 export class EventsService {
   private readonly auth = inject(AuthService);
@@ -29,9 +34,7 @@ export class EventsService {
 
     let req = getSupabase()
       .from('calendar_events')
-      .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)',
-      )
+      .select(EVENT_SELECT)
       .limit(limit);
 
     if (status !== 'all') {
@@ -69,6 +72,19 @@ export class EventsService {
     return (data ?? []).map((row) => this.mapRow(row as Record<string, unknown>));
   }
 
+  async fetchEventById(eventId: string): Promise<CalendarEventRow | null> {
+    if (!this.auth.isAdmin()) return null;
+    const id = eventId.trim();
+    if (!id) return null;
+    const { data, error } = await getSupabase()
+      .from('calendar_events')
+      .select(EVENT_SELECT)
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? this.mapRow(data as Record<string, unknown>) : null;
+  }
+
   async countPending(): Promise<number> {
     if (!this.auth.isAdmin()) return 0;
     const { count, error } = await getSupabase()
@@ -84,6 +100,11 @@ export class EventsService {
     if (!userId) throw new Error('Sesión no disponible');
 
     const payload = this.toDbPayload(input);
+    if (!payload['hermandad_topic_id'] && input.organizerLabel) {
+      payload['hermandad_topic_id'] = await this.resolveHermandadTopicId(
+        input.organizerLabel,
+      );
+    }
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .insert({
@@ -91,9 +112,7 @@ export class EventsService {
         created_by: userId,
         status: input.status ?? 'published',
       })
-      .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)',
-      )
+      .select(EVENT_SELECT)
       .single();
     if (error) throw error;
     return this.mapRow(data as Record<string, unknown>);
@@ -101,6 +120,11 @@ export class EventsService {
 
   async updateEvent(eventId: string, input: CalendarEventInput): Promise<CalendarEventRow> {
     const payload = this.toDbPayload(input);
+    if (!payload['hermandad_topic_id'] && input.organizerLabel) {
+      payload['hermandad_topic_id'] = await this.resolveHermandadTopicId(
+        input.organizerLabel,
+      );
+    }
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .update({
@@ -109,9 +133,7 @@ export class EventsService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', eventId)
-      .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)',
-      )
+      .select(EVENT_SELECT)
       .single();
     if (error) throw error;
     return this.mapRow(data as Record<string, unknown>);
@@ -259,7 +281,31 @@ export class EventsService {
       paso: input.paso ?? 'ambos',
       season_n: isEnsayo ? (input.seasonN ?? 1) : null,
       with_retranqueo: isMuda && input.withRetranqueo === true,
+      hermandad_topic_id: input.hermandadTopicId?.trim() || null,
     };
+  }
+
+  async resolveHermandadTopicId(organizerLabel: string): Promise<string | null> {
+    const label = organizerLabel.trim();
+    if (label.length < 3) return null;
+    const safe = label.replace(/[%_,]/g, '');
+    const { data, error } = await getSupabase()
+      .from('forum_topics')
+      .select('id, title')
+      .eq('forum_id', 'hermandades')
+      .eq('status', 'published')
+      .ilike('title', `%${safe}%`)
+      .limit(40);
+    if (error || !data?.length) return null;
+    for (const row of data) {
+      const title = String(row['title'] ?? '');
+      const parsed = parseHermandadTopicTitle(title);
+      const name = parsed.hermandadName.trim() || title.trim();
+      if (organizerMatchesHermandadName(label, name)) {
+        return String(row['id'] ?? '') || null;
+      }
+    }
+    return null;
   }
 
   async setLiveForceState(

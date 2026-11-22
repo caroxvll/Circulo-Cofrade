@@ -6,6 +6,10 @@ import {
   type CalendarTimeSlot,
   parseTimeSlots,
 } from '../events/events.models';
+import {
+  SEASON_ACT_DB_TYPES,
+  type SeasonActEvent,
+} from './season-acts';
 
 /** Categoría en tablón (BD / app). */
 export const OFFICIAL_CATEGORIES = [
@@ -395,6 +399,85 @@ export class HermandadPortalService {
       throw error;
     }
     return (data ?? []).map((row) => this.mapCalendarEvent(row));
+  }
+
+  async fetchPublishedEventById(eventId: string) {
+    const id = eventId.trim();
+    if (!id) return null;
+    const { data, error } = await getSupabase()
+      .from('calendar_events')
+      .select(
+        'id, title, starts_at, location, cover_image_url, event_type, admission_label, time_slots, status, view_count',
+      )
+      .eq('id', id)
+      .eq('status', 'published')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? this.mapCalendarEvent(data as Record<string, unknown>) : null;
+  }
+
+  /** Igualá / ensayos / muda / desarmá del tablón (no solo los creados por la cuenta). */
+  async fetchSeasonActEvents(input: {
+    topicId?: string | null;
+    profileId: string;
+    fromIso: string;
+    toIso: string;
+  }): Promise<SeasonActEvent[]> {
+    const select =
+      'id, title, starts_at, event_type, created_by, organizer_label, hermandad_topic_id, paso, season_n, with_retranqueo';
+    let req = getSupabase()
+      .from('calendar_events')
+      .select(select)
+      .eq('status', 'published')
+      .in('event_type', [...SEASON_ACT_DB_TYPES])
+      .gte('starts_at', input.fromIso)
+      .lt('starts_at', input.toIso)
+      .order('starts_at', { ascending: true })
+      .limit(500);
+
+    const topicId = input.topicId?.trim();
+    if (topicId) {
+      req = req.or(
+        `hermandad_topic_id.eq.${topicId},created_by.eq.${input.profileId}`,
+      );
+    } else {
+      req = req.eq('created_by', input.profileId);
+    }
+
+    const { data, error } = await req;
+    if (error) {
+      const fallback = await getSupabase()
+        .from('calendar_events')
+        .select(
+          'id, title, starts_at, event_type, created_by, organizer_label, paso, season_n, with_retranqueo',
+        )
+        .eq('status', 'published')
+        .in('event_type', [...SEASON_ACT_DB_TYPES])
+        .eq('created_by', input.profileId)
+        .gte('starts_at', input.fromIso)
+        .lt('starts_at', input.toIso)
+        .order('starts_at', { ascending: true })
+        .limit(500);
+      if (fallback.error) throw fallback.error;
+      return (fallback.data ?? []).map((row) => this.mapSeasonActEvent(row));
+    }
+    return (data ?? []).map((row) => this.mapSeasonActEvent(row));
+  }
+
+  private mapSeasonActEvent(row: Record<string, unknown>): SeasonActEvent {
+    const paso = row['paso'];
+    return {
+      id: String(row['id'] ?? ''),
+      title: String(row['title'] ?? ''),
+      startsAt: String(row['starts_at'] ?? ''),
+      eventType: String(row['event_type'] ?? ''),
+      createdBy: (row['created_by'] as string | null) ?? null,
+      organizerLabel: (row['organizer_label'] as string | null) ?? null,
+      hermandadTopicId: (row['hermandad_topic_id'] as string | null) ?? null,
+      paso: paso === 'cristo' || paso === 'virgen' ? paso : 'ambos',
+      seasonN: (row['season_n'] as number | null) ?? null,
+      withRetranqueo: row['with_retranqueo'] === true,
+    };
   }
 
   private mapCalendarEvent(row: Record<string, unknown>): {
