@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -106,69 +108,64 @@ class _LiveEventChip extends StatelessWidget {
     final timing = _timingLabel(event, now: now);
     final accent = live ? AppColors.liveGreen : AppColors.burgundy;
 
-    return Material(
-      color: _fill,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: () => _open(context),
+    return _LiveAura(
+      live: live,
+      child: Material(
+        color: _fill,
         borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          width: expanded ? double.infinity : 196,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: live
-                  ? AppColors.liveGreen.withValues(alpha: 0.4)
-                  : AppColors.gold.withValues(alpha: 0.45),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-            child: Row(
-              children: [
-                EventTypeIcon(
-                  type: event.type,
-                  size: 36,
-                  customIconUrl: event.customIconUrl,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '${_typeLabel(event.type)} · $timing',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.labelSmall(
-                          color: accent,
-                        ).copyWith(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
-                          letterSpacing: 0.2,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.hermandadName().copyWith(
-                          fontSize: 16,
-                          height: 1.05,
-                        ),
-                      ),
-                    ],
+        child: InkWell(
+          onTap: () => _open(context),
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            width: expanded ? double.infinity : 196,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+              child: Row(
+                children: [
+                  EventTypeIcon(
+                    type: event.type,
+                    size: 36,
+                    customIconUrl: event.customIconUrl,
                   ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: accent,
-                  size: 22,
-                ),
-              ],
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${_typeLabel(event.type)} · $timing',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.labelSmall(
+                            color: accent,
+                          ).copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            letterSpacing: 0.2,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.hermandadName().copyWith(
+                            fontSize: 16,
+                            height: 1.05,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: accent,
+                    size: 22,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -191,20 +188,183 @@ class _LiveEventChip extends StatelessWidget {
   }
 }
 
-class _LiveDot extends StatelessWidget {
+class _LiveDot extends StatefulWidget {
   const _LiveDot();
 
   @override
+  State<_LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<_LiveDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 7,
-      height: 7,
-      decoration: const BoxDecoration(
-        color: AppColors.liveGreen,
-        shape: BoxShape.circle,
+    return SizedBox(
+      width: 12,
+      height: 12,
+      child: AnimatedBuilder(
+        animation: _pulse,
+        builder: (context, _) {
+          final t = _pulse.value;
+          final ring = (math.sin(t * math.pi * 2) + 1) / 2;
+          return CustomPaint(
+            painter: _LiveDotPainter(ring: ring),
+          );
+        },
       ),
     );
   }
+}
+
+class _LiveDotPainter extends CustomPainter {
+  const _LiveDotPainter({required this.ring});
+
+  final double ring;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    canvas.drawCircle(
+      c,
+      5.2 + ring * 1.6,
+      Paint()
+        ..color = AppColors.liveGreen.withValues(alpha: 0.22 - ring * 0.14)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawCircle(
+      c,
+      3.4,
+      Paint()..color = AppColors.liveGreen,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_LiveDotPainter oldDelegate) => oldDelegate.ring != ring;
+}
+
+/// Borde que recorre el recuadro: oro si es de hoy, verde si está en vivo.
+class _LiveAura extends StatefulWidget {
+  const _LiveAura({required this.live, required this.child});
+
+  final bool live;
+  final Widget child;
+
+  @override
+  State<_LiveAura> createState() => _LiveAuraState();
+}
+
+class _LiveAuraState extends State<_LiveAura>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _spin = AnimationController(
+    vsync: this,
+    duration: Duration(milliseconds: widget.live ? 3200 : 5200),
+  )..repeat();
+
+  @override
+  void didUpdateWidget(_LiveAura oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.live == widget.live) return;
+    _spin
+      ..duration = Duration(milliseconds: widget.live ? 3200 : 5200)
+      ..repeat();
+  }
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _spin,
+      builder: (context, child) {
+        return CustomPaint(
+          foregroundPainter: _LiveAuraPainter(
+            t: _spin.value,
+            live: widget.live,
+          ),
+          child: child,
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
+
+class _LiveAuraPainter extends CustomPainter {
+  const _LiveAuraPainter({required this.t, required this.live});
+
+  final double t;
+  final bool live;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(16),
+    ).deflate(0.7);
+    final rect = Offset.zero & size;
+    final head = live ? AppColors.liveGreen : AppColors.gold;
+    final tail = live ? AppColors.gold : AppColors.goldDark;
+    final breathe = 0.55 + 0.45 * math.sin(t * math.pi * 2);
+
+    if (live) {
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 5
+          ..color = head.withValues(alpha: 0.05 + breathe * 0.06)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5),
+      );
+    }
+
+    final shader = SweepGradient(
+      startAngle: t * math.pi * 2,
+      endAngle: t * math.pi * 2 + math.pi * 2,
+      colors: [
+        head.withValues(alpha: 0),
+        head.withValues(alpha: live ? 0.9 : 0.55),
+        tail.withValues(alpha: live ? 0.45 : 0.28),
+        head.withValues(alpha: 0),
+      ],
+      stops: const [0.0, 0.08, 0.22, 0.42],
+    ).createShader(rect);
+
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = live ? 1.55 : 1.2
+        ..shader = shader,
+    );
+
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = (live ? AppColors.liveGreen : AppColors.gold)
+            .withValues(alpha: live ? 0.16 : 0.22),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_LiveAuraPainter oldDelegate) =>
+      oldDelegate.t != t || oldDelegate.live != live;
 }
 
 bool _isLive(CalendarEvent event, {required DateTime now}) {
