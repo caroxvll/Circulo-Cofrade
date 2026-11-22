@@ -1,0 +1,12 @@
+name: page_flip
+description: Local patch of page_flip 0.2.5+1 for El Cronicón page turns.
+version: 0.2.5+1
+publish_to: none
+
+environment:
+  sdk: ">=2.18.5 <4.0.0"
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter

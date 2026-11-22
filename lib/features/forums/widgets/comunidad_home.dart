@@ -141,9 +141,7 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
       for (final item in cards)
         if (item.kind.matches(_forYouFilter)) item,
     ];
-    final river = _forYouFilter == _ForYouFilter.todo
-        ? ref.watch(paraTiRiverProvider)
-        : const ParaTiRiver.empty();
+    final river = ref.watch(paraTiRiverProvider);
     final feed = _forYouPieces(visible, river);
 
     return Column(
@@ -211,39 +209,30 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
   /// pasa por delante de un comunicado de hermandad más antiguo.
   /// Todo acumula el hilo. Noticias y Temas solo acotan, si alguien filtra.
   List<Widget> _forYouPieces(List<_Activity> visible, ParaTiRiver river) {
-    if (_forYouFilter != _ForYouFilter.todo) {
-      final sorted = [...visible]..sort((a, b) {
-        final aAt = a.forum.lastActivityAt?.millisecondsSinceEpoch ?? 0;
-        final bAt = b.forum.lastActivityAt?.millisecondsSinceEpoch ?? 0;
-        return bAt.compareTo(aAt);
-      });
-      return [
-        for (final item in sorted)
-          _TopicActivityCard(
-            item: item,
-            onTap: () => _openTopic(context, item),
-          ),
-      ];
-    }
-
+    final todo = _forYouFilter == _ForYouFilter.todo;
     final signedIn = ref.watch(currentUserProvider) != null;
-    final posts = signedIn
+    final posts = todo && signedIn
         ? ref.watch(followedPeoplePostsProvider).asData?.value ??
             const <FollowedPersonPost>[]
         : const <FollowedPersonPost>[];
-    final digests = signedIn
+    final digests = todo && signedIn
         ? ref.watch(followedHermandadDigestsProvider).asData?.value ??
             const <HermandadDigest>[]
         : const <HermandadDigest>[];
     final coveredTopics = {for (final post in posts) post.activity.topicId};
     final coveredReplies = {for (final post in posts) post.activity.id};
+    final riverEntries = [
+      for (final entry in river.entries)
+        if (_riverEntryMatches(entry)) entry,
+    ];
+    // Publicar (modo Twitter) solo vive en Todo, no en Temas/Noticias.
     final editorialIds = {
       for (final entry in river.entries)
         if (entry is ParaTiEditorial) entry.topic.id,
     };
 
     final ranked = <({int at, Widget child})>[
-      for (final entry in river.entries)
+      for (final entry in riverEntries)
         (at: entry.at.millisecondsSinceEpoch, child: _riverEntry(entry)),
       for (final post in posts)
         (
@@ -281,6 +270,15 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
     ]..sort((a, b) => b.at.compareTo(a.at));
 
     return [for (final piece in ranked) piece.child];
+  }
+
+  bool _riverEntryMatches(ParaTiRiverEntry entry) {
+    return switch (_forYouFilter) {
+      _ForYouFilter.todo => true,
+      // Temas = hilos de los foros. Lo de Publicar se queda en Todo.
+      _ForYouFilter.temas => entry is ParaTiHotTopic,
+      _ForYouFilter.noticias => false,
+    };
   }
 
   Widget _riverEntry(ParaTiRiverEntry entry) {
@@ -1712,7 +1710,27 @@ class _TopicActivityCard extends ConsumerWidget {
   }
 
   Widget? _feedThumb(BuildContext context, ForumTopic? topic) {
-    final source = topic?.coverImageUrl?.trim();
+    if (topic == null) return null;
+    final urls = topic.editorialImageUrls;
+    if (topic.isEditorial) {
+      if (topic.hasEditorialVideoMedia) {
+        return EditorialVideoPoster(
+          posterUrl: topic.editorialPosterUrl,
+          processing: topic.hasProcessingEditorialVideo,
+        );
+      }
+      if (urls.length > 1) {
+        return EditorialPhotoStack.network(
+          urls: urls,
+          onTap: () => openEditorialPhotoGallery(
+            context,
+            urls,
+            shareText: topic.title,
+          ),
+        );
+      }
+    }
+    final source = (urls.isNotEmpty ? urls.first : topic.coverImageUrl)?.trim();
     if (source == null || source.isEmpty) return null;
     final image = topicCoverIsAsset(source)
         ? CofradeoAssetImage(
