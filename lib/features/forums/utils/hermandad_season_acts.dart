@@ -58,6 +58,13 @@ enum HermandadSeasonActStatus {
   mixed,
 }
 
+class SeasonPasoSlot {
+  const SeasonPasoSlot({required this.label, required this.filled});
+
+  final String label;
+  final bool filled;
+}
+
 class HermandadSeasonActMilestone {
   const HermandadSeasonActMilestone({
     required this.kind,
@@ -66,6 +73,7 @@ class HermandadSeasonActMilestone {
     required this.filledSlots,
     required this.requiredSlots,
     this.detailLabel,
+    this.pasoSlots = const [],
   });
 
   final HermandadSeasonActKind kind;
@@ -74,6 +82,8 @@ class HermandadSeasonActMilestone {
   final int filledSlots;
   final int requiredSlots;
   final String? detailLabel;
+  /// Cristo / Virgen / Ambos según el perfil y lo publicado.
+  final List<SeasonPasoSlot> pasoSlots;
 
   int get count => events.length;
 
@@ -271,6 +281,59 @@ const seasonActDbValues = <String>[
   'desarma',
 ];
 
+String _foldOrganizer(String raw) {
+  const from = 'áàäéèëíìïóòöúùüñÁÀÄÉÈËÍÌÏÓÒÖÚÙÜÑ';
+  const to = 'aaaeeeiiiooouuunAAAEEEIIIOOOUUUN';
+  final buffer = StringBuffer();
+  for (final rune in raw.runes) {
+    final ch = String.fromCharCode(rune);
+    final i = from.indexOf(ch);
+    buffer.write(i >= 0 ? to[i] : ch);
+  }
+  return buffer.toString().toLowerCase().trim();
+}
+
+String _canonicalOrganizer(String raw) {
+  var value = _foldOrganizer(normalizeOrganizerKey(raw));
+  const prefixes = [
+    'real ',
+    'ilustre ',
+    'pontificia ',
+    'hdad. ',
+    'hdad ',
+    'hermandad de la ',
+    'hermandad de las ',
+    'hermandad del ',
+    'hermandad de ',
+    'hermandad ',
+  ];
+  var changed = true;
+  while (changed) {
+    changed = false;
+    for (final prefix in prefixes) {
+      if (value.startsWith(prefix)) {
+        value = value.substring(prefix.length).trimLeft();
+        changed = true;
+      }
+    }
+  }
+  return value;
+}
+
+bool organizerMatchesHermandadName(String organizer, String hermandadName) {
+  final orgKey = normalizeOrganizerKey(organizer);
+  final nameKey = normalizeOrganizerKey(hermandadName);
+  if (nameKey.length < 2 || orgKey.length < 2) return false;
+  if (orgKey == nameKey) return true;
+  final orgCanon = _canonicalOrganizer(organizer);
+  final nameCanon = _canonicalOrganizer(hermandadName);
+  if (orgCanon.length < 3 || nameCanon.length < 3) return false;
+  if (orgCanon == nameCanon) return true;
+  final shorter = orgCanon.length <= nameCanon.length ? orgCanon : nameCanon;
+  final longer = orgCanon.length > nameCanon.length ? orgCanon : nameCanon;
+  return shorter.length >= 6 && longer.contains(shorter);
+}
+
 bool eventBelongsToHermandad(
   CalendarEvent event, {
   required String hermandadName,
@@ -293,10 +356,7 @@ bool eventBelongsToHermandad(
   }
   final organizer = event.organizerLabel?.trim() ?? '';
   if (organizer.isEmpty) return false;
-  final orgKey = normalizeOrganizerKey(organizer);
-  final nameKey = normalizeOrganizerKey(hermandadName);
-  if (nameKey.length < 2 || orgKey.length < 2) return false;
-  return orgKey == nameKey;
+  return organizerMatchesHermandadName(organizer, hermandadName);
 }
 
 HermandadSeasonActStatus _statusFor(
@@ -441,6 +501,64 @@ int _ensayoFilled(List<CalendarEvent> events, int n) {
   }
 }
 
+List<SeasonPasoSlot> _pasoSlotsFor(
+  HermandadSeasonActKind kind,
+  List<CalendarEvent> events,
+  HermandadSeasonProfile profile,
+) {
+  bool covers(SeasonPaso needed) =>
+      events.any((e) => e.paso.covers(needed));
+
+  if (kind == HermandadSeasonActKind.iguala) {
+    if (profile.igualaSplit) {
+      return [
+        SeasonPasoSlot(label: 'Cristo', filled: covers(SeasonPaso.cristo)),
+        SeasonPasoSlot(label: 'Virgen', filled: covers(SeasonPaso.virgen)),
+      ];
+    }
+    if (events.isEmpty) return const [];
+    final onlyAmbos = events.every((e) => e.paso == SeasonPaso.ambos);
+    if (onlyAmbos ||
+        (covers(SeasonPaso.cristo) && covers(SeasonPaso.virgen))) {
+      return const [SeasonPasoSlot(label: 'Ambos', filled: true)];
+    }
+    if (covers(SeasonPaso.cristo)) {
+      return const [SeasonPasoSlot(label: 'Cristo', filled: true)];
+    }
+    if (covers(SeasonPaso.virgen)) {
+      return const [SeasonPasoSlot(label: 'Virgen', filled: true)];
+    }
+    return const [SeasonPasoSlot(label: 'Ambos', filled: true)];
+  }
+
+  if (kind == HermandadSeasonActKind.ensayos && profile.ensayoSplit) {
+    final n = profile.ensayoCount.clamp(1, 12);
+    return [
+      SeasonPasoSlot(
+        label: 'Cristo',
+        filled: _ensayoFilled(
+              events
+                  .where((e) => e.paso.covers(SeasonPaso.cristo))
+                  .toList(),
+              n,
+            ) >=
+            n,
+      ),
+      SeasonPasoSlot(
+        label: 'Virgen',
+        filled: _ensayoFilled(
+              events
+                  .where((e) => e.paso.covers(SeasonPaso.virgen))
+                  .toList(),
+              n,
+            ) >=
+            n,
+      ),
+    ];
+  }
+  return const [];
+}
+
 List<HermandadSeasonActMilestone> buildSeasonActMilestones(
   List<CalendarEvent> events, {
   DateTime? now,
@@ -465,6 +583,7 @@ List<HermandadSeasonActMilestone> buildSeasonActMilestones(
         filledSlots: slots.filled,
         requiredSlots: slots.required,
         detailLabel: slots.detail,
+        pasoSlots: _pasoSlotsFor(kind, matched, profile),
       ),
     );
   }

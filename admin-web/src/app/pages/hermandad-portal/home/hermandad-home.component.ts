@@ -126,16 +126,19 @@ export class HermandadHomePageComponent implements OnInit {
   readonly seasonActs = computed(() =>
     buildSeasonActsSnapshot({
       year: currentSeasonActsYear(),
-      hermandadName: this.displayName(),
+      hermandadName: this.board()?.hermandadName || this.displayName(),
       events: this.store.seasonActEvents(),
       topicId: this.board()?.topicId,
       profileId: this.profile()?.id ?? null,
       hasAccount: true,
+      profile: this.store.seasonProfile(),
     }),
   );
 
   readonly missingSeasonActs = computed(() =>
-    this.seasonActs().milestones.filter((m) => m.status === 'empty'),
+    this.seasonActs().milestones.filter(
+      (m) => m.filledSlots < m.requiredSlots,
+    ),
   );
 
   publishKindForMissing(kind: string): string {

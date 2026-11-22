@@ -107,6 +107,13 @@
               <div class="milestone" [attr.data-status]="m.status">
                 <strong>{{ m.label }}</strong>
                 <span>{{ m.status === 'empty' ? '—' : m.statusLabel }}</span>
+                @if (m.pasoSlots.length) {
+                  <div class="paso-slots">
+                    @for (slot of m.pasoSlots; track slot.label) {
+                      <em [class.on]="slot.filled">{{ slot.label }}</em>
+                    }
+                  </div>
+                }
               </div>
             }
           </div>

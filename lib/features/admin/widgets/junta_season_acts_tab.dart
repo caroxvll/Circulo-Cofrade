@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../forums/hermandad_season_acts_provider.dart';
 import '../../forums/utils/hermandad_board_display.dart';
 import '../../forums/utils/hermandad_season_acts.dart';
+import '../../forums/widgets/hermandad_season_acts_card.dart';
 import '../../forums/widgets/hermandad_season_profile_sheet.dart';
 import '../junta_ui.dart';
 
@@ -498,6 +499,10 @@ class _MiniMilestone extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: JuntaUi.caption().copyWith(fontSize: 9),
         ),
+        if (milestone.pasoSlots.isNotEmpty) ...[
+          const SizedBox(height: 3),
+          SeasonPasoSlotsRow(slots: milestone.pasoSlots, compact: true),
+        ],
       ],
     );
   }

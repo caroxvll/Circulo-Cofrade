@@ -1000,6 +1000,30 @@
   line-height: 1.25;
 }
 
+.paso-slots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.paso-slots em {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--border) 55%, #fff);
+  border: 1px solid var(--border);
+}
+
+.paso-slots em.on {
+  color: #1b5e20;
+  background: color-mix(in srgb, #2e7d32 14%, #fff);
+  border-color: color-mix(in srgb, #2e7d32 40%, var(--border));
+}
+
 .season-actions {
   display: flex;
   flex-wrap: wrap;

@@ -399,8 +399,63 @@ class _MilestoneLabels extends StatelessWidget {
               color: empty ? AppColors.textMuted : AppColors.textSecondary,
             ).copyWith(fontSize: 10, height: 1.2),
           ),
+          if (milestone.pasoSlots.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            SeasonPasoSlotsRow(slots: milestone.pasoSlots),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class SeasonPasoSlotsRow extends StatelessWidget {
+  const SeasonPasoSlotsRow({
+    super.key,
+    required this.slots,
+    this.compact = false,
+  });
+
+  final List<SeasonPasoSlot> slots;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 4,
+      runSpacing: 4,
+      children: [
+        for (final slot in slots)
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 5 : 6,
+              vertical: compact ? 1 : 2,
+            ),
+            decoration: BoxDecoration(
+              color: slot.filled
+                  ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+                  : AppColors.backgroundElevated,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: slot.filled
+                    ? const Color(0xFF2E7D32).withValues(alpha: 0.45)
+                    : AppColors.border,
+              ),
+            ),
+            child: Text(
+              slot.label,
+              style: AppTypography.labelSmall(
+                color: slot.filled
+                    ? const Color(0xFF2E7D32)
+                    : AppColors.textMuted,
+              ).copyWith(
+                fontWeight: FontWeight.w700,
+                fontSize: compact ? 8 : 9,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

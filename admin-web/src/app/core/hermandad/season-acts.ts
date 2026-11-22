@@ -25,9 +25,15 @@ export interface SeasonActEvent {
   eventType: string;
   createdBy?: string | null;
   organizerLabel?: string | null;
+  hermandadTopicId?: string | null;
   paso?: SeasonPaso;
   seasonN?: number | null;
   withRetranqueo?: boolean;
+}
+
+export interface SeasonPasoSlot {
+  label: string;
+  filled: boolean;
 }
 
 export interface SeasonActMilestone {
@@ -39,6 +45,7 @@ export interface SeasonActMilestone {
   requiredSlots: number;
   statusLabel: string;
   events: SeasonActEvent[];
+  pasoSlots: SeasonPasoSlot[];
 }
 
 export interface SeasonActsSnapshot {
@@ -118,18 +125,71 @@ function normalizeOrganizerKey(raw: string): string {
     .replace(/\.+/g, '.');
 }
 
+function foldOrganizer(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function canonicalOrganizer(raw: string): string {
+  let value = foldOrganizer(normalizeOrganizerKey(raw));
+  const prefixes = [
+    'real ',
+    'ilustre ',
+    'pontificia ',
+    'hdad. ',
+    'hdad ',
+    'hermandad de la ',
+    'hermandad de las ',
+    'hermandad del ',
+    'hermandad de ',
+    'hermandad ',
+  ];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const prefix of prefixes) {
+      if (value.startsWith(prefix)) {
+        value = value.slice(prefix.length).trimStart();
+        changed = true;
+      }
+    }
+  }
+  return value;
+}
+
+export function organizerMatchesHermandadName(
+  organizer: string,
+  hermandadName: string,
+): boolean {
+  const orgKey = normalizeOrganizerKey(organizer);
+  const nameKey = normalizeOrganizerKey(hermandadName);
+  if (orgKey.length < 2 || nameKey.length < 2) return false;
+  if (orgKey === nameKey) return true;
+  const orgCanon = canonicalOrganizer(organizer);
+  const nameCanon = canonicalOrganizer(hermandadName);
+  if (orgCanon.length < 3 || nameCanon.length < 3) return false;
+  if (orgCanon === nameCanon) return true;
+  const shorter = orgCanon.length <= nameCanon.length ? orgCanon : nameCanon;
+  const longer = orgCanon.length > nameCanon.length ? orgCanon : nameCanon;
+  return shorter.length >= 6 && longer.includes(shorter);
+}
+
 export function eventBelongsToHermandad(
   event: SeasonActEvent,
   hermandadName: string,
   profileId?: string | null,
+  hermandadTopicId?: string | null,
 ): boolean {
+  const topicId = hermandadTopicId?.trim();
+  const linked = event.hermandadTopicId?.trim();
+  if (topicId && linked && topicId === linked) return true;
   if (profileId && event.createdBy === profileId) return true;
   const organizer = (event.organizerLabel ?? '').trim();
   if (!organizer) return false;
-  const orgKey = normalizeOrganizerKey(organizer);
-  const nameKey = normalizeOrganizerKey(hermandadName);
-  if (orgKey.length < 2 || nameKey.length < 2) return false;
-  return orgKey === nameKey;
+  return organizerMatchesHermandadName(organizer, hermandadName);
 }
 
 function startOfToday(): Date {
@@ -269,6 +329,53 @@ function slotsFor(
   return { filled: events.length ? 1 : 0, required: 1, detail: null };
 }
 
+function pasoSlotsFor(
+  kind: SeasonActKind,
+  events: SeasonActEvent[],
+  profile: HermandadSeasonProfile,
+): SeasonPasoSlot[] {
+  const covers = (needed: SeasonPaso) =>
+    events.some((e) => coversPaso(e.paso, needed));
+  if (kind === 'iguala') {
+    if (profile.igualaSplit) {
+      return [
+        { label: 'Cristo', filled: covers('cristo') },
+        { label: 'Virgen', filled: covers('virgen') },
+      ];
+    }
+    if (!events.length) return [];
+    const onlyAmbos = events.every((e) => (e.paso ?? 'ambos') === 'ambos');
+    if (onlyAmbos || (covers('cristo') && covers('virgen'))) {
+      return [{ label: 'Ambos', filled: true }];
+    }
+    if (covers('cristo')) return [{ label: 'Cristo', filled: true }];
+    if (covers('virgen')) return [{ label: 'Virgen', filled: true }];
+    return [{ label: 'Ambos', filled: true }];
+  }
+  if (kind === 'ensayos' && profile.ensayoSplit) {
+    const n = Math.min(12, Math.max(1, profile.ensayoCount));
+    return [
+      {
+        label: 'Cristo',
+        filled:
+          ensayoFilled(
+            events.filter((e) => coversPaso(e.paso, 'cristo')),
+            n,
+          ) >= n,
+      },
+      {
+        label: 'Virgen',
+        filled:
+          ensayoFilled(
+            events.filter((e) => coversPaso(e.paso, 'virgen')),
+            n,
+          ) >= n,
+      },
+    ];
+  }
+  return [];
+}
+
 function foldQuery(raw: string): string {
   return raw
     .toLowerCase()
@@ -317,7 +424,12 @@ export function buildSeasonActsSnapshot(input: {
   const profile = input.profile ?? DEFAULT_SEASON_PROFILE;
   const own = input.events
     .filter((e) =>
-      eventBelongsToHermandad(e, input.hermandadName, input.profileId),
+      eventBelongsToHermandad(
+        e,
+        input.hermandadName,
+        input.profileId,
+        input.topicId,
+      ),
     )
     .slice()
     .sort(
@@ -350,6 +462,7 @@ export function buildSeasonActsSnapshot(input: {
             : 'Sin publicar'
           : statusLabel(def.kind, status, matched)),
       events: matched,
+      pasoSlots: pasoSlotsFor(def.kind, matched, profile),
     };
   });
 

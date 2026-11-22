@@ -1,5 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { AuthService } from '../auth/auth.service';
+import { parseHermandadTopicTitle } from '../community/community.service';
+import { organizerMatchesHermandadName } from '../hermandad/season-acts';
 import { getSupabase } from '../supabase.client';
 import {
   CALENDAR_EVENT_TYPES,
@@ -84,6 +86,11 @@ export class EventsService {
     if (!userId) throw new Error('Sesión no disponible');
 
     const payload = this.toDbPayload(input);
+    if (!payload['hermandad_topic_id'] && input.organizerLabel) {
+      payload['hermandad_topic_id'] = await this.resolveHermandadTopicId(
+        input.organizerLabel,
+      );
+    }
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .insert({
@@ -101,6 +108,11 @@ export class EventsService {
 
   async updateEvent(eventId: string, input: CalendarEventInput): Promise<CalendarEventRow> {
     const payload = this.toDbPayload(input);
+    if (!payload['hermandad_topic_id'] && input.organizerLabel) {
+      payload['hermandad_topic_id'] = await this.resolveHermandadTopicId(
+        input.organizerLabel,
+      );
+    }
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .update({
@@ -259,7 +271,31 @@ export class EventsService {
       paso: input.paso ?? 'ambos',
       season_n: isEnsayo ? (input.seasonN ?? 1) : null,
       with_retranqueo: isMuda && input.withRetranqueo === true,
+      hermandad_topic_id: input.hermandadTopicId?.trim() || null,
     };
+  }
+
+  async resolveHermandadTopicId(organizerLabel: string): Promise<string | null> {
+    const label = organizerLabel.trim();
+    if (label.length < 3) return null;
+    const safe = label.replace(/[%_,]/g, '');
+    const { data, error } = await getSupabase()
+      .from('forum_topics')
+      .select('id, title')
+      .eq('forum_id', 'hermandades')
+      .eq('status', 'published')
+      .ilike('title', `%${safe}%`)
+      .limit(40);
+    if (error || !data?.length) return null;
+    for (const row of data) {
+      const title = String(row['title'] ?? '');
+      const parsed = parseHermandadTopicTitle(title);
+      const name = parsed.hermandadName.trim() || title.trim();
+      if (organizerMatchesHermandadName(label, name)) {
+        return String(row['id'] ?? '') || null;
+      }
+    }
+    return null;
   }
 
   async setLiveForceState(

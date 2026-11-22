@@ -12,7 +12,8 @@ import {
   publishKindById,
 } from './hermandad-portal.service';
 import {
-  SEASON_ACT_DB_TYPES,
+  DEFAULT_SEASON_PROFILE,
+  HermandadSeasonProfile,
   SeasonActEvent,
   currentSeasonActsYear,
   seasonActsRange,
@@ -40,8 +41,9 @@ export class HermandadPortalStore {
   readonly deletedPosts = signal<HermandadOfficialPost[]>([]);
   readonly scheduledPosts = signal<HermandadScheduledPost[]>([]);
   readonly upcomingEvents = signal<HermandadUpcomingEvent[]>([]);
-  /** Igualá / ensayos / muda / desarmá del año (propios). */
+  /** Igualá / ensayos / muda / desarmá del año (propios y de Junta). */
   readonly seasonActEvents = signal<SeasonActEvent[]>([]);
+  readonly seasonProfile = signal<HermandadSeasonProfile>(DEFAULT_SEASON_PROFILE);
   readonly followerCount = signal(0);
   /** Primera carga (sin caché): la UI puede mostrar “Cargando…”. */
   readonly loading = signal(false);
@@ -240,35 +242,31 @@ export class HermandadPortalStore {
 
       const year = currentSeasonActsYear();
       const range = seasonActsRange(year);
-      const [deleted, scheduled, events, seasonActs, followers] =
+      const [deleted, scheduled, events, seasonActs, followers, seasonProfile] =
         await Promise.all([
           this.api.fetchDeletedOfficialPosts(profile.id, topicIds).catch(() => []),
           this.api.fetchScheduledPosts(profile.id, topicIds).catch(() => []),
           this.api.fetchUpcomingOwnEvents(profile.id, 30).catch(() => []),
           this.api
-            .fetchOwnEventsInRange(profile.id, range.fromIso, range.toIso)
+            .fetchSeasonActEvents({
+              topicId: primaryId,
+              profileId: profile.id,
+              fromIso: range.fromIso,
+              toIso: range.toIso,
+            })
             .catch(() => []),
           primaryId
             ? this.api.countTopicFollowers(primaryId).catch(() => 0)
             : Promise.resolve(0),
+          primaryId
+            ? this.api.fetchSeasonProfile(primaryId).catch(() => DEFAULT_SEASON_PROFILE)
+            : Promise.resolve(DEFAULT_SEASON_PROFILE),
         ]);
       this.deletedPosts.set(deleted);
       this.scheduledPosts.set(scheduled);
       this.upcomingEvents.set(events);
-      this.seasonActEvents.set(
-        seasonActs
-          .filter((e) =>
-            (SEASON_ACT_DB_TYPES as readonly string[]).includes(e.eventType),
-          )
-          .map((e) => ({
-            id: e.id,
-            title: e.title,
-            startsAt: e.startsAt,
-            eventType: e.eventType,
-            createdBy: profile.id,
-            organizerLabel: null,
-          })),
-      );
+      this.seasonActEvents.set(seasonActs);
+      this.seasonProfile.set(seasonProfile);
       this.followerCount.set(followers);
       this.lastLoadedAt = Date.now();
     } catch (err) {

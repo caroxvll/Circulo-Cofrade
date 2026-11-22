@@ -101,7 +101,7 @@ export class SeasonActsPageComponent implements OnInit {
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .select(
-        'id, title, starts_at, event_type, created_by, organizer_label, paso, season_n, with_retranqueo',
+        'id, title, starts_at, event_type, created_by, organizer_label, hermandad_topic_id, paso, season_n, with_retranqueo',
       )
       .eq('status', 'published')
       .in('event_type', [...SEASON_ACT_DB_TYPES])
@@ -117,6 +117,7 @@ export class SeasonActsPageComponent implements OnInit {
       eventType: String(row['event_type'] ?? ''),
       createdBy: (row['created_by'] as string | null) ?? null,
       organizerLabel: (row['organizer_label'] as string | null) ?? null,
+      hermandadTopicId: (row['hermandad_topic_id'] as string | null) ?? null,
       paso: (row['paso'] as SeasonPaso | null) ?? 'ambos',
       seasonN: (row['season_n'] as number | null) ?? null,
       withRetranqueo: row['with_retranqueo'] === true,
