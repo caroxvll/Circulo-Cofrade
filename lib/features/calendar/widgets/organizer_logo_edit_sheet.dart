@@ -167,6 +167,7 @@ class _OrganizerLogoEditSheetState extends ConsumerState<_OrganizerLogoEditSheet
         organizerKey: widget.item.organizerKey,
         displayLabel: label,
         logoUrl: logoUrl,
+        hermandadTopicId: widget.item.hermandadTopicId,
         propagateToAllEvents: ref.read(isCalendarAdminProvider),
       );
 
@@ -213,9 +214,13 @@ class _OrganizerLogoEditSheetState extends ConsumerState<_OrganizerLogoEditSheet
             const SizedBox(height: 12),
             TextField(
               controller: _labelController,
-              decoration: const InputDecoration(
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
                 labelText: 'Hermandad / organizador',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
+                helperText: widget.item.isHermandadBoard
+                    ? 'Así aparece en el calendario. El día de estación del tablón no cambia.'
+                    : null,
               ),
             ),
             const SizedBox(height: 16),
