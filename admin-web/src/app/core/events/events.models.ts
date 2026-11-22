@@ -64,6 +64,7 @@ export interface CalendarEventInput {
   paso?: SeasonPaso;
   seasonN?: number | null;
   withRetranqueo?: boolean;
+  hermandadTopicId?: string | null;
   /** Solo en create: por defecto published (admin). */
   status?: CalendarEventStatus;
 }

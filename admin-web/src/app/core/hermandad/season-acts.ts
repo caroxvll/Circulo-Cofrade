@@ -25,10 +25,35 @@ export interface SeasonActEvent {
   eventType: string;
   createdBy?: string | null;
   organizerLabel?: string | null;
+  hermandadTopicId?: string | null;
   paso?: SeasonPaso;
   seasonN?: number | null;
   withRetranqueo?: boolean;
 }
+
+export interface SeasonPasoSlot {
+  label: string;
+  filled: boolean;
+  hint?: string | null;
+}
+
+export type SeasonActPasoFilter =
+  | 'iguala_cristo'
+  | 'iguala_virgen'
+  | 'iguala_ambas'
+  | 'ensayo_cristo'
+  | 'ensayo_virgen';
+
+export const SEASON_ACT_PASO_FILTERS: ReadonlyArray<{
+  id: SeasonActPasoFilter;
+  label: string;
+}> = [
+  { id: 'iguala_cristo', label: 'Igualá Cristo' },
+  { id: 'iguala_virgen', label: 'Igualá Virgen' },
+  { id: 'iguala_ambas', label: 'Igualá ambas' },
+  { id: 'ensayo_cristo', label: 'Ensayos Cristo' },
+  { id: 'ensayo_virgen', label: 'Ensayos Virgen' },
+];
 
 export interface SeasonActMilestone {
   kind: SeasonActKind;
@@ -39,6 +64,7 @@ export interface SeasonActMilestone {
   requiredSlots: number;
   statusLabel: string;
   events: SeasonActEvent[];
+  pasoSlots: SeasonPasoSlot[];
 }
 
 export interface SeasonActsSnapshot {
@@ -118,18 +144,71 @@ function normalizeOrganizerKey(raw: string): string {
     .replace(/\.+/g, '.');
 }
 
+function foldOrganizer(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function canonicalOrganizer(raw: string): string {
+  let value = foldOrganizer(normalizeOrganizerKey(raw));
+  const prefixes = [
+    'real ',
+    'ilustre ',
+    'pontificia ',
+    'hdad. ',
+    'hdad ',
+    'hermandad de la ',
+    'hermandad de las ',
+    'hermandad del ',
+    'hermandad de ',
+    'hermandad ',
+  ];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const prefix of prefixes) {
+      if (value.startsWith(prefix)) {
+        value = value.slice(prefix.length).trimStart();
+        changed = true;
+      }
+    }
+  }
+  return value;
+}
+
+export function organizerMatchesHermandadName(
+  organizer: string,
+  hermandadName: string,
+): boolean {
+  const orgKey = normalizeOrganizerKey(organizer);
+  const nameKey = normalizeOrganizerKey(hermandadName);
+  if (orgKey.length < 2 || nameKey.length < 2) return false;
+  if (orgKey === nameKey) return true;
+  const orgCanon = canonicalOrganizer(organizer);
+  const nameCanon = canonicalOrganizer(hermandadName);
+  if (orgCanon.length < 3 || nameCanon.length < 3) return false;
+  if (orgCanon === nameCanon) return true;
+  const shorter = orgCanon.length <= nameCanon.length ? orgCanon : nameCanon;
+  const longer = orgCanon.length > nameCanon.length ? orgCanon : nameCanon;
+  return shorter.length >= 6 && longer.includes(shorter);
+}
+
 export function eventBelongsToHermandad(
   event: SeasonActEvent,
   hermandadName: string,
   profileId?: string | null,
+  hermandadTopicId?: string | null,
 ): boolean {
+  const topicId = hermandadTopicId?.trim();
+  const linked = event.hermandadTopicId?.trim();
+  if (topicId && linked && topicId === linked) return true;
   if (profileId && event.createdBy === profileId) return true;
   const organizer = (event.organizerLabel ?? '').trim();
   if (!organizer) return false;
-  const orgKey = normalizeOrganizerKey(organizer);
-  const nameKey = normalizeOrganizerKey(hermandadName);
-  if (orgKey.length < 2 || nameKey.length < 2) return false;
-  return orgKey === nameKey;
+  return organizerMatchesHermandadName(organizer, hermandadName);
 }
 
 function startOfToday(): Date {
@@ -269,6 +348,86 @@ function slotsFor(
   return { filled: events.length ? 1 : 0, required: 1, detail: null };
 }
 
+function pasoSlotsFor(
+  kind: SeasonActKind,
+  events: SeasonActEvent[],
+  profile: HermandadSeasonProfile,
+): SeasonPasoSlot[] {
+  const covers = (needed: SeasonPaso) =>
+    events.some((e) => coversPaso(e.paso, needed));
+  if (kind === 'iguala') {
+    return [
+      { label: 'Cristo', filled: covers('cristo') },
+      { label: 'Virgen', filled: covers('virgen') },
+    ];
+  }
+  if (kind === 'ensayos') {
+    const n = Math.min(12, Math.max(1, profile.ensayoCount));
+    const cristoN = ensayoFilled(
+      events.filter((e) => coversPaso(e.paso, 'cristo')),
+      n,
+    );
+    const virgenN = ensayoFilled(
+      events.filter((e) => coversPaso(e.paso, 'virgen')),
+      n,
+    );
+    const showHint = profile.ensayoSplit || n > 1;
+    return [
+      {
+        label: 'Cristo',
+        filled: cristoN > 0,
+        hint: showHint ? `${cristoN}/${n}` : null,
+      },
+      {
+        label: 'Virgen',
+        filled: virgenN > 0,
+        hint: showHint ? `${virgenN}/${n}` : null,
+      },
+    ];
+  }
+  return [];
+}
+
+function hasPasoFilled(
+  row: SeasonActsSnapshot,
+  kind: SeasonActKind,
+  pasoLabel: string,
+): boolean {
+  const milestone = row.milestones.find((m) => m.kind === kind);
+  return milestone?.pasoSlots.some((s) => s.label === pasoLabel && s.filled) === true;
+}
+
+export function eventsForPasoSlot(
+  events: SeasonActEvent[],
+  slot: SeasonPasoSlot,
+): SeasonActEvent[] {
+  if (slot.label === 'Cristo') {
+    return events.filter((e) => coversPaso(e.paso, 'cristo'));
+  }
+  if (slot.label === 'Virgen') {
+    return events.filter((e) => coversPaso(e.paso, 'virgen'));
+  }
+  return events;
+}
+
+export function matchesPasoFilter(
+  row: SeasonActsSnapshot,
+  filter: SeasonActPasoFilter | null,
+): boolean {
+  if (!filter) return true;
+  if (filter === 'iguala_cristo') return hasPasoFilled(row, 'iguala', 'Cristo');
+  if (filter === 'iguala_virgen') return hasPasoFilled(row, 'iguala', 'Virgen');
+  if (filter === 'iguala_ambas') {
+    return (
+      hasPasoFilled(row, 'iguala', 'Cristo') &&
+      hasPasoFilled(row, 'iguala', 'Virgen')
+    );
+  }
+  if (filter === 'ensayo_cristo') return hasPasoFilled(row, 'ensayos', 'Cristo');
+  if (filter === 'ensayo_virgen') return hasPasoFilled(row, 'ensayos', 'Virgen');
+  return true;
+}
+
 function foldQuery(raw: string): string {
   return raw
     .toLowerCase()
@@ -281,10 +440,12 @@ export function filterSeasonActsSnapshots(
   rows: SeasonActsSnapshot[],
   query: string,
   processionDay: string | null,
+  pasoFilter: SeasonActPasoFilter | null = null,
 ): SeasonActsSnapshot[] {
   const q = foldQuery(query);
   return rows.filter((row) => {
     if (processionDay && row.processionDay !== processionDay) return false;
+    if (!matchesPasoFilter(row, pasoFilter)) return false;
     if (!q) return true;
     return (
       foldQuery(row.hermandadName).includes(q) ||
@@ -317,7 +478,12 @@ export function buildSeasonActsSnapshot(input: {
   const profile = input.profile ?? DEFAULT_SEASON_PROFILE;
   const own = input.events
     .filter((e) =>
-      eventBelongsToHermandad(e, input.hermandadName, input.profileId),
+      eventBelongsToHermandad(
+        e,
+        input.hermandadName,
+        input.profileId,
+        input.topicId,
+      ),
     )
     .slice()
     .sort(
@@ -350,6 +516,7 @@ export function buildSeasonActsSnapshot(input: {
             : 'Sin publicar'
           : statusLabel(def.kind, status, matched)),
       events: matched,
+      pasoSlots: pasoSlotsFor(def.kind, matched, profile),
     };
   });
 

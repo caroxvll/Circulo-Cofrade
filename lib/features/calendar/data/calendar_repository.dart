@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../../forums/utils/hermandad_board_display.dart';
+import '../../forums/utils/hermandad_season_acts.dart';
 import '../models/organizer_logo.dart';
 import '../utils/calendar_event_utils.dart';
 import 'mock_calendar_events.dart';
@@ -506,6 +507,29 @@ class CalendarRepository {
 
     final logos = await fetchHermandadOrganizerLogos();
     return logos[key]?.logoUrl;
+  }
+
+  /// Tablón oficial que corresponde a este organizador, si hay uno.
+  Future<String?> findHermandadTopicIdForOrganizer(
+    String organizerLabel,
+  ) async {
+    final label = organizerLabel.trim();
+    if (label.length < 3) return null;
+    final logos = await fetchHermandadOrganizerLogos();
+    if (logos.isEmpty) return null;
+    final key = normalizeOrganizerKey(label);
+    final direct = logos[key];
+    final directId = direct?.hermandadTopicId?.trim();
+    if (directId != null && directId.isNotEmpty) return directId;
+    for (final item in logos.values) {
+      final topicId = item.hermandadTopicId?.trim();
+      if (topicId == null || topicId.isEmpty) continue;
+      if (organizerMatchesHermandadName(label, item.displayLabel) ||
+          organizerMatchesHermandadName(label, item.organizerKey)) {
+        return topicId;
+      }
+    }
+    return null;
   }
 
   /// Escudos de tablones oficiales indexados por organizador normalizado.

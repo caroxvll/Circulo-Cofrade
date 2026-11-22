@@ -219,7 +219,13 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
 
   String? _linkedOrganizerKey;
 
+  var _linkingOrganizer = false;
+
   void _onOrganizerChanged() {
+    if (_linkingOrganizer) {
+      _scheduleOrganizerShieldLookup();
+      return;
+    }
     final key = normalizeOrganizerKey(_organizerController.text);
     if (_shieldSkipAutoLoadKey != null && _shieldSkipAutoLoadKey != key) {
       _shieldSkipAutoLoadKey = null;
@@ -266,20 +272,34 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       var logoUrl = await repo.fetchOrganizerLogo(organizer);
       logoUrl ??= await repo.fetchHermandadIconByOrganizerLabel(organizer);
       if (!mounted) return;
-      if (logoUrl == null || logoUrl.isEmpty) {
-        setState(() => _loadingOrganizerShield = false);
+
+      var topicId = _hermandadTopicId;
+      var linkedKey = _linkedOrganizerKey;
+      if (topicId == null || topicId.isEmpty) {
+        final resolved =
+            await repo.findHermandadTopicIdForOrganizer(organizer);
+        if (resolved != null && resolved.isNotEmpty) {
+          topicId = resolved;
+          linkedKey = key;
+        }
+      }
+      if (_shieldManualOverride || _selectedIconBytes != null) {
+        if (mounted) setState(() => _loadingOrganizerShield = false);
         return;
       }
-      if (_shieldManualOverride || _selectedIconBytes != null) return;
 
       setState(() {
-        _customIconUrl = logoUrl;
-        _shieldFromLibrary = true;
-        _selectedIconName = null;
-        _selectedIconBytes = null;
-        _selectedIconExtension = null;
-        _selectedIconContentType = null;
+        if (logoUrl != null && logoUrl.isNotEmpty) {
+          _customIconUrl = logoUrl;
+          _shieldFromLibrary = true;
+          _selectedIconName = null;
+          _selectedIconBytes = null;
+          _selectedIconExtension = null;
+          _selectedIconContentType = null;
+        }
         _loadingOrganizerShield = false;
+        _hermandadTopicId = topicId;
+        _linkedOrganizerKey = linkedKey;
       });
     } catch (_) {
       if (mounted) setState(() => _loadingOrganizerShield = false);
@@ -291,6 +311,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     if (picked == null || !mounted) return;
 
     setState(() {
+      _linkingOrganizer = true;
       _organizerController.text = picked.displayLabel;
       _hermandadTopicId = picked.hermandadTopicId;
       _linkedOrganizerKey = picked.organizerKey;
@@ -301,6 +322,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       _selectedIconExtension = null;
       _selectedIconContentType = null;
       _initialOrganizerKey = picked.organizerKey;
+      _linkingOrganizer = false;
 
       if (picked.hasLogo) {
         _customIconUrl = picked.logoUrl;
@@ -785,7 +807,13 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
         );
       }
 
-      final hermandadId = _hermandadTopicId?.trim();
+      var hermandadId = _hermandadTopicId?.trim();
+      if (hermandadId == null || hermandadId.isEmpty) {
+        hermandadId = await repo.findHermandadTopicIdForOrganizer(organizer);
+        if (hermandadId != null && hermandadId.isNotEmpty) {
+          _hermandadTopicId = hermandadId;
+        }
+      }
       if (_isEditing) {
         await repo.updateEvent(
           eventId: widget.existing!.id!,
@@ -829,6 +857,10 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       }
 
       invalidateCalendarMonth(ref, _date);
+      ref.read(calendarEventsEpochProvider.notifier).bump();
+      ref.invalidate(hermandadSeasonActsCoverageProvider);
+      ref.invalidate(seasonActsEventsProvider);
+      ref.invalidate(hermandadSeasonActsProvider);
       if (mounted) {
         Navigator.pop(context);
         final isAdmin = ref.read(isAdminProvider);
