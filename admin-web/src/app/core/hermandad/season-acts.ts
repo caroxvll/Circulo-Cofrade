@@ -34,7 +34,26 @@ export interface SeasonActEvent {
 export interface SeasonPasoSlot {
   label: string;
   filled: boolean;
+  hint?: string | null;
 }
+
+export type SeasonActPasoFilter =
+  | 'iguala_cristo'
+  | 'iguala_virgen'
+  | 'iguala_ambas'
+  | 'ensayo_cristo'
+  | 'ensayo_virgen';
+
+export const SEASON_ACT_PASO_FILTERS: ReadonlyArray<{
+  id: SeasonActPasoFilter;
+  label: string;
+}> = [
+  { id: 'iguala_cristo', label: 'Igualá Cristo' },
+  { id: 'iguala_virgen', label: 'Igualá Virgen' },
+  { id: 'iguala_ambas', label: 'Igualá ambas' },
+  { id: 'ensayo_cristo', label: 'Ensayos Cristo' },
+  { id: 'ensayo_virgen', label: 'Ensayos Virgen' },
+];
 
 export interface SeasonActMilestone {
   kind: SeasonActKind;
@@ -337,43 +356,76 @@ function pasoSlotsFor(
   const covers = (needed: SeasonPaso) =>
     events.some((e) => coversPaso(e.paso, needed));
   if (kind === 'iguala') {
-    if (profile.igualaSplit) {
-      return [
-        { label: 'Cristo', filled: covers('cristo') },
-        { label: 'Virgen', filled: covers('virgen') },
-      ];
-    }
-    if (!events.length) return [];
-    const onlyAmbos = events.every((e) => (e.paso ?? 'ambos') === 'ambos');
-    if (onlyAmbos || (covers('cristo') && covers('virgen'))) {
-      return [{ label: 'Ambos', filled: true }];
-    }
-    if (covers('cristo')) return [{ label: 'Cristo', filled: true }];
-    if (covers('virgen')) return [{ label: 'Virgen', filled: true }];
-    return [{ label: 'Ambos', filled: true }];
+    return [
+      { label: 'Cristo', filled: covers('cristo') },
+      { label: 'Virgen', filled: covers('virgen') },
+    ];
   }
-  if (kind === 'ensayos' && profile.ensayoSplit) {
+  if (kind === 'ensayos') {
     const n = Math.min(12, Math.max(1, profile.ensayoCount));
+    const cristoN = ensayoFilled(
+      events.filter((e) => coversPaso(e.paso, 'cristo')),
+      n,
+    );
+    const virgenN = ensayoFilled(
+      events.filter((e) => coversPaso(e.paso, 'virgen')),
+      n,
+    );
+    const showHint = profile.ensayoSplit || n > 1;
     return [
       {
         label: 'Cristo',
-        filled:
-          ensayoFilled(
-            events.filter((e) => coversPaso(e.paso, 'cristo')),
-            n,
-          ) >= n,
+        filled: cristoN > 0,
+        hint: showHint ? `${cristoN}/${n}` : null,
       },
       {
         label: 'Virgen',
-        filled:
-          ensayoFilled(
-            events.filter((e) => coversPaso(e.paso, 'virgen')),
-            n,
-          ) >= n,
+        filled: virgenN > 0,
+        hint: showHint ? `${virgenN}/${n}` : null,
       },
     ];
   }
   return [];
+}
+
+function hasPasoFilled(
+  row: SeasonActsSnapshot,
+  kind: SeasonActKind,
+  pasoLabel: string,
+): boolean {
+  const milestone = row.milestones.find((m) => m.kind === kind);
+  return milestone?.pasoSlots.some((s) => s.label === pasoLabel && s.filled) === true;
+}
+
+export function eventsForPasoSlot(
+  events: SeasonActEvent[],
+  slot: SeasonPasoSlot,
+): SeasonActEvent[] {
+  if (slot.label === 'Cristo') {
+    return events.filter((e) => coversPaso(e.paso, 'cristo'));
+  }
+  if (slot.label === 'Virgen') {
+    return events.filter((e) => coversPaso(e.paso, 'virgen'));
+  }
+  return events;
+}
+
+export function matchesPasoFilter(
+  row: SeasonActsSnapshot,
+  filter: SeasonActPasoFilter | null,
+): boolean {
+  if (!filter) return true;
+  if (filter === 'iguala_cristo') return hasPasoFilled(row, 'iguala', 'Cristo');
+  if (filter === 'iguala_virgen') return hasPasoFilled(row, 'iguala', 'Virgen');
+  if (filter === 'iguala_ambas') {
+    return (
+      hasPasoFilled(row, 'iguala', 'Cristo') &&
+      hasPasoFilled(row, 'iguala', 'Virgen')
+    );
+  }
+  if (filter === 'ensayo_cristo') return hasPasoFilled(row, 'ensayos', 'Cristo');
+  if (filter === 'ensayo_virgen') return hasPasoFilled(row, 'ensayos', 'Virgen');
+  return true;
 }
 
 function foldQuery(raw: string): string {
@@ -388,10 +440,12 @@ export function filterSeasonActsSnapshots(
   rows: SeasonActsSnapshot[],
   query: string,
   processionDay: string | null,
+  pasoFilter: SeasonActPasoFilter | null = null,
 ): SeasonActsSnapshot[] {
   const q = foldQuery(query);
   return rows.filter((row) => {
     if (processionDay && row.processionDay !== processionDay) return false;
+    if (!matchesPasoFilter(row, pasoFilter)) return false;
     if (!q) return true;
     return (
       foldQuery(row.hermandadName).includes(q) ||

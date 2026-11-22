@@ -59,10 +59,56 @@ enum HermandadSeasonActStatus {
 }
 
 class SeasonPasoSlot {
-  const SeasonPasoSlot({required this.label, required this.filled});
+  const SeasonPasoSlot({
+    required this.label,
+    required this.filled,
+    this.hint,
+  });
 
   final String label;
   final bool filled;
+  final String? hint;
+
+  String get shortLabel => switch (label) {
+        'Cristo' => 'C',
+        'Virgen' => 'V',
+        'Ambos' => '2',
+        _ => label,
+      };
+}
+
+SeasonPaso? seasonPasoFromSlotLabel(String label) => switch (label) {
+      'Cristo' => SeasonPaso.cristo,
+      'Virgen' => SeasonPaso.virgen,
+      _ => null,
+    };
+
+List<CalendarEvent> eventsForPasoSlot(
+  HermandadSeasonActMilestone milestone,
+  SeasonPasoSlot slot,
+) {
+  final needed = seasonPasoFromSlotLabel(slot.label);
+  if (needed == null) return milestone.events;
+  return [
+    for (final event in milestone.events)
+      if (event.paso.covers(needed)) event,
+  ];
+}
+
+enum SeasonActPasoFilter {
+  igualaCristo,
+  igualaVirgen,
+  igualaAmbas,
+  ensayoCristo,
+  ensayoVirgen;
+
+  String get label => switch (this) {
+        SeasonActPasoFilter.igualaCristo => 'Igualá Cristo',
+        SeasonActPasoFilter.igualaVirgen => 'Igualá Virgen',
+        SeasonActPasoFilter.igualaAmbas => 'Igualá ambas',
+        SeasonActPasoFilter.ensayoCristo => 'Ensayos Cristo',
+        SeasonActPasoFilter.ensayoVirgen => 'Ensayos Virgen',
+      };
 }
 
 class HermandadSeasonActMilestone {
@@ -196,6 +242,31 @@ class HermandadSeasonActsSnapshot {
     return null;
   }
 
+  bool hasPasoFilled(HermandadSeasonActKind kind, String pasoLabel) {
+    final item = milestone(kind);
+    if (item == null) return false;
+    for (final slot in item.pasoSlots) {
+      if (slot.label == pasoLabel && slot.filled) return true;
+    }
+    return false;
+  }
+
+  bool matchesPasoFilter(SeasonActPasoFilter filter) {
+    return switch (filter) {
+      SeasonActPasoFilter.igualaCristo =>
+        hasPasoFilled(HermandadSeasonActKind.iguala, 'Cristo'),
+      SeasonActPasoFilter.igualaVirgen =>
+        hasPasoFilled(HermandadSeasonActKind.iguala, 'Virgen'),
+      SeasonActPasoFilter.igualaAmbas =>
+        hasPasoFilled(HermandadSeasonActKind.iguala, 'Cristo') &&
+            hasPasoFilled(HermandadSeasonActKind.iguala, 'Virgen'),
+      SeasonActPasoFilter.ensayoCristo =>
+        hasPasoFilled(HermandadSeasonActKind.ensayos, 'Cristo'),
+      SeasonActPasoFilter.ensayoVirgen =>
+        hasPasoFilled(HermandadSeasonActKind.ensayos, 'Virgen'),
+    };
+  }
+
   String get coverageLabel {
     if (!hasAccount) return 'Sin cuenta';
     if (isEmpty) return 'Sin actos';
@@ -243,11 +314,13 @@ List<HermandadSeasonActsSnapshot> filterSeasonActsCoverage({
   required List<HermandadSeasonActsSnapshot> rows,
   String query = '',
   String? processionDay,
+  SeasonActPasoFilter? pasoFilter,
 }) {
   final q = _foldSeasonQuery(query);
   return [
     for (final row in rows)
       if ((processionDay == null || row.processionDay == processionDay) &&
+          (pasoFilter == null || row.matchesPasoFilter(pasoFilter)) &&
           (q.isEmpty ||
               _foldSeasonQuery(row.hermandadName).contains(q) ||
               _foldSeasonQuery(row.processionDay ?? '').contains(q)))
@@ -510,49 +583,33 @@ List<SeasonPasoSlot> _pasoSlotsFor(
       events.any((e) => e.paso.covers(needed));
 
   if (kind == HermandadSeasonActKind.iguala) {
-    if (profile.igualaSplit) {
-      return [
-        SeasonPasoSlot(label: 'Cristo', filled: covers(SeasonPaso.cristo)),
-        SeasonPasoSlot(label: 'Virgen', filled: covers(SeasonPaso.virgen)),
-      ];
-    }
-    if (events.isEmpty) return const [];
-    final onlyAmbos = events.every((e) => e.paso == SeasonPaso.ambos);
-    if (onlyAmbos ||
-        (covers(SeasonPaso.cristo) && covers(SeasonPaso.virgen))) {
-      return const [SeasonPasoSlot(label: 'Ambos', filled: true)];
-    }
-    if (covers(SeasonPaso.cristo)) {
-      return const [SeasonPasoSlot(label: 'Cristo', filled: true)];
-    }
-    if (covers(SeasonPaso.virgen)) {
-      return const [SeasonPasoSlot(label: 'Virgen', filled: true)];
-    }
-    return const [SeasonPasoSlot(label: 'Ambos', filled: true)];
+    return [
+      SeasonPasoSlot(label: 'Cristo', filled: covers(SeasonPaso.cristo)),
+      SeasonPasoSlot(label: 'Virgen', filled: covers(SeasonPaso.virgen)),
+    ];
   }
 
-  if (kind == HermandadSeasonActKind.ensayos && profile.ensayoSplit) {
+  if (kind == HermandadSeasonActKind.ensayos) {
     final n = profile.ensayoCount.clamp(1, 12);
+    final cristoN = _ensayoFilled(
+      events.where((e) => e.paso.covers(SeasonPaso.cristo)).toList(),
+      n,
+    );
+    final virgenN = _ensayoFilled(
+      events.where((e) => e.paso.covers(SeasonPaso.virgen)).toList(),
+      n,
+    );
+    final showHint = profile.ensayoSplit || n > 1;
     return [
       SeasonPasoSlot(
         label: 'Cristo',
-        filled: _ensayoFilled(
-              events
-                  .where((e) => e.paso.covers(SeasonPaso.cristo))
-                  .toList(),
-              n,
-            ) >=
-            n,
+        filled: cristoN > 0,
+        hint: showHint ? '$cristoN/$n' : null,
       ),
       SeasonPasoSlot(
         label: 'Virgen',
-        filled: _ensayoFilled(
-              events
-                  .where((e) => e.paso.covers(SeasonPaso.virgen))
-                  .toList(),
-              n,
-            ) >=
-            n,
+        filled: virgenN > 0,
+        hint: showHint ? '$virgenN/$n' : null,
       ),
     ];
   }

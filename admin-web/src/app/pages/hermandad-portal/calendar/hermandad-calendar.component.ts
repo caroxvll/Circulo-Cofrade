@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import {
   CALENDAR_EVENT_TYPES,
@@ -71,6 +71,8 @@ export class HermandadCalendarPageComponent implements OnInit {
   private readonly api = inject(HermandadPortalService);
   private readonly store = inject(HermandadPortalStore);
   private readonly confirm = inject(ConfirmDialogService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   readonly weekdays = WEEKDAYS;
   readonly eventTypes = CALENDAR_EVENT_TYPES;
@@ -187,7 +189,38 @@ export class HermandadCalendarPageComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    void this.store.ensureLoaded().then(() => this.loadMonth());
+    const editId = this.route.snapshot.queryParamMap.get('edit');
+    void this.store.ensureLoaded().then(async () => {
+      await this.loadMonth();
+      await this.openFromQuery(editId);
+    });
+  }
+
+  private async openFromQuery(eventId: string | null): Promise<void> {
+    const id = eventId?.trim();
+    if (!id) return;
+    try {
+      let ev = this.events().find((e) => e.id === id) ?? null;
+      if (!ev) {
+        ev = await this.api.fetchPublishedEventById(id);
+        if (ev) {
+          this.cursor.set(startOfMonth(new Date(ev.startsAt)));
+          await this.loadMonth();
+          ev = this.events().find((e) => e.id === id) ?? ev;
+        }
+      }
+      if (ev) this.openEvent(ev);
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo abrir el evento',
+      );
+    } finally {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: {},
+        replaceUrl: true,
+      });
+    }
   }
 
   shiftMonth(delta: number): void {

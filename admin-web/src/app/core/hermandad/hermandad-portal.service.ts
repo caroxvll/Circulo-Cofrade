@@ -401,6 +401,21 @@ export class HermandadPortalService {
     return (data ?? []).map((row) => this.mapCalendarEvent(row));
   }
 
+  async fetchPublishedEventById(eventId: string) {
+    const id = eventId.trim();
+    if (!id) return null;
+    const { data, error } = await getSupabase()
+      .from('calendar_events')
+      .select(
+        'id, title, starts_at, location, cover_image_url, event_type, admission_label, time_slots, status, view_count',
+      )
+      .eq('id', id)
+      .eq('status', 'published')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? this.mapCalendarEvent(data as Record<string, unknown>) : null;
+  }
+
   /** Igualá / ensayos / muda / desarmá del tablón (no solo los creados por la cuenta). */
   async fetchSeasonActEvents(input: {
     topicId?: string | null;

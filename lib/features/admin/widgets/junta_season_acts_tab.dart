@@ -21,6 +21,7 @@ class JuntaSeasonActsTab extends ConsumerStatefulWidget {
 class _JuntaSeasonActsTabState extends ConsumerState<JuntaSeasonActsTab> {
   final _search = TextEditingController();
   String? _day;
+  SeasonActPasoFilter? _paso;
 
   @override
   void dispose() {
@@ -61,6 +62,7 @@ class _JuntaSeasonActsTabState extends ConsumerState<JuntaSeasonActsTab> {
           coverage: coverage,
           query: _search.text,
           selectedDay: _day,
+          pasoFilter: _paso,
           searchController: _search,
           onQueryChanged: (_) => setState(() {}),
           onClearQuery: () {
@@ -68,6 +70,7 @@ class _JuntaSeasonActsTabState extends ConsumerState<JuntaSeasonActsTab> {
             setState(() {});
           },
           onDayChanged: (day) => setState(() => _day = day),
+          onPasoChanged: (filter) => setState(() => _paso = filter),
         ),
       ),
     );
@@ -79,19 +82,23 @@ class _CoverageList extends StatelessWidget {
     required this.coverage,
     required this.query,
     required this.selectedDay,
+    required this.pasoFilter,
     required this.searchController,
     required this.onQueryChanged,
     required this.onClearQuery,
     required this.onDayChanged,
+    required this.onPasoChanged,
   });
 
   final HermandadSeasonActsCoverage coverage;
   final String query;
   final String? selectedDay;
+  final SeasonActPasoFilter? pasoFilter;
   final TextEditingController searchController;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onClearQuery;
   final ValueChanged<String?> onDayChanged;
+  final ValueChanged<SeasonActPasoFilter?> onPasoChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -99,7 +106,12 @@ class _CoverageList extends StatelessWidget {
       rows: coverage.rows,
       query: query,
       processionDay: selectedDay,
+      pasoFilter: pasoFilter,
     );
+    final pasoCounts = <SeasonActPasoFilter, int>{
+      for (final filter in SeasonActPasoFilter.values)
+        filter: coverage.rows.where((row) => row.matchesPasoFilter(filter)).length,
+    };
     final visible = HermandadSeasonActsCoverage(
       year: coverage.year,
       rows: filtered,
@@ -121,8 +133,8 @@ class _CoverageList extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Checks según cómo monta cada casa la temporada. '
-          'Busca por hermandad o filtra por día de estación.',
+          'Cristo, Virgen o ambas en igualá y ensayos. '
+          'Busca por hermandad o filtra por día y por paso.',
           style: JuntaUi.body(),
         ),
         const SizedBox(height: 12),
@@ -179,10 +191,33 @@ class _CoverageList extends StatelessWidget {
             ],
           ),
         ),
-        if (selectedDay != null) ...[
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 36,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              for (final filter in SeasonActPasoFilter.values) ...[
+                _DayChip(
+                  label: filter.label,
+                  count: pasoCounts[filter] ?? 0,
+                  selected: pasoFilter == filter,
+                  onTap: () => onPasoChanged(
+                    pasoFilter == filter ? null : filter,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ),
+        if (selectedDay != null || pasoFilter != null) ...[
           const SizedBox(height: 8),
           Text(
-            selectedDay!,
+            [
+              ?selectedDay,
+              ?pasoFilter?.label,
+            ].join(' · '),
             style: JuntaUi.caption(color: AppColors.burgundy).copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -202,9 +237,9 @@ class _CoverageList extends StatelessWidget {
           JuntaEmptyPanel(
             icon: Icons.search_off_outlined,
             message: 'Ninguna hermandad coincide',
-            subtitle: selectedDay == null
+            subtitle: selectedDay == null && pasoFilter == null
                 ? 'Prueba con otro nombre.'
-                : 'Nada en ${hermandadDayShortLabel(selectedDay!)} con esa búsqueda.',
+                : 'Nada coincide con ese filtro.',
           )
         else
           for (final row in filtered) ...[
@@ -354,7 +389,7 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-class _CoverageRow extends StatelessWidget {
+class _CoverageRow extends ConsumerWidget {
   const _CoverageRow({required this.snapshot, this.onConfigure});
 
   final HermandadSeasonActsSnapshot snapshot;
@@ -368,29 +403,30 @@ class _CoverageRow extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final day = snapshot.processionDay;
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(JuntaUi.cardRadius),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(JuntaUi.cardRadius),
-        onTap: snapshot.topicId == null
-            ? null
-            : () => context.push('/foros/hermandades/tema/${snapshot.topicId}'),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(JuntaUi.cardRadius),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Padding(
-            padding: JuntaUi.cardPadding,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
+      child: Ink(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(JuntaUi.cardRadius),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Padding(
+          padding: JuntaUi.cardPadding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: snapshot.topicId == null
+                          ? null
+                          : () => context.push(
+                                '/foros/hermandades/tema/${snapshot.topicId}',
+                              ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -410,6 +446,7 @@ class _CoverageRow extends StatelessWidget {
                         ],
                       ),
                     ),
+                  ),
                     if (onConfigure != null)
                       IconButton(
                         tooltip: 'Ajustar temporada',
@@ -444,6 +481,20 @@ class _CoverageRow extends StatelessWidget {
                         child: _MiniMilestone(
                           milestone: milestone,
                           label: milestone.kind.shortLabelFor(snapshot.profile),
+                          onOpen: () => openSeasonActEvents(
+                            context,
+                            ref,
+                            events: milestone.events,
+                            title:
+                                '${snapshot.hermandadName} · ${milestone.kind.shortLabelFor(snapshot.profile)}',
+                          ),
+                          onOpenPaso: (slot) => openSeasonActEvents(
+                            context,
+                            ref,
+                            events: eventsForPasoSlot(milestone, slot),
+                            title:
+                                '${snapshot.hermandadName} · ${milestone.kind.shortLabelFor(snapshot.profile)} ${slot.label}',
+                          ),
                         ),
                       ),
                   ],
@@ -452,16 +503,22 @@ class _CoverageRow extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
 class _MiniMilestone extends StatelessWidget {
-  const _MiniMilestone({required this.milestone, required this.label});
+  const _MiniMilestone({
+    required this.milestone,
+    required this.label,
+    required this.onOpen,
+    required this.onOpenPaso,
+  });
 
   final HermandadSeasonActMilestone milestone;
   final String label;
+  final VoidCallback onOpen;
+  final ValueChanged<SeasonPasoSlot> onOpenPaso;
 
   Color get _color => switch (milestone.status) {
         HermandadSeasonActStatus.empty => AppColors.textMuted,
@@ -474,35 +531,59 @@ class _MiniMilestone extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(
-          milestone.isFilled
-              ? Icons.check_circle
-              : milestone.hasAny
-                  ? Icons.timelapse
-                  : Icons.radio_button_unchecked,
-          size: 16,
-          color: _color,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: JuntaUi.caption(color: AppColors.textPrimary).copyWith(
-            fontWeight: FontWeight.w600,
-            fontSize: 10,
+        InkWell(
+          onTap: milestone.hasAny ? onOpen : null,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+            child: Column(
+              children: [
+                Icon(
+                  milestone.isFilled
+                      ? Icons.check_circle
+                      : milestone.hasAny
+                          ? Icons.timelapse
+                          : Icons.radio_button_unchecked,
+                  size: 16,
+                  color: _color,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: JuntaUi.caption(color: AppColors.textPrimary).copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        Text(
-          milestone.isFilled ? milestone.statusLabel : '—',
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: JuntaUi.caption().copyWith(fontSize: 9),
-        ),
         if (milestone.pasoSlots.isNotEmpty) ...[
-          const SizedBox(height: 3),
-          SeasonPasoSlotsRow(slots: milestone.pasoSlots, compact: true),
-        ],
+          const SizedBox(height: 4),
+          SeasonPasoSlotsRow(
+            slots: milestone.pasoSlots,
+            compact: true,
+            onSlotTap: (slot) {
+              if (slot.filled) onOpenPaso(slot);
+            },
+          ),
+        ] else
+          InkWell(
+            onTap: milestone.hasAny ? onOpen : null,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+              child: Text(
+                milestone.isFilled ? milestone.statusLabel : '—',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: JuntaUi.caption().copyWith(fontSize: 9),
+              ),
+            ),
+          ),
       ],
     );
   }

@@ -128,7 +128,28 @@ export class EventsPageComponent implements OnInit {
     if (tab === 'pending') {
       this.tab.set('pending');
     }
-    void this.reload();
+    void this.reload().then(() => this.openFromQuery());
+  }
+
+  private async openFromQuery(): Promise<void> {
+    const id = this.route.snapshot.queryParamMap.get('edit')?.trim();
+    if (!id) return;
+    try {
+      const listed = [...this.events(), ...this.pending()].find((e) => e.id === id);
+      const event = listed ?? (await this.eventsApi.fetchEventById(id));
+      if (event) this.openEdit(event);
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo abrir el evento',
+      );
+    } finally {
+      const tab = this.tab() === 'pending' ? 'pending' : null;
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: tab ? { tab } : {},
+        replaceUrl: true,
+      });
+    }
   }
 
   setTab(tab: EventsTab): void {

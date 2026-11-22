@@ -225,7 +225,20 @@ h1 {
   text-align: center;
   padding: 8px 4px;
   border-radius: 10px;
+  border: 0;
   background: color-mix(in srgb, var(--surface-alt, #f5efe8) 75%, #fff);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.milestone:hover:not(:disabled) {
+  outline: 1px solid color-mix(in srgb, var(--burgundy) 35%, var(--border));
+}
+
+.milestone:disabled {
+  cursor: default;
+  opacity: 0.85;
 }
 
 .milestone strong {
@@ -276,6 +289,75 @@ h1 {
   color: #1b5e20;
   background: color-mix(in srgb, #2e7d32 14%, #fff);
   border-color: color-mix(in srgb, #2e7d32 40%, var(--border));
+}
+
+.paso-slots em.clickable {
+  cursor: pointer;
+}
+
+.paso-slots em.clickable:hover {
+  border-color: #1b5e20;
+}
+
+.event-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: color-mix(in srgb, #1a1410 45%, transparent);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.event-picker {
+  width: min(420px, 100%);
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.event-picker h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.event-picker p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.event-picker ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.event-picker li button {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+}
+
+.event-picker li button:hover {
+  border-color: var(--burgundy);
+}
+
+.event-picker li span {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
 }
 
 .error-box,

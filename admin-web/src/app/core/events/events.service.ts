@@ -18,6 +18,9 @@ import {
   seasonActDayLabel,
 } from './events.models';
 
+const EVENT_SELECT =
+  'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)';
+
 @Injectable({ providedIn: 'root' })
 export class EventsService {
   private readonly auth = inject(AuthService);
@@ -31,9 +34,7 @@ export class EventsService {
 
     let req = getSupabase()
       .from('calendar_events')
-      .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)',
-      )
+      .select(EVENT_SELECT)
       .limit(limit);
 
     if (status !== 'all') {
@@ -71,6 +72,19 @@ export class EventsService {
     return (data ?? []).map((row) => this.mapRow(row as Record<string, unknown>));
   }
 
+  async fetchEventById(eventId: string): Promise<CalendarEventRow | null> {
+    if (!this.auth.isAdmin()) return null;
+    const id = eventId.trim();
+    if (!id) return null;
+    const { data, error } = await getSupabase()
+      .from('calendar_events')
+      .select(EVENT_SELECT)
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? this.mapRow(data as Record<string, unknown>) : null;
+  }
+
   async countPending(): Promise<number> {
     if (!this.auth.isAdmin()) return 0;
     const { count, error } = await getSupabase()
@@ -98,9 +112,7 @@ export class EventsService {
         created_by: userId,
         status: input.status ?? 'published',
       })
-      .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)',
-      )
+      .select(EVENT_SELECT)
       .single();
     if (error) throw error;
     return this.mapRow(data as Record<string, unknown>);
@@ -121,9 +133,7 @@ export class EventsService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', eventId)
-      .select(
-        'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)',
-      )
+      .select(EVENT_SELECT)
       .single();
     if (error) throw error;
     return this.mapRow(data as Record<string, unknown>);
