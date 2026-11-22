@@ -50,6 +50,17 @@ const hermandadDirectoryDays = [
   return (processionDay: null, hermandadName: title.trim());
 }
 
+/// Inverse of [parseHermandadTopicTitle]: keeps the station day prefix.
+String formatHermandadTopicTitle({
+  String? processionDay,
+  required String hermandadName,
+}) {
+  final day = processionDay?.trim();
+  final name = hermandadName.trim();
+  if (day == null || day.isEmpty) return name;
+  return '$day · $name';
+}
+
 /// Franja de color del card según el día de estación o Glorias.
 Color hermandadDayAccentColor(String? day) {
   return switch (day) {

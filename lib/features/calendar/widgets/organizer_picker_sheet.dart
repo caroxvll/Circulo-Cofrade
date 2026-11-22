@@ -350,13 +350,14 @@ class _OrganizerLogoTile extends StatelessWidget {
                   color: AppColors.burgundy,
                   visualDensity: VisualDensity.compact,
                 ),
-                IconButton(
-                  onPressed: onDelete,
-                  tooltip: 'Eliminar',
-                  icon: const Icon(Icons.delete_outline, size: 20),
-                  color: AppColors.accentRed,
-                  visualDensity: VisualDensity.compact,
-                ),
+                if (!item.isHermandadBoard)
+                  IconButton(
+                    onPressed: onDelete,
+                    tooltip: 'Eliminar',
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    color: AppColors.accentRed,
+                    visualDensity: VisualDensity.compact,
+                  ),
               ],
               if (selectOnTap)
                 const Icon(Icons.chevron_right, color: AppColors.burgundy),

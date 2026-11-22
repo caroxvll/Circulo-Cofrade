@@ -539,6 +539,33 @@ class CalendarRepository {
           hermandadTopicId: topicId,
         );
       }
+      if (result.isNotEmpty) {
+        try {
+          final overlayRows = await _client!
+              .from('organizer_logos')
+              .select('organizer_key, display_label, logo_url')
+              .inFilter('organizer_key', result.keys.toList());
+          for (final row in overlayRows as List<dynamic>) {
+            final overlay = Map<String, dynamic>.from(row as Map);
+            final overlayKey =
+                (overlay['organizer_key'] as String?)?.trim() ?? '';
+            final existing = result[overlayKey];
+            if (overlayKey.isEmpty || existing == null) continue;
+            final overlayLabel =
+                (overlay['display_label'] as String?)?.trim() ?? '';
+            final overlayUrl = _nonEmptyUrl(overlay['logo_url'] as String?);
+            if (overlayLabel.isEmpty && overlayUrl == null) continue;
+            result[overlayKey] = OrganizerLogo(
+              organizerKey: existing.organizerKey,
+              displayLabel: overlayLabel.isNotEmpty
+                  ? overlayLabel
+                  : existing.displayLabel,
+              logoUrl: overlayUrl ?? existing.logoUrl,
+              hermandadTopicId: existing.hermandadTopicId,
+            );
+          }
+        } catch (_) {}
+      }
       return result;
     } catch (_) {
       return const {};
@@ -589,6 +616,7 @@ class CalendarRepository {
     required String organizerKey,
     required String displayLabel,
     String? logoUrl,
+    String? hermandadTopicId,
     bool propagateToAllEvents = false,
   }) async {
     final label = displayLabel.trim();
@@ -607,34 +635,69 @@ class CalendarRepository {
         organizerKey: key,
         displayLabel: label,
         logoUrl: url ?? _mockOrganizerLogoList[idx].logoUrl,
+        hermandadTopicId: hermandadTopicId,
       );
       return;
     }
 
-    final payload = <String, dynamic>{
-      'display_label': label,
-      'updated_by': userId,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    };
     final url = logoUrl?.trim();
-    if (url != null && url.isNotEmpty) {
-      payload['logo_url'] = url;
-    }
-
-    await _client!
-        .from('organizer_logos')
-        .update(payload)
-        .eq('organizer_key', key);
-
-    final resolvedLogoUrl = url?.trim().isNotEmpty == true
-        ? url!.trim()
+    final topicId = hermandadTopicId?.trim();
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    final resolvedLogo = url != null && url.isNotEmpty
+        ? url
         : await _fetchOrganizerLogoUrl(key);
 
-    if (resolvedLogoUrl.isNotEmpty) {
+    Future<void> upsertLibraryRow(String organizerKey) async {
+      await _client!.from('organizer_logos').upsert({
+        'organizer_key': organizerKey,
+        'display_label': label,
+        'logo_url': resolvedLogo,
+        'updated_by': userId,
+        'updated_at': nowIso,
+      });
+    }
+
+    // Los tablones oficiales no tienen fila en organizer_logos: hay que
+    // crear/actualizar (upsert), no un update silencioso a 0 filas.
+    await upsertLibraryRow(key);
+
+    var boardNameUpdated = false;
+    final renamedKey = normalizeOrganizerKey(label);
+    if (topicId != null && topicId.isNotEmpty) {
+      if (resolvedLogo.isNotEmpty && url != null && url.isNotEmpty) {
+        try {
+          await _client!.rpc(
+            'update_hermandad_board_images',
+            params: {
+              'p_topic_id': topicId,
+              'p_icon_image_url': url,
+              'p_set_icon': true,
+            },
+          );
+        } catch (_) {
+          // Si el RPC no está, el escudo queda en la biblioteca y se superpone.
+        }
+      }
+      try {
+        boardNameUpdated = await _updateHermandadBoardName(
+          topicId: topicId,
+          hermandadName: label,
+        );
+      } catch (_) {
+        boardNameUpdated = false;
+      }
+      if (boardNameUpdated &&
+          renamedKey.length >= 2 &&
+          renamedKey != key) {
+        await upsertLibraryRow(renamedKey);
+      }
+    }
+
+    if (resolvedLogo.isNotEmpty) {
       await _propagateOrganizerLogoToEvents(
         organizerKey: key,
         displayLabel: label,
-        logoUrl: resolvedLogoUrl,
+        logoUrl: resolvedLogo,
         onlyCreatedBy: propagateToAllEvents ? null : userId,
       );
     } else {
@@ -644,6 +707,52 @@ class CalendarRepository {
         onlyCreatedBy: propagateToAllEvents ? null : userId,
       );
     }
+
+    if (boardNameUpdated &&
+        renamedKey.length >= 2 &&
+        renamedKey != key) {
+      await _client!
+          .from('organizer_logos')
+          .delete()
+          .eq('organizer_key', key);
+    }
+  }
+
+  Future<bool> _updateHermandadBoardName({
+    required String topicId,
+    required String hermandadName,
+  }) async {
+    final row = await _client!
+        .from('forum_topics')
+        .select('title')
+        .eq('id', topicId)
+        .eq('forum_id', 'hermandades')
+        .maybeSingle();
+    if (row == null) return false;
+
+    final current = (row['title'] as String?)?.trim() ?? '';
+    if (current.isEmpty) return false;
+
+    final parsed = parseHermandadTopicTitle(current);
+    final next = formatHermandadTopicTitle(
+      processionDay: parsed.processionDay,
+      hermandadName: hermandadName,
+    );
+    if (next.length < 3) return false;
+    if (next == current) return true;
+
+    await _client!
+        .from('forum_topics')
+        .update({'title': next})
+        .eq('id', topicId)
+        .eq('forum_id', 'hermandades');
+
+    final after = await _client!
+        .from('forum_topics')
+        .select('title')
+        .eq('id', topicId)
+        .maybeSingle();
+    return ((after?['title'] as String?)?.trim() ?? '') == next;
   }
 
   Future<String> _fetchOrganizerLogoUrl(String organizerKey) async {
@@ -803,10 +912,31 @@ class CalendarRepository {
           ),
         )
         .where((item) => item.displayLabel.isNotEmpty)
-        .where((item) => !hermandadMap.containsKey(item.organizerKey))
         .toList();
+    final libraryByKey = {
+      for (final item in library) item.organizerKey: item,
+    };
 
-    return [...matchedHermandades, ...library].take(limit).toList();
+    final mergedHermandades = [
+      for (final item in matchedHermandades)
+        if (libraryByKey[item.organizerKey] case final overlay?)
+          OrganizerLogo(
+            organizerKey: item.organizerKey,
+            displayLabel: overlay.displayLabel.isNotEmpty
+                ? overlay.displayLabel
+                : item.displayLabel,
+            logoUrl: overlay.hasLogo ? overlay.logoUrl : item.logoUrl,
+            hermandadTopicId: item.hermandadTopicId,
+          )
+        else
+          item,
+    ];
+    final libraryOnly = [
+      for (final item in library)
+        if (!hermandadMap.containsKey(item.organizerKey)) item,
+    ];
+
+    return [...mergedHermandades, ...libraryOnly].take(limit).toList();
   }
 
   CalendarEvent eventFromRow(Map<String, dynamic> row) => _fromRow(row);
