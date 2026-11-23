@@ -230,16 +230,6 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     if (_shieldSkipAutoLoadKey != null && _shieldSkipAutoLoadKey != key) {
       _shieldSkipAutoLoadKey = null;
     }
-    // Si editan a mano el nombre, se pierde el enlace al tablón.
-    final linkedKey = _linkedOrganizerKey;
-    if (_hermandadTopicId != null &&
-        linkedKey != null &&
-        key != linkedKey) {
-      setState(() {
-        _hermandadTopicId = null;
-        _linkedOrganizerKey = null;
-      });
-    }
     _scheduleOrganizerShieldLookup();
   }
 
@@ -259,37 +249,45 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     final key = normalizeOrganizerKey(organizer);
     if (_shieldSkipAutoLoadKey == key) return;
 
-    if (_isEditing &&
+    final skipIcon = _isEditing &&
         widget.existing?.customIconUrl?.trim().isNotEmpty == true &&
-        key == _initialOrganizerKey) {
-      return;
-    }
+        key == _initialOrganizerKey;
 
     setState(() => _loadingOrganizerShield = true);
 
     try {
       final repo = ref.read(calendarRepositoryProvider);
-      var logoUrl = await repo.fetchOrganizerLogo(organizer);
-      logoUrl ??= await repo.fetchHermandadIconByOrganizerLabel(organizer);
+      String? logoUrl;
+      if (!skipIcon) {
+        logoUrl = await repo.fetchOrganizerLogo(organizer);
+        logoUrl ??= await repo.fetchHermandadIconByOrganizerLabel(organizer);
+      }
       if (!mounted) return;
 
       var topicId = _hermandadTopicId;
       var linkedKey = _linkedOrganizerKey;
-      if (topicId == null || topicId.isEmpty) {
-        final resolved =
-            await repo.findHermandadTopicIdForOrganizer(organizer);
-        if (resolved != null && resolved.isNotEmpty) {
-          topicId = resolved;
-          linkedKey = key;
+      final alreadyLinked = topicId != null && topicId.trim().isNotEmpty;
+      if (!alreadyLinked) {
+        final resolved = await repo.findHermandadForOrganizer(organizer);
+        final resolvedId = resolved?.hermandadTopicId?.trim();
+        if (resolvedId != null && resolvedId.isNotEmpty) {
+          topicId = resolvedId;
         }
       }
+      linkedKey = key;
       if (_shieldManualOverride || _selectedIconBytes != null) {
-        if (mounted) setState(() => _loadingOrganizerShield = false);
+        if (mounted) {
+          setState(() {
+            _loadingOrganizerShield = false;
+            _hermandadTopicId = topicId;
+            _linkedOrganizerKey = linkedKey;
+          });
+        }
         return;
       }
 
       setState(() {
-        if (logoUrl != null && logoUrl.isNotEmpty) {
+        if (!skipIcon && logoUrl != null && logoUrl.isNotEmpty) {
           _customIconUrl = logoUrl;
           _shieldFromLibrary = true;
           _selectedIconName = null;
@@ -310,10 +308,18 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     final picked = await OrganizerPickerSheet.show(context);
     if (picked == null || !mounted) return;
 
+    var topicId = picked.hermandadTopicId?.trim();
+    if (topicId == null || topicId.isEmpty) {
+      topicId = await ref
+          .read(calendarRepositoryProvider)
+          .findHermandadTopicIdForOrganizer(picked.displayLabel);
+    }
+    if (!mounted) return;
+
     setState(() {
       _linkingOrganizer = true;
       _organizerController.text = picked.displayLabel;
-      _hermandadTopicId = picked.hermandadTopicId;
+      _hermandadTopicId = topicId;
       _linkedOrganizerKey = picked.organizerKey;
       _shieldSkipAutoLoadKey = null;
       _shieldManualOverride = false;
@@ -807,13 +813,25 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
         );
       }
 
-      var hermandadId = _hermandadTopicId?.trim();
-      if (hermandadId == null || hermandadId.isEmpty) {
-        hermandadId = await repo.findHermandadTopicIdForOrganizer(organizer);
-        if (hermandadId != null && hermandadId.isNotEmpty) {
-          _hermandadTopicId = hermandadId;
+      String? hermandadId = _hermandadTopicId?.trim();
+      String? hermandadName = organizer;
+      if (organizer.length >= 3 &&
+          (hermandadId == null || hermandadId.isEmpty)) {
+        final resolved = await repo.findHermandadForOrganizer(organizer);
+        final resolvedId = resolved?.hermandadTopicId?.trim();
+        if (resolvedId != null && resolvedId.isNotEmpty) {
+          hermandadId = resolvedId;
+          hermandadName = resolved?.displayLabel ?? organizer;
         }
       }
+      if ((hermandadId == null || hermandadId.isEmpty) &&
+          organizer.isNotEmpty) {
+        hermandadId = widget.existing?.hermandadTopicId?.trim();
+      }
+      if (hermandadId != null && hermandadId.isNotEmpty) {
+        _hermandadTopicId = hermandadId;
+      }
+      final unlinkHermandad = organizer.isEmpty;
       if (_isEditing) {
         await repo.updateEvent(
           eventId: widget.existing!.id!,
@@ -824,8 +842,8 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           dayLabel: _seasonAwareDayLabel(),
           location: location,
           organizerLabel: organizer,
-          hermandadTopicId: hermandadId,
-          clearHermandadTopicId: hermandadId == null || hermandadId.isEmpty,
+          hermandadTopicId: unlinkHermandad ? null : hermandadId,
+          clearHermandadTopicId: unlinkHermandad,
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
           admissionLabel: admission,
@@ -867,11 +885,17 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              _isEditing
-                  ? 'Evento actualizado'
-                  : isAdmin
-                      ? 'Evento publicado en el calendario'
-                      : 'Evento enviado a la Junta para aprobación',
+              hermandadId != null && hermandadId.isNotEmpty
+                  ? _isEditing
+                      ? 'Actualizado en ${hermandadName ?? organizer}'
+                      : isAdmin
+                          ? 'Publicado en ${hermandadName ?? organizer}'
+                          : 'Enviado a la Junta · ${hermandadName ?? organizer}'
+                  : _isEditing
+                      ? 'Evento actualizado'
+                      : isAdmin
+                          ? 'Evento publicado en el calendario'
+                          : 'Evento enviado a la Junta para aprobación',
             ),
           ),
         );
@@ -963,8 +987,8 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
                 labelText: 'Hermandad / organizador',
                 hintText: 'Elige el tablón oficial o escribe un nombre',
                 helperText: _hermandadTopicId != null
-                    ? 'Enlazado al tablón oficial'
-                    : 'Usa «Elegir hermandad» para enlazar escudo e igualás',
+                    ? 'Mismo tablón: si cambias el nombre, sigue siendo esta hermandad'
+                    : 'Usa «Elegir hermandad» para guardarlo en su tablón',
                 suffixIcon: IconButton(
                   onPressed: _submitting ? null : _openOrganizerLibrary,
                   tooltip: 'Elegir hermandad o escudo',

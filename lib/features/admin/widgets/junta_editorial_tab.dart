@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -290,11 +291,23 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
   final _bodyController = TextEditingController();
   final _photos = <Uint8List>[];
   Uint8List? _videoBytes;
+  XFile? _videoFile;
+  int _videoLength = 0;
   String? _videoMime;
   String? _videoName;
   var _saving = false;
   double? _uploadProgress;
   var _uploadAttempt = 0;
+
+  bool get _hasVideo => _videoLength > 0 && (_videoFile != null || _videoBytes != null);
+
+  void _clearVideo() {
+    _videoBytes = null;
+    _videoFile = null;
+    _videoLength = 0;
+    _videoMime = null;
+    _videoName = null;
+  }
 
   @override
   void initState() {
@@ -311,7 +324,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
   }
 
   Future<void> _pickPhotos() async {
-    if (_videoBytes != null) {
+    if (_hasVideo) {
       final file = await ImagePicker().pickImage(
         source: ImageSource.gallery,
         imageQuality: 88,
@@ -361,35 +374,61 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
   Future<void> _pickVideo() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.video,
-      withData: true,
+      withData: kIsWeb,
     );
     final file = result?.files.single;
     if (file == null) return;
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo leer el vídeo')),
-      );
-      return;
-    }
-    if (bytes.length > editorialVideoMaxBytes) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El vídeo supera 500 MB')),
-      );
-      return;
-    }
+
     final ext = (file.extension ?? '').toLowerCase();
     final mime = switch (ext) {
       'webm' => 'video/webm',
       'mov' => 'video/quicktime',
       _ => 'video/mp4',
     };
+
+    Uint8List? bytes;
+    XFile? xfile;
+    var length = file.size;
+    if (kIsWeb) {
+      bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo leer el vídeo')),
+        );
+        return;
+      }
+      length = bytes.length;
+    } else {
+      final path = file.path;
+      if (path == null || path.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo leer el vídeo')),
+        );
+        return;
+      }
+      xfile = XFile(path);
+      length = await xfile.length();
+    }
+
+    if (length > editorialVideoMaxBytes) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'El vídeo supera ${editorialVideoSizeLabel(editorialVideoMaxBytes)}',
+          ),
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
     final hadPile = _photos.length > 1;
     setState(() {
       _videoBytes = bytes;
+      _videoFile = xfile;
+      _videoLength = length;
       _videoMime = mime;
       _videoName = file.name;
       if (hadPile) _photos.clear();
@@ -403,14 +442,34 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
     }
   }
 
+  Future<Uint8List> _readVideoSlice(int start, int end) async {
+    final memory = _videoBytes;
+    if (memory != null) {
+      return Uint8List.sublistView(memory, start, end);
+    }
+    final file = _videoFile;
+    if (file == null || end <= start) return Uint8List(0);
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in file.openRead(start, end)) {
+      builder.add(chunk);
+    }
+    return builder.takeBytes();
+  }
+
+  Duration _videoUploadTimeout() {
+    final minutes = (_videoLength / (40 * 1024 * 1024)).ceil().clamp(8, 40);
+    return Duration(minutes: minutes);
+  }
+
   Future<bool> _uploadVideoWithRetries({
     required String uploadUrl,
     required String uploadMethod,
-    required Uint8List bytes,
     required String contentType,
     String? fileName,
   }) async {
     const maxAttempts = 3;
+    final length = _videoLength;
+    if (length <= 0) return false;
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       if (!mounted) return false;
       setState(() {
@@ -419,10 +478,10 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
       });
       try {
         if (uploadMethod.toUpperCase() == 'TUS') {
-          final uploaded = await _uploadTus(uploadUrl: uploadUrl, bytes: bytes);
+          final uploaded = await _uploadTus(uploadUrl: uploadUrl);
           if (uploaded) return true;
         } else if (uploadMethod.toUpperCase() == 'POST') {
-          // Cloudflare Stream: multipart POST a uploadURL de un solo uso.
+          final bytes = await _readVideoSlice(0, length);
           final request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
           request.files.add(
             http.MultipartFile.fromBytes(
@@ -433,9 +492,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
             ),
           );
           if (mounted) setState(() => _uploadProgress = 0.15);
-          final response = await request.send().timeout(
-                const Duration(minutes: 12),
-              );
+          final response = await request.send().timeout(_videoUploadTimeout());
           if (mounted) setState(() => _uploadProgress = 1);
           if (response.statusCode >= 200 && response.statusCode < 300) {
             return true;
@@ -448,18 +505,14 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
         } else {
           final request = http.StreamedRequest('PUT', Uri.parse(uploadUrl))
             ..headers['Content-Type'] = contentType
-            ..contentLength = bytes.length;
-          final responseFuture = request.send().timeout(
-                const Duration(minutes: 8),
-              );
+            ..contentLength = length;
+          final responseFuture = request.send().timeout(_videoUploadTimeout());
           const chunkSize = 256 * 1024;
-          for (var offset = 0; offset < bytes.length; offset += chunkSize) {
-            final end = (offset + chunkSize < bytes.length)
-                ? offset + chunkSize
-                : bytes.length;
-            request.sink.add(Uint8List.sublistView(bytes, offset, end));
+          for (var offset = 0; offset < length; offset += chunkSize) {
+            final end = offset + chunkSize < length ? offset + chunkSize : length;
+            request.sink.add(await _readVideoSlice(offset, end));
             if (mounted) {
-              setState(() => _uploadProgress = end / bytes.length);
+              setState(() => _uploadProgress = end / length);
             }
             await Future<void>.delayed(Duration.zero);
           }
@@ -485,29 +538,28 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
   }
 
   /// Subida a Stream por trozos. El POST simple se corta en 200 MB; tus no.
-  /// Cada trozo intermedio mide 50 MB (múltiplo de 256 KiB). El último puede ser menor.
+  /// Trozo de 16 MB (múltiplo de 256 KiB) para no hinchar la RAM del iPhone.
   Future<bool> _uploadTus({
     required String uploadUrl,
-    required Uint8List bytes,
   }) async {
-    const chunkSize = 50 * 1024 * 1024;
+    const chunkSize = 16 * 1024 * 1024;
     const maxChunkAttempts = 3;
+    final length = _videoLength;
     var offset = await _tusOffset(uploadUrl);
-    if (offset < 0 || offset > bytes.length) return false;
+    if (offset < 0 || offset > length) return false;
 
-    while (offset < bytes.length) {
-      final end = offset + chunkSize < bytes.length
-          ? offset + chunkSize
-          : bytes.length;
+    while (offset < length) {
+      final end = offset + chunkSize < length ? offset + chunkSize : length;
       var sent = false;
       for (var attempt = 1; attempt <= maxChunkAttempts && offset < end; attempt++) {
         if (!mounted) return false;
         try {
+          final slice = await _readVideoSlice(offset, end);
           final request = http.Request('PATCH', Uri.parse(uploadUrl))
             ..headers['Tus-Resumable'] = '1.0.0'
             ..headers['Upload-Offset'] = '$offset'
             ..headers['Content-Type'] = 'application/offset+octet-stream'
-            ..bodyBytes = Uint8List.sublistView(bytes, offset, end);
+            ..bodyBytes = slice;
           final response = await request.send().timeout(
                 const Duration(minutes: 8),
               );
@@ -516,8 +568,8 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
             offset =
                 int.tryParse(response.headers['upload-offset'] ?? '') ?? end;
             sent = true;
-            if (mounted && bytes.isNotEmpty) {
-              setState(() => _uploadProgress = offset / bytes.length);
+            if (mounted && length > 0) {
+              setState(() => _uploadProgress = offset / length);
             }
             break;
           }
@@ -582,7 +634,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
       if (details is String && details.trim().isNotEmpty) return details.trim();
     }
     if (error is StateError && error.message.contains('portada')) {
-      return 'Sin Cloudflare Stream el vídeo necesita portada y no puede pasar de 150 MB.';
+      return 'Sin Cloudflare Stream el vídeo necesita portada y no puede pasar de ${editorialVideoSizeLabel(editorialVideoMaxBytesR2)}.';
     }
     if (_uploadAttempt > 0) {
       return 'No se pudo subir el vídeo tras $_uploadAttempt intentos.';
@@ -599,7 +651,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
       );
       return;
     }
-    if (body.isEmpty && _photos.isEmpty && _videoBytes == null) {
+    if (body.isEmpty && _photos.isEmpty && !_hasVideo) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Escribe un texto, añade una imagen o un vídeo'),
@@ -645,7 +697,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
       }
 
       var videoProcessing = false;
-      if (_videoBytes != null && _videoBytes!.isNotEmpty) {
+      if (_hasVideo) {
         final contentType = _videoMime ?? 'video/mp4';
         await repo.setEditorialVideo(
           topicId: topic.id,
@@ -655,14 +707,13 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
         final upload = await repo.requestEditorialVideoUpload(
           topicId: topic.id,
           contentType: contentType,
-          byteLength: _videoBytes!.length,
+          byteLength: _videoLength,
         );
         final streamMode = upload.mode == 'stream';
         final poster = coverUrl ?? upload.posterUrl;
         final uploaded = await _uploadVideoWithRetries(
           uploadUrl: upload.uploadUrl,
           uploadMethod: upload.uploadMethod,
-          bytes: _videoBytes!,
           contentType: contentType,
           fileName: _videoName,
         );
@@ -798,12 +849,12 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
               OutlinedButton.icon(
                 onPressed: _saving ? null : _pickPhotos,
                 icon: Icon(
-                  _videoBytes == null
+                  !_hasVideo
                       ? Icons.photo_library_outlined
                       : Icons.image_outlined,
                 ),
                 label: Text(
-                  _videoBytes == null
+                  !_hasVideo
                       ? 'Añadir fotos'
                       : 'Portada (opcional · Stream la genera)',
                 ),
@@ -871,7 +922,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
               const SizedBox(height: 8),
               Row(
                 children: [
-                  if (_videoBytes == null &&
+                  if (!_hasVideo &&
                       _photos.length < editorialGalleryMaxImages)
                     TextButton(
                       onPressed: _saving ? null : _pickPhotos,
@@ -889,7 +940,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
               ),
             ],
             const SizedBox(height: 8),
-            if (_videoBytes != null)
+            if (_hasVideo)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.videocam_outlined),
@@ -899,16 +950,12 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
-                  '${(_videoBytes!.length / (1024 * 1024)).toStringAsFixed(1)} MB',
+                  '${(_videoLength / (1024 * 1024)).toStringAsFixed(1)} MB',
                 ),
                 trailing: IconButton(
                   onPressed: _saving
                       ? null
-                      : () => setState(() {
-                            _videoBytes = null;
-                            _videoMime = null;
-                            _videoName = null;
-                          }),
+                      : () => setState(_clearVideo),
                   icon: const Icon(Icons.close),
                 ),
               )
@@ -916,7 +963,9 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
               OutlinedButton.icon(
                 onPressed: _saving ? null : _pickVideo,
                 icon: const Icon(Icons.videocam_outlined),
-                label: const Text('Añadir vídeo (HLS, máx. 500 MB / 10 min)'),
+                label: Text(
+                  'Añadir vídeo (HLS, máx. ${editorialVideoSizeLabel(editorialVideoMaxBytes)} / 10 min)',
+                ),
               ),
             if (_saving && _uploadProgress != null) ...[
               const SizedBox(height: 14),

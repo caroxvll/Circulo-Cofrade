@@ -684,6 +684,19 @@ class EnsayoLiveUpdateTile extends StatelessWidget {
                   children: [
                     Row(
                       children: [
+                        Text(
+                          formatLiveStamp(update.createdAt),
+                          style: TopicDetailTypography.meta(
+                            color: isLatest
+                                ? AppColors.burgundy
+                                : AppColors.textSecondary,
+                            fontWeight: FontWeight.w800,
+                          ).copyWith(
+                            fontSize: 13,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         Flexible(
                           child: Text(
                             handle,
@@ -716,13 +729,6 @@ class EnsayoLiveUpdateTile extends StatelessWidget {
                             ),
                           ),
                         ],
-                        const SizedBox(width: 8),
-                        Text(
-                          formatTimeAgo(update.createdAt),
-                          style: TopicDetailTypography.meta().copyWith(
-                            fontSize: 12,
-                          ),
-                        ),
                         if (onDelete != null)
                           SizedBox(
                             width: 32,

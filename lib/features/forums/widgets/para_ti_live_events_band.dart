@@ -15,7 +15,7 @@ import '../../cuaresma/utils/cuaresma_topic.dart';
 
 const _circuloForumId = 'foro-cofradiero';
 
-/// Banda fija de Para ti: lo de hoy que está en curso, sale pronto o es el próximo.
+/// Banda fija de Para ti: en curso, lo que sale, y lo ya cerrado hasta medianoche.
 class ParaTiLiveEventsBand extends ConsumerWidget {
   const ParaTiLiveEventsBand({super.key});
 
@@ -28,6 +28,8 @@ class ParaTiLiveEventsBand extends ConsumerWidget {
     if (events.isEmpty) return const SizedBox.shrink();
 
     final anyLive = events.any((event) => _isLive(event, now: now));
+    final onlyFinished = !anyLive &&
+        events.every((event) => _isFinished(event, now: now));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -41,7 +43,11 @@ class ParaTiLiveEventsBand extends ConsumerWidget {
                 const SizedBox(width: 6),
               ],
               Text(
-                anyLive ? 'EN VIVO' : 'HOY',
+                anyLive
+                    ? 'EN VIVO'
+                    : onlyFinished
+                        ? 'HOY · FINALIZADOS'
+                        : 'HOY',
                 style: AppTypography.labelSmall(
                   color: anyLive ? AppColors.liveGreen : AppColors.goldDark,
                 ).copyWith(
@@ -104,14 +110,26 @@ class _LiveEventChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final live = _isLive(event, now: now);
+    final finished = _isFinished(event, now: now);
     final name = _eventName(event);
     final timing = _timingLabel(event, now: now);
-    final accent = live ? AppColors.liveGreen : AppColors.burgundy;
+    final accent = live
+        ? AppColors.liveGreen
+        : finished
+            ? AppColors.textMuted
+            : AppColors.burgundy;
+    final fill = finished
+        ? Color.alphaBlend(
+            AppColors.backgroundElevated.withValues(alpha: 0.7),
+            AppColors.surface,
+          )
+        : _fill;
 
     return _LiveAura(
       live: live,
+      finished: finished,
       child: Material(
-        color: _fill,
+        color: fill,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: () => _open(context),
@@ -154,13 +172,16 @@ class _LiveEventChip extends StatelessWidget {
                           style: AppTypography.hermandadName().copyWith(
                             fontSize: 16,
                             height: 1.05,
+                            color: finished ? AppColors.textSecondary : null,
                           ),
                         ),
                       ],
                     ),
                   ),
                   Icon(
-                    Icons.chevron_right_rounded,
+                    finished
+                        ? Icons.history_rounded
+                        : Icons.chevron_right_rounded,
                     color: accent,
                     size: 22,
                   ),
@@ -254,10 +275,16 @@ class _LiveDotPainter extends CustomPainter {
 }
 
 /// Borde que recorre el recuadro: oro si es de hoy, verde si está en vivo.
+/// Los finalizados se quedan quietos, con un borde suave.
 class _LiveAura extends StatefulWidget {
-  const _LiveAura({required this.live, required this.child});
+  const _LiveAura({
+    required this.live,
+    required this.child,
+    this.finished = false,
+  });
 
   final bool live;
+  final bool finished;
   final Widget child;
 
   @override
@@ -266,18 +293,31 @@ class _LiveAura extends StatefulWidget {
 
 class _LiveAuraState extends State<_LiveAura>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _spin = AnimationController(
-    vsync: this,
-    duration: Duration(milliseconds: widget.live ? 3200 : 5200),
-  )..repeat();
+  late final AnimationController _spin;
+
+  @override
+  void initState() {
+    super.initState();
+    _spin = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: widget.live ? 3200 : 5200),
+    );
+    if (!widget.finished) _spin.repeat();
+  }
 
   @override
   void didUpdateWidget(_LiveAura oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.live == widget.live) return;
-    _spin
-      ..duration = Duration(milliseconds: widget.live ? 3200 : 5200)
-      ..repeat();
+    if (oldWidget.live == widget.live &&
+        oldWidget.finished == widget.finished) {
+      return;
+    }
+    _spin.duration = Duration(milliseconds: widget.live ? 3200 : 5200);
+    if (widget.finished) {
+      _spin.stop();
+    } else {
+      _spin.repeat();
+    }
   }
 
   @override
@@ -288,6 +328,16 @@ class _LiveAuraState extends State<_LiveAura>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.finished) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: widget.child,
+      );
+    }
+
     return AnimatedBuilder(
       animation: _spin,
       builder: (context, child) {
@@ -370,6 +420,12 @@ class _LiveAuraPainter extends CustomPainter {
 bool _isLive(CalendarEvent event, {required DateTime now}) {
   return calendarEventTiming(event, now: now)?.kind ==
       CalendarEventTimingKind.inProgress;
+}
+
+bool _isFinished(CalendarEvent event, {required DateTime now}) {
+  if (event.liveForceState == EventLiveForceState.closed) return true;
+  return calendarEventTiming(event, now: now)?.kind ==
+      CalendarEventTimingKind.finished;
 }
 
 String _eventName(CalendarEvent event) {

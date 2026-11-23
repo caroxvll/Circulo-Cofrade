@@ -57,15 +57,20 @@ final todayCuaresmaAgendaProvider =
   ];
 });
 
-/// Los de hoy que aún se pueden seguir, para la banda de Para ti.
-/// Se reagrupan cada minuto, sin volver a pedir el día.
+/// Los de hoy para la banda de Para ti.
+/// En curso primero; los ya cerrados al final, hasta medianoche.
 final todayParaTiLiveEventsProvider = Provider<AsyncValue<List<CalendarEvent>>>((
   ref,
 ) {
   final now = ref.watch(minuteClockProvider).asData?.value ?? DateTime.now();
   return ref.watch(todayCuaresmaAgendaProvider).whenData((events) {
     final groups = groupTodayEnsayos(events, now: now);
-    return [...groups.live, ...groups.soon, ...groups.upcoming];
+    return [
+      ...groups.live,
+      ...groups.soon,
+      ...groups.upcoming,
+      ...groups.finished.reversed,
+    ];
   });
 });
 

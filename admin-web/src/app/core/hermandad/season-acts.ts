@@ -158,13 +158,25 @@ function canonicalOrganizer(raw: string): string {
     'real ',
     'ilustre ',
     'pontificia ',
+    'venerable ',
+    'sacramental ',
     'hdad. ',
     'hdad ',
     'hermandad de la ',
     'hermandad de las ',
     'hermandad del ',
+    'hermandad de los ',
     'hermandad de ',
     'hermandad ',
+    'de la ',
+    'de las ',
+    'de los ',
+    'del ',
+    'de ',
+    'la ',
+    'el ',
+    'las ',
+    'los ',
   ];
   let changed = true;
   while (changed) {
@@ -179,21 +191,31 @@ function canonicalOrganizer(raw: string): string {
   return value;
 }
 
+export function organizerMatchScore(
+  organizer: string,
+  hermandadName: string,
+): number {
+  const orgKey = normalizeOrganizerKey(organizer);
+  const nameKey = normalizeOrganizerKey(hermandadName);
+  if (orgKey.length < 2 || nameKey.length < 2) return 0;
+  if (orgKey === nameKey) return 100;
+  const orgCanon = canonicalOrganizer(organizer);
+  const nameCanon = canonicalOrganizer(hermandadName);
+  if (orgCanon.length < 3 || nameCanon.length < 3) return 0;
+  if (orgCanon === nameCanon) return 90;
+  const shorter = orgCanon.length <= nameCanon.length ? orgCanon : nameCanon;
+  const longer = orgCanon.length > nameCanon.length ? orgCanon : nameCanon;
+  if (shorter.length >= 6 && longer.includes(shorter)) {
+    return 40 + Math.min(40, shorter.length * 2);
+  }
+  return 0;
+}
+
 export function organizerMatchesHermandadName(
   organizer: string,
   hermandadName: string,
 ): boolean {
-  const orgKey = normalizeOrganizerKey(organizer);
-  const nameKey = normalizeOrganizerKey(hermandadName);
-  if (orgKey.length < 2 || nameKey.length < 2) return false;
-  if (orgKey === nameKey) return true;
-  const orgCanon = canonicalOrganizer(organizer);
-  const nameCanon = canonicalOrganizer(hermandadName);
-  if (orgCanon.length < 3 || nameCanon.length < 3) return false;
-  if (orgCanon === nameCanon) return true;
-  const shorter = orgCanon.length <= nameCanon.length ? orgCanon : nameCanon;
-  const longer = orgCanon.length > nameCanon.length ? orgCanon : nameCanon;
-  return shorter.length >= 6 && longer.includes(shorter);
+  return organizerMatchScore(organizer, hermandadName) > 0;
 }
 
 export function eventBelongsToHermandad(
