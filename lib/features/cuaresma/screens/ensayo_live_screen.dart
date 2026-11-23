@@ -7,9 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../../core/utils/forum_text_format.dart';
 import '../../../core/utils/minute_clock.dart';
 import '../../../core/utils/street_from_coordinates.dart';
+import '../../../core/utils/time_ago.dart';
+import '../../../core/widgets/app_logo.dart';
+import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../../../shared/models/forum.dart';
@@ -18,6 +21,7 @@ import '../../calendar/calendar_provider.dart'
 import '../../admin/widgets/junta_editorial_tab.dart';
 import '../../forums/para_ti_pulse_provider.dart';
 import '../../forums/topic_detail_typography.dart';
+import '../../forums/utils/editorial_post.dart';
 import '../../permissions/permissions_provider.dart';
 import '../../profile/profile_provider.dart';
 import '../../profile/widgets/suspended_account_banner.dart';
@@ -442,6 +446,7 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
                       SliverToBoxAdapter(
                         child: _EventNewsStrip(
                           eventId: widget.eventId,
+                          eventTitle: event.title,
                           isStaff: isStaff,
                           onPublish: () => _publishNews(event),
                         ),
@@ -542,11 +547,13 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
 class _EventNewsStrip extends ConsumerWidget {
   const _EventNewsStrip({
     required this.eventId,
+    required this.eventTitle,
     required this.isStaff,
     required this.onPublish,
   });
 
   final String eventId;
+  final String eventTitle;
   final bool isStaff;
   final VoidCallback onPublish;
 
@@ -580,9 +587,16 @@ class _EventNewsStrip extends ConsumerWidget {
               ),
             ),
           if (items.isNotEmpty) ...[
-            if (isStaff) const SizedBox(height: 10),
+            if (isStaff) const SizedBox(height: 12),
+            EnsayoLiveSectionHeader(
+              title: 'Noticias oficiales',
+              subtitle: items.length == 1
+                  ? 'Círculo Cofrade · este acto'
+                  : '${items.length} de Círculo Cofrade · más reciente arriba',
+            ),
+            const SizedBox(height: 10),
             for (final topic in items) ...[
-              _EventNewsTile(topic: topic),
+              _EventNewsTile(topic: topic, eventTitle: eventTitle),
               const SizedBox(height: 8),
             ],
           ],
@@ -593,61 +607,142 @@ class _EventNewsStrip extends ConsumerWidget {
 }
 
 class _EventNewsTile extends StatelessWidget {
-  const _EventNewsTile({required this.topic});
+  const _EventNewsTile({
+    required this.topic,
+    required this.eventTitle,
+  });
 
   final ForumTopic topic;
+  final String eventTitle;
 
   @override
   Widget build(BuildContext context) {
     final cover = topic.editorialPosterUrl;
+    final when = topic.createdAt;
+    final stamp = when != null ? formatLiveStamp(when) : topic.timeAgo;
+    final excerpt = plainTextForExcerpt(
+      topic.excerpt.trim().isNotEmpty ? topic.excerpt : topic.body,
+      maxLength: 120,
+    );
+    final title = topic.title.trim();
+    final repeatsEvent = title.toLowerCase() == eventTitle.trim().toLowerCase();
+    final headline = repeatsEvent && excerpt.isNotEmpty ? excerpt : title;
+    final sub = !repeatsEvent &&
+            excerpt.isNotEmpty &&
+            excerpt.toLowerCase() != title.toLowerCase()
+        ? excerpt
+        : null;
+
     return Material(
       color: AppColors.surface,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         onTap: () => context.push('/foros/${topic.forumId}/tema/${topic.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Row(
-            children: [
-              if (cover != null) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: CofradeoNetworkImage(
-                    url: cover,
-                    width: 56,
-                    height: 56,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.burgundy.withValues(alpha: 0.16),
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(width: 3, color: AppColors.burgundy),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 10, 4, 10),
+                    child: cover != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: CofradeoNetworkImage(
+                              url: cover,
+                              width: 56,
+                              height: 56,
+                            ),
+                          )
+                        : const AppLogo(
+                            size: 40,
+                            useIconVariant: true,
+                            circular: true,
+                          ),
                   ),
-                ),
-                const SizedBox(width: 10),
-              ],
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'CÍRCULO COFRADE',
-                      style: TopicDetailTypography.meta(
-                        color: AppColors.burgundy,
-                        fontWeight: FontWeight.w700,
-                      ).copyWith(fontSize: 10, letterSpacing: 0.4),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      topic.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TopicDetailTypography.body().copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        height: 1.2,
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 10, 4, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  editorialPublicName.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TopicDetailTypography.meta(
+                                    color: AppColors.burgundy,
+                                    fontWeight: FontWeight.w700,
+                                  ).copyWith(
+                                    fontSize: 10,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                stamp,
+                                style: TopicDetailTypography.meta(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w800,
+                                ).copyWith(
+                                  fontSize: 12,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            headline,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TopicDetailTypography.body().copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              height: 1.25,
+                            ),
+                          ),
+                          if (sub != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              sub,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TopicDetailTypography.meta(
+                                color: AppColors.textSecondary,
+                              ).copyWith(fontSize: 12, height: 1.3),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(right: 6),
+                    child: Icon(
+                      Icons.chevron_right,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
               ),
-              const Icon(Icons.chevron_right, color: AppColors.textMuted),
-            ],
+            ),
           ),
         ),
       ),

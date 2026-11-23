@@ -42,6 +42,7 @@ class PageFlipWidgetState extends State<PageFlipWidget>
   List<Widget> pages = [];
   final List<AnimationController> _controllers = [];
   bool? _isForward;
+  var _busy = false;
 
   @override
   void didUpdateWidget(PageFlipWidget oldWidget) {
@@ -59,26 +60,31 @@ class PageFlipWidgetState extends State<PageFlipWidget>
   @override
   void initState() {
     super.initState();
-    // Initialize global variables (defined in page_flip.dart)
     imageData = {};
-    currentPage = ValueNotifier(-1);
-    currentWidget = ValueNotifier(Container());
-    currentPageIndex = ValueNotifier(0);
-    // Associate the controller, if provided, with this state
+    currentPage.value = -1;
+    currentWidget.value = Container();
+    currentPageIndex.value = 0;
     widget.controller?._state = this;
     _setUp();
   }
 
   void _setUp({bool isRefresh = false}) {
+    for (final c in _controllers) {
+      c.dispose();
+    }
     _controllers.clear();
     pages.clear();
     final items = List<Widget>.from(widget.children);
     if (widget.lastPage != null) {
       items.add(widget.lastPage!);
     }
+    final lastIndex = items.isEmpty ? 0 : items.length - 1;
+    pageNumber = isRefresh
+        ? pageNumber.clamp(0, lastIndex)
+        : widget.initialIndex.clamp(0, lastIndex);
     for (var i = 0; i < items.length; i++) {
       final controller = AnimationController(
-        value: 1,
+        value: i < pageNumber ? 0 : 1,
         duration: widget.duration,
         vsync: this,
       );
@@ -94,27 +100,18 @@ class PageFlipWidgetState extends State<PageFlipWidget>
       pages.add(child);
     }
     pages = pages.reversed.toList();
-    if (isRefresh) {
-      goToPage(pageNumber);
-    } else {
-      pageNumber = widget.initialIndex;
-      lastPageLoad = pages.length < 3 ? 0 : 3;
-    }
-    if (widget.initialIndex != 0) {
-      currentPage = ValueNotifier(widget.initialIndex);
-      currentWidget = ValueNotifier(pages[pageNumber]);
-      currentPageIndex = ValueNotifier(widget.initialIndex);
+    currentPage.value = -1;
+    currentPageIndex.value = pageNumber;
+    if (pages.isNotEmpty) {
+      currentWidget.value = pages[pageNumber.clamp(0, pages.length - 1)];
     }
   }
 
   bool get _isLastPage => (pages.length - 1) == pageNumber;
-  int lastPageLoad = 0;
   bool get _isFirstPage => pageNumber == 0;
 
   void _turnPage(DragUpdateDetails details, BoxConstraints dimens) {
-    // During dragging, update currentPage to trigger the builder's animation effect
-    currentPage.value = pageNumber;
-    currentWidget.value = Container();
+    if (_busy || dimens.maxWidth <= 0) return;
     final ratio = details.delta.dx / dimens.maxWidth;
     if (_isForward == null) {
       if (widget.isRightSwipe
@@ -129,115 +126,97 @@ class PageFlipWidgetState extends State<PageFlipWidget>
         _isForward = null;
       }
     }
-    if (_isForward == true || pageNumber == 0) {
-      final pageLength = pages.length;
-      final pageSize = widget.lastPage != null ? pageLength : pageLength - 1;
-      if (pageNumber != pageSize && !_isLastPage) {
-        widget.isRightSwipe
-            ? _controllers[pageNumber].value -= ratio
-            : _controllers[pageNumber].value += ratio;
-      }
+    if (_isForward == true && !_isLastPage) {
+      currentPage.value = pageNumber;
+      widget.isRightSwipe
+          ? _controllers[pageNumber].value -= ratio
+          : _controllers[pageNumber].value += ratio;
+    } else if (_isForward == false && !_isFirstPage) {
+      currentPage.value = pageNumber - 1;
+      widget.isRightSwipe
+          ? _controllers[pageNumber - 1].value -= ratio
+          : _controllers[pageNumber - 1].value += ratio;
     }
   }
 
-  Future _onDragFinish() async {
-    if (_isForward != null) {
-      if (_isForward == true) {
-        if (!_isLastPage &&
-            _controllers[pageNumber].value <= (widget.cutoffForward + 0.15)) {
-          await nextPage();
-        } else {
-          if (!_isLastPage) {
-            await _controllers[pageNumber].forward();
-          }
-        }
+  Future<void> _onDragFinish() async {
+    if (_busy) {
+      _isForward = null;
+      return;
+    }
+    if (_isForward == true) {
+      if (!_isLastPage &&
+          _controllers[pageNumber].value <= (widget.cutoffForward + 0.15)) {
+        await nextPage();
+      } else if (!_isLastPage) {
+        await _controllers[pageNumber].forward();
+      }
+    } else if (_isForward == false) {
+      if (_isFirstPage) {
+        await _controllers[pageNumber].forward();
+      } else if (_controllers[pageNumber - 1].value >= widget.cutoffPrevious) {
+        await previousPage();
       } else {
-        if (!_isFirstPage &&
-            _controllers[pageNumber - 1].value >= widget.cutoffPrevious) {
-          await previousPage();
-        } else {
-          if (_isFirstPage) {
-            await _controllers[pageNumber].forward();
-          } else {
-            await _controllers[pageNumber - 1].reverse();
-            if (!_isFirstPage) {
-              await previousPage();
-            }
-          }
-        }
+        await _controllers[pageNumber - 1].reverse();
       }
     }
     _isForward = null;
     currentPage.value = -1;
   }
 
-  /// Triggers the animation to advance to the next page – via gesture or button.
-  Future nextPage() async {
-    // Prevent going beyond the last page
-    if (_isLastPage) return;
+  Future<void> nextPage() async {
+    if (_busy || _isLastPage) return;
+    _busy = true;
     widget.onFlipStart?.call();
-    // Update currentPage to trigger the builder effect
     currentPage.value = pageNumber;
-    await _controllers[pageNumber].reverse();
-    if (mounted) {
+    try {
+      await _controllers[pageNumber].reverse();
+      if (!mounted) return;
       setState(() {
         pageNumber++;
       });
-      if (pageNumber < pages.length) {
-        currentPageIndex.value = pageNumber;
-        currentWidget.value = pages[pageNumber];
-      }
-      // In case it is the last page, ensure the notifiers are updated
-      if (_isLastPage) {
-        currentPageIndex.value = pageNumber;
-        currentWidget.value = pages[pageNumber];
-      }
+      currentPageIndex.value = pageNumber;
       widget.onPageFlipped?.call(pageNumber);
+    } finally {
+      _busy = false;
+      currentPage.value = -1;
     }
-    // Reset currentPage after the animation
-    currentPage.value = -1;
   }
 
-  /// Triggers the animation to go back to the previous page – via gesture or button.
-  Future previousPage() async {
-    // Prevent going before the first page
-    if (_isFirstPage) return;
+  Future<void> previousPage() async {
+    if (_busy || _isFirstPage) return;
+    _busy = true;
     widget.onFlipStart?.call();
-    // Update currentPage to trigger the reverse animation effect
     currentPage.value = pageNumber - 1;
-    await _controllers[pageNumber - 1].forward();
-    if (mounted) {
+    try {
+      await _controllers[pageNumber - 1].forward();
+      if (!mounted) return;
       setState(() {
         pageNumber--;
       });
       currentPageIndex.value = pageNumber;
-      currentWidget.value = pages[pageNumber];
       imageData[pageNumber] = null;
       widget.onPageFlipped?.call(pageNumber);
+    } finally {
+      _busy = false;
+      currentPage.value = -1;
     }
-    currentPage.value = -1;
   }
 
-  Future goToPage(int index) async {
+  Future<void> goToPage(int index) async {
+    final lastIndex = pages.isEmpty ? 0 : pages.length - 1;
+    final target = index.clamp(0, lastIndex);
     if (mounted) {
       setState(() {
-        pageNumber = index;
+        pageNumber = target;
       });
+    } else {
+      pageNumber = target;
     }
     for (var i = 0; i < _controllers.length; i++) {
-      if (i == index) {
-        _controllers[i].forward();
-      } else if (i < index) {
-        _controllers[i].reverse();
-      } else {
-        if (_controllers[i].status == AnimationStatus.reverse) {
-          _controllers[i].value = 1;
-        }
-      }
+      _controllers[i].value = i < target ? 0 : 1;
     }
     currentPageIndex.value = pageNumber;
-    currentWidget.value = pages[pageNumber];
-    // Idle must be -1; a live index makes every cached page paint a curl.
     currentPage.value = -1;
   }
 

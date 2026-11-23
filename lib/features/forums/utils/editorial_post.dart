@@ -5,8 +5,19 @@ const editorialPublicHandle = '@cofradeo';
 const editorialPublicName = 'Círculo Cofrade';
 
 /// Tope de cliente. Stream lo recibe por tus (el POST simple corta en 200 MB).
-/// R2, si Stream no está activo, sigue cortando en 150 MB.
-const editorialVideoMaxBytes = 500 * 1024 * 1024;
+/// Un clip de iPhone en 4K ronda 200 MB en 10 s; 2 GB cubre un par de minutos.
+const editorialVideoMaxBytes = 2 * 1024 * 1024 * 1024;
+
+/// Fallback MP4 en R2 si Stream no está activo.
+const editorialVideoMaxBytesR2 = 1024 * 1024 * 1024;
+
+String editorialVideoSizeLabel(int bytes) {
+  const gb = 1024 * 1024 * 1024;
+  const mb = 1024 * 1024;
+  if (bytes >= gb && bytes % gb == 0) return '${bytes ~/ gb} GB';
+  if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(1)} GB';
+  return '${(bytes / mb).round()} MB';
+}
 
 /// Fotos de una publicación de Para ti. La primera queda delante del montón.
 const editorialGalleryMaxImages = 4;

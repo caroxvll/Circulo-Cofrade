@@ -7,14 +7,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-/** R2 (MP4 directo). */
-const MAX_BYTES_R2 = 150 * 1024 * 1024;
+/** R2 (MP4 directo). 1 GB: un clip de iPhone 4K de ~30–40 s. */
+const MAX_BYTES_R2 = 1024 * 1024 * 1024;
 /**
  * Tope de la app. Stream recibe el archivo por tus: el POST simple corta en
- * 200 MB y no se puede subir en el panel. La duración reservada va en
- * maxDurationSeconds (Cloudflare admite hasta 36000 s).
+ * 200 MB y no se puede subir en el panel. 2 GB cubre un par de minutos en
+ * 4K de iPhone. La duración reservada va en maxDurationSeconds
+ * (Cloudflare admite hasta 36000 s).
  */
-const MAX_BYTES_STREAM = 500 * 1024 * 1024;
+const MAX_BYTES_STREAM = 2 * 1024 * 1024 * 1024;
 const MAX_DURATION_SECONDS = 10 * 60;
 
 const ALLOWED_TYPES = new Set([
@@ -252,8 +253,8 @@ Deno.serve(async (req) => {
       return jsonResponse(
         {
           error: useStream
-            ? "El vídeo supera 500 MB"
-            : "El vídeo supera 150 MB",
+            ? "El vídeo supera 2 GB"
+            : "El vídeo supera 1 GB",
         },
         400,
       );

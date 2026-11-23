@@ -7,14 +7,14 @@ Excepción a [`MEDIA.md`](MEDIA.md): **solo Junta**, en publicaciones oficiales.
 - MP4/MOV/WebM directo en **Cloudflare R2**
 - Poster manual (imagen en `topic-covers`)
 - Edge Function `editorial-video-upload` → URL firmada PUT
-- Máx. **150 MB**
+- Máx. **1 GB**
 
 ## Fase 2b — HLS con Cloudflare Stream (recomendado)
 
 - Subida a **Cloudflare Stream** (transcodifica a HLS + poster automático)
 - Mientras procesa: `video_status = processing` (badge «OPTIMIZANDO» en Para ti)
 - Al terminar: `video_url` = manifest HLS, `video_poster_url` = thumbnail
-- Máx. **500 MB** / **10 min**
+- Máx. **2 GB** / **10 min** (un clip de iPhone 15 en 4K ronda 200 MB en 10 s)
 - Si no hay token Stream, la edge function cae al modo R2 (2a)
 
 ### Variables nuevas (Edge Functions)

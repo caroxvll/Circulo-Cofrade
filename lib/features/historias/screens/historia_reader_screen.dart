@@ -23,7 +23,7 @@ import '../widgets/historia_compose_sheet.dart';
 const _paper = Color(0xFFFBF6EA);
 const _desk = Color(0xFFE4D2B8);
 
-class HistoriaReaderScreen extends ConsumerWidget {
+class HistoriaReaderScreen extends ConsumerStatefulWidget {
   const HistoriaReaderScreen({
     super.key,
     required this.historiaId,
@@ -34,9 +34,20 @@ class HistoriaReaderScreen extends ConsumerWidget {
   final int? resumePage;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(historiaByIdProvider(historiaId));
-    final progress = ref.watch(historiaReadingPageProvider(historiaId));
+  ConsumerState<HistoriaReaderScreen> createState() =>
+      _HistoriaReaderScreenState();
+}
+
+class _HistoriaReaderScreenState extends ConsumerState<HistoriaReaderScreen> {
+  /// Se fija al abrir. Si no, guardar la hoja reconstruye el libro.
+  int? _openedAtPage;
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(historiaByIdProvider(widget.historiaId));
+    final progress = _openedAtPage == null
+        ? ref.watch(historiaReadingPageProvider(widget.historiaId))
+        : const AsyncValue<int>.data(0);
 
     return async.when(
       loading: () => const Scaffold(
@@ -54,25 +65,27 @@ class HistoriaReaderScreen extends ConsumerWidget {
             body: const Center(child: Text('Esta obra ya no está.')),
           );
         }
-        if (resumePage == null &&
-            !progress.hasValue &&
-            !progress.hasError) {
-          return const Scaffold(
-            backgroundColor: _desk,
-            body: Center(child: CircularProgressIndicator()),
+        if (_openedAtPage == null) {
+          if (widget.resumePage == null &&
+              !progress.hasValue &&
+              !progress.hasError) {
+            return const Scaffold(
+              backgroundColor: _desk,
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          _openedAtPage = clampHistoriaResumePage(
+            widget.resumePage ?? progress.asData?.value ?? 0,
+            historia.pages.length,
           );
         }
-        final startPage = clampHistoriaResumePage(
-          resumePage ?? progress.asData?.value ?? 0,
-          historia.pages.length,
-        );
         return _BookReader(
           key: ValueKey(
-            '${historia.id}|$startPage|${historia.title}|${historia.coverImageUrl}|'
+            '${historia.id}|${historia.title}|${historia.coverImageUrl}|'
             '${historia.pages.map((p) => '${p.body.length}:${p.imageUrl}').join(',')}',
           ),
           historia: historia,
-          initialPage: startPage,
+          initialPage: _openedAtPage!,
         );
       },
     );
@@ -105,11 +118,6 @@ class _BookReaderState extends ConsumerState<_BookReader>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.initialPage > 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(_jumpToSavedPage());
-      });
-    }
   }
 
   @override
@@ -117,14 +125,14 @@ class _BookReaderState extends ConsumerState<_BookReader>
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.paused) {
-      unawaited(_persist(_page));
+      unawaited(_persist(_page, refreshShelf: true));
     }
   }
 
   @override
   void deactivate() {
     _saveTimer?.cancel();
-    unawaited(_persist(_page));
+    unawaited(_persist(_page, refreshShelf: true));
     super.deactivate();
   }
 
@@ -143,27 +151,17 @@ class _BookReaderState extends ConsumerState<_BookReader>
     });
   }
 
-  Future<void> _jumpToSavedPage() async {
-    final target = widget.initialPage;
-    if (target <= 0) return;
-    await Future<void>.delayed(const Duration(milliseconds: 220));
-    if (!mounted) return;
-    _flip.goToPage(target);
-    currentPage.value = -1;
-    if (mounted) setState(() => _page = target);
-  }
-
-  Future<void> _persist(int page) async {
+  Future<void> _persist(int page, {bool refreshShelf = false}) async {
     try {
       final repo = ref.read(historiasRepositoryProvider);
-      final container = ProviderScope.containerOf(context, listen: false);
       await repo.saveReadingProgress(
         historiaId: historia.id,
         page: page,
         pageCount: historia.pages.length,
       );
-      container.invalidate(continueReadingProvider);
-      container.invalidate(historiaReadingPageProvider(historia.id));
+      if (refreshShelf && mounted) {
+        ref.invalidate(continueReadingProvider);
+      }
     } catch (_) {}
   }
 
@@ -198,7 +196,10 @@ class _BookReaderState extends ConsumerState<_BookReader>
                 controller: _flip,
                 backgroundColor: _paper,
                 duration: const Duration(milliseconds: 520),
-                initialIndex: 0,
+                initialIndex: widget.initialPage.clamp(
+                  0,
+                  historia.pages.length,
+                ),
                 onPageFlipped: _onFlipped,
                 lastPage: _ColophonPage(
                   historia: historia,
