@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/network/app_network_status_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
@@ -118,6 +119,14 @@ class _SsInformarComposeScreenState
     if (profile == null || profile.isSuspended) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Inicia sesión para publicar')),
+      );
+      return;
+    }
+
+    final net = ref.read(appNetworkStatusProvider);
+    if (net.isOffline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(net.liveSendBlockedMessage)),
       );
       return;
     }

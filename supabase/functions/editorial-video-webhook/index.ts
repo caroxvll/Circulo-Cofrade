@@ -58,20 +58,13 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     // Formatos posibles: notificación directa o envuelta.
     const uid = String(payload.uid ?? payload.video?.uid ?? "").trim();
-    const topicId = String(
-      payload.meta?.topicId ??
-        payload.video?.meta?.topicId ??
-        payload.data?.meta?.topicId ??
-        "",
-    ).trim();
     const readyToStream =
       payload.readyToStream === true ||
       payload.status?.state === "ready" ||
       payload.video?.readyToStream === true;
 
-    if (!uid || !topicId) {
-      // ACK para no reintentar basura; logueamos.
-      console.warn("webhook sin uid/topicId", payload);
+    if (!uid) {
+      console.warn("webhook sin uid", payload);
       return jsonResponse({ ok: true, skipped: true });
     }
 
@@ -89,6 +82,18 @@ Deno.serve(async (req) => {
       streamPlaybackUrls(uid).posterUrl;
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
+    const { data: topic } = await admin
+      .from("forum_topics")
+      .select("id")
+      .eq("video_external_id", uid)
+      .eq("is_editorial", true)
+      .maybeSingle();
+    const topicId = topic?.id as string | undefined;
+    if (!topicId) {
+      console.warn("webhook sin publicación para", uid);
+      return jsonResponse({ ok: true, skipped: true });
+    }
+
     await admin.rpc("finalize_editorial_video", {
       p_topic_id: topicId,
       p_video_url: playbackHls,

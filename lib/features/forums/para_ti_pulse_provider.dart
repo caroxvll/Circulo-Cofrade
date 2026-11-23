@@ -90,6 +90,48 @@ final publishedEditorialPostsProvider =
   return ref.watch(forumsRepositoryProvider).fetchPublishedEditorialPosts();
 });
 
+/// Stream tarda minutos en un vídeo grande. Mientras haya uno «OPTIMIZANDO»,
+/// preguntamos si ya está listo y refrescamos Para ti.
+final editorialProcessingSyncProvider = Provider<void>((ref) {
+  final posts =
+      ref.watch(publishedEditorialPostsProvider).asData?.value ?? const [];
+  final ids = [
+    for (final topic in posts)
+      if (topic.hasProcessingEditorialVideo) topic.id,
+  ];
+  if (ids.isEmpty) return;
+
+  var cancelled = false;
+  Future<void> tick() async {
+    if (cancelled) return;
+    final client = SupabaseBootstrap.client;
+    if (client == null) return;
+    var ready = false;
+    for (final id in ids) {
+      try {
+        final response = await client.functions.invoke(
+          'editorial-video-finalize',
+          body: {'topicId': id},
+        );
+        final data = response.data;
+        if (data is Map && data['ready'] == true) ready = true;
+      } catch (_) {}
+    }
+    if (ready && !cancelled) {
+      ref.invalidate(publishedEditorialPostsProvider);
+    }
+  }
+
+  unawaited(tick());
+  final timer = Timer.periodic(const Duration(seconds: 15), (_) {
+    unawaited(tick());
+  });
+  ref.onDispose(() {
+    cancelled = true;
+    timer.cancel();
+  });
+});
+
 /// Noticias de Círculo Cofrade ligadas a un evento. Siguen ahí al cerrar el directo.
 final eventEditorialPostsProvider = FutureProvider.autoDispose
     .family<List<ForumTopic>, String>((ref, eventId) async {
@@ -101,6 +143,7 @@ final eventEditorialPostsProvider = FutureProvider.autoDispose
 /// Río de Para ti: avisos de hoy, directo de Semana Santa y el tema que se mueve.
 final paraTiRiverProvider = Provider<ParaTiRiver>((ref) {
   ref.watch(ssLiveRealtimeProvider);
+  ref.watch(editorialProcessingSyncProvider);
 
   final tweets = ref.watch(todayCuaresmaLiveTweetsProvider);
   final gate = ref.watch(ssLiveGateProvider);

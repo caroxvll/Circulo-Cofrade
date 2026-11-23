@@ -296,6 +296,15 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
   bool get _wantsCalendar =>
       _alsoCalendar && hermandadPublishKindById(_kindId).canCalendar;
 
+  SeasonPaso get _resolvedPaso {
+    final profile = ref
+            .read(hermandadSeasonProfileProvider(widget.topicId))
+            .asData
+            ?.value ??
+        HermandadSeasonProfile.defaults;
+    return profile.pasosLayout.resolvedEventPaso(_paso);
+  }
+
   HermandadScheduledCalendar? _scheduledCalendar({String? imageUrl}) {
     if (!_wantsCalendar) return null;
     final place = _calendarPlace();
@@ -308,7 +317,7 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
       coverImageUrl: imageUrl,
       customIconUrl: place.iconUrl,
       organizerLabel: place.organizer,
-      paso: _paso.dbValue,
+      paso: _resolvedPaso.dbValue,
       seasonNumber: type == 'ensayo' ? _ensayoN : null,
       withRetranqueo: type == 'muda' && _withRetranqueo,
     );
@@ -361,11 +370,11 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
           status: 'published',
           dayLabel: seasonActDayLabel(
             typeDb: kind.calendarEventType ?? '',
-            paso: _paso,
+            paso: _resolvedPaso,
             seasonN: kind.calendarEventType == 'ensayo' ? _ensayoN : null,
             withRetranqueo: _withRetranqueo,
           ),
-          paso: _paso,
+          paso: _resolvedPaso,
           seasonNumber: kind.calendarEventType == 'ensayo' ? _ensayoN : null,
           withRetranqueo:
               kind.calendarEventType == 'muda' && _withRetranqueo,
@@ -731,7 +740,9 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
             .asData
             ?.value ??
         HermandadSeasonProfile.defaults;
-    final showPaso = type == 'iguala' || type == 'ensayo';
+    final pasoChoices = profile.pasosLayout.eventChoices;
+    final showPaso =
+        (type == 'iguala' || type == 'ensayo') && pasoChoices.length > 1;
     final showN = type == 'ensayo';
     final showRetr = type == 'muda' &&
         profile.mudaMode != MudaRetranqueoMode.mudaOnly;
@@ -749,9 +760,9 @@ class _ReplyComposeSheetState extends ConsumerState<_ReplyComposeSheet> {
         Wrap(
           spacing: 8,
           children: [
-            for (final paso in SeasonPaso.values)
+            for (final paso in pasoChoices)
               ChoiceChip(
-                label: Text(paso.shortLabel),
+                label: Text(profile.pasosLayout.eventChipLabel(paso)),
                 selected: _paso == paso,
                 onSelected: (_) => setState(() => _paso = paso),
                 selectedColor: AppColors.goldPale,

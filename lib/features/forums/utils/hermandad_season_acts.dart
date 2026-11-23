@@ -2,6 +2,7 @@ import 'package:intl/intl.dart';
 
 import '../../../shared/models/calendar_event.dart';
 import '../../calendar/utils/calendar_event_utils.dart';
+import '../../calendar/utils/holy_week_countdown.dart';
 import 'hermandad_season_profile.dart';
 
 /// Hitos de temporada que interesa seguir por hermandad.
@@ -71,6 +72,8 @@ class SeasonPasoSlot {
 
   String get shortLabel => switch (label) {
         'Cristo' => 'C',
+        'Cristo 1' => 'C1',
+        'Cristo 2' => 'C2',
         'Virgen' => 'V',
         'Ambos' => '2',
         _ => label,
@@ -78,7 +81,8 @@ class SeasonPasoSlot {
 }
 
 SeasonPaso? seasonPasoFromSlotLabel(String label) => switch (label) {
-      'Cristo' => SeasonPaso.cristo,
+      'Cristo' || 'Cristo 1' => SeasonPaso.cristo,
+      'Cristo 2' => SeasonPaso.cristo2,
       'Virgen' => SeasonPaso.virgen,
       _ => null,
     };
@@ -97,16 +101,20 @@ List<CalendarEvent> eventsForPasoSlot(
 
 enum SeasonActPasoFilter {
   igualaCristo,
+  igualaCristo2,
   igualaVirgen,
   igualaAmbas,
   ensayoCristo,
+  ensayoCristo2,
   ensayoVirgen;
 
   String get label => switch (this) {
         SeasonActPasoFilter.igualaCristo => 'Igualá Cristo',
+        SeasonActPasoFilter.igualaCristo2 => 'Igualá Cristo 2',
         SeasonActPasoFilter.igualaVirgen => 'Igualá Virgen',
         SeasonActPasoFilter.igualaAmbas => 'Igualá ambas',
         SeasonActPasoFilter.ensayoCristo => 'Ensayos Cristo',
+        SeasonActPasoFilter.ensayoCristo2 => 'Ensayos Cristo 2',
         SeasonActPasoFilter.ensayoVirgen => 'Ensayos Virgen',
       };
 }
@@ -246,7 +254,9 @@ class HermandadSeasonActsSnapshot {
     final item = milestone(kind);
     if (item == null) return false;
     for (final slot in item.pasoSlots) {
-      if (slot.label == pasoLabel && slot.filled) return true;
+      if (!slot.filled) continue;
+      if (slot.label == pasoLabel) return true;
+      if (pasoLabel == 'Cristo' && slot.label == 'Cristo 1') return true;
     }
     return false;
   }
@@ -255,6 +265,8 @@ class HermandadSeasonActsSnapshot {
     return switch (filter) {
       SeasonActPasoFilter.igualaCristo =>
         hasPasoFilled(HermandadSeasonActKind.iguala, 'Cristo'),
+      SeasonActPasoFilter.igualaCristo2 =>
+        hasPasoFilled(HermandadSeasonActKind.iguala, 'Cristo 2'),
       SeasonActPasoFilter.igualaVirgen =>
         hasPasoFilled(HermandadSeasonActKind.iguala, 'Virgen'),
       SeasonActPasoFilter.igualaAmbas =>
@@ -262,6 +274,8 @@ class HermandadSeasonActsSnapshot {
             hasPasoFilled(HermandadSeasonActKind.iguala, 'Virgen'),
       SeasonActPasoFilter.ensayoCristo =>
         hasPasoFilled(HermandadSeasonActKind.ensayos, 'Cristo'),
+      SeasonActPasoFilter.ensayoCristo2 =>
+        hasPasoFilled(HermandadSeasonActKind.ensayos, 'Cristo 2'),
       SeasonActPasoFilter.ensayoVirgen =>
         hasPasoFilled(HermandadSeasonActKind.ensayos, 'Virgen'),
     };
@@ -328,13 +342,15 @@ List<HermandadSeasonActsSnapshot> filterSeasonActsCoverage({
   ];
 }
 
-/// Año civil de la temporada (p. ej. 2026).
-int currentSeasonActsYear([DateTime? now]) => (now ?? DateTime.now()).year;
+/// Año de Semana Santa de la temporada (p. ej. noviembre 2026 → 2027).
+int currentSeasonActsYear([DateTime? now]) => liturgicalSeasonYear(now);
 
+/// De septiembre del año anterior a septiembre del año de Ramos, para
+/// recoger igualás de otoño y mudas/desarmás de primavera-verano.
 ({DateTime start, DateTime end}) seasonActsRange(int year) {
   return (
-    start: DateTime(year, 1, 1),
-    end: DateTime(year + 1, 1, 1),
+    start: DateTime(year - 1, 9, 1),
+    end: DateTime(year, 9, 1),
   );
 }
 
@@ -493,49 +509,63 @@ int _ensayoFilled(List<CalendarEvent> events, int n) {
 ) {
   switch (kind) {
     case HermandadSeasonActKind.iguala:
-      if (!profile.igualaSplit) {
+      if (!profile.pasosLayout.splitsIguala(profile.igualaSplit)) {
+        final tracked = profile.pasosLayout.trackedPasos;
+        final hits = events.where(
+          (e) => tracked.any((paso) => e.paso.covers(paso)),
+        );
         return (
-          filled: events.isEmpty ? 0 : 1,
+          filled: hits.isEmpty ? 0 : 1,
           required: 1,
           detail: null,
         );
       }
-      final cristo = _countCovering(events, SeasonPaso.cristo) > 0;
-      final virgen = _countCovering(events, SeasonPaso.virgen) > 0;
+      final tracked = profile.pasosLayout.trackedPasos;
+      var filled = 0;
+      final missing = <String>[];
+      for (final paso in tracked) {
+        if (_countCovering(events, paso) > 0) {
+          filled++;
+        } else {
+          missing.add(profile.pasosLayout.slotLabel(paso));
+        }
+      }
       return (
-        filled: (cristo ? 1 : 0) + (virgen ? 1 : 0),
-        required: 2,
-        detail: cristo && virgen
+        filled: filled,
+        required: tracked.length,
+        detail: missing.isEmpty
             ? null
-            : [
-                if (cristo) 'Cristo',
-                if (virgen) 'Virgen',
-                if (!cristo) 'falta Cristo',
-                if (!virgen) 'falta Virgen',
-              ].join(' · '),
+            : missing.map((name) => 'falta $name').join(' · '),
       );
     case HermandadSeasonActKind.ensayos:
       final n = profile.ensayoCount.clamp(1, 12);
-      if (!profile.ensayoSplit) {
-        final filled = _ensayoFilled(events, n);
+      if (!profile.pasosLayout.splitsEnsayo(profile.ensayoSplit)) {
+        final tracked = profile.pasosLayout.trackedPasos;
+        final ofPaso = events
+            .where((e) => tracked.any((paso) => e.paso.covers(paso)))
+            .toList();
+        final filled = _ensayoFilled(ofPaso, n);
         return (
           filled: filled,
           required: n,
           detail: n > 1 ? '$filled/$n ensayos' : null,
         );
       }
-      final cristo = _ensayoFilled(
-        events.where((e) => e.paso.covers(SeasonPaso.cristo)).toList(),
-        n,
-      );
-      final virgen = _ensayoFilled(
-        events.where((e) => e.paso.covers(SeasonPaso.virgen)).toList(),
-        n,
-      );
+      final tracked = profile.pasosLayout.trackedPasos;
+      var filled = 0;
+      final bits = <String>[];
+      for (final paso in tracked) {
+        final count = _ensayoFilled(
+          events.where((e) => e.paso.covers(paso)).toList(),
+          n,
+        );
+        filled += count;
+        bits.add('${profile.pasosLayout.slotLabel(paso)} $count/$n');
+      }
       return (
-        filled: cristo + virgen,
-        required: n * 2,
-        detail: 'Cristo $cristo/$n · Virgen $virgen/$n',
+        filled: filled,
+        required: n * tracked.length,
+        detail: bits.join(' · '),
       );
     case HermandadSeasonActKind.muda:
       final mudas = events.where((e) => e.type == EventType.muda).toList();
@@ -598,39 +628,38 @@ List<SeasonPasoSlot> _pasoSlotsFor(
   List<CalendarEvent> events,
   HermandadSeasonProfile profile,
 ) {
-  bool covers(SeasonPaso needed) =>
-      events.any((e) => e.paso.covers(needed));
+  final tracked = profile.pasosLayout.trackedPasos;
+  if (tracked.isEmpty) return const [];
 
   if (kind == HermandadSeasonActKind.iguala) {
     return [
-      SeasonPasoSlot(label: 'Cristo', filled: covers(SeasonPaso.cristo)),
-      SeasonPasoSlot(label: 'Virgen', filled: covers(SeasonPaso.virgen)),
+      for (final paso in tracked)
+        SeasonPasoSlot(
+          label: profile.pasosLayout.slotLabel(paso),
+          filled: events.any((e) => e.paso.covers(paso)),
+        ),
     ];
   }
 
   if (kind == HermandadSeasonActKind.ensayos) {
     final n = profile.ensayoCount.clamp(1, 12);
-    final cristoN = _ensayoFilled(
-      events.where((e) => e.paso.covers(SeasonPaso.cristo)).toList(),
-      n,
-    );
-    final virgenN = _ensayoFilled(
-      events.where((e) => e.paso.covers(SeasonPaso.virgen)).toList(),
-      n,
-    );
-    final showHint = profile.ensayoSplit || n > 1;
-    return [
-      SeasonPasoSlot(
-        label: 'Cristo',
-        filled: cristoN > 0,
-        hint: showHint ? '$cristoN/$n' : null,
-      ),
-      SeasonPasoSlot(
-        label: 'Virgen',
-        filled: virgenN > 0,
-        hint: showHint ? '$virgenN/$n' : null,
-      ),
-    ];
+    final showHint =
+        profile.pasosLayout.splitsEnsayo(profile.ensayoSplit) || n > 1;
+    final slots = <SeasonPasoSlot>[];
+    for (final paso in tracked) {
+      final count = _ensayoFilled(
+        events.where((e) => e.paso.covers(paso)).toList(),
+        n,
+      );
+      slots.add(
+        SeasonPasoSlot(
+          label: profile.pasosLayout.slotLabel(paso),
+          filled: count > 0,
+          hint: showHint ? '$count/$n' : null,
+        ),
+      );
+    }
+    return slots;
   }
   return const [];
 }

@@ -295,6 +295,114 @@
   font-size: 0.85rem;
 }
 
+.stats em {
+  display: block;
+  margin-top: 6px;
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--burgundy);
+}
+
+.pulse-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(220px, 0.8fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.pulse-chart-wrap,
+.pulse-split {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.pulse-kicker {
+  margin: 0 0 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--burgundy);
+}
+
+.pulse-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 108px;
+}
+
+.pulse-col {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
+.pulse-bar {
+  width: 100%;
+  max-width: 18px;
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, var(--gold) 0%, var(--burgundy) 100%);
+}
+
+.pulse-col span {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.split-track {
+  display: flex;
+  height: 10px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: var(--border);
+  margin-bottom: 10px;
+}
+
+.split-track i {
+  display: block;
+  height: 100%;
+}
+
+.split-track .cofrades {
+  background: var(--burgundy);
+}
+
+.split-track .hermandades {
+  background: var(--gold);
+}
+
+.split-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.split-legend b {
+  color: var(--text);
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -466,6 +574,10 @@ td.actions {
 
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pulse-board {
+    grid-template-columns: 1fr;
   }
 
   .form-grid,

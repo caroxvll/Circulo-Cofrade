@@ -136,6 +136,13 @@ class AdminRepository {
 
   bool get isAvailable => _client != null;
 
+  Future<SignupPulse> fetchSignupPulse() async {
+    if (_client == null) throw const AdminUnavailableException();
+    final row = await _client!.rpc('admin_signup_pulse');
+    if (row is! Map) throw const AdminUnavailableException();
+    return SignupPulse.fromJson(Map<String, dynamic>.from(row));
+  }
+
   Future<List<ForumTopic>> fetchPendingTopics() async {
     if (_client == null) return [];
 
@@ -1265,6 +1272,71 @@ class AdminRepository {
       TopicStatus.rejected => 'rejected',
       TopicStatus.published => 'published',
     };
+  }
+}
+
+class SignupDayCount {
+  const SignupDayCount({required this.date, required this.count});
+
+  final String date;
+  final int count;
+}
+
+class SignupPulse {
+  const SignupPulse({
+    required this.today,
+    required this.yesterday,
+    required this.last7,
+    required this.last30,
+    required this.total,
+    required this.cofrades,
+    required this.hermandades,
+    required this.days,
+  });
+
+  final int today;
+  final int yesterday;
+  final int last7;
+  final int last30;
+  final int total;
+  final int cofrades;
+  final int hermandades;
+  final List<SignupDayCount> days;
+
+  String get todayHint {
+    final delta = today - yesterday;
+    if (delta == 0) return 'Igual que ayer';
+    if (delta > 0) return '+$delta respecto a ayer';
+    return '$delta respecto a ayer';
+  }
+
+  factory SignupPulse.fromJson(Map<String, dynamic> json) {
+    final rawDays = json['days'];
+    final days = <SignupDayCount>[];
+    if (rawDays is List) {
+      for (final item in rawDays) {
+        if (item is! Map) continue;
+        final map = Map<String, dynamic>.from(item);
+        final date = map['date']?.toString() ?? '';
+        if (date.isEmpty) continue;
+        days.add(
+          SignupDayCount(
+            date: date,
+            count: (map['count'] as num?)?.toInt() ?? 0,
+          ),
+        );
+      }
+    }
+    return SignupPulse(
+      today: (json['today'] as num?)?.toInt() ?? 0,
+      yesterday: (json['yesterday'] as num?)?.toInt() ?? 0,
+      last7: (json['last7'] as num?)?.toInt() ?? 0,
+      last30: (json['last30'] as num?)?.toInt() ?? 0,
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      cofrades: (json['cofrades'] as num?)?.toInt() ?? 0,
+      hermandades: (json['hermandades'] as num?)?.toInt() ?? 0,
+      days: days,
+    );
   }
 }
 

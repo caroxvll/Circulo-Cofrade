@@ -31,10 +31,19 @@ export class HermandadSettingsPageComponent implements OnInit {
   readonly brandingBusy = signal(false);
   readonly brandingError = signal<string | null>(null);
   readonly brandingOk = signal<string | null>(null);
+  pasosLayout:
+    | 'cristo'
+    | 'virgen'
+    | 'cristo_virgen'
+    | 'dos_cristos_virgen' = 'cristo_virgen';
   igualaSplit = false;
   ensayoSplit = false;
   ensayoCount = 1;
   mudaMode: 'with_retranqueo' | 'split' | 'muda_only' = 'muda_only';
+
+  get canSplitPasos(): boolean {
+    return this.pasosLayout === 'cristo_virgen';
+  }
   readonly seasonSaving = signal(false);
   readonly seasonError = signal<string | null>(null);
 
@@ -86,6 +95,7 @@ export class HermandadSettingsPageComponent implements OnInit {
     const topicId = this.topicId();
     if (!topicId) return;
     const profile = await this.portal.fetchSeasonProfile(topicId);
+    this.pasosLayout = profile.pasosLayout;
     this.igualaSplit = profile.igualaSplit;
     this.ensayoSplit = profile.ensayoSplit;
     this.ensayoCount = profile.ensayoCount;
@@ -99,6 +109,7 @@ export class HermandadSettingsPageComponent implements OnInit {
     this.seasonError.set(null);
     try {
       await this.portal.saveSeasonProfile(topicId, {
+        pasosLayout: this.pasosLayout,
         igualaSplit: this.igualaSplit,
         ensayoSplit: this.ensayoSplit,
         ensayoCount: this.ensayoCount,
@@ -109,7 +120,7 @@ export class HermandadSettingsPageComponent implements OnInit {
       this.seasonError.set(
         err instanceof Error
           ? err.message
-          : 'No se pudo guardar. ¿Ejecutaste hermandad_season_profile.sql?',
+          : 'No se pudo guardar. ¿Ejecutaste hermandad_season_pasos.sql?',
       );
     } finally {
       this.seasonSaving.set(false);

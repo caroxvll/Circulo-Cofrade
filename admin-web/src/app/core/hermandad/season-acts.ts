@@ -1,10 +1,18 @@
+import { addDays, easterSunday } from '../season/season.models';
+
 export type SeasonActKind = 'iguala' | 'ensayos' | 'muda' | 'desarma';
 export type SeasonActStatus = 'empty' | 'upcoming' | 'done' | 'mixed';
 
-export type SeasonPaso = 'ambos' | 'cristo' | 'virgen';
+export type SeasonPaso = 'ambos' | 'cristo' | 'cristo2' | 'virgen';
+export type HermandadPasosLayout =
+  | 'cristo'
+  | 'virgen'
+  | 'cristo_virgen'
+  | 'dos_cristos_virgen';
 export type MudaRetranqueoMode = 'with_retranqueo' | 'split' | 'muda_only';
 
 export interface HermandadSeasonProfile {
+  pasosLayout: HermandadPasosLayout;
   igualaSplit: boolean;
   ensayoSplit: boolean;
   ensayoCount: number;
@@ -12,11 +20,88 @@ export interface HermandadSeasonProfile {
 }
 
 export const DEFAULT_SEASON_PROFILE: HermandadSeasonProfile = {
+  pasosLayout: 'cristo_virgen',
   igualaSplit: false,
   ensayoSplit: false,
   ensayoCount: 1,
   mudaMode: 'muda_only',
 };
+
+export function parseSeasonPaso(raw: unknown): SeasonPaso {
+  const value = String(raw ?? '');
+  if (value === 'cristo' || value === 'cristo2' || value === 'virgen') return value;
+  return 'ambos';
+}
+
+export function eventPasoChoices(
+  layout: HermandadPasosLayout,
+): ReadonlyArray<{ id: SeasonPaso; label: string }> {
+  if (layout === 'cristo') return [{ id: 'cristo', label: 'Cristo' }];
+  if (layout === 'virgen') return [{ id: 'virgen', label: 'Virgen' }];
+  if (layout === 'dos_cristos_virgen') {
+    return [
+      { id: 'cristo', label: 'Cristo 1' },
+      { id: 'cristo2', label: 'Cristo 2' },
+      { id: 'virgen', label: 'Virgen' },
+    ];
+  }
+  return [
+    { id: 'ambos', label: 'Ambos' },
+    { id: 'cristo', label: 'Cristo' },
+    { id: 'virgen', label: 'Virgen' },
+  ];
+}
+
+export function parsePasosLayout(raw: unknown): HermandadPasosLayout {
+  const value = String(raw ?? '');
+  if (value === 'cristo' || value === 'virgen' || value === 'dos_cristos_virgen') {
+    return value;
+  }
+  return 'cristo_virgen';
+}
+
+export function parseSeasonProfile(
+  row: Record<string, unknown> | null | undefined,
+): HermandadSeasonProfile {
+  if (!row) return { ...DEFAULT_SEASON_PROFILE };
+  const mode = String(row['muda_mode'] ?? 'muda_only');
+  return {
+    pasosLayout: parsePasosLayout(row['pasos_layout']),
+    igualaSplit: row['iguala_split'] === true,
+    ensayoSplit: row['ensayo_split'] === true,
+    ensayoCount: Number(row['ensayo_count'] ?? 1) || 1,
+    mudaMode:
+      mode === 'with_retranqueo' || mode === 'split' ? mode : 'muda_only',
+  };
+}
+
+function trackedPasos(layout: HermandadPasosLayout): SeasonPaso[] {
+  if (layout === 'cristo') return ['cristo'];
+  if (layout === 'virgen') return ['virgen'];
+  if (layout === 'dos_cristos_virgen') return ['cristo', 'cristo2', 'virgen'];
+  return ['cristo', 'virgen'];
+}
+
+function slotLabel(layout: HermandadPasosLayout, paso: SeasonPaso): string {
+  if (paso === 'cristo2') return 'Cristo 2';
+  if (paso === 'virgen') return 'Virgen';
+  if (paso === 'ambos') return 'Ambos';
+  return layout === 'dos_cristos_virgen' ? 'Cristo 1' : 'Cristo';
+}
+
+function splitsIguala(profile: HermandadSeasonProfile): boolean {
+  return (
+    profile.pasosLayout === 'dos_cristos_virgen' ||
+    (profile.pasosLayout === 'cristo_virgen' && profile.igualaSplit)
+  );
+}
+
+function splitsEnsayo(profile: HermandadSeasonProfile): boolean {
+  return (
+    profile.pasosLayout === 'dos_cristos_virgen' ||
+    (profile.pasosLayout === 'cristo_virgen' && profile.ensayoSplit)
+  );
+}
 
 export interface SeasonActEvent {
   id: string;
@@ -39,9 +124,11 @@ export interface SeasonPasoSlot {
 
 export type SeasonActPasoFilter =
   | 'iguala_cristo'
+  | 'iguala_cristo2'
   | 'iguala_virgen'
   | 'iguala_ambas'
   | 'ensayo_cristo'
+  | 'ensayo_cristo2'
   | 'ensayo_virgen';
 
 export const SEASON_ACT_PASO_FILTERS: ReadonlyArray<{
@@ -49,9 +136,11 @@ export const SEASON_ACT_PASO_FILTERS: ReadonlyArray<{
   label: string;
 }> = [
   { id: 'iguala_cristo', label: 'Igualá Cristo' },
+  { id: 'iguala_cristo2', label: 'Igualá Cristo 2' },
   { id: 'iguala_virgen', label: 'Igualá Virgen' },
   { id: 'iguala_ambas', label: 'Igualá ambas' },
   { id: 'ensayo_cristo', label: 'Ensayos Cristo' },
+  { id: 'ensayo_cristo2', label: 'Ensayos Cristo 2' },
   { id: 'ensayo_virgen', label: 'Ensayos Virgen' },
 ];
 
@@ -105,7 +194,9 @@ export const SEASON_ACT_DB_TYPES = [
 function coversPaso(eventPaso: SeasonPaso | undefined, needed: SeasonPaso): boolean {
   const paso = eventPaso ?? 'ambos';
   if (needed === 'ambos') return true;
-  return paso === 'ambos' || paso === needed;
+  if (paso === needed) return true;
+  if (paso === 'ambos') return needed === 'cristo' || needed === 'virgen';
+  return false;
 }
 
 function ensayoFilled(events: SeasonActEvent[], n: number): number {
@@ -125,14 +216,20 @@ function mudaLabel(mode: MudaRetranqueoMode): string {
   return 'Muda';
 }
 
+const SEASON_ACTS_ROLL_DAYS_AFTER_EASTER = 90;
+
 export function currentSeasonActsYear(now = new Date()): number {
-  return now.getFullYear();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+  const easter = easterSunday(today.getFullYear());
+  const roll = addDays(easter, SEASON_ACTS_ROLL_DAYS_AFTER_EASTER);
+  if (today.getTime() >= roll.getTime()) return today.getFullYear() + 1;
+  return today.getFullYear();
 }
 
 export function seasonActsRange(year: number): { fromIso: string; toIso: string } {
   return {
-    fromIso: new Date(Date.UTC(year, 0, 1)).toISOString(),
-    toIso: new Date(Date.UTC(year + 1, 0, 1)).toISOString(),
+    fromIso: new Date(Date.UTC(year - 1, 8, 1)).toISOString(),
+    toIso: new Date(Date.UTC(year, 8, 1)).toISOString(),
   };
 }
 
@@ -296,42 +393,55 @@ function slotsFor(
   profile: HermandadSeasonProfile,
 ): { filled: number; required: number; detail: string | null } {
   if (kind === 'iguala') {
-    if (!profile.igualaSplit) {
-      return { filled: events.length ? 1 : 0, required: 1, detail: null };
+    if (!splitsIguala(profile)) {
+      const tracked = trackedPasos(profile.pasosLayout);
+      const hits = events.filter((e) =>
+        tracked.some((paso) => coversPaso(e.paso, paso)),
+      );
+      return { filled: hits.length ? 1 : 0, required: 1, detail: null };
     }
-    const cristo = events.some((e) => coversPaso(e.paso, 'cristo'));
-    const virgen = events.some((e) => coversPaso(e.paso, 'virgen'));
+    const tracked = trackedPasos(profile.pasosLayout);
+    let filled = 0;
+    const missing: string[] = [];
+    for (const paso of tracked) {
+      if (events.some((e) => coversPaso(e.paso, paso))) filled += 1;
+      else missing.push(slotLabel(profile.pasosLayout, paso));
+    }
     return {
-      filled: (cristo ? 1 : 0) + (virgen ? 1 : 0),
-      required: 2,
-      detail:
-        cristo && virgen
-          ? null
-          : `${cristo ? 'Cristo' : 'falta Cristo'} · ${virgen ? 'Virgen' : 'falta Virgen'}`,
+      filled,
+      required: tracked.length,
+      detail: missing.length ? missing.map((name) => `falta ${name}`).join(' · ') : null,
     };
   }
   if (kind === 'ensayos') {
     const n = Math.min(12, Math.max(1, profile.ensayoCount));
-    if (!profile.ensayoSplit) {
-      const filled = ensayoFilled(events, n);
+    if (!splitsEnsayo(profile)) {
+      const tracked = trackedPasos(profile.pasosLayout);
+      const ofPaso = events.filter((e) =>
+        tracked.some((paso) => coversPaso(e.paso, paso)),
+      );
+      const filled = ensayoFilled(ofPaso, n);
       return {
         filled,
         required: n,
         detail: n > 1 ? `${filled}/${n} ensayos` : null,
       };
     }
-    const cristo = ensayoFilled(
-      events.filter((e) => coversPaso(e.paso, 'cristo')),
-      n,
-    );
-    const virgen = ensayoFilled(
-      events.filter((e) => coversPaso(e.paso, 'virgen')),
-      n,
-    );
+    const tracked = trackedPasos(profile.pasosLayout);
+    let filled = 0;
+    const bits: string[] = [];
+    for (const paso of tracked) {
+      const count = ensayoFilled(
+        events.filter((e) => coversPaso(e.paso, paso)),
+        n,
+      );
+      filled += count;
+      bits.push(`${slotLabel(profile.pasosLayout, paso)} ${count}/${n}`);
+    }
     return {
-      filled: cristo + virgen,
-      required: n * 2,
-      detail: `Cristo ${cristo}/${n} · Virgen ${virgen}/${n}`,
+      filled,
+      required: n * tracked.length,
+      detail: bits.join(' · '),
     };
   }
   if (kind === 'muda') {
@@ -375,37 +485,27 @@ function pasoSlotsFor(
   events: SeasonActEvent[],
   profile: HermandadSeasonProfile,
 ): SeasonPasoSlot[] {
-  const covers = (needed: SeasonPaso) =>
-    events.some((e) => coversPaso(e.paso, needed));
+  const tracked = trackedPasos(profile.pasosLayout);
   if (kind === 'iguala') {
-    return [
-      { label: 'Cristo', filled: covers('cristo') },
-      { label: 'Virgen', filled: covers('virgen') },
-    ];
+    return tracked.map((paso) => ({
+      label: slotLabel(profile.pasosLayout, paso),
+      filled: events.some((e) => coversPaso(e.paso, paso)),
+    }));
   }
   if (kind === 'ensayos') {
     const n = Math.min(12, Math.max(1, profile.ensayoCount));
-    const cristoN = ensayoFilled(
-      events.filter((e) => coversPaso(e.paso, 'cristo')),
-      n,
-    );
-    const virgenN = ensayoFilled(
-      events.filter((e) => coversPaso(e.paso, 'virgen')),
-      n,
-    );
-    const showHint = profile.ensayoSplit || n > 1;
-    return [
-      {
-        label: 'Cristo',
-        filled: cristoN > 0,
-        hint: showHint ? `${cristoN}/${n}` : null,
-      },
-      {
-        label: 'Virgen',
-        filled: virgenN > 0,
-        hint: showHint ? `${virgenN}/${n}` : null,
-      },
-    ];
+    const showHint = splitsEnsayo(profile) || n > 1;
+    return tracked.map((paso) => {
+      const count = ensayoFilled(
+        events.filter((e) => coversPaso(e.paso, paso)),
+        n,
+      );
+      return {
+        label: slotLabel(profile.pasosLayout, paso),
+        filled: count > 0,
+        hint: showHint ? `${count}/${n}` : null,
+      };
+    });
   }
   return [];
 }
@@ -416,15 +516,24 @@ function hasPasoFilled(
   pasoLabel: string,
 ): boolean {
   const milestone = row.milestones.find((m) => m.kind === kind);
-  return milestone?.pasoSlots.some((s) => s.label === pasoLabel && s.filled) === true;
+  return (
+    milestone?.pasoSlots.some(
+      (s) =>
+        s.filled &&
+        (s.label === pasoLabel || (pasoLabel === 'Cristo' && s.label === 'Cristo 1')),
+    ) === true
+  );
 }
 
 export function eventsForPasoSlot(
   events: SeasonActEvent[],
   slot: SeasonPasoSlot,
 ): SeasonActEvent[] {
-  if (slot.label === 'Cristo') {
+  if (slot.label === 'Cristo' || slot.label === 'Cristo 1') {
     return events.filter((e) => coversPaso(e.paso, 'cristo'));
+  }
+  if (slot.label === 'Cristo 2') {
+    return events.filter((e) => coversPaso(e.paso, 'cristo2'));
   }
   if (slot.label === 'Virgen') {
     return events.filter((e) => coversPaso(e.paso, 'virgen'));
@@ -438,6 +547,7 @@ export function matchesPasoFilter(
 ): boolean {
   if (!filter) return true;
   if (filter === 'iguala_cristo') return hasPasoFilled(row, 'iguala', 'Cristo');
+  if (filter === 'iguala_cristo2') return hasPasoFilled(row, 'iguala', 'Cristo 2');
   if (filter === 'iguala_virgen') return hasPasoFilled(row, 'iguala', 'Virgen');
   if (filter === 'iguala_ambas') {
     return (
@@ -446,6 +556,7 @@ export function matchesPasoFilter(
     );
   }
   if (filter === 'ensayo_cristo') return hasPasoFilled(row, 'ensayos', 'Cristo');
+  if (filter === 'ensayo_cristo2') return hasPasoFilled(row, 'ensayos', 'Cristo 2');
   if (filter === 'ensayo_virgen') return hasPasoFilled(row, 'ensayos', 'Virgen');
   return true;
 }

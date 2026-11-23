@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/cofradeo_badge.dart';
 import '../../profile/profile_provider.dart';
 import '../admin_provider.dart';
+import '../data/admin_repository.dart';
 import '../junta_modules.dart';
 import '../junta_ui.dart';
 import 'admin_ads_tab.dart';
@@ -503,11 +504,16 @@ class _JuntaOverviewPanel extends ConsumerWidget {
         ref.invalidate(pendingReportGroupsProvider);
         ref.invalidate(pendingCalendarEventsProvider);
         ref.invalidate(closeRequestedTopicsProvider);
+        ref.invalidate(signupPulseProvider);
       },
       child: ListView(
         padding: JuntaUi.listPadding,
         children: [
           _OverviewStatusCard(counts: counts),
+          if (isAdmin) ...[
+            const SizedBox(height: 12),
+            const _SignupPulseCard(),
+          ],
           const SizedBox(height: 20),
           _OverviewSection(
             title: JuntaNavSection.moderation.title,
@@ -617,6 +623,101 @@ class _OverviewStatusCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SignupPulseCard extends ConsumerWidget {
+  const _SignupPulseCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pulse = ref.watch(signupPulseProvider);
+    return pulse.when(
+      data: (data) {
+        if (data == null) return const SizedBox.shrink();
+        return _SignupPulseBody(pulse: data);
+      },
+      loading: () => Container(
+        width: double.infinity,
+        padding: JuntaUi.cardPadding,
+        decoration: JuntaUi.cardDecoration(),
+        child: Text('Cargando registros…', style: JuntaUi.body()),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _SignupPulseBody extends StatelessWidget {
+  const _SignupPulseBody({required this.pulse});
+
+  final SignupPulse pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    final max = pulse.days.fold<int>(
+      1,
+      (acc, day) => day.count > acc ? day.count : acc,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: JuntaUi.cardPadding,
+      decoration: JuntaUi.cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('REGISTROS', style: JuntaUi.sectionHeader()),
+          const SizedBox(height: 6),
+          Text(
+            '${pulse.total} en la casa',
+            style: JuntaUi.cardTitle(),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Hoy ${pulse.today} · ${pulse.todayHint}',
+            style: JuntaUi.body(),
+          ),
+          const SizedBox(height: 12),
+          if (pulse.days.isNotEmpty)
+            SizedBox(
+              height: 56,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (final day in pulse.days)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Container(
+                            height: day.count <= 0
+                                ? 4
+                                : (4 + (day.count / max) * 52),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(3),
+                              gradient: const LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [AppColors.gold, AppColors.burgundy],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 10),
+          Text(
+            '${pulse.cofrades} cofrades · ${pulse.hermandades} hermandades · 14 días',
+            style: JuntaUi.caption(),
           ),
         ],
       ),
