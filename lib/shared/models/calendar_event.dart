@@ -4,10 +4,12 @@
 enum SeasonPaso {
   ambos,
   cristo,
+  cristo2,
   virgen;
 
   static SeasonPaso fromDb(String? raw) => switch (raw) {
         'cristo' => SeasonPaso.cristo,
+        'cristo2' => SeasonPaso.cristo2,
         'virgen' => SeasonPaso.virgen,
         _ => SeasonPaso.ambos,
       };
@@ -17,18 +19,24 @@ enum SeasonPaso {
   String get label => switch (this) {
         SeasonPaso.ambos => 'Los dos pasos',
         SeasonPaso.cristo => 'Cristo',
+        SeasonPaso.cristo2 => 'Cristo 2',
         SeasonPaso.virgen => 'Virgen',
       };
 
   String get shortLabel => switch (this) {
         SeasonPaso.ambos => 'Ambos',
         SeasonPaso.cristo => 'Cristo',
+        SeasonPaso.cristo2 => 'Cristo 2',
         SeasonPaso.virgen => 'Virgen',
       };
 
   bool covers(SeasonPaso needed) {
     if (needed == SeasonPaso.ambos) return true;
-    return this == SeasonPaso.ambos || this == needed;
+    if (this == needed) return true;
+    if (this == SeasonPaso.ambos) {
+      return needed == SeasonPaso.cristo || needed == SeasonPaso.virgen;
+    }
+    return false;
   }
 }
 

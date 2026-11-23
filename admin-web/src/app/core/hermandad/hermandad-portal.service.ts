@@ -7,8 +7,12 @@ import {
   parseTimeSlots,
 } from '../events/events.models';
 import {
+  parseSeasonPaso,
+  parseSeasonProfile,
   SEASON_ACT_DB_TYPES,
+  type HermandadSeasonProfile,
   type SeasonActEvent,
+  type SeasonPaso,
 } from './season-acts';
 
 /** Categoría en tablón (BD / app). */
@@ -474,7 +478,7 @@ export class HermandadPortalService {
       createdBy: (row['created_by'] as string | null) ?? null,
       organizerLabel: (row['organizer_label'] as string | null) ?? null,
       hermandadTopicId: (row['hermandad_topic_id'] as string | null) ?? null,
-      paso: paso === 'cristo' || paso === 'virgen' ? paso : 'ambos',
+      paso: parseSeasonPaso(paso),
       seasonN: (row['season_n'] as number | null) ?? null,
       withRetranqueo: row['with_retranqueo'] === true,
     };
@@ -720,7 +724,7 @@ export class HermandadPortalService {
     /** Comunicado oficial que originó el evento (si hay). */
     sourceReplyId?: string | null;
     hermandadTopicId?: string | null;
-    paso?: 'ambos' | 'cristo' | 'virgen';
+    paso?: SeasonPaso;
     seasonN?: number | null;
     withRetranqueo?: boolean;
   }): Promise<void> {
@@ -892,7 +896,7 @@ export class HermandadPortalService {
       coverImageUrl?: string | null;
       customIconUrl?: string | null;
       organizerLabel?: string | null;
-      paso?: 'ambos' | 'cristo' | 'virgen';
+      paso?: SeasonPaso;
       seasonN?: number | null;
       withRetranqueo?: boolean;
     } | null;
@@ -980,57 +984,29 @@ export class HermandadPortalService {
     if (error) throw error;
   }
 
-  async fetchSeasonProfile(topicId: string): Promise<{
-    igualaSplit: boolean;
-    ensayoSplit: boolean;
-    ensayoCount: number;
-    mudaMode: 'with_retranqueo' | 'split' | 'muda_only';
-  }> {
+  async fetchSeasonProfile(topicId: string): Promise<HermandadSeasonProfile> {
     try {
       const { data, error } = await getSupabase()
         .from('hermandad_season_profile')
-        .select('iguala_split, ensayo_split, ensayo_count, muda_mode')
+        .select(
+          'pasos_layout, iguala_split, ensayo_split, ensayo_count, muda_mode',
+        )
         .eq('topic_id', topicId)
         .maybeSingle();
-      if (error || !data) {
-        return {
-          igualaSplit: false,
-          ensayoSplit: false,
-          ensayoCount: 1,
-          mudaMode: 'muda_only',
-        };
-      }
-      const mode = String(data['muda_mode'] ?? 'muda_only');
-      return {
-        igualaSplit: data['iguala_split'] === true,
-        ensayoSplit: data['ensayo_split'] === true,
-        ensayoCount: Number(data['ensayo_count'] ?? 1) || 1,
-        mudaMode:
-          mode === 'with_retranqueo' || mode === 'split'
-            ? mode
-            : 'muda_only',
-      };
+      if (error || !data) return parseSeasonProfile(null);
+      return parseSeasonProfile(data as Record<string, unknown>);
     } catch {
-      return {
-        igualaSplit: false,
-        ensayoSplit: false,
-        ensayoCount: 1,
-        mudaMode: 'muda_only',
-      };
+      return parseSeasonProfile(null);
     }
   }
 
   async saveSeasonProfile(
     topicId: string,
-    profile: {
-      igualaSplit: boolean;
-      ensayoSplit: boolean;
-      ensayoCount: number;
-      mudaMode: 'with_retranqueo' | 'split' | 'muda_only';
-    },
+    profile: HermandadSeasonProfile,
   ): Promise<void> {
     const { error } = await getSupabase().from('hermandad_season_profile').upsert({
       topic_id: topicId,
+      pasos_layout: profile.pasosLayout,
       iguala_split: profile.igualaSplit,
       ensayo_split: profile.ensayoSplit,
       ensayo_count: profile.ensayoCount,

@@ -90,4 +90,11 @@ void main() {
     expect(CountdownBannerArtboard.labelForDays(45), '45');
     expect(CountdownBannerArtboard.labelForDays(5), '5');
   });
+
+  test('Temporada de actos sigue el año de Ramos, no el civil', () {
+    expect(liturgicalSeasonYear(DateTime(2026, 3, 1)), 2026);
+    expect(liturgicalSeasonYear(DateTime(2026, 6, 1)), 2026);
+    expect(liturgicalSeasonYear(DateTime(2026, 11, 23)), 2027);
+    expect(liturgicalSeasonYear(DateTime(2027, 2, 6)), 2027);
+  });
 }

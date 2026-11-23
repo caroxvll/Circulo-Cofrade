@@ -410,7 +410,7 @@ function emptyToNull(value: string | null | undefined): string | null {
 }
 
 function parsePaso(raw: unknown): SeasonPaso {
-  return raw === 'cristo' || raw === 'virgen' ? raw : 'ambos';
+  return raw === 'cristo' || raw === 'cristo2' || raw === 'virgen' ? raw : 'ambos';
 }
 
 function startOfLocalDayIso(): string {

@@ -71,12 +71,6 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
-    const { data: juntaOk } = await admin.rpc("is_junta_member", {
-      p_user_id: user.id,
-    });
-    if (juntaOk !== true) {
-      return jsonResponse({ error: "forbidden" }, 403);
-    }
 
     const { data: topic, error: topicError } = await admin
       .from("forum_topics")

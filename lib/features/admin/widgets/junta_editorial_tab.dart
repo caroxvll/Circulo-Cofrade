@@ -616,11 +616,11 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
     required String topicId,
   }) async {
     final repo = ref.read(adminRepositoryProvider);
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 24; i++) {
       if (!mounted) return;
       final ready = await repo.finalizeEditorialVideo(topicId: topicId);
       if (ready) return;
-      await Future<void>.delayed(Duration(seconds: 2 + (i ~/ 2)));
+      await Future<void>.delayed(Duration(seconds: 5 + (i ~/ 3)));
     }
   }
 

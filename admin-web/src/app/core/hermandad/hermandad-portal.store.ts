@@ -15,6 +15,7 @@ import {
   DEFAULT_SEASON_PROFILE,
   HermandadSeasonProfile,
   SeasonActEvent,
+  SeasonPaso,
   currentSeasonActsYear,
   seasonActsRange,
 } from './season-acts';
@@ -294,7 +295,7 @@ export class HermandadPortalStore {
     imageFile?: File | null;
     /** Si se indica, se programa en el tablón en vez de publicar ya. */
     scheduleAtLocal?: string | null;
-    paso?: 'ambos' | 'cristo' | 'virgen';
+    paso?: SeasonPaso;
     seasonN?: number | null;
     withRetranqueo?: boolean;
   }): Promise<'published' | 'scheduled'> {

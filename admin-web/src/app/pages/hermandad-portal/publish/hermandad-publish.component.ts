@@ -10,6 +10,10 @@ import {
   publishKindById,
 } from '../../../core/hermandad/hermandad-portal.service';
 import { HermandadPortalStore } from '../../../core/hermandad/hermandad-portal.store';
+import {
+  eventPasoChoices,
+  type SeasonPaso,
+} from '../../../core/hermandad/season-acts';
 
 @Component({
   selector: 'app-hermandad-publish-page',
@@ -43,15 +47,13 @@ export class HermandadPublishPageComponent implements OnInit {
   destNoticias = false;
   timing: 'now' | 'later' = 'now';
   scheduleAtLocal = '';
-  paso: 'ambos' | 'cristo' | 'virgen' = 'ambos';
+  paso: SeasonPaso = 'ambos';
   ensayoN = 1;
   withRetranqueo = false;
   ensayoCount = 3;
-  readonly pasoOpts = [
-    { id: 'ambos' as const, label: 'Los dos pasos' },
-    { id: 'cristo' as const, label: 'Cristo' },
-    { id: 'virgen' as const, label: 'Virgen' },
-  ];
+  pasoOpts: ReadonlyArray<{ id: SeasonPaso; label: string }> = eventPasoChoices(
+    'cristo_virgen',
+  );
   readonly ensayoNs = [1, 2, 3, 4, 5, 6];
 
   get activeKind() {
@@ -69,6 +71,8 @@ export class HermandadPublishPageComponent implements OnInit {
       const profile = await this.portal.fetchSeasonProfile(this.topicId);
       this.ensayoCount = profile.ensayoCount;
       this.withRetranqueo = profile.mudaMode === 'with_retranqueo';
+      this.pasoOpts = eventPasoChoices(profile.pasosLayout);
+      this.paso = this.pasoOpts[0]?.id ?? 'ambos';
     }
     const kindParam = this.route.snapshot.queryParamMap.get('kind');
     if (kindParam && PUBLISH_KINDS.some((k) => k.id === kindParam)) {
