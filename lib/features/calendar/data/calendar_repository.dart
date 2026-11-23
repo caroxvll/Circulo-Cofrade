@@ -85,10 +85,11 @@ class CalendarRepository {
       ..sort(compareCalendarEventsByStart);
   }
 
-  /// Igualás, ensayos, mudas y desarmás publicados en el año civil [year].
+  /// Igualás, ensayos, mudas y desarmás de la temporada de Semana Santa [year].
   Future<List<CalendarEvent>> fetchSeasonActs({required int year}) async {
-    final start = DateTime(year, 1, 1);
-    final end = DateTime(year + 1, 1, 1);
+    final range = seasonActsRange(year);
+    final start = range.start;
+    final end = range.end;
     const types = {
       EventType.iguala,
       EventType.ensayo,

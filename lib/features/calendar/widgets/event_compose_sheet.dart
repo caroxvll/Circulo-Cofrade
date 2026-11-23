@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -83,6 +84,8 @@ Future<void> showEventComposeSheet(
 
   if (!context.mounted) return;
 
+  _hideEventComposeKeyboard();
+
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -99,6 +102,12 @@ Future<void> showEventComposeSheet(
       ),
     ),
   );
+  _hideEventComposeKeyboard();
+}
+
+void _hideEventComposeKeyboard() {
+  FocusManager.instance.primaryFocus?.unfocus();
+  SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
 }
 
 class _EventComposeSheet extends ConsumerStatefulWidget {
@@ -305,6 +314,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   }
 
   Future<void> _openOrganizerLibrary() async {
+    _hideEventComposeKeyboard();
     final picked = await OrganizerPickerSheet.show(context);
     if (picked == null || !mounted) return;
 
@@ -359,9 +369,12 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   }
 
   String _seasonAwareDayLabel() {
+    final profile = _seasonProfile();
+    final topicId = _hermandadTopicId?.trim();
+    final linked = topicId != null && topicId.isNotEmpty;
     final extra = seasonActDayLabel(
       typeDb: _type.dbValue,
-      paso: _paso,
+      paso: _resolvedPaso(profile: profile, linked: linked),
       seasonN: _type == EventType.ensayo ? _ensayoN : null,
       withRetranqueo: _type == EventType.muda && _withRetranqueo,
     );
@@ -372,6 +385,24 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   int? get _seasonNumber => _type == EventType.ensayo ? _ensayoN : null;
   bool get _seasonRetranqueo => _type == EventType.muda && _withRetranqueo;
 
+  List<SeasonPaso> _pasoChoices({
+    required HermandadSeasonProfile profile,
+    required bool linked,
+  }) {
+    if (!linked) {
+      return const [SeasonPaso.ambos, SeasonPaso.cristo, SeasonPaso.virgen];
+    }
+    return profile.pasosLayout.eventChoices;
+  }
+
+  SeasonPaso _resolvedPaso({
+    required HermandadSeasonProfile profile,
+    required bool linked,
+  }) {
+    if (!linked) return _paso;
+    return profile.pasosLayout.resolvedEventPaso(_paso);
+  }
+
   List<Widget> _seasonActFields() {
     final profile = _seasonProfile();
     final topicId = _hermandadTopicId?.trim();
@@ -379,13 +410,15 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     final ensayoMax = (linked ? profile.ensayoCount : 8).clamp(1, 8);
     final showRetr = _showRetranqueo &&
         (!linked || profile.mudaMode != MudaRetranqueoMode.mudaOnly);
-    if (!_showSeasonPaso && !_showEnsayoN && !showRetr) {
+    final pasoChoices = _pasoChoices(profile: profile, linked: linked);
+    final showPasoPicker = _showSeasonPaso && pasoChoices.length > 1;
+    if (!showPasoPicker && !_showEnsayoN && !showRetr) {
       return const [];
     }
 
     return [
       const SizedBox(height: 12),
-      if (_showSeasonPaso) ...[
+      if (showPasoPicker) ...[
         Text(
           'Paso',
           style: AppTypography.labelSmall(color: AppColors.goldDark)
@@ -395,9 +428,13 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
         Wrap(
           spacing: 8,
           children: [
-            for (final paso in SeasonPaso.values)
+            for (final paso in pasoChoices)
               ChoiceChip(
-                label: Text(paso.shortLabel),
+                label: Text(
+                  linked
+                      ? profile.pasosLayout.eventChipLabel(paso)
+                      : paso.shortLabel,
+                ),
                 selected: _paso == paso,
                 onSelected: _submitting
                     ? null
@@ -470,6 +507,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       DateTime(_date.year, _date.month, _date.day, _time.hour, _time.minute);
 
   Future<void> _pickDate() async {
+    _hideEventComposeKeyboard();
     final picked = await showDatePicker(
       context: context,
       initialDate: _date,
@@ -486,6 +524,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   }
 
   Future<void> _pickTime() async {
+    _hideEventComposeKeyboard();
     final picked = await showTimePicker(context: context, initialTime: _time);
     if (picked != null) {
       setState(() {
@@ -734,6 +773,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   }
 
   Future<void> _submit() async {
+    _hideEventComposeKeyboard();
     final title = _titleController.text.trim();
     final subtitle = _subtitleController.text.trim();
     final location = _locationController.text.trim();
@@ -832,6 +872,9 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
         _hermandadTopicId = hermandadId;
       }
       final unlinkHermandad = organizer.isEmpty;
+      final linked =
+          !unlinkHermandad && hermandadId != null && hermandadId.isNotEmpty;
+      final paso = _resolvedPaso(profile: _seasonProfile(), linked: linked);
       if (_isEditing) {
         await repo.updateEvent(
           eventId: widget.existing!.id!,
@@ -848,7 +891,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           coverImageUrl: coverImageUrl,
           admissionLabel: admission,
           timeSlots: slots,
-          paso: _paso,
+          paso: paso,
           seasonNumber: _seasonNumber,
           withRetranqueo: _seasonRetranqueo,
         );
@@ -868,7 +911,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           coverImageUrl: coverImageUrl,
           admissionLabel: admission,
           timeSlots: slots,
-          paso: _paso,
+          paso: paso,
           seasonNumber: _seasonNumber,
           withRetranqueo: _seasonRetranqueo,
         );
@@ -880,6 +923,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       ref.invalidate(seasonActsEventsProvider);
       ref.invalidate(hermandadSeasonActsProvider);
       if (mounted) {
+        _hideEventComposeKeyboard();
         Navigator.pop(context);
         final isAdmin = ref.read(isAdminProvider);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -950,7 +994,12 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
                   ),
                 ),
                 IconButton(
-                  onPressed: _submitting ? null : () => Navigator.pop(context),
+                  onPressed: _submitting
+                      ? null
+                      : () {
+                          _hideEventComposeKeyboard();
+                          Navigator.pop(context);
+                        },
                   icon: const Icon(Icons.close, color: AppColors.burgundy),
                 ),
               ],
@@ -958,6 +1007,8 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
             Expanded(
               child: SingleChildScrollView(
                 controller: widget.scrollController,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: EdgeInsets.only(
                   right: 8,
                   bottom: cofradeoSheetBottomPadding(context),

@@ -233,6 +233,11 @@ final editorialPostsProvider = FutureProvider<List<ForumTopic>>((ref) async {
   return ref.watch(adminRepositoryProvider).fetchEditorialPosts();
 });
 
+final signupPulseProvider = FutureProvider<SignupPulse?>((ref) async {
+  if (!ref.watch(isAdminProvider)) return null;
+  return ref.watch(adminRepositoryProvider).fetchSignupPulse();
+});
+
 class JuntaSelectedModule extends Notifier<JuntaModule> {
   @override
   JuntaModule build() => JuntaModule.overview;

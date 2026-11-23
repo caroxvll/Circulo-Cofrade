@@ -201,3 +201,18 @@ int countdownVisibleDaysFromToday(
   final easter = _dateOnly(easterSunday(year));
   return (palmSunday: addCalendarDays(easter, -7), easterSunday: easter);
 }
+
+/// Días tras Pascua en los que aún se cuentan muda y desarmá de esa Semana Santa.
+const seasonActsRollDaysAfterEaster = 90;
+
+/// Año de Semana Santa de la temporada de actos (igualá → desarmá).
+///
+/// Hasta ~90 días después de Pascua sigue el año en curso; luego pasa al
+/// siguiente (p. ej. en noviembre de 2026, temporada 2027).
+int liturgicalSeasonYear([DateTime? now]) {
+  final today = _dateOnly(now ?? DateTime.now());
+  final easter = _dateOnly(easterSunday(today.year));
+  final roll = addCalendarDays(easter, seasonActsRollDaysAfterEaster);
+  if (!today.isBefore(roll)) return today.year + 1;
+  return today.year;
+}

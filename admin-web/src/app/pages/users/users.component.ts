@@ -134,6 +134,39 @@ export class UsersPageComponent implements OnInit {
     }
   }
 
+  barPct(count: number): number {
+    const days = this.stats()?.days ?? [];
+    const max = Math.max(1, ...days.map((day) => day.count));
+    if (count <= 0) return 8;
+    return Math.max(12, Math.round((count / max) * 100));
+  }
+
+  dayHint(date: string, count: number): string {
+    const parsed = new Date(`${date}T12:00:00`);
+    const label = parsed.toLocaleDateString('es-ES', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+    return `${label}: ${count}`;
+  }
+
+  todayHint(): string {
+    const s = this.stats();
+    if (!s) return '';
+    const delta = s.today - s.yesterday;
+    if (delta === 0) return 'Igual que ayer';
+    if (delta > 0) return `+${delta} respecto a ayer`;
+    return `${delta} respecto a ayer`;
+  }
+
+  splitPct(kind: 'cofrades' | 'hermandades'): number {
+    const s = this.stats();
+    if (!s || s.total <= 0) return 0;
+    const n = kind === 'cofrades' ? s.cofrades : s.hermandades;
+    return Math.round((n / s.total) * 100);
+  }
+
   async toggleAdmin(user: AdminUserRow): Promise<void> {
     if (user.id === this.selfId()) {
       this.error.set('No puedes cambiar tu propio rol desde aquí.');

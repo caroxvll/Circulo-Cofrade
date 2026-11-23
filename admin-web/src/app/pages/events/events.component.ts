@@ -70,6 +70,7 @@ export class EventsPageComponent implements OnInit {
   readonly pasoOpts: { id: SeasonPaso; label: string }[] = [
     { id: 'ambos', label: 'Ambos' },
     { id: 'cristo', label: 'Cristo' },
+    { id: 'cristo2', label: 'Cristo 2' },
     { id: 'virgen', label: 'Virgen' },
   ];
   readonly ensayoNs = [1, 2, 3, 4, 5, 6, 7, 8];

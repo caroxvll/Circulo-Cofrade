@@ -21,7 +21,7 @@ export type CalendarEventType =
   | 'via_crucis_consejo'
   | 'evento';
 
-export type SeasonPaso = 'ambos' | 'cristo' | 'virgen';
+export type SeasonPaso = 'ambos' | 'cristo' | 'cristo2' | 'virgen';
 
 export interface CalendarEventRow {
   id: string;

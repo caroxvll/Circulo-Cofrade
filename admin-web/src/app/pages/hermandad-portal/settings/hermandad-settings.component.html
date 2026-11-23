@@ -218,19 +218,38 @@
         en el tablón y en la Junta.
       </p>
       <label class="season-field">
-        Igualá
-        <select [(ngModel)]="igualaSplit" name="igualaSplit">
-          <option [ngValue]="false">Los dos pasos juntos</option>
-          <option [ngValue]="true">Cristo y Virgen por separado</option>
+        Pasos
+        <select [(ngModel)]="pasosLayout" name="pasosLayout">
+          <option value="cristo">Solo Cristo</option>
+          <option value="virgen">Solo Virgen</option>
+          <option value="cristo_virgen">Cristo y Virgen</option>
+          <option value="dos_cristos_virgen">Dos Cristos y Virgen</option>
         </select>
       </label>
-      <label class="season-field">
-        Ensayos
-        <select [(ngModel)]="ensayoSplit" name="ensayoSplit">
-          <option [ngValue]="false">Juntos</option>
-          <option [ngValue]="true">Cristo y Virgen por separado</option>
-        </select>
-      </label>
+      @if (canSplitPasos) {
+        <label class="season-field">
+          Igualá
+          <select [(ngModel)]="igualaSplit" name="igualaSplit">
+            <option [ngValue]="false">Los dos pasos juntos</option>
+            <option [ngValue]="true">Cristo y Virgen por separado</option>
+          </select>
+        </label>
+        <label class="season-field">
+          Ensayos
+          <select [(ngModel)]="ensayoSplit" name="ensayoSplit">
+            <option [ngValue]="false">Juntos</option>
+            <option [ngValue]="true">Cristo y Virgen por separado</option>
+          </select>
+        </label>
+      } @else {
+        <p class="card-lead">
+          @if (pasosLayout === 'dos_cristos_virgen') {
+            Cada paso se marca aparte: Cristo 1, Cristo 2 y Virgen.
+          } @else {
+            Un solo paso: igualá y ensayos se marcan una vez.
+          }
+        </p>
+      }
       <label class="season-field">
         Número de ensayos{{ ensayoSplit ? ' de cada paso' : '' }}
         <select [(ngModel)]="ensayoCount" name="ensayoCount">

@@ -112,7 +112,7 @@
             />
           </label>
         </div>
-        @if (kindId === 'iguala' || kindId === 'ensayo') {
+        @if ((kindId === 'iguala' || kindId === 'ensayo') && pasoOpts.length > 1) {
           <div class="chips" style="margin-top: 10px">
             @for (opt of pasoOpts; track opt.id) {
               <button

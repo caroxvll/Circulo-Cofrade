@@ -34,6 +34,32 @@
     }
   </div>
 
+  @if (isAdmin() && signup(); as s) {
+    <div class="block-head">
+      <h2 class="block-title">Registros</h2>
+      <a class="block-note" routerLink="/app/usuarios">Ver detalle →</a>
+    </div>
+    <div class="stats">
+      <article><strong>{{ s.today }}</strong><span>Hoy</span></article>
+      <article><strong>{{ s.last7 }}</strong><span>7 días</span></article>
+      <article><strong>{{ s.last30 }}</strong><span>30 días</span></article>
+      <article><strong>{{ s.total }}</strong><span>En la casa</span></article>
+    </div>
+    @if (s.days.length) {
+      <div class="pulse-chart-wrap" style="margin-bottom: 28px">
+        <p class="pulse-kicker">Altas · últimos 14 días</p>
+        <div class="pulse-chart" role="img" aria-label="Altas diarias">
+          @for (day of s.days; track day.date) {
+            <div class="pulse-col" [title]="day.date + ': ' + day.count">
+              <div class="pulse-bar" [style.height.%]="barPct(day.count)"></div>
+              <span>{{ day.date.slice(8) }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  }
+
   <div class="block-head">
     <h2 class="block-title">Módulos</h2>
     <p class="block-note">Moderación · comunidad · patrocinios</p>

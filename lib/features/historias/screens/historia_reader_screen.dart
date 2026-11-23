@@ -132,7 +132,9 @@ class _BookReaderState extends ConsumerState<_BookReader>
   @override
   void deactivate() {
     _saveTimer?.cancel();
-    unawaited(_persist(_page, refreshShelf: true));
+    // El container sigue vivo en la estantería; `mounted` ya no, tras el pop.
+    final container = ProviderScope.containerOf(context);
+    unawaited(_persist(_page, refreshShelf: true, container: container));
     super.deactivate();
   }
 
@@ -151,16 +153,27 @@ class _BookReaderState extends ConsumerState<_BookReader>
     });
   }
 
-  Future<void> _persist(int page, {bool refreshShelf = false}) async {
+  Future<void> _persist(
+    int page, {
+    bool refreshShelf = false,
+    ProviderContainer? container,
+  }) async {
+    final host = container;
     try {
-      final repo = ref.read(historiasRepositoryProvider);
+      final repo = host != null
+          ? host.read(historiasRepositoryProvider)
+          : ref.read(historiasRepositoryProvider);
       await repo.saveReadingProgress(
         historiaId: historia.id,
         page: page,
         pageCount: historia.pages.length,
       );
-      if (refreshShelf && mounted) {
-        ref.invalidate(continueReadingProvider);
+      if (refreshShelf) {
+        if (host != null) {
+          host.invalidate(continueReadingProvider);
+        } else if (mounted) {
+          ref.invalidate(continueReadingProvider);
+        }
       }
     } catch (_) {}
   }

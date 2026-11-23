@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/cofradeo_bottom_nav.dart';
+import '../../core/widgets/network_status_banner.dart';
 import '../calendar/calendar_provider.dart';
 import '../calendar/liturgical_countdown_provider.dart';
 import '../calendar/widgets/calendar_shell_ad_bar.dart';
@@ -121,6 +122,7 @@ class _CofradeoShellState extends ConsumerState<CofradeoShell> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          const NetworkStatusBanner(),
           if (showCalendarAd) const CalendarShellAdBar(),
           if (showForumsAd) const ForumsShellAdBar(),
           if (showNoticiasAd) const NoticiasShellAdBar(),

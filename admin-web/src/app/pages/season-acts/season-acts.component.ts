@@ -12,7 +12,7 @@ import { getSupabase } from '../../core/supabase.client';
 import {
   DEFAULT_SEASON_PROFILE,
   HermandadSeasonProfile,
-  MudaRetranqueoMode,
+  parseSeasonProfile,
   SeasonActEvent,
   SeasonActsSnapshot,
   SeasonPaso,
@@ -146,18 +146,13 @@ export class SeasonActsPageComponent implements OnInit {
     try {
       const { data, error } = await getSupabase()
         .from('hermandad_season_profile')
-        .select('topic_id, iguala_split, ensayo_split, ensayo_count, muda_mode');
+        .select(
+          'topic_id, pasos_layout, iguala_split, ensayo_split, ensayo_count, muda_mode',
+        );
       if (error) return new Map();
       return new Map(
         (data ?? []).map((row) => {
-          const mode = String(row['muda_mode'] ?? 'muda_only') as MudaRetranqueoMode;
-          const profile: HermandadSeasonProfile = {
-            igualaSplit: row['iguala_split'] === true,
-            ensayoSplit: row['ensayo_split'] === true,
-            ensayoCount: Number(row['ensayo_count'] ?? 1) || 1,
-            mudaMode:
-              mode === 'with_retranqueo' || mode === 'split' ? mode : 'muda_only',
-          };
+          const profile = parseSeasonProfile(row as Record<string, unknown>);
           return [String(row['topic_id']), profile] as const;
         }),
       );
@@ -238,9 +233,11 @@ export class SeasonActsPageComponent implements OnInit {
     const paso =
       event.paso === 'cristo'
         ? 'Cristo'
-        : event.paso === 'virgen'
-          ? 'Virgen'
-          : 'Ambos';
+        : event.paso === 'cristo2'
+          ? 'Cristo 2'
+          : event.paso === 'virgen'
+            ? 'Virgen'
+            : 'Ambos';
     const n = event.seasonN ? ` · ${event.seasonN}º` : '';
     return `${when} · ${paso}${n}`;
   }

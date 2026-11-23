@@ -78,7 +78,7 @@ class _SeasonProfileSheetState extends ConsumerState<_SeasonProfileSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'No se pudo guardar. Ejecuta hermandad_season_profile.sql.',
+            'No se pudo guardar. Ejecuta hermandad_season_pasos.sql.',
           ),
         ),
       );
@@ -112,45 +112,77 @@ class _SeasonProfileSheetState extends ConsumerState<_SeasonProfileSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
             const SizedBox(height: 8),
+            Text('Pasos', style: AppTypography.sectionTitle()),
+            const SizedBox(height: 8),
+            for (final layout in HermandadPasosLayout.values) ...[
+              _Choice(
+                selected: _profile.pasosLayout == layout,
+                title: layout.label,
+                subtitle: layout.subtitle,
+                onTap: () => setState(
+                  () => _profile = _profile.copyWith(pasosLayout: layout),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 8),
             Text('Igualá', style: AppTypography.sectionTitle()),
             const SizedBox(height: 8),
-            _Choice(
-              selected: !_profile.igualaSplit,
-              title: 'Los dos pasos juntos',
-              subtitle: 'Una sola igualá.',
-              onTap: () => setState(
-                () => _profile = _profile.copyWith(igualaSplit: false),
+            if (_profile.pasosLayout.canSplitPasos) ...[
+              _Choice(
+                selected: !_profile.igualaSplit,
+                title: 'Los dos pasos juntos',
+                subtitle: 'Una sola igualá.',
+                onTap: () => setState(
+                  () => _profile = _profile.copyWith(igualaSplit: false),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            _Choice(
-              selected: _profile.igualaSplit,
-              title: 'Cristo y Virgen por separado',
-              subtitle: 'Hace falta una igualá de cada paso.',
-              onTap: () => setState(
-                () => _profile = _profile.copyWith(igualaSplit: true),
+              const SizedBox(height: 8),
+              _Choice(
+                selected: _profile.igualaSplit,
+                title: 'Cristo y Virgen por separado',
+                subtitle: 'Hace falta una igualá de cada paso.',
+                onTap: () => setState(
+                  () => _profile = _profile.copyWith(igualaSplit: true),
+                ),
               ),
-            ),
+            ] else
+              Text(
+                _profile.pasosLayout == HermandadPasosLayout.dosCristosVirgen
+                    ? 'Cada paso tiene su igualá: Cristo 1, Cristo 2 y Virgen.'
+                    : 'Un solo paso: basta una igualá.',
+                style: AppTypography.bodyMedium(color: AppColors.textSecondary)
+                    .copyWith(fontSize: 13),
+              ),
             const SizedBox(height: 16),
             Text('Ensayos', style: AppTypography.sectionTitle()),
             const SizedBox(height: 8),
-            _Choice(
-              selected: !_profile.ensayoSplit,
-              title: 'Juntos',
-              subtitle: 'Los dos pasos ensayan el mismo día.',
-              onTap: () => setState(
-                () => _profile = _profile.copyWith(ensayoSplit: false),
+            if (_profile.pasosLayout.canSplitPasos) ...[
+              _Choice(
+                selected: !_profile.ensayoSplit,
+                title: 'Juntos',
+                subtitle: 'Los dos pasos ensayan el mismo día.',
+                onTap: () => setState(
+                  () => _profile = _profile.copyWith(ensayoSplit: false),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            _Choice(
-              selected: _profile.ensayoSplit,
-              title: 'Cristo y Virgen por separado',
-              subtitle: 'Cada paso tiene su tanda de ensayos.',
-              onTap: () => setState(
-                () => _profile = _profile.copyWith(ensayoSplit: true),
+              const SizedBox(height: 8),
+              _Choice(
+                selected: _profile.ensayoSplit,
+                title: 'Cristo y Virgen por separado',
+                subtitle: 'Cada paso tiene su tanda de ensayos.',
+                onTap: () => setState(
+                  () => _profile = _profile.copyWith(ensayoSplit: true),
+                ),
               ),
-            ),
+            ] else
+              Text(
+                _profile.pasosLayout == HermandadPasosLayout.dosCristosVirgen
+                    ? 'Cada paso tiene su tanda de ensayos.'
+                    : 'Un solo paso: los ensayos cuentan una sola tanda.',
+                style: AppTypography.bodyMedium(color: AppColors.textSecondary)
+                    .copyWith(fontSize: 13),
+              ),
             const SizedBox(height: 10),
             Text(
               _profile.ensayoSplit

@@ -4,10 +4,8 @@
       <p class="eyebrow">Comunidad · solo admin</p>
       <h1>Usuarios y altas</h1>
       <p class="lead">
-        Altas recientes, búsqueda y gestión de rol, verificación, noticias,
-        calendario, suspensión y borrado. Verificar es la cuenta oficial.
-        Noticias lleva el verificado dorado. Calendario propone eventos y
-        también abre noticias. Un moderador de foro ya puede las dos cosas.
+        Pulso de registros: cuánta gente entra, cómo crece y de qué tipo.
+        Debajo, búsqueda y gestión de rol, verificación y suspensión.
       </p>
     </div>
     <div class="queue-toolbar">
@@ -19,10 +17,43 @@
 
   @if (stats(); as s) {
     <div class="stats">
-      <article><strong>{{ s.today }}</strong><span>Hoy</span></article>
+      <article>
+        <strong>{{ s.today }}</strong>
+        <span>Hoy</span>
+        <em>{{ todayHint() }}</em>
+      </article>
       <article><strong>{{ s.last7 }}</strong><span>7 días</span></article>
       <article><strong>{{ s.last30 }}</strong><span>30 días</span></article>
-      <article><strong>{{ s.total }}</strong><span>Total</span></article>
+      <article><strong>{{ s.total }}</strong><span>En la casa</span></article>
+    </div>
+
+    <div class="pulse-board">
+      <div class="pulse-chart-wrap">
+        <p class="pulse-kicker">Altas · últimos 14 días</p>
+        @if (s.days.length) {
+          <div class="pulse-chart" role="img" aria-label="Altas diarias">
+            @for (day of s.days; track day.date) {
+              <div class="pulse-col" [title]="dayHint(day.date, day.count)">
+                <div class="pulse-bar" [style.height.%]="barPct(day.count)"></div>
+                <span>{{ day.date.slice(8) }}</span>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="pulse-empty">Ejecuta admin_signup_pulse.sql para ver la curva.</p>
+        }
+      </div>
+      <div class="pulse-split">
+        <p class="pulse-kicker">De qué tipo</p>
+        <div class="split-track" aria-hidden="true">
+          <i class="cofrades" [style.width.%]="splitPct('cofrades')"></i>
+          <i class="hermandades" [style.width.%]="splitPct('hermandades')"></i>
+        </div>
+        <p class="split-legend">
+          <span><b>{{ s.cofrades }}</b> cofrades</span>
+          <span><b>{{ s.hermandades }}</b> hermandades</span>
+        </p>
+      </div>
     </div>
   }
 

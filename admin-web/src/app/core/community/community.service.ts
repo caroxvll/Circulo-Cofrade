@@ -207,17 +207,65 @@ export function hermandadBoardTopicId(day: string, name: string): string {
   return id || `hermandad-${Date.now()}`;
 }
 
+export interface SignupDay {
+  date: string;
+  count: number;
+}
+
 export interface SignupStats {
   today: number;
+  yesterday: number;
   last7: number;
   last30: number;
   total: number;
+  cofrades: number;
+  hermandades: number;
+  days: SignupDay[];
+}
+
+const emptySignupStats: SignupStats = {
+  today: 0,
+  yesterday: 0,
+  last7: 0,
+  last30: 0,
+  total: 0,
+  cofrades: 0,
+  hermandades: 0,
+  days: [],
+};
+
+function mapSignupStats(raw: unknown): SignupStats {
+  if (!raw || typeof raw !== 'object') return emptySignupStats;
+  const row = raw as Record<string, unknown>;
+  const daysRaw = Array.isArray(row['days']) ? row['days'] : [];
+  return {
+    today: Number(row['today'] ?? 0),
+    yesterday: Number(row['yesterday'] ?? 0),
+    last7: Number(row['last7'] ?? 0),
+    last30: Number(row['last30'] ?? 0),
+    total: Number(row['total'] ?? 0),
+    cofrades: Number(row['cofrades'] ?? 0),
+    hermandades: Number(row['hermandades'] ?? 0),
+    days: daysRaw
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const day = item as Record<string, unknown>;
+        return {
+          date: String(day['date'] ?? ''),
+          count: Number(day['count'] ?? 0),
+        };
+      })
+      .filter((day): day is SignupDay => day !== null && day.date.length > 0),
+  };
 }
 
 @Injectable({ providedIn: 'root' })
 export class CommunityService {
   async fetchSignupStats(): Promise<SignupStats> {
     const client = getSupabase();
+    const { data, error } = await client.rpc('admin_signup_pulse');
+    if (!error && data) return mapSignupStats(data);
+
     const now = new Date();
     const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const start7 = new Date(startToday);
@@ -242,6 +290,7 @@ export class CommunityService {
     ]);
 
     return {
+      ...emptySignupStats,
       today: today.count ?? 0,
       last7: last7.count ?? 0,
       last30: last30.count ?? 0,

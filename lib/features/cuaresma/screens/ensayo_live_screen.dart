@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/network/app_network_status_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/forum_text_format.dart';
 import '../../../core/utils/minute_clock.dart';
@@ -233,6 +234,15 @@ class _EnsayoLiveScreenState extends ConsumerState<EnsayoLiveScreen> {
     if (message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Escribe dónde va el ensayo')),
+      );
+      return;
+    }
+
+    final net = ref.read(appNetworkStatusProvider);
+    if (net.isOffline) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(net.liveSendBlockedMessage)),
       );
       return;
     }
