@@ -513,23 +513,69 @@ class CalendarRepository {
   Future<String?> findHermandadTopicIdForOrganizer(
     String organizerLabel,
   ) async {
+    final match = await findHermandadForOrganizer(organizerLabel);
+    return match?.hermandadTopicId?.trim();
+  }
+
+  /// Mejor tablón oficial para este nombre de hermandad.
+  Future<OrganizerLogo?> findHermandadForOrganizer(
+    String organizerLabel,
+  ) async {
     final label = organizerLabel.trim();
     if (label.length < 3) return null;
-    final logos = await fetchHermandadOrganizerLogos();
-    if (logos.isEmpty) return null;
-    final key = normalizeOrganizerKey(label);
-    final direct = logos[key];
-    final directId = direct?.hermandadTopicId?.trim();
-    if (directId != null && directId.isNotEmpty) return directId;
-    for (final item in logos.values) {
+
+    OrganizerLogo? best;
+    var bestScore = 0;
+
+    void consider(OrganizerLogo item, String candidate) {
       final topicId = item.hermandadTopicId?.trim();
-      if (topicId == null || topicId.isEmpty) continue;
-      if (organizerMatchesHermandadName(label, item.displayLabel) ||
-          organizerMatchesHermandadName(label, item.organizerKey)) {
-        return topicId;
+      if (topicId == null || topicId.isEmpty) return;
+      final score = organizerMatchScore(label, candidate);
+      if (score > bestScore) {
+        bestScore = score;
+        best = item;
       }
     }
-    return null;
+
+    final logos = await fetchHermandadOrganizerLogos();
+    final direct = logos[normalizeOrganizerKey(label)];
+    if (direct?.hermandadTopicId?.trim().isNotEmpty == true) return direct;
+    for (final item in logos.values) {
+      consider(item, item.displayLabel);
+      consider(item, item.organizerKey);
+    }
+    if (bestScore >= 90) return best;
+
+    if (_client != null) {
+      try {
+        final rows = await _client!
+            .from('forum_topics')
+            .select('id, title, icon_image_url')
+            .eq('forum_id', 'hermandades')
+            .eq('status', 'published')
+            .limit(400);
+        for (final row in rows as List<dynamic>) {
+          final map = Map<String, dynamic>.from(row as Map);
+          final topicId = (map['id'] as String?)?.trim() ?? '';
+          if (topicId.isEmpty) continue;
+          final title = (map['title'] as String?)?.trim() ?? '';
+          if (title.isEmpty) continue;
+          final parsed = parseHermandadTopicTitle(title);
+          final name = parsed.hermandadName.trim().isEmpty
+              ? title
+              : parsed.hermandadName.trim();
+          final item = OrganizerLogo(
+            organizerKey: normalizeOrganizerKey(name),
+            displayLabel: name,
+            logoUrl: _nonEmptyUrl(map['icon_image_url'] as String?) ?? '',
+            hermandadTopicId: topicId,
+          );
+          consider(item, name);
+          consider(item, title);
+        }
+      } catch (_) {}
+    }
+    return bestScore > 0 ? best : null;
   }
 
   /// Escudos de tablones oficiales indexados por organizador normalizado.
@@ -722,12 +768,14 @@ class CalendarRepository {
         organizerKey: key,
         displayLabel: label,
         logoUrl: resolvedLogo,
+        hermandadTopicId: topicId,
         onlyCreatedBy: propagateToAllEvents ? null : userId,
       );
     } else {
       await _propagateOrganizerLabelToEvents(
         organizerKey: key,
         displayLabel: label,
+        hermandadTopicId: topicId,
         onlyCreatedBy: propagateToAllEvents ? null : userId,
       );
     }
@@ -799,18 +847,22 @@ class CalendarRepository {
     required String organizerKey,
     required String displayLabel,
     required String logoUrl,
+    String? hermandadTopicId,
     String? onlyCreatedBy,
   }) async {
     final eventIds = await _matchingOrganizerEventIds(
       organizerKey,
+      hermandadTopicId: hermandadTopicId,
       onlyCreatedBy: onlyCreatedBy,
     );
     if (eventIds.isEmpty) return 0;
 
-    final payload = {
+    final payload = <String, dynamic>{
       'organizer_label': displayLabel,
       'custom_icon_url': logoUrl,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
+      if (hermandadTopicId != null && hermandadTopicId.isNotEmpty)
+        'hermandad_topic_id': hermandadTopicId,
     };
 
     if (_client == null) return 0;
@@ -824,17 +876,21 @@ class CalendarRepository {
   Future<int> _propagateOrganizerLabelToEvents({
     required String organizerKey,
     required String displayLabel,
+    String? hermandadTopicId,
     String? onlyCreatedBy,
   }) async {
     final eventIds = await _matchingOrganizerEventIds(
       organizerKey,
+      hermandadTopicId: hermandadTopicId,
       onlyCreatedBy: onlyCreatedBy,
     );
     if (eventIds.isEmpty) return 0;
 
-    final payload = {
+    final payload = <String, dynamic>{
       'organizer_label': displayLabel,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
+      if (hermandadTopicId != null && hermandadTopicId.isNotEmpty)
+        'hermandad_topic_id': hermandadTopicId,
     };
 
     if (_client == null) return 0;
@@ -847,23 +903,34 @@ class CalendarRepository {
 
   Future<List<String>> _matchingOrganizerEventIds(
     String organizerKey, {
+    String? hermandadTopicId,
     String? onlyCreatedBy,
   }) async {
     if (_client == null) return const [];
 
+    final topicId = hermandadTopicId?.trim();
     final rows = await _client!
         .from('calendar_events')
-        .select('id, organizer_label, created_by')
-        .neq('organizer_label', '');
+        .select('id, organizer_label, created_by, hermandad_topic_id');
 
     return rows
-        .where(
-          (row) =>
-              normalizeOrganizerKey(row['organizer_label'] as String? ?? '') ==
-                  organizerKey &&
-              (onlyCreatedBy == null ||
-                  (row['created_by'] as String?) == onlyCreatedBy),
-        )
+        .where((row) {
+          if (onlyCreatedBy != null &&
+              (row['created_by'] as String?) != onlyCreatedBy) {
+            return false;
+          }
+          final linked = (row['hermandad_topic_id'] as String?)?.trim();
+          if (topicId != null &&
+              topicId.isNotEmpty &&
+              linked != null &&
+              linked == topicId) {
+            return true;
+          }
+          return normalizeOrganizerKey(
+                row['organizer_label'] as String? ?? '',
+              ) ==
+              organizerKey;
+        })
         .map((row) => row['id'] as String)
         .toList();
   }
@@ -940,15 +1007,30 @@ class CalendarRepository {
     final libraryByKey = {
       for (final item in library) item.organizerKey: item,
     };
+    final usedLibraryKeys = <String>{};
+
+    OrganizerLogo? overlayFor(OrganizerLogo item) {
+      final exact = libraryByKey[item.organizerKey];
+      if (exact != null) {
+        usedLibraryKeys.add(exact.organizerKey);
+        return exact;
+      }
+      for (final lib in library) {
+        if (organizerMatchesHermandadName(lib.displayLabel, item.displayLabel) ||
+            organizerMatchesHermandadName(lib.organizerKey, item.displayLabel)) {
+          usedLibraryKeys.add(lib.organizerKey);
+          return lib;
+        }
+      }
+      return null;
+    }
 
     final mergedHermandades = [
       for (final item in matchedHermandades)
-        if (libraryByKey[item.organizerKey] case final overlay?)
+        if (overlayFor(item) case final overlay?)
           OrganizerLogo(
             organizerKey: item.organizerKey,
-            displayLabel: overlay.displayLabel.isNotEmpty
-                ? overlay.displayLabel
-                : item.displayLabel,
+            displayLabel: item.displayLabel,
             logoUrl: overlay.hasLogo ? overlay.logoUrl : item.logoUrl,
             hermandadTopicId: item.hermandadTopicId,
           )
@@ -957,7 +1039,9 @@ class CalendarRepository {
     ];
     final libraryOnly = [
       for (final item in library)
-        if (!hermandadMap.containsKey(item.organizerKey)) item,
+        if (!hermandadMap.containsKey(item.organizerKey) &&
+            !usedLibraryKeys.contains(item.organizerKey))
+          item,
     ];
 
     return [...mergedHermandades, ...libraryOnly].take(limit).toList();

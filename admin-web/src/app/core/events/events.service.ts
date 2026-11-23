@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { AuthService } from '../auth/auth.service';
 import { parseHermandadTopicTitle } from '../community/community.service';
-import { organizerMatchesHermandadName } from '../hermandad/season-acts';
+import { organizerMatchScore } from '../hermandad/season-acts';
 import { getSupabase } from '../supabase.client';
 import {
   CALENDAR_EVENT_TYPES,
@@ -100,11 +100,7 @@ export class EventsService {
     if (!userId) throw new Error('Sesión no disponible');
 
     const payload = this.toDbPayload(input);
-    if (!payload['hermandad_topic_id'] && input.organizerLabel) {
-      payload['hermandad_topic_id'] = await this.resolveHermandadTopicId(
-        input.organizerLabel,
-      );
-    }
+    await this.ensureHermandadTopicId(payload, input);
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .insert({
@@ -120,11 +116,7 @@ export class EventsService {
 
   async updateEvent(eventId: string, input: CalendarEventInput): Promise<CalendarEventRow> {
     const payload = this.toDbPayload(input);
-    if (!payload['hermandad_topic_id'] && input.organizerLabel) {
-      payload['hermandad_topic_id'] = await this.resolveHermandadTopicId(
-        input.organizerLabel,
-      );
-    }
+    await this.ensureHermandadTopicId(payload, input, { keepExisting: true });
     const { data, error } = await getSupabase()
       .from('calendar_events')
       .update({
@@ -281,31 +273,59 @@ export class EventsService {
       paso: input.paso ?? 'ambos',
       season_n: isEnsayo ? (input.seasonN ?? 1) : null,
       with_retranqueo: isMuda && input.withRetranqueo === true,
-      hermandad_topic_id: input.hermandadTopicId?.trim() || null,
+      ...(input.hermandadTopicId !== undefined
+        ? { hermandad_topic_id: input.hermandadTopicId?.trim() || null }
+        : {}),
     };
   }
 
   async resolveHermandadTopicId(organizerLabel: string): Promise<string | null> {
     const label = organizerLabel.trim();
     if (label.length < 3) return null;
-    const safe = label.replace(/[%_,]/g, '');
     const { data, error } = await getSupabase()
       .from('forum_topics')
       .select('id, title')
       .eq('forum_id', 'hermandades')
       .eq('status', 'published')
-      .ilike('title', `%${safe}%`)
-      .limit(40);
+      .limit(400);
     if (error || !data?.length) return null;
+    let bestId: string | null = null;
+    let bestScore = 0;
     for (const row of data) {
       const title = String(row['title'] ?? '');
       const parsed = parseHermandadTopicTitle(title);
       const name = parsed.hermandadName.trim() || title.trim();
-      if (organizerMatchesHermandadName(label, name)) {
-        return String(row['id'] ?? '') || null;
+      const score = Math.max(
+        organizerMatchScore(label, name),
+        organizerMatchScore(label, title),
+      );
+      if (score > bestScore) {
+        bestScore = score;
+        bestId = String(row['id'] ?? '') || null;
       }
     }
-    return null;
+    return bestScore > 0 ? bestId : null;
+  }
+
+  private async ensureHermandadTopicId(
+    payload: Record<string, unknown>,
+    input: CalendarEventInput,
+    opts: { keepExisting?: boolean } = {},
+  ): Promise<void> {
+    const organizer = (input.organizerLabel ?? '').trim();
+    if (!organizer) {
+      payload['hermandad_topic_id'] = null;
+      return;
+    }
+    if (payload['hermandad_topic_id']) return;
+    const resolved = await this.resolveHermandadTopicId(organizer);
+    if (resolved) {
+      payload['hermandad_topic_id'] = resolved;
+      return;
+    }
+    if (opts.keepExisting) {
+      delete payload['hermandad_topic_id'];
+    }
   }
 
   async setLiveForceState(

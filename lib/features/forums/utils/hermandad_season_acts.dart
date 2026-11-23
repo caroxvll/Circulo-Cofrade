@@ -372,13 +372,25 @@ String _canonicalOrganizer(String raw) {
     'real ',
     'ilustre ',
     'pontificia ',
+    'venerable ',
+    'sacramental ',
     'hdad. ',
     'hdad ',
     'hermandad de la ',
     'hermandad de las ',
     'hermandad del ',
+    'hermandad de los ',
     'hermandad de ',
     'hermandad ',
+    'de la ',
+    'de las ',
+    'de los ',
+    'del ',
+    'de ',
+    'la ',
+    'el ',
+    'las ',
+    'los ',
   ];
   var changed = true;
   while (changed) {
@@ -393,18 +405,25 @@ String _canonicalOrganizer(String raw) {
   return value;
 }
 
-bool organizerMatchesHermandadName(String organizer, String hermandadName) {
+int organizerMatchScore(String organizer, String hermandadName) {
   final orgKey = normalizeOrganizerKey(organizer);
   final nameKey = normalizeOrganizerKey(hermandadName);
-  if (nameKey.length < 2 || orgKey.length < 2) return false;
-  if (orgKey == nameKey) return true;
+  if (nameKey.length < 2 || orgKey.length < 2) return 0;
+  if (orgKey == nameKey) return 100;
   final orgCanon = _canonicalOrganizer(organizer);
   final nameCanon = _canonicalOrganizer(hermandadName);
-  if (orgCanon.length < 3 || nameCanon.length < 3) return false;
-  if (orgCanon == nameCanon) return true;
+  if (orgCanon.length < 3 || nameCanon.length < 3) return 0;
+  if (orgCanon == nameCanon) return 90;
   final shorter = orgCanon.length <= nameCanon.length ? orgCanon : nameCanon;
   final longer = orgCanon.length > nameCanon.length ? orgCanon : nameCanon;
-  return shorter.length >= 6 && longer.contains(shorter);
+  if (shorter.length >= 6 && longer.contains(shorter)) {
+    return 40 + (shorter.length * 2).clamp(0, 40);
+  }
+  return 0;
+}
+
+bool organizerMatchesHermandadName(String organizer, String hermandadName) {
+  return organizerMatchScore(organizer, hermandadName) > 0;
 }
 
 bool eventBelongsToHermandad(
