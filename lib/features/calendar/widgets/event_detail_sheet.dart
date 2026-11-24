@@ -36,26 +36,28 @@ Future<void> showEventDetailSheet(
 
   if (!context.mounted) return;
   final hasCover = CalendarEventImage.hasDisplayableCover(display);
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: AppColors.background,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-    ),
-    builder: (_) => DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: hasCover ? 0.78 : 0.62,
-      minChildSize: 0.28,
-      maxChildSize: hasCover ? 0.92 : 0.82,
-      builder: (context, scrollController) => _EventDetailSheet(
-        event: display,
-        focusedMonth: focusedMonth,
-        scrollController: scrollController,
+  await withCalendarEventSheetHidden(ref, () {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
-    ),
-  );
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: hasCover ? 0.78 : 0.62,
+        minChildSize: 0.28,
+        maxChildSize: hasCover ? 0.92 : 0.82,
+        builder: (context, scrollController) => _EventDetailSheet(
+          event: display,
+          focusedMonth: focusedMonth,
+          scrollController: scrollController,
+        ),
+      ),
+    );
+  });
 }
 
 class _EventDetailSheet extends ConsumerWidget {
