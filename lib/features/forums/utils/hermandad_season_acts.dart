@@ -421,6 +421,20 @@ String _canonicalOrganizer(String raw) {
   return value;
 }
 
+/// «Jesús del Gran Poder» ≡ «Gran Poder», pero «Pasión» ≠ «Pasión y Muerte»
+/// ni «Esperanza» ≠ «Bendición y Esperanza».
+bool _isCanonicalPhraseSuffix(String shorter, String longer) {
+  if (shorter.isEmpty || longer.length <= shorter.length) return false;
+  if (!longer.endsWith(shorter)) return false;
+  if (longer[longer.length - shorter.length - 1] != ' ') return false;
+  final prefix = longer
+      .substring(0, longer.length - shorter.length)
+      .trimRight();
+  if (prefix.endsWith(' y') || prefix.endsWith(' e')) return false;
+  final tokens = shorter.split(' ').where((part) => part.isNotEmpty).length;
+  return tokens >= 2 || shorter.length >= 8;
+}
+
 int organizerMatchScore(String organizer, String hermandadName) {
   final orgKey = normalizeOrganizerKey(organizer);
   final nameKey = normalizeOrganizerKey(hermandadName);
@@ -432,8 +446,8 @@ int organizerMatchScore(String organizer, String hermandadName) {
   if (orgCanon == nameCanon) return 90;
   final shorter = orgCanon.length <= nameCanon.length ? orgCanon : nameCanon;
   final longer = orgCanon.length > nameCanon.length ? orgCanon : nameCanon;
-  if (shorter.length >= 6 && longer.contains(shorter)) {
-    return 40 + (shorter.length * 2).clamp(0, 40);
+  if (_isCanonicalPhraseSuffix(shorter, longer)) {
+    return 70 + (shorter.length * 2).clamp(0, 20);
   }
   return 0;
 }
