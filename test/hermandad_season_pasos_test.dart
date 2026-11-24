@@ -68,6 +68,58 @@ void main() {
     expect(iguala.isFilled, isFalse);
   });
 
+  test('Pasión no es la misma hermandad que Pasión y Muerte', () {
+    expect(
+      organizerMatchScore('Pasión', 'Pasión y Muerte'),
+      0,
+    );
+    expect(
+      organizerMatchScore(
+        'Hermandad de Pasión',
+        'Hermandad de Pasión y Muerte',
+      ),
+      0,
+    );
+    expect(
+      organizerMatchScore('Hermandad de Pasión', 'Pasión'),
+      greaterThanOrEqualTo(90),
+    );
+    expect(
+      organizerMatchScore('Jesús del Gran Poder', 'Gran Poder'),
+      greaterThan(0),
+    );
+  });
+
+  test('Otras hermandades de nombre parecido no se cruzan', () {
+    expect(
+      organizerMatchScore(
+        'Soledad de San Buenaventura',
+        'La Soledad de San Lorenzo',
+      ),
+      0,
+    );
+    expect(
+      organizerMatchScore('Soledad', 'Soledad de San Lorenzo'),
+      0,
+    );
+    expect(
+      organizerMatchScore('Soledad', 'Soledad de San Buenaventura'),
+      0,
+    );
+    expect(
+      organizerMatchScore('Esperanza', 'La Esperanza de Triana'),
+      0,
+    );
+    expect(
+      organizerMatchScore('Esperanza', 'Bendición y Esperanza'),
+      0,
+    );
+    expect(
+      organizerMatchScore('Santa Cruz', 'Vera Cruz'),
+      0,
+    );
+  });
+
   test('Al crear evento, un solo paso no pide elegir', () {
     expect(HermandadPasosLayout.cristo.eventChoices, [SeasonPaso.cristo]);
     expect(
