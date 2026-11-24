@@ -114,6 +114,8 @@ class _CofradeoShellState extends ConsumerState<CofradeoShell> {
     final showNoticiasAd = branchIndex == 1 &&
         (path == '/noticias' || path == '/foros/$noticiasForumId');
     final showCalendarAd = branchIndex == 0 && path == '/calendario';
+    final calendarEventSheetOpen =
+        ref.watch(calendarEventSheetOpenProvider) > 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -123,7 +125,8 @@ class _CofradeoShellState extends ConsumerState<CofradeoShell> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const NetworkStatusBanner(),
-          if (showCalendarAd) const CalendarShellAdBar(),
+          if (showCalendarAd)
+            CalendarShellAdBar(visible: !calendarEventSheetOpen),
           if (showForumsAd) const ForumsShellAdBar(),
           if (showNoticiasAd) const NoticiasShellAdBar(),
           CofradeoBottomNav(

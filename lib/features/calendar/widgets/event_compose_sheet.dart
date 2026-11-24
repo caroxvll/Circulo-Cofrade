@@ -86,22 +86,24 @@ Future<void> showEventComposeSheet(
 
   _hideEventComposeKeyboard();
 
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.74,
-      minChildSize: 0.42,
-      maxChildSize: 0.88,
-      builder: (context, scrollController) => _EventComposeSheet(
-        initialDate: initialDate,
-        existing: existing,
-        scrollController: scrollController,
+  await withCalendarEventSheetHidden(ref, () {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.74,
+        minChildSize: 0.42,
+        maxChildSize: 0.88,
+        builder: (context, scrollController) => _EventComposeSheet(
+          initialDate: initialDate,
+          existing: existing,
+          scrollController: scrollController,
+        ),
       ),
-    ),
-  );
+    );
+  });
   _hideEventComposeKeyboard();
 }
 
