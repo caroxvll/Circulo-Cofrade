@@ -288,6 +288,16 @@ function canonicalOrganizer(raw: string): string {
   return value;
 }
 
+function isCanonicalPhraseSuffix(shorter: string, longer: string): boolean {
+  if (!shorter || longer.length <= shorter.length) return false;
+  if (!longer.endsWith(shorter)) return false;
+  if (longer[longer.length - shorter.length - 1] !== ' ') return false;
+  const prefix = longer.slice(0, longer.length - shorter.length).trimEnd();
+  if (prefix.endsWith(' y') || prefix.endsWith(' e')) return false;
+  const tokens = shorter.split(' ').filter(Boolean).length;
+  return tokens >= 2 || shorter.length >= 8;
+}
+
 export function organizerMatchScore(
   organizer: string,
   hermandadName: string,
@@ -302,8 +312,8 @@ export function organizerMatchScore(
   if (orgCanon === nameCanon) return 90;
   const shorter = orgCanon.length <= nameCanon.length ? orgCanon : nameCanon;
   const longer = orgCanon.length > nameCanon.length ? orgCanon : nameCanon;
-  if (shorter.length >= 6 && longer.includes(shorter)) {
-    return 40 + Math.min(40, shorter.length * 2);
+  if (isCanonicalPhraseSuffix(shorter, longer)) {
+    return 70 + Math.min(20, shorter.length * 2);
   }
   return 0;
 }
