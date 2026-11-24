@@ -51,6 +51,35 @@ final calendarEventsEpochProvider =
   CalendarEventsEpochNotifier.new,
 );
 
+/// Fichas / formularios de evento abiertos. El banner del shell se oculta.
+class CalendarEventSheetOpenNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void push() => state++;
+
+  void pop() {
+    if (state > 0) state--;
+  }
+}
+
+final calendarEventSheetOpenProvider =
+    NotifierProvider<CalendarEventSheetOpenNotifier, int>(
+  CalendarEventSheetOpenNotifier.new,
+);
+
+Future<T> withCalendarEventSheetHidden<T>(
+  Ref ref,
+  Future<T> Function() action,
+) async {
+  ref.read(calendarEventSheetOpenProvider.notifier).push();
+  try {
+    return await action();
+  } finally {
+    ref.read(calendarEventSheetOpenProvider.notifier).pop();
+  }
+}
+
 final calendarEventsProvider =
     FutureProvider.autoDispose.family<List<CalendarEvent>, DateTime>(
   (ref, month) async {
