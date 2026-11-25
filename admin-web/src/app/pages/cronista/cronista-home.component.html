@@ -50,6 +50,39 @@
     </section>
   }
 
+  @if (isAdmin()) {
+    <section class="review-queue">
+      <h2>Comentarios</h2>
+      <p class="muted">Lo que deja la gente en libros y artículos. Puedes quitarlo.</p>
+      @if (comments().length === 0) {
+        <p class="muted">Todavía no hay comentarios.</p>
+      } @else {
+        <ul>
+          @for (comment of comments(); track comment.id) {
+            <li>
+              <div>
+                <strong>{{ comment.historiaTitle }}</strong>
+                <small>
+                  {{ comment.userDisplayName }}
+                  @if (handleLabel(comment.userHandle); as handle) {
+                    · {{ handle }}
+                  }
+                  · {{ timeAgo(comment.createdAt) }}
+                </small>
+                <p>{{ comment.body }}</p>
+              </div>
+              <div class="review-actions">
+                <button type="button" class="ghost" (click)="deleteComment(comment)">
+                  Eliminar
+                </button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+
   @if (loading()) {
     <p class="muted">Cargando tu estantería…</p>
   } @else {

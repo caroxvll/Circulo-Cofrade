@@ -63,13 +63,19 @@
             <button type="button" class="link" (click)="removePage(i)">Quitar</button>
           }
         </header>
+        <div class="format-bar">
+          <button type="button" (click)="applyHeading(i, pageBody)">Título</button>
+          <button type="button" (click)="applyWrap(i, pageBody, '**', '**')">Negrita</button>
+          <button type="button" (click)="applyWrap(i, pageBody, '_', '_')">Cursiva</button>
+        </div>
         <textarea
+          #pageBody
           class="page-body"
           [(ngModel)]="pages[i].body"
           [ngModelOptions]="{ standalone: true }"
           rows="8"
           maxlength="3500"
-          placeholder="Escribe como en un libro. La letra en la app es EB Garamond."
+          placeholder="Escribe. Selecciona y pulsa Título, Negrita o Cursiva."
         ></textarea>
         <div class="photo-row">
           <label class="photo-btn">

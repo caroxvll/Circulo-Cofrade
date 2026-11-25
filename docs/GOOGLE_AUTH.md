@@ -6,10 +6,10 @@ La app **ya tiene el botón y el código** (`signInWithOAuth`). Para que funcion
 
 ```
 Usuario → «Continuar con Google»
-    → Supabase abre Google (navegador / pestaña)
+    → Sesión del sistema (Auth Tab / hoja de Google, no una pestaña suelta)
     → Google devuelve a Supabase
-    → Supabase redirige a la app (deep link o URL web)
-    → Se crea sesión + perfil en `profiles`
+    → Supabase redirige a cofradeo://oauth-callback
+    → La pestaña se cierra sola y se crea sesión + perfil en `profiles`
 ```
 
 ---
@@ -70,6 +70,7 @@ Copia el SHA-1 de `debug` (desarrollo) y el de `release` (producción).
 | Redirect URLs | Añade todas las que uses: |
 
 ```
+cofradeo://oauth-callback
 cofradeo://login-callback
 cofradeo://reset-password
 http://localhost:**
@@ -107,15 +108,15 @@ Perfil → Iniciar sesión → **Continuar con Google**.
 flutter run -d TU_DISPOSITIVO --dart-define-from-file=env.json
 ```
 
-1. Pulsa Google → se abre Chrome/Custom Tabs.
-2. Elige cuenta → vuelve a la app sola (`cofradeo://login-callback`).
+1. Pulsa Google → se abre la hoja/Auth Tab de Google (no una pestaña suelta de Chrome).
+2. Elige cuenta → la hoja se cierra sola (`cofradeo://oauth-callback`).
 3. Deberías entrar al calendario (o a la ruta `redirect` si venías de un hilo).
 
 ### Si no vuelve a la app
 
 | Síntoma | Revisar |
 |---------|---------|
-| Se queda en el navegador | Redirect URLs en Supabase incluyen `cofradeo://login-callback` |
+| Se queda en el navegador | Redirect URLs en Supabase incluyen `cofradeo://oauth-callback` |
 | Error «redirect_uri_mismatch» | URI de callback en Google = la de Supabase (`.../auth/v1/callback`) |
 | App abre pero sin sesión | Deep link en `AndroidManifest.xml` / `Info.plist` (ya en el repo) |
 | «Supabase no configurado» | `env.json` con `SUPABASE_URL` y `SUPABASE_ANON_KEY` |
@@ -129,10 +130,12 @@ flutter run -d TU_DISPOSITIVO --dart-define-from-file=env.json
 | `lib/features/auth/data/auth_repository.dart` | `signInWithGoogle()` con PKCE |
 | `lib/features/auth/login_screen.dart` | Botón dorado |
 | `lib/app.dart` | Al volver del OAuth, navega con sesión |
-| `android/.../AndroidManifest.xml` | Intent `cofradeo://login-callback` |
+| `android/.../AndroidManifest.xml` | Intent `cofradeo://oauth-callback` (Google) y `login-callback` (email) |
 | `ios/Runner/Info.plist` | URL scheme `cofradeo` |
 
 **Nota:** Con Google el email suele venir **ya verificado**; no pasa por la pantalla «Confirma tu email».
+
+En iPhone, **Continuar con Apple** no abre navegador (hoja nativa). Google sí abre una hoja del sistema que se cierra sola al elegir la cuenta.
 
 ---
 

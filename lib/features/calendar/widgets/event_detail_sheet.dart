@@ -133,6 +133,8 @@ class _EventDetailSheet extends ConsumerWidget {
     final hasCover = CalendarEventImage.hasDisplayableCover(event);
     final media = MediaQuery.of(context);
     final bottomPad = media.padding.bottom + 16;
+    final showBoardLink =
+        ref.watch(calendarShowBoardLinkProvider).asData?.value == true;
     final location = event.location?.trim().isNotEmpty == true
         ? event.location!.trim()
         : null;
@@ -165,7 +167,8 @@ class _EventDetailSheet extends ConsumerWidget {
                             organizer: organizer,
                             shieldUrl: shieldUrl,
                           ),
-                          if (event.hermandadTopicId != null &&
+                          if (showBoardLink &&
+                              event.hermandadTopicId != null &&
                               event.hermandadTopicId!.trim().isNotEmpty) ...[
                             const SizedBox(height: 10),
                             Align(

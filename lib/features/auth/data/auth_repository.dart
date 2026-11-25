@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,6 +11,10 @@ import '../../../core/supabase/supabase_bootstrap.dart';
 
 class AppleSignInCancelled implements Exception {
   const AppleSignInCancelled();
+}
+
+class GoogleSignInCancelled implements Exception {
+  const GoogleSignInCancelled();
 }
 
 class AuthUnavailableException implements Exception {
@@ -85,13 +91,35 @@ class AuthRepository {
 
   Future<void> signInWithGoogle() async {
     _ensureAvailable();
-    await _client!.auth.signInWithOAuth(
-      OAuthProvider.google,
-      redirectTo: _oauthRedirectUrl,
-      authScreenLaunchMode: kIsWeb
-          ? LaunchMode.platformDefault
-          : LaunchMode.externalApplication,
+    if (kIsWeb || !_usesSystemAuthSession) {
+      await _client!.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: _oauthRedirectUrl,
+        authScreenLaunchMode: LaunchMode.platformDefault,
+      );
+      return;
+    }
+
+    // Chrome/Safari abiertos con url_launcher no se cierran al volver a la
+    // app (cofradeo://…). ASWebAuthenticationSession / Auth Tab sí.
+    final res = await _client!.auth.getOAuthSignInUrl(
+      provider: OAuthProvider.google,
+      redirectTo: _mobileOAuthCallback,
     );
+    final String callback;
+    try {
+      callback = await FlutterWebAuth2.authenticate(
+        url: res.url,
+        callbackUrlScheme: 'cofradeo',
+      );
+    } on PlatformException catch (error) {
+      if (_isAuthSessionCancelled(error)) {
+        throw const GoogleSignInCancelled();
+      }
+      throw AuthException('No se pudo continuar con Google.');
+    }
+
+    await _client!.auth.getSessionFromUrl(Uri.parse(callback));
   }
 
   /// Hoja nativa de Apple. La sesión queda en la app, sin pasar por el navegador.
@@ -240,6 +268,20 @@ class AuthRepository {
     return value.replaceAll(RegExp(r'[^a-z0-9_]'), '');
   }
 
+  /// Host distinto a `login-callback` / `reset-password` para que Android
+  /// entregue el retorno de Google a CallbackActivity y no a MainActivity.
+  static const _mobileOAuthCallback = 'cofradeo://oauth-callback';
+
+  bool get _usesSystemAuthSession {
+    return defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.android;
+  }
+
+  bool _isAuthSessionCancelled(PlatformException error) {
+    final code = error.code.toUpperCase();
+    return code == 'CANCELED' || code == 'CANCELLED';
+  }
+
   String get _oauthRedirectUrl {
     if (kIsWeb) {
       final base = Uri.base;
@@ -248,7 +290,7 @@ class AuthRepository {
       if (path.isEmpty || path == '/') return base.origin;
       return '${base.origin}$path';
     }
-    return 'cofradeo://login-callback';
+    return _mobileOAuthCallback;
   }
 
   void _ensureAvailable() {

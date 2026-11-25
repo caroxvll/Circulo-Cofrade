@@ -10,6 +10,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/chronicler_badge.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../../core/widgets/forum_post_content.dart';
 import '../../auth/auth_provider.dart';
 import '../../permissions/permissions_provider.dart';
 import '../cronicon_brand.dart';
@@ -199,46 +200,62 @@ class _BookReaderState extends ConsumerState<_BookReader>
             : '$_page / $paperCount';
 
     return Scaffold(
-      backgroundColor: _desk,
+      backgroundColor: onCover ? const Color(0xFF3A1A16) : _paper,
       body: Stack(
         children: [
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 48, 10, 36),
-              child: PageFlipWidget(
-                controller: _flip,
-                backgroundColor: _paper,
-                duration: const Duration(milliseconds: 520),
-                initialIndex: widget.initialPage.clamp(
-                  0,
-                  historia.pages.length,
-                ),
-                onPageFlipped: _onFlipped,
-                lastPage: _ColophonPage(
-                  historia: historia,
-                  others: others,
-                ),
-                children: [
-                  _CoverLeaf(historia: historia),
-                  for (var i = 0; i < historia.pages.length; i++)
-                    _PaperLeaf(
-                      page: historia.pages[i],
-                      dropCap: i == 0,
-                    ),
-                ],
+          Positioned.fill(
+            child: PageFlipWidget(
+              controller: _flip,
+              backgroundColor: _paper,
+              duration: const Duration(milliseconds: 520),
+              initialIndex: widget.initialPage.clamp(
+                0,
+                historia.pages.length,
               ),
+              onPageFlipped: _onFlipped,
+              lastPage: _ColophonPage(
+                historia: historia,
+                others: others,
+              ),
+              children: [
+                _CoverLeaf(historia: historia),
+                for (var i = 0; i < historia.pages.length; i++)
+                  _PaperLeaf(
+                    page: historia.pages[i],
+                    dropCap: i == 0,
+                  ),
+              ],
             ),
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: Row(
                 children: [
-                  IconButton(
-                    tooltip: 'Cerrar',
+                  TextButton.icon(
                     onPressed: () => Navigator.maybePop(context),
-                    icon: const Icon(Icons.close_rounded),
-                    color: AppColors.burgundyDark,
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: onCover ? AppColors.goldPale : AppColors.burgundyDark,
+                    ),
+                    label: Text(
+                      'Salir',
+                      style: AppTypography.labelSmall(
+                        color: onCover
+                            ? AppColors.goldPale
+                            : AppColors.burgundyDark,
+                      ).copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor: onCover
+                          ? Colors.black.withValues(alpha: 0.35)
+                          : _paper.withValues(alpha: 0.92),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
                   const Spacer(),
                   if (!onCover)
@@ -249,7 +266,7 @@ class _BookReaderState extends ConsumerState<_BookReader>
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: AppTypography.hermandadName().copyWith(
-                          fontSize: 16,
+                          fontSize: 15,
                         ),
                       ),
                     ),
@@ -270,7 +287,9 @@ class _BookReaderState extends ConsumerState<_BookReader>
                         }
                       },
                       icon: const Icon(Icons.edit_outlined),
-                      color: AppColors.burgundyDark,
+                      color: onCover
+                          ? AppColors.goldPale
+                          : AppColors.burgundyDark,
                     ),
                   IconButton(
                     tooltip: 'Comentarios',
@@ -284,7 +303,9 @@ class _BookReaderState extends ConsumerState<_BookReader>
                       label: Text('${historia.commentCount}'),
                       child: const Icon(Icons.chat_bubble_outline_rounded),
                     ),
-                    color: AppColors.burgundyDark,
+                    color: onCover
+                        ? AppColors.goldPale
+                        : AppColors.burgundyDark,
                   ),
                 ],
               ),
@@ -301,8 +322,9 @@ class _BookReaderState extends ConsumerState<_BookReader>
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
-                  style: AppTypography.labelSmall(color: AppColors.goldDark)
-                      .copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.6),
+                  style: AppTypography.labelSmall(
+                    color: onCover ? AppColors.goldPale : AppColors.goldDark,
+                  ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.6),
                 ),
               ),
             ),
@@ -342,7 +364,7 @@ class _TitlePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 36, 28, 28),
+      padding: const EdgeInsets.fromLTRB(28, 72, 28, 28),
       child: Column(
         children: [
           Text(
@@ -448,7 +470,7 @@ class _PaperLeaf extends StatelessWidget {
     return ColoredBox(
       color: _paper,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 28, 22, 28),
+        padding: const EdgeInsets.fromLTRB(22, 72, 22, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -467,13 +489,10 @@ class _PaperLeaf extends StatelessWidget {
                 flex: hasImage ? 5 : 8,
                 child: Align(
                   alignment: Alignment.topLeft,
-                  child: dropCap
-                      ? _DropCapText(page.body)
-                      : Text(
-                          page.body,
-                          style: AppTypography.bookBody(),
-                          overflow: TextOverflow.fade,
-                        ),
+                  child: _HistoriaPageBody(
+                    body: page.body,
+                    dropCap: dropCap,
+                  ),
                 ),
               ),
           ],
@@ -497,7 +516,7 @@ class _ColophonPage extends StatelessWidget {
     return ColoredBox(
       color: _paper,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(28, 40, 28, 28),
+        padding: const EdgeInsets.fromLTRB(28, 72, 28, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -599,6 +618,32 @@ class _PagePicture extends StatelessWidget {
       ],
     );
   }
+}
+
+class _HistoriaPageBody extends StatelessWidget {
+  const _HistoriaPageBody({
+    required this.body,
+    required this.dropCap,
+  });
+
+  final String body;
+  final bool dropCap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (dropCap && !_historiaHasFormat(body)) {
+      return _DropCapText(body);
+    }
+    return ForumPostContent(
+      text: body,
+      style: AppTypography.bookBody(),
+      subtleLinks: true,
+    );
+  }
+}
+
+bool _historiaHasFormat(String body) {
+  return RegExp(r'(^|\n)\s*#{1,3}\s|\*\*|_[^\s*]|\*[^*\s]').hasMatch(body);
 }
 
 class _DropCapText extends StatelessWidget {

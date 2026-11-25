@@ -7,6 +7,7 @@ import '../../../core/utils/time_ago.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../auth/auth_provider.dart';
 import '../../auth/email_verification_gate.dart';
+import '../../permissions/permissions_provider.dart';
 import '../data/historias_repository.dart';
 import '../historias_provider.dart';
 import '../models/historia.dart';
@@ -180,6 +181,43 @@ class _HistoriaCommentsSheetState
     }
   }
 
+  Future<void> _delete(HistoriaComment comment) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Eliminar comentario?'),
+        content: const Text('Se quita de esta obra. No se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(historiasRepositoryProvider).deleteComment(comment.id);
+      if (!mounted) return;
+      setState(() {
+        _items.removeWhere((item) => item.id == comment.id);
+        _count = (_count - 1).clamp(0, 999999);
+      });
+      ref.invalidate(historiaByIdProvider(widget.historiaId));
+      ref.invalidate(publishedHistoriasFeedProvider);
+      ref.invalidate(publishedHistoriasProvider);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo eliminar el comentario')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
@@ -330,6 +368,7 @@ class _HistoriaCommentsSheetState
           );
         }
         final comment = _items[index];
+        final canDelete = ref.watch(isAdminProvider);
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -372,6 +411,14 @@ class _HistoriaCommentsSheetState
                 ],
               ),
             ),
+            if (canDelete)
+              IconButton(
+                tooltip: 'Eliminar',
+                onPressed: () => _delete(comment),
+                icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                color: AppColors.textMuted,
+                visualDensity: VisualDensity.compact,
+              ),
           ],
         );
       },

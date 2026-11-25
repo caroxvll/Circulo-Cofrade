@@ -297,6 +297,19 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
                 );
               },
             ),
+            const SizedBox(height: JuntaUi.sectionGap),
+            const JuntaSectionHeader(
+              title: 'Comentarios',
+              subtitle:
+                  'Lo que deja la gente en libros y artículos. Puedes quitarlo.',
+            ),
+            const SizedBox(height: 10),
+            _StaffCommentsPanel(
+              onDeleted: () {
+                ref.invalidate(staffHistoriaCommentsProvider);
+                ref.invalidate(staffHistoriasProvider);
+              },
+            ),
             const SizedBox(height: 72),
           ],
         ),
@@ -320,6 +333,82 @@ class _JuntaHistoriasTabState extends ConsumerState<JuntaHistoriasTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StaffCommentsPanel extends ConsumerWidget {
+  const _StaffCommentsPanel({required this.onDeleted});
+
+  final VoidCallback onDeleted;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(staffHistoriaCommentsProvider);
+    return async.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => JuntaEmptyPanel(
+        icon: Icons.error_outline,
+        message: 'No se pudieron cargar los comentarios.',
+        onRetry: () => ref.invalidate(staffHistoriaCommentsProvider),
+      ),
+      data: (items) {
+        if (items.isEmpty) {
+          return Text('Todavía no hay comentarios.', style: JuntaUi.caption());
+        }
+        return Column(
+          children: [
+            for (final comment in items) ...[
+              Container(
+                width: double.infinity,
+                padding: JuntaUi.cardPadding,
+                decoration: JuntaUi.cardDecoration(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      comment.historiaTitle?.trim().isNotEmpty == true
+                          ? comment.historiaTitle!
+                          : 'Obra',
+                      style: JuntaUi.cardTitle(),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${comment.userDisplayName} · ${comment.body}',
+                      style: JuntaUi.body(color: AppColors.textPrimary),
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () async {
+                          try {
+                            await ref
+                                .read(historiasRepositoryProvider)
+                                .deleteComment(comment.id);
+                            onDeleted();
+                          } catch (_) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('No se pudo eliminar'),
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('Eliminar'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ],
+        );
+      },
     );
   }
 }

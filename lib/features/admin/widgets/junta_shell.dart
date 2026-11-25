@@ -21,6 +21,7 @@ import 'junta_pillars_tab.dart';
 import 'junta_quiz_tab.dart';
 import 'junta_rejected_topics_panel.dart';
 import 'junta_season_acts_tab.dart';
+import 'junta_x_ingest_tab.dart';
 import '../../quiz/quiz_provider.dart';
 import '../../permissions/permissions_provider.dart';
 
@@ -118,6 +119,7 @@ class _JuntaCounts {
     required this.reports,
     required this.events,
     required this.closeRequests,
+    required this.xIngestDrafts,
     required this.isLoading,
   });
 
@@ -125,6 +127,7 @@ class _JuntaCounts {
   final int reports;
   final int events;
   final int closeRequests;
+  final int xIngestDrafts;
   final bool isLoading;
 
   int badgeFor(JuntaModule module) => switch (module) {
@@ -132,6 +135,7 @@ class _JuntaCounts {
     JuntaModule.reports => reports,
     JuntaModule.events => events,
     JuntaModule.closeRequests => closeRequests,
+    JuntaModule.xIngest => xIngestDrafts,
     _ => 0,
   };
 
@@ -143,6 +147,7 @@ final _juntaCountsProvider = Provider<_JuntaCounts>((ref) {
   final reportGroupsAsync = ref.watch(pendingReportGroupsProvider);
   final eventsAsync = ref.watch(pendingCalendarEventsProvider);
   final closeAsync = ref.watch(closeRequestedTopicsProvider);
+  final xIngestAsync = ref.watch(xIngestDraftsProvider);
 
   final isLoading = topicsAsync.isLoading ||
       reportGroupsAsync.isLoading ||
@@ -154,6 +159,7 @@ final _juntaCountsProvider = Provider<_JuntaCounts>((ref) {
     reports: reportGroupsAsync.asData?.value.length ?? 0,
     events: eventsAsync.asData?.value.length ?? 0,
     closeRequests: closeAsync.asData?.value.length ?? 0,
+    xIngestDrafts: xIngestAsync.asData?.value.length ?? 0,
     isLoading: isLoading,
   );
 });
@@ -479,6 +485,7 @@ class _JuntaModuleBody extends StatelessWidget {
       JuntaModule.moderators => const JuntaModeratorsTab(),
       JuntaModule.hermandades => const JuntaHermandadesTab(),
       JuntaModule.seasonActs => const JuntaSeasonActsTab(),
+      JuntaModule.xIngest => const JuntaXIngestTab(),
       JuntaModule.forums => const JuntaPillarsTab(),
       JuntaModule.historias => const JuntaHistoriasTab(),
       JuntaModule.season => const JuntaCountdownTab(),

@@ -143,6 +143,144 @@ class AdminRepository {
     return SignupPulse.fromJson(Map<String, dynamic>.from(row));
   }
 
+  Future<XIngestSettings> fetchXIngestSettings() async {
+    if (_client == null) throw const AdminUnavailableException();
+    final row = await _client!
+        .from('x_ingest_settings')
+        .select()
+        .eq('id', 1)
+        .maybeSingle();
+    if (row == null) throw const AdminUnavailableException();
+    return XIngestSettings.fromJson(Map<String, dynamic>.from(row));
+  }
+
+  Future<void> saveXIngestSettings({
+    required bool enabled,
+    required int intervalMinutes,
+    required int maxPostsPerAccount,
+  }) async {
+    if (_client == null) throw const AdminUnavailableException();
+    await _client!.from('x_ingest_settings').update({
+      'enabled': enabled,
+      'interval_minutes': intervalMinutes,
+      'max_posts_per_account': maxPostsPerAccount,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      'updated_by': _client!.auth.currentUser?.id,
+    }).eq('id', 1);
+  }
+
+  Future<List<XIngestAccount>> fetchXIngestAccounts() async {
+    if (_client == null) return [];
+    final rows = await _client!
+        .from('x_ingest_accounts')
+        .select('*, forum_topics(title)')
+        .order('handle');
+    return [
+      for (final row in rows)
+        XIngestAccount.fromJson(Map<String, dynamic>.from(row)),
+    ];
+  }
+
+  Future<void> upsertXIngestAccount({
+    required String topicId,
+    required String handle,
+    String? id,
+  }) async {
+    if (_client == null) throw const AdminUnavailableException();
+    final payload = {
+      'topic_id': topicId,
+      'handle': handle.trim().replaceFirst(RegExp(r'^@+'), ''),
+    };
+    if (id != null && id.isNotEmpty) {
+      await _client!.from('x_ingest_accounts').update(payload).eq('id', id);
+      return;
+    }
+    await _client!.from('x_ingest_accounts').upsert(
+          payload,
+          onConflict: 'topic_id',
+        );
+  }
+
+  Future<void> setXIngestAccountEnabled({
+    required String id,
+    required bool enabled,
+  }) async {
+    if (_client == null) throw const AdminUnavailableException();
+    await _client!
+        .from('x_ingest_accounts')
+        .update({'ingest_enabled': enabled})
+        .eq('id', id);
+  }
+
+  Future<void> deleteXIngestAccount(String id) async {
+    if (_client == null) throw const AdminUnavailableException();
+    await _client!.from('x_ingest_accounts').delete().eq('id', id);
+  }
+
+  Future<List<XIngestDraft>> fetchXIngestDrafts({String status = 'pending'}) async {
+    if (_client == null) return [];
+    final rows = await _client!
+        .from('x_ingest_drafts')
+        .select('*, forum_topics(title)')
+        .eq('status', status)
+        .order('created_at', ascending: false)
+        .limit(80);
+    return [
+      for (final row in rows)
+        XIngestDraft.fromJson(Map<String, dynamic>.from(row)),
+    ];
+  }
+
+  Future<Map<String, dynamic>> runXIngestPull({
+    bool force = true,
+    bool skipBacklog = false,
+    String? accountId,
+  }) async {
+    if (_client == null) throw const AdminUnavailableException();
+    final response = await _client!.functions.invoke(
+      'x-ingest-pull',
+      body: {
+        'force': force,
+        'skipBacklog': skipBacklog,
+        if (accountId != null && accountId.isNotEmpty) 'accountId': accountId,
+      },
+    );
+    final data = response.data;
+    if (data is! Map) throw const AdminUnavailableException();
+    final map = Map<String, dynamic>.from(data);
+    final error = map['error']?.toString();
+    if (error != null && error.isNotEmpty) {
+      throw XIngestException(error);
+    }
+    return map;
+  }
+
+  Future<void> publishXIngestDraft({
+    required String draftId,
+    required String topicId,
+    required String category,
+    required String body,
+  }) async {
+    if (_client == null) throw const AdminUnavailableException();
+    await _client!.rpc(
+      'x_ingest_publish_draft',
+      params: {
+        'p_draft_id': draftId,
+        'p_topic_id': topicId,
+        'p_category': category,
+        'p_body': body,
+      },
+    );
+  }
+
+  Future<void> discardXIngestDraft(String draftId) async {
+    if (_client == null) throw const AdminUnavailableException();
+    await _client!.rpc(
+      'x_ingest_discard_draft',
+      params: {'p_draft_id': draftId},
+    );
+  }
+
   Future<List<ForumTopic>> fetchPendingTopics() async {
     if (_client == null) return [];
 
@@ -1338,6 +1476,179 @@ class SignupPulse {
       days: days,
     );
   }
+}
+
+class XIngestSettings {
+  const XIngestSettings({
+    required this.enabled,
+    required this.intervalMinutes,
+    required this.maxPostsPerAccount,
+    this.lastRunAt,
+    this.lastRunStatus,
+    this.lastRunError,
+    this.lastRunNewPosts = 0,
+    this.lastRunAccounts = 0,
+    this.lastRunForced = false,
+  });
+
+  final bool enabled;
+  final int intervalMinutes;
+  final int maxPostsPerAccount;
+  final DateTime? lastRunAt;
+  final String? lastRunStatus;
+  final String? lastRunError;
+  final int lastRunNewPosts;
+  final int lastRunAccounts;
+  final bool lastRunForced;
+
+  factory XIngestSettings.fromJson(Map<String, dynamic> json) {
+    return XIngestSettings(
+      enabled: json['enabled'] == true,
+      intervalMinutes: (json['interval_minutes'] as num?)?.toInt() ?? 60,
+      maxPostsPerAccount:
+          (json['max_posts_per_account'] as num?)?.toInt() ?? 8,
+      lastRunAt: DateTime.tryParse(json['last_run_at']?.toString() ?? ''),
+      lastRunStatus: json['last_run_status']?.toString(),
+      lastRunError: json['last_run_error']?.toString(),
+      lastRunNewPosts: (json['last_run_new_posts'] as num?)?.toInt() ?? 0,
+      lastRunAccounts: (json['last_run_accounts'] as num?)?.toInt() ?? 0,
+      lastRunForced: json['last_run_forced'] == true,
+    );
+  }
+}
+
+class XIngestAccount {
+  const XIngestAccount({
+    required this.id,
+    required this.topicId,
+    required this.handle,
+    required this.ingestEnabled,
+    this.xUserId,
+    this.sinceId,
+    this.lastError,
+    this.lastPulledAt,
+    this.lastCapped = false,
+    this.topicTitle,
+  });
+
+  final String id;
+  final String topicId;
+  final String handle;
+  final bool ingestEnabled;
+  final String? xUserId;
+  final String? sinceId;
+  final String? lastError;
+  final DateTime? lastPulledAt;
+  final bool lastCapped;
+  final String? topicTitle;
+
+  String get handleLabel => '@$handle';
+
+  factory XIngestAccount.fromJson(Map<String, dynamic> json) {
+    final topic = json['forum_topics'];
+    String? title;
+    if (topic is Map) {
+      title = topic['title']?.toString();
+    }
+    return XIngestAccount(
+      id: json['id'] as String,
+      topicId: json['topic_id'] as String,
+      handle: json['handle'] as String,
+      ingestEnabled: json['ingest_enabled'] != false,
+      xUserId: json['x_user_id']?.toString(),
+      sinceId: json['since_id']?.toString(),
+      lastError: json['last_error']?.toString(),
+      lastPulledAt: DateTime.tryParse(json['last_pulled_at']?.toString() ?? ''),
+      lastCapped: json['last_capped'] == true,
+      topicTitle: title,
+    );
+  }
+}
+
+class XIngestDraft {
+  const XIngestDraft({
+    required this.id,
+    required this.accountId,
+    required this.topicId,
+    required this.handle,
+    required this.xPostId,
+    required this.body,
+    required this.status,
+    required this.suggestedCategory,
+    this.sourceUrl,
+    this.media = const [],
+    this.postedAt,
+    this.topicTitle,
+  });
+
+  final String id;
+  final String accountId;
+  final String topicId;
+  final String handle;
+  final String xPostId;
+  final String body;
+  final String status;
+  final String suggestedCategory;
+  final String? sourceUrl;
+  final List<Map<String, dynamic>> media;
+  final DateTime? postedAt;
+  final String? topicTitle;
+
+  String? get imageUrl {
+    for (final item in media) {
+      final type = item['type']?.toString();
+      final url = item['url']?.toString();
+      if ((type == 'photo' || type == 'image') &&
+          url != null &&
+          url.isNotEmpty) {
+        return url;
+      }
+    }
+    for (final item in media) {
+      final preview = item['previewUrl']?.toString() ?? item['url']?.toString();
+      if (preview != null && preview.isNotEmpty) return preview;
+    }
+    return null;
+  }
+
+  factory XIngestDraft.fromJson(Map<String, dynamic> json) {
+    final topic = json['forum_topics'];
+    String? title;
+    if (topic is Map) {
+      title = topic['title']?.toString();
+    }
+    final rawMedia = json['media'];
+    final media = <Map<String, dynamic>>[];
+    if (rawMedia is List) {
+      for (final item in rawMedia) {
+        if (item is Map) {
+          media.add(Map<String, dynamic>.from(item));
+        }
+      }
+    }
+    return XIngestDraft(
+      id: json['id'] as String,
+      accountId: json['account_id'] as String,
+      topicId: json['topic_id'] as String,
+      handle: json['handle'] as String,
+      xPostId: json['x_post_id'] as String,
+      body: json['body'] as String? ?? '',
+      status: json['status'] as String? ?? 'pending',
+      suggestedCategory: json['suggested_category'] as String? ?? 'noticia',
+      sourceUrl: json['source_url']?.toString(),
+      media: media,
+      postedAt: DateTime.tryParse(json['posted_at']?.toString() ?? ''),
+      topicTitle: title,
+    );
+  }
+}
+
+class XIngestException implements Exception {
+  const XIngestException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 class AdminUnavailableException implements Exception {
