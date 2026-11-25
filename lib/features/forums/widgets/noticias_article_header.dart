@@ -321,6 +321,8 @@ class _NoticiasArticleBody extends StatelessWidget {
         children.add(
           ForumPostContent(
             text: switch (block.kind) {
+              ForumMarkdownBlockKind.heading =>
+                '${'#' * block.level.clamp(1, 3)} ${block.lines.first}',
               ForumMarkdownBlockKind.paragraph => block.lines.first,
               ForumMarkdownBlockKind.bulletList => [
                   for (final line in block.lines) '- $line',
