@@ -13,7 +13,7 @@ No hace falta saberlo todo de golpe. Sigue el orden: **Android → iOS**.
 | Nombre en tienda / launcher | **Círculo Cofrade** |
 | Package / Bundle ID | `com.cofradeo.cofradeo` |
 | Versión actual (`pubspec.yaml`) | `1.0.0+1` → nombre `1.0.0`, build `1` |
-| Deep link OAuth | `cofradeo://login-callback` |
+| Deep link OAuth | `cofradeo://oauth-callback` (Google) · `cofradeo://login-callback` (email) |
 | Supabase / Firebase | vía `--dart-define-from-file=env.json` |
 
 **Importante:** hoy el release de Android firma con la clave **debug** (`android/app/build.gradle.kts`). Eso vale para probar en tu móvil; **no** sirve para Play Store. Hay que crear un keystore de producción (paso Android §3).

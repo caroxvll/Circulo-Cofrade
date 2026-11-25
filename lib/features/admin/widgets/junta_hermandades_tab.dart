@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../permissions/data/permissions_repository.dart';
 import '../../permissions/permissions_provider.dart';
+import '../../calendar/calendar_provider.dart';
 import '../../profile/hermandad_following_provider.dart';
 import '../admin_provider.dart';
 import '../junta_ui.dart';
@@ -33,6 +34,7 @@ class _JuntaHermandadesTabState extends ConsumerState<JuntaHermandadesTab> {
   var _assigning = false;
   var _autoPassword = true;
   var _savingFollowing = false;
+  var _savingBoardLink = false;
 
   @override
   void dispose() {
@@ -219,6 +221,21 @@ class _JuntaHermandadesTabState extends ConsumerState<JuntaHermandadesTab> {
     );
   }
 
+  Future<void> _setCalendarBoardLink(bool enabled) async {
+    setState(() => _savingBoardLink = true);
+    try {
+      await ref.read(adminRepositoryProvider).setAppConfig(
+            calendarShowBoardLinkConfigKey,
+            enabled ? 'on' : 'off',
+          );
+      ref.invalidate(calendarShowBoardLinkProvider);
+    } catch (_) {
+      _snack('No se pudo guardar. Revisa que app_config exista.');
+    } finally {
+      if (mounted) setState(() => _savingBoardLink = false);
+    }
+  }
+
   Future<void> _setHermandadFollowing(bool enabled) async {
     setState(() => _savingFollowing = true);
     try {
@@ -298,6 +315,8 @@ class _JuntaHermandadesTabState extends ConsumerState<JuntaHermandadesTab> {
     final assignmentsAsync = ref.watch(hermandadAssignmentsProvider);
     final followingAsync = ref.watch(hermandadFollowingEnabledProvider);
     final followingEnabled = followingAsync.asData?.value ?? false;
+    final boardLinkAsync = ref.watch(calendarShowBoardLinkProvider);
+    final boardLinkOn = boardLinkAsync.asData?.value ?? false;
 
     return ListView(
       padding: JuntaUi.listPadding,
@@ -326,6 +345,32 @@ class _JuntaHermandadesTabState extends ConsumerState<JuntaHermandadesTab> {
           onChanged: _savingFollowing || followingAsync.isLoading
               ? null
               : _setHermandadFollowing,
+        ),
+        const SizedBox(height: 18),
+        const JuntaSectionHeader(
+          title: 'Ver tablón en el calendario',
+          subtitle:
+              'Al abrir un evento, el botón que lleva al tablón de la hermandad. '
+              'Apágalo mientras los tablones no estén listos.',
+        ),
+        const SizedBox(height: 4),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            boardLinkOn ? 'Visible en el evento' : 'Oculto',
+            style: JuntaUi.body(color: AppColors.textPrimary),
+          ),
+          subtitle: Text(
+            boardLinkOn
+                ? 'La gente ve «Ver tablón» y puede entrar al tablón.'
+                : 'El evento no enseña el enlace al tablón.',
+            style: JuntaUi.body(color: AppColors.textMuted),
+          ),
+          value: boardLinkOn,
+          activeThumbColor: AppColors.burgundy,
+          onChanged: _savingBoardLink || boardLinkAsync.isLoading
+              ? null
+              : _setCalendarBoardLink,
         ),
         const SizedBox(height: 18),
         const JuntaSectionHeader(

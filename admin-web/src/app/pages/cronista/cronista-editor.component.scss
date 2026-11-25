@@ -57,6 +57,25 @@ textarea {
   color: var(--text);
 }
 
+.format-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.format-bar button {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--border));
+  background: #f7f1e6;
+  color: var(--burgundy);
+  border-radius: 999px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
 .page-body {
   font-family: 'EB Garamond', var(--font-serif);
   font-size: 1.15rem;

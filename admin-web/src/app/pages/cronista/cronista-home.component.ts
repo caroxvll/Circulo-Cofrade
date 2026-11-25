@@ -3,9 +3,11 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import {
   HISTORIA_KIND_OPTIONS,
+  HistoriaCommentRow,
   HistoriaRow,
   HistoriasService,
 } from '../../core/historias/historias.service';
+import { formatTimeAgo } from '../../core/utils/date';
 
 @Component({
   selector: 'app-cronista-home-page',
@@ -20,8 +22,10 @@ export class CronistaHomePageComponent implements OnInit {
 
   readonly items = signal<HistoriaRow[]>([]);
   readonly pending = signal<HistoriaRow[]>([]);
+  readonly comments = signal<HistoriaCommentRow[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly timeAgo = formatTimeAgo;
   readonly kinds = HISTORIA_KIND_OPTIONS;
   readonly isAdmin = this.auth.isAdmin;
   readonly kindLabel = (kind: HistoriaRow['kind']) => this.historias.kindLabel(kind);
@@ -30,6 +34,11 @@ export class CronistaHomePageComponent implements OnInit {
 
   ngOnInit(): void {
     void this.reload();
+  }
+
+  handleLabel(handle: string): string {
+    const clean = handle.replace(/^@+/, '').trim();
+    return clean ? `@${clean}` : '';
   }
 
   authorLine(item: HistoriaRow): string {
@@ -50,8 +59,14 @@ export class CronistaHomePageComponent implements OnInit {
         } catch {
           this.pending.set([]);
         }
+        try {
+          this.comments.set(await this.historias.fetchRecentComments());
+        } catch {
+          this.comments.set([]);
+        }
       } else {
         this.pending.set([]);
+        this.comments.set([]);
       }
     } catch (err) {
       this.error.set(
@@ -70,6 +85,21 @@ export class CronistaHomePageComponent implements OnInit {
       await this.reload();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo aprobar.');
+    }
+  }
+
+  async deleteComment(comment: HistoriaCommentRow): Promise<void> {
+    const ok = window.confirm(
+      `¿Eliminar el comentario de ${comment.userDisplayName} en «${comment.historiaTitle}»?`,
+    );
+    if (!ok) return;
+    try {
+      await this.historias.deleteComment(comment.id);
+      this.comments.set(this.comments().filter((item) => item.id !== comment.id));
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo eliminar el comentario.',
+      );
     }
   }
 

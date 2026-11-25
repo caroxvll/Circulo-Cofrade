@@ -238,6 +238,22 @@ final signupPulseProvider = FutureProvider<SignupPulse?>((ref) async {
   return ref.watch(adminRepositoryProvider).fetchSignupPulse();
 });
 
+final xIngestSettingsProvider = FutureProvider<XIngestSettings?>((ref) async {
+  if (!ref.watch(isAdminProvider)) return null;
+  return ref.watch(adminRepositoryProvider).fetchXIngestSettings();
+});
+
+final xIngestAccountsProvider =
+    FutureProvider<List<XIngestAccount>>((ref) async {
+  if (!ref.watch(isAdminProvider)) return [];
+  return ref.watch(adminRepositoryProvider).fetchXIngestAccounts();
+});
+
+final xIngestDraftsProvider = FutureProvider<List<XIngestDraft>>((ref) async {
+  if (!ref.watch(isAdminProvider)) return [];
+  return ref.watch(adminRepositoryProvider).fetchXIngestDrafts();
+});
+
 class JuntaSelectedModule extends Notifier<JuntaModule> {
   @override
   JuntaModule build() => JuntaModule.overview;

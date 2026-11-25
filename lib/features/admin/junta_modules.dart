@@ -13,6 +13,7 @@ enum JuntaModule {
   moderators,
   hermandades,
   seasonActs,
+  xIngest,
   forums,
   historias,
   season,
@@ -32,6 +33,7 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.moderators => 'Moderadores',
     JuntaModule.hermandades => 'Hermandades',
     JuntaModule.seasonActs => 'Actos de temporada',
+    JuntaModule.xIngest => 'Redes X',
     JuntaModule.forums => 'Foros y apariencia',
     JuntaModule.historias => 'El Cronicón',
     JuntaModule.season => 'Temporada',
@@ -50,6 +52,7 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.moderators => 'Moderadores',
     JuntaModule.hermandades => 'Hermandades',
     JuntaModule.seasonActs => 'Actos',
+    JuntaModule.xIngest => 'Redes X',
     JuntaModule.forums => 'Foros',
     JuntaModule.historias => 'El Cronicón',
     JuntaModule.season => 'Temporada',
@@ -68,6 +71,7 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.moderators => Icons.admin_panel_settings_outlined,
     JuntaModule.hermandades => Icons.church_outlined,
     JuntaModule.seasonActs => Icons.timeline_outlined,
+    JuntaModule.xIngest => Icons.rss_feed_outlined,
     JuntaModule.forums => Icons.forum_outlined,
     JuntaModule.historias => Icons.auto_stories_outlined,
     JuntaModule.season => Icons.calendar_month_outlined,
@@ -87,6 +91,7 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.moderators ||
     JuntaModule.hermandades ||
     JuntaModule.seasonActs ||
+    JuntaModule.xIngest ||
     JuntaModule.forums ||
     JuntaModule.historias =>
       JuntaNavSection.community,
@@ -99,6 +104,7 @@ extension JuntaModuleMeta on JuntaModule {
     JuntaModule.moderators ||
     JuntaModule.hermandades ||
     JuntaModule.seasonActs ||
+    JuntaModule.xIngest ||
     JuntaModule.forums ||
     JuntaModule.historias ||
     JuntaModule.season ||

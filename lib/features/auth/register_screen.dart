@@ -55,11 +55,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     try {
       await action();
       if (!mounted) return;
-      // En móvil el OAuth termina en el navegador; la app navega al volver
-      // (deep link) vía authStateChanges en app.dart.
-      if (!kIsWeb) {
-        setState(() => _loading = false);
-      }
+      // En móvil el login termina al cerrar la sesión de Google; la app
+      // navega vía authStateChanges en app.dart.
+    } on GoogleSignInCancelled {
+      // Cerró el selector de Google.
     } on AuthException catch (e) {
       setState(() => _error = friendlyAuthErrorMessage(e));
     } on AuthUnavailableException catch (e) {
@@ -67,7 +66,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     } catch (_) {
       setState(() => _error = 'No se pudo abrir Google. Inténtalo de nuevo.');
     } finally {
-      if (mounted && kIsWeb) setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 

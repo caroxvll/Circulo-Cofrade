@@ -1,0 +1,449 @@
+<section class="queue-page x-ingest-page">
+  <header>
+    <div>
+      <p class="eyebrow">Comunidad · solo admin</p>
+      <h1>Redes X</h1>
+      <p class="lead">
+        Pulmón de las hermandades: leemos sus posts públicos, llegan como
+        borrador y tú publicas. El cron se puede apagar; Lanzar ahora corre
+        cuando quieras.
+      </p>
+    </div>
+    <div class="queue-toolbar">
+      <button type="button" class="btn btn-soft" (click)="reload()" [disabled]="loading() || saving()">
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-box">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="state-box">Cargando Redes X…</div>
+  } @else {
+    @if (settings(); as job) {
+      <article class="job-card" [class.on]="job.enabled">
+        <div class="job-copy">
+          <p class="panel-label">Job</p>
+          <h2>{{ job.enabled ? 'Encendido' : 'En pausa' }}</h2>
+          <p>
+            {{
+              job.enabled
+                ? 'Pregunta solo posts nuevos cada ' + intervalLabel(job.intervalMinutes) + '.'
+                : 'El cron no corre. Sigue pudiendo lanzarlo a mano.'
+            }}
+          </p>
+          <p class="hint">{{ lastRunLabel(job) }}</p>
+          @if (job.lastRunError) {
+            <p class="warn">{{ friendlyError(job.lastRunError) }}</p>
+          }
+        </div>
+        <div class="job-controls">
+          <label class="switch">
+            <input
+              type="checkbox"
+              [checked]="job.enabled"
+              (change)="setEnabled(($any($event.target)).checked)"
+              [disabled]="saving()"
+            />
+            <span>Cron automático</span>
+          </label>
+          <label>
+            Intervalo
+            <select
+              [ngModel]="job.intervalMinutes"
+              (ngModelChange)="setInterval(+$event)"
+              [disabled]="saving()"
+            >
+              @for (minutes of intervals; track minutes) {
+                <option [ngValue]="minutes">{{ intervalLabel(minutes) }}</option>
+              }
+            </select>
+          </label>
+          <div class="actions">
+            <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="run()">
+              Lanzar ahora
+            </button>
+            <button
+              type="button"
+              class="btn btn-soft"
+              [disabled]="saving()"
+              (click)="run({ skipBacklog: true })"
+            >
+              Al día (sin importar)
+            </button>
+          </div>
+        </div>
+      </article>
+    }
+
+    <div class="summary">
+      <span class="chip ok">{{ activeCount() }} activas</span>
+      <span class="chip warn">{{ pausedCount() }} pausadas</span>
+      <span class="chip muted">{{ missingCount() }} sin X</span>
+      <button type="button" class="chip burgundy" (click)="scrollToDrafts()">
+        {{ drafts().length }} borradores
+      </button>
+    </div>
+
+    <section class="inbox-block" id="borradores">
+      <header class="day-head">
+        <div>
+          <p class="panel-label">Bandeja</p>
+          <h2>Borradores</h2>
+        </div>
+        <span>{{ drafts().length }} pendientes</span>
+      </header>
+
+      @if (drafts().length === 0) {
+        <p class="empty-inline">
+          Cola vacía. Cuando el job traiga posts, saldrán aquí agrupados por hermandad.
+        </p>
+      } @else {
+        <div class="inbox-toolbar">
+          <label class="inline-search">
+            <input
+              [ngModel]="draftQuery()"
+              (ngModelChange)="draftQuery.set($event)"
+              placeholder="Buscar hermandad, handle o texto…"
+              type="search"
+              autocomplete="off"
+            />
+          </label>
+          <div class="day-filter" role="tablist" aria-label="Filtrar borradores por día">
+            <button
+              type="button"
+              class="day-chip"
+              [class.on]="draftDayFilter() === null"
+              (click)="setDraftDayFilter(null)"
+            >
+              Todos
+              <span class="n">{{ drafts().length }}</span>
+            </button>
+            @for (day of draftDays(); track day) {
+              <button
+                type="button"
+                class="day-chip"
+                [class.on]="draftDayFilter() === day"
+                [title]="day"
+                (click)="setDraftDayFilter(draftDayFilter() === day ? null : day)"
+              >
+                {{ shortDayLabel(day) }}
+              </button>
+            }
+          </div>
+          @if (draftTopicFilter()) {
+            <p class="filter-hint">
+              Solo <strong>{{ draftFilterName() ?? 'una hermandad' }}</strong>
+              <button type="button" class="btn btn-ghost linkish" (click)="setDraftTopicFilter(null)">
+                Ver todas
+              </button>
+            </p>
+          }
+        </div>
+
+        @if (!filteredDrafts().length) {
+          <div class="empty-box">Ningún borrador coincide con ese filtro.</div>
+        } @else {
+          <div class="inbox">
+            <div class="inbox-list">
+              <p class="inbox-count">
+                {{ filteredDrafts().length }} post{{ filteredDrafts().length === 1 ? '' : 's' }}
+                · {{ draftGroups().length }} hermandad{{ draftGroups().length === 1 ? '' : 'es' }}
+              </p>
+              <div class="inbox-scroll">
+                @for (group of draftGroups(); track group.topicId) {
+                  <section class="inbox-group">
+                    <header class="inbox-group-head">
+                      <button type="button" class="inbox-group-toggle" (click)="toggleGroup(group.topicId)">
+                        <span class="caret" [class.open]="!isGroupCollapsed(group.topicId)" aria-hidden="true"></span>
+                        <span class="inbox-group-name">{{ group.name }}</span>
+                        <span class="handle">{{ '@' + group.handle }}</span>
+                        @if (group.day) {
+                          <small>{{ shortDayLabel(group.day) }}</small>
+                        }
+                        <span class="n">{{ group.drafts.length }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-ghost inbox-discard"
+                        [disabled]="saving()"
+                        (click)="discardGroup(group)"
+                      >
+                        Descartar lote
+                      </button>
+                    </header>
+                    @if (!isGroupCollapsed(group.topicId)) {
+                      <ul class="inbox-rows">
+                        @for (draft of group.drafts; track draft.id) {
+                          <li>
+                            <button
+                              type="button"
+                              class="inbox-row"
+                              [class.on]="isSelected(draft)"
+                              (click)="selectDraft(draft)"
+                            >
+                              @if (draft.imageUrl) {
+                                <img [src]="draft.imageUrl" alt="" />
+                              } @else {
+                                <span class="thumb-empty" aria-hidden="true"></span>
+                              }
+                              <span class="inbox-row-copy">
+                                <span class="inbox-row-meta">
+                                  <strong>{{ categoryLabel(draft.suggestedCategory) }}</strong>
+                                  @if (draft.postedAt) {
+                                    <small>{{ timeAgo(draft.postedAt) }}</small>
+                                  }
+                                </span>
+                                <em>{{ excerpt(draft.body) }}</em>
+                              </span>
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </section>
+                }
+              </div>
+            </div>
+
+            <aside class="review">
+              @if (selectedDraft(); as draft) {
+                <p class="panel-label">Revisar</p>
+                <h3>{{ draft.hermandadName }}</h3>
+                <p class="handle">
+                  {{ '@' + draft.handle }}
+                  @if (draft.postedAt) {
+                    · {{ timeAgo(draft.postedAt) }}
+                  }
+                </p>
+                @if (draft.imageUrl) {
+                  <img class="review-media" [src]="draft.imageUrl" alt="" />
+                }
+                <textarea
+                  rows="8"
+                  [ngModel]="draft.body"
+                  (ngModelChange)="draft.body = $event"
+                  [disabled]="saving()"
+                ></textarea>
+                <div class="draft-meta">
+                  <label>
+                    Sección
+                    <select
+                      [ngModel]="draft.suggestedCategory"
+                      (ngModelChange)="draft.suggestedCategory = $event"
+                      [disabled]="saving()"
+                    >
+                      @for (cat of categories; track cat.value) {
+                        <option [ngValue]="cat.value">{{ cat.label }}</option>
+                      }
+                    </select>
+                  </label>
+                  <label>
+                    Hermandad
+                    <select
+                      [ngModel]="draft.topicId"
+                      (ngModelChange)="draft.topicId = $event"
+                      [disabled]="saving()"
+                    >
+                      @for (board of boards(); track board.id) {
+                        <option [ngValue]="board.id">{{ board.hermandadName }}</option>
+                      }
+                    </select>
+                  </label>
+                </div>
+                <div class="actions review-actions">
+                  @if (draft.sourceUrl) {
+                    <a class="btn btn-ghost" [href]="draft.sourceUrl" target="_blank" rel="noreferrer">
+                      Ver en X
+                    </a>
+                  }
+                  <button type="button" class="btn btn-danger" [disabled]="saving()" (click)="discard(draft)">
+                    Descartar
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-primary"
+                    [disabled]="saving()"
+                    (click)="publish(draft, draft.body, draft.suggestedCategory, draft.topicId)"
+                  >
+                    Publicar
+                  </button>
+                </div>
+              }
+            </aside>
+          </div>
+        }
+      }
+    </section>
+
+    <header class="day-head directory-head">
+      <div>
+        <p class="panel-label">Directorio</p>
+        <h2>Cuentas por día</h2>
+      </div>
+      <span>{{ rows().length }} hermandades</span>
+    </header>
+
+    <div class="toolbar">
+      <label class="inline-search">
+        <input
+          [ngModel]="query()"
+          (ngModelChange)="query.set($event)"
+          placeholder="Buscar hermandad o handle…"
+          type="search"
+          autocomplete="off"
+        />
+      </label>
+    </div>
+
+    <div class="day-filter" role="tablist" aria-label="Filtrar por día">
+      <button
+        type="button"
+        class="day-chip"
+        [class.on]="dayFilter() === null"
+        (click)="setDayFilter(null)"
+      >
+        Todos
+        <span class="n">{{ rows().length }}</span>
+      </button>
+      @for (day of stationDays; track day) {
+        <button
+          type="button"
+          class="day-chip"
+          [class.on]="dayFilter() === day"
+          [title]="day"
+          (click)="setDayFilter(dayFilter() === day ? null : day)"
+        >
+          {{ shortDayLabel(day) }}
+          @if (countForDay(day) > 0) {
+            <span class="n">{{ countForDay(day) }}</span>
+          }
+          @if (activeForDay(day) > 0) {
+            <i class="dot-ok" aria-hidden="true"></i>
+          }
+        </button>
+      }
+    </div>
+
+    @if (dayFilter(); as activeDay) {
+      <p class="filter-hint">
+        Mostrando <strong>{{ activeDay }}</strong>
+        · {{ filteredRows().length }}
+        hermandad{{ filteredRows().length === 1 ? '' : 'es' }}
+        <button type="button" class="btn btn-ghost linkish" (click)="setDayFilter(null)">
+          Quitar filtro
+        </button>
+      </p>
+    }
+
+    @if (!filteredRows().length) {
+      <div class="empty-box">Ninguna hermandad coincide con ese filtro.</div>
+    } @else {
+      @for (group of groups(); track group.day) {
+        <section class="day-block">
+          <header class="day-head">
+            <h2>{{ group.day }}</h2>
+            <span>{{ group.items.length }}</span>
+          </header>
+          <div class="board-grid">
+            @for (row of group.items; track row.board.id) {
+              <article class="board-card" [attr.data-status]="statusOf(row)">
+                <header>
+                  @if (row.board.iconImageUrl) {
+                    <img class="shield" [src]="row.board.iconImageUrl" alt="" />
+                  }
+                  <div class="board-copy">
+                    <h3>{{ row.board.hermandadName }}</h3>
+                    @if (row.account) {
+                      <p class="handle">{{ '@' + row.account.handle }}</p>
+                    } @else {
+                      <p class="handle muted">Sin cuenta de X</p>
+                    }
+                    @if (draftCountFor(row.board.id); as pending) {
+                      <button type="button" class="draft-pill" (click)="openInboxFor(row.board.id)">
+                        {{ pending }} pendiente{{ pending === 1 ? '' : 's' }}
+                      </button>
+                    }
+                  </div>
+                  <span class="status" [attr.data-status]="statusOf(row)">
+                    @if (statusOf(row) === 'active') {
+                      <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <path
+                          d="M5 10.5 8.2 14 15 6.5"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2.2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    }
+                    {{ statusLabel(row) }}
+                  </span>
+                </header>
+
+                @if (row.account; as account) {
+                  @if (account.lastError) {
+                    <p class="card-warn">{{ friendlyError(account.lastError) }}</p>
+                  }
+                  @if (account.lastCapped) {
+                    <p class="card-warn">Última pasada recortada: hay más posts de los importados.</p>
+                  }
+                  <div class="card-actions">
+                    <label class="switch compact">
+                      <input
+                        type="checkbox"
+                        [checked]="account.ingestEnabled"
+                        (change)="toggleAccount(account, ($any($event.target)).checked)"
+                        [disabled]="saving()"
+                      />
+                      <span>{{ account.ingestEnabled ? 'Activa' : 'Pausada' }}</span>
+                    </label>
+                    <button
+                      type="button"
+                      class="btn btn-ghost"
+                      [disabled]="saving()"
+                      (click)="run({ skipBacklog: true, accountId: account.id })"
+                    >
+                      Al día
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      [disabled]="saving()"
+                      (click)="removeAccount(account)"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                } @else {
+                  <div class="link-row">
+                    <input
+                      [ngModel]="handles[row.board.id] || ''"
+                      (ngModelChange)="handles[row.board.id] = $event"
+                      [placeholder]="'@macarena'"
+                      autocomplete="off"
+                      [disabled]="saving()"
+                    />
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      [disabled]="saving() || !(handles[row.board.id] || '').trim()"
+                      (click)="addAccount(row.board.id)"
+                    >
+                      Enlazar
+                    </button>
+                  </div>
+                }
+              </article>
+            }
+          </div>
+        </section>
+      }
+    }
+
+  }
+</section>

@@ -209,7 +209,7 @@ class _MentionRichTextState extends ConsumerState<MentionRichText> {
     if (plain.isEmpty) return [];
 
     final spans = <InlineSpan>[];
-    final stylePattern = RegExp(r'\*\*(.+?)\*\*|_(.+?)_');
+    final stylePattern = RegExp(r'\*\*(.+?)\*\*|_(.+?)_|\*(.+?)\*');
     var last = 0;
 
     for (final match in stylePattern.allMatches(plain)) {
@@ -224,9 +224,9 @@ class _MentionRichTextState extends ConsumerState<MentionRichText> {
           text: match.group(1)!,
           style: _boldStyle(base),
         ));
-      } else if (match.group(2) != null) {
+      } else if (match.group(2) != null || match.group(3) != null) {
         spans.add(TextSpan(
-          text: match.group(2)!,
+          text: match.group(2) ?? match.group(3)!,
           style: _italicStyle(base),
         ));
       }
