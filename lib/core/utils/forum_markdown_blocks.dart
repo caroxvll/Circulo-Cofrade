@@ -1,11 +1,20 @@
 /// Bloques estructurados de Markdown generados por el editor Quill.
-enum ForumMarkdownBlockKind { paragraph, bulletList, orderedList, blockquote }
+enum ForumMarkdownBlockKind {
+  paragraph,
+  heading,
+  bulletList,
+  orderedList,
+  blockquote,
+}
 
 class ForumMarkdownBlock {
-  const ForumMarkdownBlock._(this.kind, this.lines);
+  const ForumMarkdownBlock._(this.kind, this.lines, {this.level = 1});
 
   ForumMarkdownBlock.paragraph(String text)
       : this._(ForumMarkdownBlockKind.paragraph, [text]);
+
+  ForumMarkdownBlock.heading(String text, {int level = 2})
+      : this._(ForumMarkdownBlockKind.heading, [text], level: level);
 
   ForumMarkdownBlock.bulletList(List<String> items)
       : this._(ForumMarkdownBlockKind.bulletList, items);
@@ -18,18 +27,21 @@ class ForumMarkdownBlock {
 
   final ForumMarkdownBlockKind kind;
   final List<String> lines;
+  final int level;
 }
 
 final _bulletLine = RegExp(r'^(\s*)([-*+])\s+(.*)$');
 final _orderedLine = RegExp(r'^\s*(\d+)\.\s+(.*)$');
 final _quoteLine = RegExp(r'^>\s?(.*)$');
+final _headingLine = RegExp(r'^(#{1,3})\s+(.*)$');
 
 bool _isStructuredLine(String line) {
   final trimmed = line.trim();
   if (trimmed.isEmpty) return false;
   return _bulletLine.hasMatch(line) ||
       _orderedLine.hasMatch(line) ||
-      _quoteLine.hasMatch(line);
+      _quoteLine.hasMatch(line) ||
+      _headingLine.hasMatch(trimmed);
 }
 
 /// Divide el Markdown en párrafos, listas y citas para lectura editorial.
@@ -75,6 +87,17 @@ List<ForumMarkdownBlock> parseForumMarkdownBlocks(String raw) {
       if (items.isNotEmpty) {
         blocks.add(ForumMarkdownBlock.orderedList(items));
       }
+      continue;
+    }
+
+    final heading = _headingLine.firstMatch(line.trim());
+    if (heading != null) {
+      final level = heading.group(1)!.length;
+      final title = heading.group(2)!.trim();
+      if (title.isNotEmpty) {
+        blocks.add(ForumMarkdownBlock.heading(title, level: level));
+      }
+      index++;
       continue;
     }
 

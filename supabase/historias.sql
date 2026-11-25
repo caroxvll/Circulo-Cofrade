@@ -186,13 +186,12 @@ create policy "Cofrade comenta historia"
 
 drop policy if exists "Autor o Junta borra comentario de historia"
   on public.historia_comments;
-create policy "Autor o Junta borra comentario de historia"
+drop policy if exists "Solo admin borra comentario de historia"
+  on public.historia_comments;
+create policy "Solo admin borra comentario de historia"
   on public.historia_comments for delete
   to authenticated
-  using (
-    user_id = auth.uid()
-    or public.is_junta_member(auth.uid())
-  );
+  using (public.is_admin_user(auth.uid()));
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (

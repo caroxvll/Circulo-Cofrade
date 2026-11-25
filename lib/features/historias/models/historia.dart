@@ -153,6 +153,7 @@ class HistoriaComment {
     required this.body,
     required this.createdAt,
     this.userAvatarUrl,
+    this.historiaTitle,
   });
 
   final String id;
@@ -163,4 +164,5 @@ class HistoriaComment {
   final String? userAvatarUrl;
   final String body;
   final DateTime createdAt;
+  final String? historiaTitle;
 }

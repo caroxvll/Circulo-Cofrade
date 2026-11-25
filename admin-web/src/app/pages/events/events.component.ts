@@ -39,6 +39,8 @@ export class EventsPageComponent implements OnInit {
   readonly pending = signal<CalendarEventRow[]>([]);
   readonly pendingCount = signal(0);
   readonly loading = signal(true);
+  readonly showBoardLink = signal(false);
+  readonly savingBoardLink = signal(false);
   readonly saving = signal(false);
   readonly uploading = signal(false);
   readonly error = signal<string | null>(null);
@@ -176,7 +178,11 @@ export class EventsPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      await Promise.all([this.reloadCalendar(), this.reloadPending()]);
+      await Promise.all([
+        this.reloadCalendar(),
+        this.reloadPending(),
+        this.reloadBoardLink(),
+      ]);
       await this.moderation.refreshCounts();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo cargar');
@@ -204,6 +210,28 @@ export class EventsPageComponent implements OnInit {
     });
     this.pending.set(rows);
     this.pendingCount.set(rows.length);
+  }
+
+  private async reloadBoardLink(): Promise<void> {
+    try {
+      this.showBoardLink.set(await this.eventsApi.fetchShowBoardLink());
+    } catch {
+      this.showBoardLink.set(false);
+    }
+  }
+
+  async setShowBoardLink(enabled: boolean): Promise<void> {
+    this.savingBoardLink.set(true);
+    try {
+      await this.eventsApi.setShowBoardLink(enabled);
+      this.showBoardLink.set(enabled);
+    } catch (err) {
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo guardar el enlace al tablón',
+      );
+    } finally {
+      this.savingBoardLink.set(false);
+    }
   }
 
   searchCalendar(): void {

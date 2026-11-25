@@ -15,6 +15,7 @@ import '../data/historias_repository.dart';
 import '../historias_provider.dart';
 import '../models/historia.dart';
 import '../utils/historia_page_limits.dart';
+import 'historia_page_editor.dart';
 
 Future<bool> showHistoriaPublishSheet(
   BuildContext context, {
@@ -565,30 +566,16 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
                   ),
               ],
             ),
-            TextField(
+            HistoriaPageEditor(
               controller: _pages[i].body,
               enabled: !_saving,
-              maxLines: 8,
-              minLines: 5,
-              style: AppTypography.bookBody(),
-              decoration: InputDecoration(
-                hintText: 'Escribe esta página…',
-                helperText: _pageWordHelper(_pages[i]),
-                helperMaxLines: 2,
-                filled: true,
-                fillColor: const Color(0xFFF7F1E6),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: AppColors.gold.withValues(alpha: 0.35),
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: AppColors.gold.withValues(alpha: 0.35),
-                  ),
-                ),
+              hintText: 'Escribe esta página. Marca un título, negrita o cursiva.',
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 6, left: 2),
+              child: Text(
+                _pageWordHelper(_pages[i]),
+                style: AppTypography.labelSmall(color: AppColors.textMuted),
               ),
             ),
             const SizedBox(height: 8),

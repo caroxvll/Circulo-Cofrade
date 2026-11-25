@@ -33,6 +33,21 @@
   }
 
   @if (tab() === 'calendar') {
+    <label class="board-link-switch">
+      <input
+        type="checkbox"
+        [checked]="showBoardLink()"
+        [disabled]="savingBoardLink() || loading()"
+        (change)="setShowBoardLink(($any($event.target)).checked)"
+      />
+      <span>
+        <strong>{{ showBoardLink() ? 'Ver tablón visible' : 'Ver tablón oculto' }}</strong>
+        <em>
+          En el detalle del evento. Apágalo mientras los tablones de hermandad
+          no estén listos.
+        </em>
+      </span>
+    </label>
     <div class="filters">
       <input
         type="search"

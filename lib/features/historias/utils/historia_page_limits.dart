@@ -3,9 +3,16 @@ const historiaPageMaxWords = 90;
 const historiaPageMaxWordsWithImage = 40;
 
 int countHistoriaWords(String raw) {
-  final text = raw.trim();
+  var text = raw.trim();
   if (text.isEmpty) return 0;
-  return text.split(RegExp(r'\s+')).length;
+  text = text.replaceAllMapped(
+    RegExp(r'\[([^\]]+)\]\([^)]+\)'),
+    (match) => match.group(1) ?? '',
+  );
+  text = text.replaceAll(RegExp(r'[#*_>`]+'), ' ');
+  text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (text.isEmpty) return 0;
+  return text.split(' ').length;
 }
 
 int historiaPageWordLimit({required bool hasImage}) =>

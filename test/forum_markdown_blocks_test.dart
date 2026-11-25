@@ -14,6 +14,18 @@ void main() {
     expect(blocks[2].lines.single, 'Tercero tras línea en blanco.');
   });
 
+  test('los títulos markdown se leen como encabezado', () {
+    const raw = '## Capítulo\nEl cuerpo del relato.';
+    final blocks = parseForumMarkdownBlocks(raw);
+
+    expect(blocks.map((b) => b.kind).toList(), [
+      ForumMarkdownBlockKind.heading,
+      ForumMarkdownBlockKind.paragraph,
+    ]);
+    expect(blocks[0].lines.single, 'Capítulo');
+    expect(blocks[0].level, 2);
+  });
+
   test('listas y citas siguen agrupadas', () {
     const raw = 'Intro.\n- uno\n- dos\n> cita';
     final blocks = parseForumMarkdownBlocks(raw);

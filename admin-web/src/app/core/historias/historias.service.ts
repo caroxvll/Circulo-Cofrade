@@ -32,6 +32,17 @@ export interface HistoriaPage {
   caption?: string;
 }
 
+export interface HistoriaCommentRow {
+  id: string;
+  historiaId: string;
+  historiaTitle: string;
+  userId: string;
+  userHandle: string;
+  userDisplayName: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface HistoriaRow {
   id: string;
   authorId: string;
@@ -188,6 +199,26 @@ export class HistoriasService {
     if (error) throw error;
   }
 
+  async fetchRecentComments(limit = 80): Promise<HistoriaCommentRow[]> {
+    const { data, error } = await getSupabase()
+      .from('historia_comments')
+      .select(
+        'id, historia_id, user_id, body, created_at, profiles!user_id (handle, display_name), historias!historia_id (title, kind)',
+      )
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []).map((row) => this.mapComment(row as Record<string, unknown>));
+  }
+
+  async deleteComment(id: string): Promise<void> {
+    const { error } = await getSupabase()
+      .from('historia_comments')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  }
+
   async uploadCover(historiaId: string, file: File): Promise<string> {
     return this.uploadImage(historiaId, file, `${historiaId}.`);
   }
@@ -285,6 +316,35 @@ export class HistoriasService {
         typeof profile?.['display_name'] === 'string'
           ? profile['display_name']
           : undefined,
+    };
+  }
+
+  private mapComment(row: Record<string, unknown>): HistoriaCommentRow {
+    const profileRaw = row['profiles'];
+    const profile =
+      profileRaw && typeof profileRaw === 'object'
+        ? (profileRaw as Record<string, unknown>)
+        : null;
+    const historiaRaw = row['historias'];
+    const historia =
+      historiaRaw && typeof historiaRaw === 'object'
+        ? (historiaRaw as Record<string, unknown>)
+        : null;
+    const handle =
+      typeof profile?.['handle'] === 'string' ? profile['handle'] : '';
+    return {
+      id: String(row['id']),
+      historiaId: String(row['historia_id'] ?? ''),
+      historiaTitle:
+        typeof historia?.['title'] === 'string' ? historia['title'] : 'Obra',
+      userId: String(row['user_id'] ?? ''),
+      userHandle: handle,
+      userDisplayName:
+        typeof profile?.['display_name'] === 'string'
+          ? profile['display_name']
+          : handle || 'Cofrade',
+      body: String(row['body'] ?? ''),
+      createdAt: String(row['created_at'] ?? ''),
     };
   }
 
