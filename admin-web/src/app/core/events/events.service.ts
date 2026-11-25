@@ -18,6 +18,8 @@ import {
   seasonActDayLabel,
 } from './events.models';
 
+const CALENDAR_SHOW_BOARD_LINK_KEY = 'calendar_show_board_link';
+
 const EVENT_SELECT =
   'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)';
 
@@ -389,6 +391,25 @@ export class EventsService {
       seasonN: (row['season_n'] as number | null) ?? null,
       withRetranqueo: row['with_retranqueo'] === true,
     };
+  }
+
+  async fetchShowBoardLink(): Promise<boolean> {
+    const { data, error } = await getSupabase()
+      .from('app_config')
+      .select('value')
+      .eq('key', CALENDAR_SHOW_BOARD_LINK_KEY)
+      .maybeSingle();
+    if (error) throw error;
+    return String(data?.['value'] ?? '').trim() === 'on';
+  }
+
+  async setShowBoardLink(enabled: boolean): Promise<void> {
+    const { error } = await getSupabase().from('app_config').upsert({
+      key: CALENDAR_SHOW_BOARD_LINK_KEY,
+      value: enabled ? 'on' : 'off',
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw error;
   }
 }
 

@@ -175,7 +175,7 @@ Con la opción **OFF** (solo dev rápido): no se envía confirmación y el login
 **Authentication → URL Configuration:**
 
 - Site URL: `http://localhost:7357` (Flutter web) o tu dominio
-- Redirect URLs: `cofradeo://login-callback`, `cofradeo://reset-password`, `http://localhost:**`, y la URL de tu app con `/#/verificar-email` (confirmación de email)
+- Redirect URLs: `cofradeo://oauth-callback` (Google), `cofradeo://login-callback`, `cofradeo://reset-password`, `http://localhost:**`, y la URL de tu app con `/#/verificar-email` (confirmación de email)
 
 ### Plantillas de email en español (recomendado)
 
@@ -300,7 +300,7 @@ Comprueba en Table Editor: tabla `follows` (cuenta A) y `notifications` (user_id
 
 ## 7. Deep links móvil
 
-Para Google/Apple en iOS/Android configura el scheme `cofradeo://login-callback`.  
+Para Google en iOS/Android configura el scheme `cofradeo://oauth-callback`. Confirmación de email y recuperación: `cofradeo://login-callback` y `cofradeo://reset-password`. Apple en iPhone usa la hoja nativa, sin navegador.  
 [Docs Supabase + Flutter](https://supabase.com/docs/guides/auth/native-mobile-deep-linking)
 
 ---

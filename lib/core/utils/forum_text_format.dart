@@ -12,6 +12,8 @@ final RegExp _boldInTextPattern = RegExp(r'\*\*(.+?)\*\*');
 
 final RegExp _italicInTextPattern = RegExp(r'_(.+?)_');
 
+final RegExp _asteriskItalicPattern = RegExp(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)');
+
 /// Texto plano para extractos / búsqueda (sin marcadores).
 String plainTextForExcerpt(String raw, {int maxLength = 160}) {
   var text = raw.trim();
@@ -37,6 +39,7 @@ String _stripInlineMarkdown(String text) {
   t = _replaceFirstGroup(markdownLinkPattern, t);
   t = _replaceFirstGroup(_boldInTextPattern, t);
   t = _replaceFirstGroup(_italicInTextPattern, t);
+  t = _replaceFirstGroup(_asteriskItalicPattern, t);
   return t;
 }
 

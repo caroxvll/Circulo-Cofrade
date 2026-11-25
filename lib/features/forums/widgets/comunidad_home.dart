@@ -52,6 +52,7 @@ import '../utils/hermandad_board_display.dart';
 import '../utils/hermandad_local_assets.dart';
 import '../utils/noticias_forum.dart';
 import '../utils/official_post_categories.dart';
+import '../../calendar/calendar_provider.dart';
 import '../../profile/hermandad_following_provider.dart';
 import '../../profile/open_hermandad_picker.dart';
 import '../../search/follows_provider.dart';
@@ -313,9 +314,12 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
     final topics = ref.watch(followedTopicsDetailsProvider);
     final profiles = ref.watch(followedProfilesDetailsProvider);
     final posts = ref.watch(followedPeoplePostsProvider);
-    final hermandades =
-        ref.watch(followedHermandadBoardsProvider).asData?.value ??
-        const <FollowedTopic>[];
+    final boardsPublic =
+        ref.watch(calendarShowBoardLinkProvider).asData?.value == true;
+    final hermandades = boardsPublic
+        ? (ref.watch(followedHermandadBoardsProvider).asData?.value ??
+            const <FollowedTopic>[])
+        : const <FollowedTopic>[];
     final hashtagsAsync = ref.watch(followedHashtagsProvider);
     final hashtags = (hashtagsAsync.asData?.value.toList() ?? <String>[])
       ..sort();
@@ -333,7 +337,19 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
             .toList() ??
         const <HermandadDigest>[];
     final personPosts = posts.asData?.value ?? const <FollowedPersonPost>[];
-    final filter = _followingFilter;
+    final followingFilters = [
+      for (final item in _FollowingFilter.values)
+        if (boardsPublic || !item.isHermandadBoardOnly) item,
+    ];
+    var filter = _followingFilter;
+    if (!followingFilters.contains(filter)) {
+      filter = _FollowingFilter.todo;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !followingFilters.contains(_followingFilter)) {
+          setState(() => _followingFilter = _FollowingFilter.todo);
+        }
+      });
+    }
     final visibleBoards = [
       for (final topic in boards)
         if (_followedTopicMatches(topic, filter)) topic,
@@ -341,13 +357,16 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
     final topicCount = filter == _FollowingFilter.todo
         ? (visibleBoards.length > 3 ? 3 : visibleBoards.length)
         : visibleBoards.length;
-    final visibleDigests = _digestsForFilter(published, filter);
+    final visibleDigests = boardsPublic
+        ? _digestsForFilter(published, filter)
+        : const <HermandadDigest>[];
     final visiblePosts = [
       for (final post in personPosts)
         if (_personPostMatches(post, filter)) post,
     ];
     final activity = _followingActivity(visibleDigests, visiblePosts);
-    final waiting = (digests.isLoading && published.isEmpty) ||
+    final waiting =
+        (boardsPublic && digests.isLoading && published.isEmpty) ||
         (posts.isLoading && personPosts.isEmpty);
     final hasFeed = visibleBoards.isNotEmpty ||
         visibleDigests.isNotEmpty ||
@@ -356,11 +375,13 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
     return [
       SliverToBoxAdapter(
         child: _PillFilterBar(
-          labels: [for (final item in _FollowingFilter.values) item.label],
-          icons: [for (final item in _FollowingFilter.values) item.icon],
-          selectedIndex: filter.index,
+          labels: [for (final item in followingFilters) item.label],
+          icons: [for (final item in followingFilters) item.icon],
+          selectedIndex: followingFilters
+              .indexOf(filter)
+              .clamp(0, followingFilters.length - 1),
           onChanged: (index) => setState(
-            () => _followingFilter = _FollowingFilter.values[index],
+            () => _followingFilter = followingFilters[index],
           ),
         ),
       ),
@@ -664,6 +685,15 @@ extension on _FollowingFilter {
         _FollowingFilter.actos => 'acto',
         _FollowingFilter.patrimonio => 'patrimonio',
         _FollowingFilter.todo || _FollowingFilter.temas => null,
+      };
+
+  /// Solo tienen sentido con tablones de hermandad activos.
+  bool get isHermandadBoardOnly => switch (this) {
+        _FollowingFilter.cultos ||
+        _FollowingFilter.actos ||
+        _FollowingFilter.patrimonio =>
+          true,
+        _ => false,
       };
 
   String get emptyLabel => switch (this) {

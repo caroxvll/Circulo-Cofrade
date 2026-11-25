@@ -364,6 +364,19 @@ class HistoriasRepository {
     await client.from('historia_comments').delete().eq('id', commentId);
   }
 
+  Future<List<HistoriaComment>> fetchRecentComments({int limit = 80}) async {
+    final client = _client;
+    if (client == null) return [];
+    final rows = await client
+        .from('historia_comments')
+        .select(
+          '$_commentSelect, historias!historia_id (title, kind)',
+        )
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return rows.map(_commentFromRow).toList();
+  }
+
   String? get _userId => _client?.auth.currentUser?.id;
 
   Future<int> loadReadingPage(String historiaId) async {
@@ -578,6 +591,8 @@ class HistoriasRepository {
 
   HistoriaComment _commentFromRow(Map<String, dynamic> row) {
     final profile = _embedProfile(row['profiles']);
+    final historiaRaw = row['historias'];
+    final historia = historiaRaw is Map ? historiaRaw : null;
     return HistoriaComment(
       id: row['id'] as String,
       historiaId: row['historia_id'] as String,
@@ -587,6 +602,7 @@ class HistoriasRepository {
       userAvatarUrl: profile.avatarUrl,
       body: row['body'] as String? ?? '',
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+      historiaTitle: historia?['title'] as String?,
     );
   }
 

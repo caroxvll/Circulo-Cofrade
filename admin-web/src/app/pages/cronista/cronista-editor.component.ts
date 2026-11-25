@@ -115,6 +115,39 @@ export class CronistaEditorPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  applyWrap(
+    index: number,
+    area: HTMLTextAreaElement,
+    before: string,
+    after: string,
+  ): void {
+    const start = area.selectionStart;
+    const end = area.selectionEnd;
+    const value = this.pages[index].body;
+    const selected = value.slice(start, end) || 'texto';
+    const next = `${value.slice(0, start)}${before}${selected}${after}${value.slice(end)}`;
+    this.pages[index] = { ...this.pages[index], body: next };
+    queueMicrotask(() => {
+      area.focus();
+      const cursor = start + before.length + selected.length + after.length;
+      area.setSelectionRange(cursor, cursor);
+    });
+  }
+
+  applyHeading(index: number, area: HTMLTextAreaElement): void {
+    const start = area.selectionStart;
+    const value = this.pages[index].body;
+    const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+    const lineEnd = value.indexOf('\n', start);
+    const end = lineEnd === -1 ? value.length : lineEnd;
+    const line = value.slice(lineStart, end);
+    const stripped = line.replace(/^#{1,3}\s+/, '');
+    const nextLine = line.startsWith('#') ? stripped : `## ${stripped || 'Título'}`;
+    const next = `${value.slice(0, lineStart)}${nextLine}${value.slice(end)}`;
+    this.pages[index] = { ...this.pages[index], body: next };
+    queueMicrotask(() => area.focus());
+  }
+
   addPage(): void {
     if (this.pages.length >= 30) return;
     this.pages = [...this.pages, this.emptyPage()];

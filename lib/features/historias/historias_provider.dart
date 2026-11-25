@@ -146,6 +146,12 @@ final historiaCommentsProvider =
   return ref.watch(historiasRepositoryProvider).fetchComments(historiaId);
 });
 
+final staffHistoriaCommentsProvider =
+    FutureProvider<List<HistoriaComment>>((ref) {
+  if (!ref.watch(isJuntaMemberProvider)) return Future.value(const []);
+  return ref.watch(historiasRepositoryProvider).fetchRecentComments();
+});
+
 final canPublishHistoriasProvider = Provider<bool>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) return false;

@@ -78,6 +78,19 @@ class _ForumMarkdownBlockView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (block.kind) {
+      ForumMarkdownBlockKind.heading => MentionRichText(
+          text: block.lines.first,
+          style: baseStyle.copyWith(
+            fontWeight: FontWeight.w700,
+            fontSize: (baseStyle.fontSize ?? 16) *
+                (block.level <= 1 ? 1.38 : block.level == 2 ? 1.22 : 1.1),
+            height: 1.22,
+            color: AppColors.burgundyDark,
+            letterSpacing: 0.1,
+          ),
+          subtleLinks: subtleLinks,
+          textAlign: textAlign,
+        ),
       ForumMarkdownBlockKind.paragraph => MentionRichText(
           text: block.lines.first,
           style: baseStyle,

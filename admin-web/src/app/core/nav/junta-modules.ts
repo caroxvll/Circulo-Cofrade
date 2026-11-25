@@ -13,6 +13,7 @@ export type JuntaModuleId =
   | 'ss-reporters'
   | 'hermandades'
   | 'season-acts'
+  | 'x-ingest'
   | 'forums'
   | 'historias'
   | 'season'
@@ -159,6 +160,15 @@ export const JUNTA_MODULES: JuntaModuleDef[] = [
     label: 'Actos de temporada',
     shortLabel: 'Actos',
     route: '/app/actos-temporada',
+    section: 'community',
+    adminOnly: true,
+    comingSoon: false,
+  },
+  {
+    id: 'x-ingest',
+    label: 'Redes X',
+    shortLabel: 'Redes X',
+    route: '/app/redes-x',
     section: 'community',
     adminOnly: true,
     comingSoon: false,

@@ -69,7 +69,7 @@ final calendarEventSheetOpenProvider =
 );
 
 Future<T> withCalendarEventSheetHidden<T>(
-  Ref ref,
+  WidgetRef ref,
   Future<T> Function() action,
 ) async {
   ref.read(calendarEventSheetOpenProvider.notifier).push();
@@ -132,6 +132,25 @@ final isCalendarEditorProvider = Provider<bool>((ref) {
 
 final isCalendarAdminProvider = Provider<bool>((ref) {
   return ref.watch(isAdminProvider);
+});
+
+/// `on` muestra «Ver tablón» al abrir un evento. Apagado hasta que los
+/// tablones de hermandad estén listos.
+const calendarShowBoardLinkConfigKey = 'calendar_show_board_link';
+
+final calendarShowBoardLinkProvider = FutureProvider<bool>((ref) async {
+  final client = SupabaseBootstrap.client;
+  if (client == null) return false;
+  try {
+    final row = await client
+        .from('app_config')
+        .select('value')
+        .eq('key', calendarShowBoardLinkConfigKey)
+        .maybeSingle();
+    return (row?['value'] as String?)?.trim() == 'on';
+  } catch (_) {
+    return false;
+  }
 });
 
 /// Escudos de la biblioteca + escudos de tablones de hermandad.

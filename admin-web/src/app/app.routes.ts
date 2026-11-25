@@ -208,6 +208,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'redes-x',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./pages/x-ingest/x-ingest.component').then(
+            (m) => m.XIngestPageComponent,
+          ),
+      },
+      {
         path: 'foros',
         canActivate: [adminGuard],
         loadComponent: () =>
