@@ -64,6 +64,7 @@ export class EventsPageComponent implements OnInit {
   formFirstEnd = '';
   formExtraSlots: { start: string; end: string }[] = [];
   formCoverUrl = '';
+  formCoverCredit = '';
   formIconUrl = '';
   formPaso: SeasonPaso = 'ambos';
   formEnsayoN = 1;
@@ -268,6 +269,7 @@ export class EventsPageComponent implements OnInit {
       ? toDatetimeLocalValue(new Date(event.endsAt))
       : '';
     this.formCoverUrl = event.coverImageUrl ?? '';
+    this.formCoverCredit = event.coverImageCredit ?? '';
     this.formIconUrl = event.customIconUrl ?? '';
     this.formPaso = event.paso ?? 'ambos';
     this.formEnsayoN = event.seasonN ?? 1;
@@ -351,6 +353,7 @@ export class EventsPageComponent implements OnInit {
     this.formFirstEnd = '';
     this.formExtraSlots = [];
     this.formCoverUrl = '';
+    this.formCoverCredit = '';
     this.formIconUrl = '';
     this.formPaso = 'ambos';
     this.formEnsayoN = 1;
@@ -436,6 +439,7 @@ export class EventsPageComponent implements OnInit {
         timeSlots: this.slotsFromForm(),
         organizerLabel,
         coverImageUrl,
+        coverImageCredit: this.formCoverCredit.trim() || null,
         customIconUrl,
         paso: this.formPaso,
         seasonN: this.formType === 'ensayo' ? this.formEnsayoN : null,

@@ -13,6 +13,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_upload_compress.dart';
 import '../../../core/utils/pick_gallery_image.dart';
 import '../../../core/widgets/cofradeo_bottom_nav.dart';
+import '../../../core/widgets/image_source_credit.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/event_type_icon.dart';
 import '../../../shared/models/calendar_event.dart';
@@ -133,6 +134,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   final _locationController = TextEditingController();
   final _admissionController = TextEditingController();
   final _organizerController = TextEditingController();
+  final _coverCreditController = TextEditingController();
 
   late DateTime _date;
   late TimeOfDay _time;
@@ -185,6 +187,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       _type = existing.type;
       _customIconUrl = existing.customIconUrl;
       _coverImageUrl = existing.coverImageUrl;
+      _coverCreditController.text = existing.coverImageCredit ?? '';
       _hermandadTopicId = existing.hermandadTopicId;
       if (_hermandadTopicId != null) {
         _linkedOrganizerKey =
@@ -502,6 +505,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     _locationController.dispose();
     _admissionController.dispose();
     _organizerController.dispose();
+    _coverCreditController.dispose();
     super.dispose();
   }
 
@@ -680,6 +684,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       _selectedCoverName = null;
       _selectedCoverExtension = null;
       _selectedCoverContentType = null;
+      _coverCreditController.clear();
     });
   }
 
@@ -891,6 +896,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           clearHermandadTopicId: unlinkHermandad,
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
+          coverImageCredit: sanitizeImageCredit(_coverCreditController.text),
           admissionLabel: admission,
           timeSlots: slots,
           paso: paso,
@@ -911,6 +917,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           publisherHandle: handle,
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
+          coverImageCredit: sanitizeImageCredit(_coverCreditController.text),
           admissionLabel: admission,
           timeSlots: slots,
           paso: paso,
@@ -1081,6 +1088,14 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               onPickCover: _submitting || _processingImagePick ? null : _pickCover,
               onClearCover: _submitting ? null : _clearCover,
             ),
+            if (_coverImageUrl?.trim().isNotEmpty == true ||
+                _selectedCoverBytes != null) ...[
+              const SizedBox(height: 8),
+              ImageSourceCreditField(
+                controller: _coverCreditController,
+                enabled: !_submitting,
+              ),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _titleController,
