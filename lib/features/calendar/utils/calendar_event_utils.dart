@@ -21,6 +21,70 @@ DateTime calendarDefaultMonth({required bool supabaseReady}) {
 bool isSameCalendarDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 
+DateTime calendarDay(DateTime date) => DateTime(date.year, date.month, date.day);
+
+/// Último día inclusive. Null si el acto es de una sola jornada.
+DateTime? eventSpanEndDay(CalendarEvent event) {
+  if (!event.type.allowsDateSpan) return null;
+  final until = event.spanUntil;
+  if (until == null) return null;
+  final last = calendarDay(until);
+  final first = calendarDay(event.date);
+  if (!last.isAfter(first)) return null;
+  return last;
+}
+
+bool eventCoversDay(CalendarEvent event, DateTime day) {
+  final target = calendarDay(day);
+  final first = calendarDay(event.date);
+  if (target == first) return true;
+  final last = eventSpanEndDay(event);
+  if (last == null) return false;
+  return !target.isBefore(first) && !target.isAfter(last);
+}
+
+/// El acto pisa el intervalo [start, end).
+bool eventOverlapsRange(CalendarEvent event, DateTime start, DateTime end) {
+  final first = calendarDay(event.date);
+  final last = eventSpanEndDay(event) ?? first;
+  final rangeStart = calendarDay(start);
+  final rangeEnd = calendarDay(end);
+  return first.isBefore(rangeEnd) && !last.isBefore(rangeStart);
+}
+
+/// Cómo se dibuja el tramo en la celda de ese día.
+enum EventSpanEdge { start, middle, end }
+
+EventSpanEdge? eventSpanEdgeOn(CalendarEvent event, DateTime day) {
+  final last = eventSpanEndDay(event);
+  if (last == null || !eventCoversDay(event, day)) return null;
+  final target = calendarDay(day);
+  final first = calendarDay(event.date);
+  final continuesBefore = target.isAfter(first);
+  final continuesAfter = target.isBefore(last);
+  if (continuesBefore && continuesAfter) return EventSpanEdge.middle;
+  if (continuesAfter) return EventSpanEdge.start;
+  if (continuesBefore) return EventSpanEdge.end;
+  return null;
+}
+
+String formatEventWhenLabel(CalendarEvent event) {
+  final last = eventSpanEndDay(event);
+  if (last == null) {
+    final formatted = DateFormat("EEEE d 'de' MMMM", 'es').format(event.date);
+    if (formatted.isEmpty) return formatted;
+    return formatted[0].toUpperCase() + formatted.substring(1);
+  }
+  final first = calendarDay(event.date);
+  if (first.year == last.year && first.month == last.month) {
+    final month = DateFormat('MMMM', 'es').format(last);
+    return 'Del ${first.day} al ${last.day} de $month';
+  }
+  final from = DateFormat("d 'de' MMMM", 'es').format(first);
+  final to = DateFormat("d 'de' MMMM yyyy", 'es').format(last);
+  return 'Del $from al $to';
+}
+
 bool isCurrentCalendarMonth(DateTime month) {
   final now = DateTime.now();
   return month.year == now.year && month.month == now.month;
@@ -41,9 +105,7 @@ List<CalendarEvent> eventsOnDate(
   List<CalendarEvent> events,
   DateTime date,
 ) {
-  final dayEvents = events
-      .where((e) => isSameCalendarDay(e.date, date))
-      .toList();
+  final dayEvents = events.where((e) => eventCoversDay(e, date)).toList();
   dayEvents.sort(compareCalendarEventsByStart);
   return dayEvents;
 }
@@ -150,6 +212,7 @@ Duration _defaultEventDuration(EventType type) => switch (type) {
       EventType.concierto => const Duration(hours: 2),
       EventType.culto => const Duration(hours: 2),
       EventType.besamanos => const Duration(hours: 2),
+      EventType.besapies => const Duration(hours: 2),
       EventType.quinario => const Duration(hours: 2),
       EventType.triduo => const Duration(hours: 2),
       EventType.pregon => const Duration(hours: 2),
@@ -177,6 +240,12 @@ DateTime? eventStartDateTime(CalendarEvent event) {
 Duration calendarEventDuration(EventType type) => _defaultEventDuration(type);
 
 DateTime? eventEndDateTime(CalendarEvent event) {
+  final span = eventSpanEndDay(event);
+  if (span != null) {
+    final windows = _eventWindows(event, onDay: span);
+    if (windows.isNotEmpty) return windows.last.end;
+    return DateTime(span.year, span.month, span.day, 23, 59);
+  }
   if (event.endsAt != null) return event.endsAt;
   final start = eventStartDateTime(event);
   if (start == null) return null;
@@ -209,10 +278,8 @@ CalendarEventTiming? calendarEventTiming(
   DateTime? now,
 }) {
   final clock = now ?? DateTime.now();
-  if (!isSameCalendarDay(
-    event.date,
-    DateTime(clock.year, clock.month, clock.day),
-  )) {
+  final today = DateTime(clock.year, clock.month, clock.day);
+  if (!eventCoversDay(event, today)) {
     return null;
   }
 
@@ -224,7 +291,7 @@ CalendarEventTiming? calendarEventTiming(
     );
   }
 
-  final windows = _eventWindows(event);
+  final windows = _eventWindows(event, onDay: today);
   if (windows.isEmpty) return null;
   final start = windows.first.start;
 
@@ -289,12 +356,25 @@ class _EventWindow {
   final String label;
 }
 
-List<_EventWindow> _eventWindows(CalendarEvent event) {
+List<_EventWindow> _eventWindows(CalendarEvent event, {DateTime? onDay}) {
   final fallback = _defaultEventDuration(event.type);
+  final day = onDay == null
+      ? DateTime(event.date.year, event.date.month, event.date.day)
+      : DateTime(onDay.year, onDay.month, onDay.day);
   if (event.slots.isEmpty) {
-    final start = eventStartDateTime(event);
-    if (start == null) return const [];
-    final end = eventEndDateTime(event) ?? start.add(fallback);
+    final startMinutes = timeStringToMinutes(event.time);
+    if (startMinutes == null) return const [];
+    final start = DateTime(
+      day.year,
+      day.month,
+      day.day,
+      startMinutes ~/ 60,
+      startMinutes % 60,
+    );
+    final end = eventSpanEndDay(event) == null && event.endsAt != null
+        ? event.endsAt!
+        : start.add(fallback);
+    if (!end.isAfter(start)) return const [];
     return [
       _EventWindow(start: start, end: end, label: event.time ?? ''),
     ];
@@ -305,18 +385,18 @@ List<_EventWindow> _eventWindows(CalendarEvent event) {
     final startMin = timeStringToMinutes(slot.start);
     if (startMin == null) continue;
     final start = DateTime(
-      event.date.year,
-      event.date.month,
-      event.date.day,
+      day.year,
+      day.month,
+      day.day,
       startMin ~/ 60,
       startMin % 60,
     );
     final endMin = timeStringToMinutes(slot.end);
     final end = endMin != null
         ? DateTime(
-            event.date.year,
-            event.date.month,
-            event.date.day,
+            day.year,
+            day.month,
+            day.day,
             endMin ~/ 60,
             endMin % 60,
           )
@@ -330,10 +410,14 @@ List<_EventWindow> _eventWindows(CalendarEvent event) {
 
 /// Hora de la miniatura: el tramo en curso, si no el siguiente, si no el primero.
 String? eventThumbTime(CalendarEvent event, {DateTime? now}) {
-  final windows = _eventWindows(event);
-  if (windows.isEmpty) return event.time;
   final clock = now ?? DateTime.now();
-  if (!isSameCalendarDay(event.date, DateTime(clock.year, clock.month, clock.day))) {
+  final today = DateTime(clock.year, clock.month, clock.day);
+  final windows = _eventWindows(
+    event,
+    onDay: eventCoversDay(event, today) ? today : null,
+  );
+  if (windows.isEmpty) return event.time;
+  if (!eventCoversDay(event, today)) {
     return windows.first.label.isEmpty ? event.time : windows.first.label;
   }
   for (final window in windows) {
@@ -478,8 +562,11 @@ List<CalendarEvent> eventsForMonth(
   return events
       .where(
         (e) =>
-            e.date.year == month.year &&
-            e.date.month == month.month &&
+            eventOverlapsRange(
+              e,
+              DateTime(month.year, month.month, 1),
+              DateTime(month.year, month.month + 1, 1),
+            ) &&
             filter.matches(e),
       )
       .toList()

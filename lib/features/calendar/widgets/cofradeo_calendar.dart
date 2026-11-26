@@ -25,7 +25,7 @@ class CofradeoCalendar extends StatelessWidget {
 
   static const _weekdays = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
   static const _cellSize = 36.0;
-  static const _dotRowHeight = 10.0;
+  static const _dotRowHeight = 14.0;
 
   @override
   Widget build(BuildContext context) {
@@ -116,6 +116,7 @@ class CofradeoCalendar extends StatelessWidget {
     final isFocusedCurrentMonth =
         focusedMonth.year == now.year && focusedMonth.month == now.month;
     for (var day = 1; day <= daysInMonth; day++) {
+      final date = DateTime(focusedMonth.year, focusedMonth.month, day);
       final dayEvents = eventsOnDay(
         events,
         focusedMonth,
@@ -124,6 +125,7 @@ class CofradeoCalendar extends StatelessWidget {
       cells.add(
         _DayCell(
           day: day,
+          date: date,
           events: dayEvents,
           isToday: isFocusedCurrentMonth && day == now.day,
           isSelected: selectedDay == day,
@@ -190,6 +192,7 @@ class _MonthArrow extends StatelessWidget {
 class _DayCell extends StatelessWidget {
   const _DayCell({
     required this.day,
+    required this.date,
     required this.events,
     required this.isToday,
     required this.isSelected,
@@ -197,6 +200,7 @@ class _DayCell extends StatelessWidget {
   });
 
   final int day;
+  final DateTime date;
   final List<CalendarEvent> events;
   final bool isToday;
   final bool isSelected;
@@ -252,8 +256,10 @@ class _DayCell extends StatelessWidget {
                 ),
                 SizedBox(
                   height: CofradeoCalendar._dotRowHeight,
+                  width: double.infinity,
                   child: hasEvent
-                      ? _EventDots(
+                      ? _DayMarks(
+                          date: date,
                           events: events,
                           isSelected: isSelected,
                         )
@@ -264,6 +270,66 @@ class _DayCell extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _DayMarks extends StatelessWidget {
+  const _DayMarks({
+    required this.date,
+    required this.events,
+    required this.isSelected,
+  });
+
+  final DateTime date;
+  final List<CalendarEvent> events;
+  final bool isSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    CalendarEvent? spanEvent;
+    EventSpanEdge? edge;
+    for (final event in events) {
+      final found = eventSpanEdgeOn(event, date);
+      if (found != null) {
+        spanEvent = event;
+        edge = found;
+        break;
+      }
+    }
+    final others = [
+      for (final event in events)
+        if (!identical(event, spanEvent)) event,
+    ];
+    final barColor = isSelected
+        ? AppColors.textOnDark.withValues(alpha: 0.9)
+        : AppColors.goldDark;
+    final roundLeft = edge == EventSpanEdge.start ||
+        date.weekday == DateTime.monday;
+    final roundRight = edge == EventSpanEdge.end ||
+        date.weekday == DateTime.sunday;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (edge != null)
+          Container(
+            height: 4,
+            margin: EdgeInsets.only(
+              left: roundLeft ? 5 : 0,
+              right: roundRight ? 5 : 0,
+            ),
+            decoration: BoxDecoration(
+              color: barColor,
+              borderRadius: BorderRadius.horizontal(
+                left: roundLeft ? const Radius.circular(3) : Radius.zero,
+                right: roundRight ? const Radius.circular(3) : Radius.zero,
+              ),
+            ),
+          ),
+        if (others.isNotEmpty)
+          _EventDots(events: others, isSelected: isSelected),
+      ],
     );
   }
 }

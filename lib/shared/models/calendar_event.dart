@@ -55,6 +55,8 @@ enum EventType {
 
   besamanos('Besamanos'),
 
+  besapies('Besapiés'),
+
   quinario('Quinarios'),
 
   triduo('Triduos'),
@@ -95,6 +97,8 @@ enum EventType {
 
       'besamanos' => EventType.besamanos,
 
+      'besapies' => EventType.besapies,
+
       'quinario' => EventType.quinario,
 
       'triduo' => EventType.triduo,
@@ -132,6 +136,8 @@ enum EventType {
 
     EventType.besamanos => 'besamanos',
 
+    EventType.besapies => 'besapies',
+
     EventType.quinario => 'quinario',
 
     EventType.triduo => 'triduo',
@@ -162,6 +168,7 @@ enum EventType {
     EventType.concierto => 'Concierto',
     EventType.culto => 'Culto',
     EventType.besamanos => 'Besamanos',
+    EventType.besapies => 'Besapiés',
     EventType.quinario => 'Quinario',
     EventType.triduo => 'Triduo',
     EventType.pregon => 'Pregón',
@@ -185,6 +192,10 @@ enum EventType {
     EventType.viaCrucisConsejo => true,
     _ => false,
   };
+
+  /// Besamanos y besapiés pueden ocupar varios días seguidos.
+  bool get allowsDateSpan =>
+      this == EventType.besamanos || this == EventType.besapies;
 }
 
 enum CalendarEventStatus { published, pendingReview, rejected }
@@ -300,6 +311,7 @@ class CalendarEvent {
     this.coverImageCredit,
     this.status = CalendarEventStatus.published,
     this.endsAt,
+    this.spanUntil,
     this.liveForceState = EventLiveForceState.auto,
     this.viewCount = 0,
     this.admissionLabel,
@@ -346,6 +358,9 @@ class CalendarEvent {
 
   /// Fin estimado del live (si null, duración por tipo en la app).
   final DateTime? endsAt;
+
+  /// Último día inclusive, si el acto dura más de una jornada.
+  final DateTime? spanUntil;
 
   /// auto / open / closed — cierre manual (lluvia, etc.).
   final EventLiveForceState liveForceState;
@@ -405,6 +420,8 @@ class CalendarEvent {
     CalendarEventStatus? status,
     DateTime? endsAt,
     bool clearEndsAt = false,
+    DateTime? spanUntil,
+    bool clearSpanUntil = false,
     EventLiveForceState? liveForceState,
     int? viewCount,
     String? admissionLabel,
@@ -435,6 +452,7 @@ class CalendarEvent {
       coverImageCredit: coverImageCredit ?? this.coverImageCredit,
       status: status ?? this.status,
       endsAt: clearEndsAt ? null : (endsAt ?? this.endsAt),
+      spanUntil: clearSpanUntil ? null : (spanUntil ?? this.spanUntil),
       liveForceState: liveForceState ?? this.liveForceState,
       viewCount: viewCount ?? this.viewCount,
       admissionLabel: clearAdmissionLabel
@@ -466,6 +484,8 @@ enum EventFilter {
   cultos('Cultos'),
 
   besamanos('Besamanos'),
+
+  besapies('Besapiés'),
 
   quinarios('Quinarios'),
 
@@ -510,6 +530,8 @@ enum EventFilter {
     EventFilter.cultos => EventType.culto,
 
     EventFilter.besamanos => EventType.besamanos,
+
+    EventFilter.besapies => EventType.besapies,
 
     EventFilter.quinarios => EventType.quinario,
 

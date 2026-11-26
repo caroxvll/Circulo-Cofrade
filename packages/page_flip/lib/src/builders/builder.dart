@@ -1,9 +1,6 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-
-import '../../page_flip.dart';
 
 Map<int, ui.Image?> imageData = {};
 ValueNotifier<int> currentPage = ValueNotifier(-1);
@@ -31,58 +28,20 @@ class PageFlipBuilder extends StatefulWidget {
 }
 
 class PageFlipBuilderState extends State<PageFlipBuilder> {
-  final _boundaryKey = GlobalKey();
-
-  void _captureImage(Duration timeStamp, int index) async {
-    if (_boundaryKey.currentContext == null) return;
-    await Future.delayed(const Duration(milliseconds: 100));
-    if (mounted) {
-      final boundary = _boundaryKey.currentContext!.findRenderObject()!
-          as RenderRepaintBoundary;
-      final image = await boundary.toImage();
-      setState(() {
-        imageData[index] = image.clone();
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: currentPage,
-      builder: (context, value, child) {
-        // Only the page being flipped should paint the curl. Upstream used
-        // `value >= 0`, so older pages (the cover) drew on top and froze the book.
-        if (imageData[widget.pageIndex] != null &&
-            value == widget.pageIndex) {
-          return CustomPaint(
-            painter: PageFlipEffect(
-              amount: widget.amount,
-              image: imageData[widget.pageIndex]!,
-              backgroundColor: widget.backgroundColor,
-              isRightSwipe: widget.isRightSwipe,
-            ),
-            size: Size.infinite,
+    return ValueListenableBuilder<int>(
+      valueListenable: currentPageIndex,
+      builder: (context, index, child) {
+        // La hoja viva se queda en pantalla. La captura del rizo sustituía
+        // el texto por un bitmap y, si fallaba, la página quedaba en blanco.
+        if (widget.pageIndex == index) {
+          return ColoredBox(
+            color: widget.backgroundColor ?? Colors.black12,
+            child: widget.child,
           );
-        } else {
-          if (value == widget.pageIndex) {
-            WidgetsBinding.instance.addPostFrameCallback(
-              (timeStamp) => _captureImage(timeStamp, widget.pageIndex),
-            );
-          }
-          if (widget.pageIndex == currentPageIndex.value ||
-              (widget.pageIndex == (currentPageIndex.value + 1))) {
-            return ColoredBox(
-              color: widget.backgroundColor ?? Colors.black12,
-              child: RepaintBoundary(
-                key: _boundaryKey,
-                child: widget.child,
-              ),
-            );
-          } else {
-            return Container();
-          }
         }
+        return const SizedBox.shrink();
       },
     );
   }

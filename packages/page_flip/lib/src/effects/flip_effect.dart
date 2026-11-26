@@ -20,6 +20,12 @@ class PageFlipEffect extends CustomPainter {
 
   @override
   void paint(ui.Canvas canvas, ui.Size size) {
+    if (!size.width.isFinite ||
+        !size.height.isFinite ||
+        size.width <= 0 ||
+        size.height <= 0) {
+      return;
+    }
     final pos = isRightSwipe ? 1.0 - amount.value : amount.value;
     final movX = isRightSwipe ? pos : (1.0 - pos) * 0.85;
     final calcR = (movX < 0.20) ? radius * movX * 5 : radius;

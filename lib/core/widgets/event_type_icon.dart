@@ -61,6 +61,7 @@ class EventTypeIcon extends StatelessWidget {
       EventType.concierto => Icons.music_note,
       EventType.culto => Icons.menu_book_outlined,
       EventType.besamanos => Icons.front_hand_outlined,
+      EventType.besapies => Icons.do_not_step_outlined,
       EventType.quinario => Icons.auto_stories_outlined,
       EventType.triduo => Icons.church_outlined,
       EventType.pregon => Icons.campaign_outlined,

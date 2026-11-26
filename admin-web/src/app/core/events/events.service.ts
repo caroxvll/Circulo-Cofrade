@@ -21,7 +21,7 @@ import {
 const CALENDAR_SHOW_BOARD_LINK_KEY = 'calendar_show_board_link';
 
 const EVENT_SELECT =
-  'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, cover_image_credit, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)';
+  'id, title, subtitle, event_type, starts_at, ends_at, span_until, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, cover_image_credit, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)';
 
 @Injectable({ providedIn: 'root' })
 export class EventsService {
@@ -261,6 +261,10 @@ export class EventsService {
       event_type: type,
       starts_at: new Date(input.startsAt).toISOString(),
       ...(endsAt !== undefined ? { ends_at: endsAt } : {}),
+      span_until:
+        type === 'besamanos' || type === 'besapies'
+          ? input.spanUntil?.trim() || null
+          : null,
       day_label: (
         input.dayLabel?.trim() ||
         seasonLabel ||
@@ -375,6 +379,7 @@ export class EventsService {
       eventType,
       startsAt: String(row['starts_at'] ?? ''),
       endsAt: (row['ends_at'] as string | null) ?? null,
+      spanUntil: (row['span_until'] as string | null) ?? null,
       liveForceState,
       dayLabel: (row['day_label'] as string | null) ?? null,
       location: emptyToNull(row['location'] as string | null),
