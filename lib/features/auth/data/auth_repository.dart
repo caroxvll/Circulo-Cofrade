@@ -91,11 +91,14 @@ class AuthRepository {
 
   Future<void> signInWithGoogle() async {
     _ensureAvailable();
+    // Sin esto Google entra solo con la última cuenta del teléfono/Chrome.
+    const accountPicker = {'prompt': 'select_account'};
     if (kIsWeb || !_usesSystemAuthSession) {
       await _client!.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: _oauthRedirectUrl,
         authScreenLaunchMode: LaunchMode.platformDefault,
+        queryParams: accountPicker,
       );
       return;
     }
@@ -105,6 +108,7 @@ class AuthRepository {
     final res = await _client!.auth.getOAuthSignInUrl(
       provider: OAuthProvider.google,
       redirectTo: _mobileOAuthCallback,
+      queryParams: accountPicker,
     );
     final String callback;
     try {

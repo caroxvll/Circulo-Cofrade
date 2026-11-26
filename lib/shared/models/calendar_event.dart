@@ -297,6 +297,7 @@ class CalendarEvent {
     this.customIconUrl,
 
     this.coverImageUrl,
+    this.coverImageCredit,
     this.status = CalendarEventStatus.published,
     this.endsAt,
     this.liveForceState = EventLiveForceState.auto,
@@ -337,6 +338,9 @@ class CalendarEvent {
 
   /// Foto de portada para carrusel y miniatura en listas.
   final String? coverImageUrl;
+
+  /// Origen de la foto (archivo, fotógrafo, web) para el copyright.
+  final String? coverImageCredit;
 
   final CalendarEventStatus status;
 
@@ -397,6 +401,7 @@ class CalendarEvent {
     String? publisherHandle,
     String? customIconUrl,
     String? coverImageUrl,
+    String? coverImageCredit,
     CalendarEventStatus? status,
     DateTime? endsAt,
     bool clearEndsAt = false,
@@ -427,6 +432,7 @@ class CalendarEvent {
       publisherHandle: publisherHandle ?? this.publisherHandle,
       customIconUrl: customIconUrl ?? this.customIconUrl,
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      coverImageCredit: coverImageCredit ?? this.coverImageCredit,
       status: status ?? this.status,
       endsAt: clearEndsAt ? null : (endsAt ?? this.endsAt),
       liveForceState: liveForceState ?? this.liveForceState,

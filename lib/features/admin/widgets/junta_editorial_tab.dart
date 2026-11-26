@@ -14,6 +14,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/cofradeo_badge.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../../core/widgets/image_source_credit.dart';
 import '../../../shared/models/forum.dart';
 import '../../forums/forums_provider.dart';
 import '../../forums/para_ti_pulse_provider.dart';
@@ -289,6 +290,7 @@ class _EditorialComposeSheet extends ConsumerStatefulWidget {
 class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
+  final _creditController = TextEditingController();
   final _photos = <Uint8List>[];
   Uint8List? _videoBytes;
   XFile? _videoFile;
@@ -320,6 +322,7 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
   void dispose() {
     _titleController.dispose();
     _bodyController.dispose();
+    _creditController.dispose();
     super.dispose();
   }
 
@@ -694,6 +697,14 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
             galleryImageUrls: urls.sublist(1),
           );
         }
+        final credit = sanitizeImageCredit(_creditController.text);
+        if (credit != null) {
+          await ref.read(forumsRepositoryProvider).setTopicCoverAsOwner(
+                topicId: topic.id,
+                coverImageUrl: coverUrl,
+                coverImageCredit: credit,
+              );
+        }
       }
 
       var videoProcessing = false;
@@ -937,6 +948,13 @@ class _EditorialComposeSheetState extends ConsumerState<_EditorialComposeSheet> 
                     ),
                   ),
                 ],
+              ),
+            ],
+            if (_photos.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ImageSourceCreditField(
+                controller: _creditController,
+                enabled: !_saving,
               ),
             ],
             const SizedBox(height: 8),

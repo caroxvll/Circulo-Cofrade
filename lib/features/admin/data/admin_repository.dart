@@ -791,6 +791,10 @@ class AdminRepository {
       iconKey: row['icon_key'] as String?,
       iconImageUrl: row['icon_image_url'] as String?,
       coverImageUrl: row['cover_image_url'] as String?,
+      coverImageCredit: (row['cover_image_credit'] as String?)?.trim().isNotEmpty ==
+              true
+          ? (row['cover_image_credit'] as String).trim()
+          : null,
       galleryImageUrls: parseGalleryImageUrls(row['gallery_image_urls']),
       videoUrl: row['video_url'] as String?,
       videoPosterUrl: row['video_poster_url'] as String?,
@@ -1092,6 +1096,10 @@ class AdminRepository {
       publisherHandle: handle,
       customIconUrl: row['custom_icon_url'] as String?,
       coverImageUrl: row['cover_image_url'] as String?,
+      coverImageCredit: (row['cover_image_credit'] as String?)?.trim().isNotEmpty ==
+              true
+          ? (row['cover_image_credit'] as String).trim()
+          : null,
       status: CalendarEventStatusX.fromDb(row['status'] as String?),
     );
   }

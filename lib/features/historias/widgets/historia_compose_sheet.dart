@@ -634,7 +634,7 @@ class _HistoriaComposeSheetState extends ConsumerState<_HistoriaComposeSheet> {
                 maxLength: 120,
                 style: AppTypography.bookCaption(),
                 decoration: const InputDecoration(
-                  hintText: 'Pie de foto (opcional)',
+                  hintText: 'Origen de la imagen (fotógrafo, archivo…)',
                   counterText: '',
                   border: InputBorder.none,
                 ),

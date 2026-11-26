@@ -195,6 +195,7 @@ class CalendarRepository {
     String? publisherHandle,
     String? customIconUrl,
     String? coverImageUrl,
+    String? coverImageCredit,
     String? admissionLabel,
     List<EventTimeSlot>? timeSlots,
     String? sourceReplyId,
@@ -221,6 +222,7 @@ class CalendarRepository {
               (hermandadId == null || hermandadId.isEmpty) ? null : hermandadId,
           'custom_icon_url': customIconUrl ?? '',
           'cover_image_url': coverImageUrl ?? '',
+          if (coverImageCredit != null) 'cover_image_credit': coverImageCredit,
           'admission_label': _admissionOrNull(admissionLabel),
           'time_slots': _slotsPayload(timeSlots),
           'created_by': userId,
@@ -251,6 +253,7 @@ class CalendarRepository {
     bool clearHermandadTopicId = false,
     String? customIconUrl,
     String? coverImageUrl,
+    String? coverImageCredit,
     String? admissionLabel,
     List<EventTimeSlot>? timeSlots,
     SeasonPaso paso = SeasonPaso.ambos,
@@ -270,6 +273,7 @@ class CalendarRepository {
       'organizer_label': organizerLabel ?? '',
       'custom_icon_url': customIconUrl ?? '',
       'cover_image_url': coverImageUrl ?? '',
+      'cover_image_credit': coverImageCredit,
       'admission_label': _admissionOrNull(admissionLabel),
       'time_slots': _slotsPayload(timeSlots),
       'paso': paso.dbValue,
@@ -1088,6 +1092,7 @@ class CalendarRepository {
       publisherHandle: handle,
       customIconUrl: row['custom_icon_url'] as String?,
       coverImageUrl: _nonEmptyUrl(row['cover_image_url'] as String?),
+      coverImageCredit: _creditOrNull(row['cover_image_credit'] as String?),
       status: CalendarEventStatusX.fromDb(row['status'] as String?),
       endsAt: row['ends_at'] != null
           ? DateTime.parse(row['ends_at'] as String).toLocal()
@@ -1130,6 +1135,12 @@ class CalendarRepository {
     final text = raw?.trim() ?? '';
     if (text.isEmpty) return null;
     return text.length > 40 ? text.substring(0, 40) : text;
+  }
+
+  String? _creditOrNull(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) return null;
+    return text.length > 160 ? text.substring(0, 160) : text;
   }
 
   String? _nonEmptyUrl(String? raw) {

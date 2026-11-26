@@ -21,7 +21,7 @@ import {
 const CALENDAR_SHOW_BOARD_LINK_KEY = 'calendar_show_board_link';
 
 const EVENT_SELECT =
-  'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)';
+  'id, title, subtitle, event_type, starts_at, ends_at, live_force_state, day_label, location, admission_label, time_slots, organizer_label, custom_icon_url, cover_image_url, cover_image_credit, status, created_by, created_at, updated_at, paso, season_n, with_retranqueo, profiles!created_by(handle)';
 
 @Injectable({ providedIn: 'root' })
 export class EventsService {
@@ -272,6 +272,7 @@ export class EventsService {
       organizer_label: (input.organizerLabel ?? '').trim(),
       custom_icon_url: (input.customIconUrl ?? '').trim(),
       cover_image_url: (input.coverImageUrl ?? '').trim(),
+      cover_image_credit: emptyToNull(input.coverImageCredit),
       paso: input.paso ?? 'ambos',
       season_n: isEnsayo ? (input.seasonN ?? 1) : null,
       with_retranqueo: isMuda && input.withRetranqueo === true,
@@ -382,6 +383,7 @@ export class EventsService {
       organizerLabel: emptyToNull(row['organizer_label'] as string | null),
       customIconUrl: emptyToNull(row['custom_icon_url'] as string | null),
       coverImageUrl: emptyToNull(row['cover_image_url'] as string | null),
+      coverImageCredit: emptyToNull(row['cover_image_credit'] as string | null),
       status,
       createdBy: (row['created_by'] as string | null) ?? null,
       createdByHandle: profiles?.handle ?? null,

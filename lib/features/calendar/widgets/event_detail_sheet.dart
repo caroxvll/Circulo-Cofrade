@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/event_type_icon.dart';
+import '../../../core/widgets/image_source_credit.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../../auth/auth_provider.dart';
 import '../../forums/viewer_id_provider.dart';
@@ -157,6 +158,12 @@ class _EventDetailSheet extends ConsumerWidget {
                       hasCover: hasCover,
                       onClose: () => Navigator.pop(context),
                     ),
+                    if (hasCover &&
+                        (event.coverImageCredit?.trim().isNotEmpty ?? false))
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                        child: ImageSourceCredit(credit: event.coverImageCredit),
+                      ),
                     Padding(
                       padding: EdgeInsets.fromLTRB(20, 16, 20, bottomPad),
                       child: Column(

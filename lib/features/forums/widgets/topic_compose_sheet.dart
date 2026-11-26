@@ -23,6 +23,7 @@ import '../utils/topic_permissions.dart';
 import 'forum_compose_field.dart';
 import 'forum_compose_sheet_header.dart';
 import 'forum_compose_sheet_layout.dart';
+import '../../../core/widgets/image_source_credit.dart';
 import 'hermandad_post_image_picker.dart';
 import 'topic_poll_compose_section.dart';
 
@@ -139,6 +140,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
   ];
   Uint8List? _coverBytes;
   String? _coverMimeType;
+  final _coverCreditController = TextEditingController();
   String? _relatedForumId;
   bool _pollEnabled = false;
   bool _submitting = false;
@@ -152,6 +154,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
   void dispose() {
     _titleController.dispose();
     _bodyController.dispose();
+    _coverCreditController.dispose();
     _pollQuestionController.dispose();
     for (final c in _pollOptionControllers) {
       c.dispose();
@@ -196,6 +199,7 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
             seasonKey: widget.seasonKey,
             coverBytes: _coverBytes,
             coverMimeType: _coverMimeType,
+            coverImageCredit: sanitizeImageCredit(_coverCreditController.text),
             relatedForumId: _relatedForumId,
             poll: pollCheck.draft,
           );
@@ -383,6 +387,13 @@ class _TopicComposeSheetState extends ConsumerState<_TopicComposeSheet> {
               });
             },
           ),
+          if (_coverBytes != null) ...[
+            const SizedBox(height: 8),
+            ImageSourceCreditField(
+              controller: _coverCreditController,
+              enabled: !_submitting,
+            ),
+          ],
           if (_supportsPoll) ...[
             const SizedBox(height: 8),
             TopicPollComposeSection(

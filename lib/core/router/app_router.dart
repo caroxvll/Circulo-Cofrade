@@ -235,6 +235,19 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ),
       ),
+      GoRoute(
+        path: '/historias/:historiaId',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) => cofradeoFadePage(
+          state: state,
+          child: HistoriaReaderScreen(
+            historiaId: state.pathParameters['historiaId']!,
+            resumePage: int.tryParse(
+              state.uri.queryParameters['p'] ?? '',
+            ),
+          ),
+        ),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return CofradeoShell(navigationShell: navigationShell);
@@ -316,18 +329,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                   state: state,
                   child: HistoriaAuthorScreen(
                     authorId: state.pathParameters['authorId']!,
-                  ),
-                ),
-              ),
-              GoRoute(
-                path: '/historias/:historiaId',
-                pageBuilder: (context, state) => cofradeoFadePage(
-                  state: state,
-                  child: HistoriaReaderScreen(
-                    historiaId: state.pathParameters['historiaId']!,
-                    resumePage: int.tryParse(
-                      state.uri.queryParameters['p'] ?? '',
-                    ),
                   ),
                 ),
               ),

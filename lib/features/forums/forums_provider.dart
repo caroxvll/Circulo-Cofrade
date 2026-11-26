@@ -883,6 +883,7 @@ class TopicSubmitController {
     String? seasonKey,
     Uint8List? coverBytes,
     String? coverMimeType,
+    String? coverImageCredit,
     String? relatedForumId,
     TopicPollDraft? poll,
   }) async {
@@ -940,6 +941,7 @@ class TopicSubmitController {
       await repo.setTopicCoverAsOwner(
         topicId: topic.id,
         coverImageUrl: url,
+        coverImageCredit: coverImageCredit,
       );
       topic = await repo.fetchTopic(forumId, topic.id) ?? topic;
     }
