@@ -1101,6 +1101,14 @@ class AdminRepository {
           ? (row['cover_image_credit'] as String).trim()
           : null,
       status: CalendarEventStatusX.fromDb(row['status'] as String?),
+      spanUntil: () {
+        final raw = row['span_until'];
+        if (raw == null) return null;
+        final parsed = DateTime.tryParse(raw.toString());
+        if (parsed == null) return null;
+        final local = parsed.isUtc ? parsed.toLocal() : parsed;
+        return DateTime(local.year, local.month, local.day);
+      }(),
     );
   }
 

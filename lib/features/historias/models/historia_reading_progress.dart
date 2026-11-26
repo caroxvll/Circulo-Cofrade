@@ -63,3 +63,10 @@ int clampHistoriaResumePage(int page, int contentPages) {
   if (page > contentPages) return 0;
   return page;
 }
+
+/// Hoja con la que se abre el lector. Sin marca válida, la primera de texto.
+int historiaReaderStartPage(int page, int contentPages) {
+  final clamped = clampHistoriaResumePage(page, contentPages);
+  if (clamped == 0 && contentPages > 0) return 1;
+  return clamped;
+}

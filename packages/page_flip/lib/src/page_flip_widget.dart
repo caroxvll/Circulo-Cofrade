@@ -113,29 +113,33 @@ class PageFlipWidgetState extends State<PageFlipWidget>
   void _turnPage(DragUpdateDetails details, BoxConstraints dimens) {
     if (_busy || dimens.maxWidth <= 0) return;
     final ratio = details.delta.dx / dimens.maxWidth;
+    final dx = details.delta.dx;
     if (_isForward == null) {
-      if (widget.isRightSwipe
-          ? details.delta.dx < 0.0
-          : details.delta.dx > 0.0) {
+      final backward = widget.isRightSwipe ? dx < -0.2 : dx > 0.2;
+      final forward = widget.isRightSwipe ? dx > 0.2 : dx < -0.2;
+      if (backward) {
         _isForward = false;
-      } else if (widget.isRightSwipe
-          ? details.delta.dx > 0.2
-          : details.delta.dx < -0.2) {
+      } else if (forward) {
         _isForward = true;
-      } else {
-        _isForward = null;
       }
     }
     if (_isForward == true && !_isLastPage) {
-      currentPage.value = pageNumber;
       widget.isRightSwipe
           ? _controllers[pageNumber].value -= ratio
           : _controllers[pageNumber].value += ratio;
     } else if (_isForward == false && !_isFirstPage) {
-      currentPage.value = pageNumber - 1;
       widget.isRightSwipe
           ? _controllers[pageNumber - 1].value -= ratio
           : _controllers[pageNumber - 1].value += ratio;
+    }
+  }
+
+  void _turnFromTap(TapUpDetails details, BoxConstraints dimens) {
+    if (_busy || dimens.maxWidth <= 0) return;
+    if (details.localPosition.dx >= dimens.maxWidth / 2) {
+      nextPage();
+    } else {
+      previousPage();
     }
   }
 
@@ -149,15 +153,15 @@ class PageFlipWidgetState extends State<PageFlipWidget>
           _controllers[pageNumber].value <= (widget.cutoffForward + 0.15)) {
         await nextPage();
       } else if (!_isLastPage) {
-        await _controllers[pageNumber].forward();
+        _controllers[pageNumber].value = 1;
       }
     } else if (_isForward == false) {
       if (_isFirstPage) {
-        await _controllers[pageNumber].forward();
+        _controllers[pageNumber].value = 1;
       } else if (_controllers[pageNumber - 1].value >= widget.cutoffPrevious) {
         await previousPage();
       } else {
-        await _controllers[pageNumber - 1].reverse();
+        _controllers[pageNumber - 1].value = 0;
       }
     }
     _isForward = null;
@@ -168,15 +172,8 @@ class PageFlipWidgetState extends State<PageFlipWidget>
     if (_busy || _isLastPage) return;
     _busy = true;
     widget.onFlipStart?.call();
-    currentPage.value = pageNumber;
     try {
-      await _controllers[pageNumber].reverse();
-      if (!mounted) return;
-      setState(() {
-        pageNumber++;
-      });
-      currentPageIndex.value = pageNumber;
-      widget.onPageFlipped?.call(pageNumber);
+      await goToPage(pageNumber + 1);
     } finally {
       _busy = false;
       currentPage.value = -1;
@@ -187,16 +184,8 @@ class PageFlipWidgetState extends State<PageFlipWidget>
     if (_busy || _isFirstPage) return;
     _busy = true;
     widget.onFlipStart?.call();
-    currentPage.value = pageNumber - 1;
     try {
-      await _controllers[pageNumber - 1].forward();
-      if (!mounted) return;
-      setState(() {
-        pageNumber--;
-      });
-      currentPageIndex.value = pageNumber;
-      imageData[pageNumber] = null;
-      widget.onPageFlipped?.call(pageNumber);
+      await goToPage(pageNumber - 1);
     } finally {
       _busy = false;
       currentPage.value = -1;
@@ -206,6 +195,7 @@ class PageFlipWidgetState extends State<PageFlipWidget>
   Future<void> goToPage(int index) async {
     final lastIndex = pages.isEmpty ? 0 : pages.length - 1;
     final target = index.clamp(0, lastIndex);
+    final changed = target != pageNumber;
     if (mounted) {
       setState(() {
         pageNumber = target;
@@ -218,6 +208,7 @@ class PageFlipWidgetState extends State<PageFlipWidget>
     }
     currentPageIndex.value = pageNumber;
     currentPage.value = -1;
+    if (changed) widget.onPageFlipped?.call(pageNumber);
   }
 
   @override
@@ -226,7 +217,7 @@ class PageFlipWidgetState extends State<PageFlipWidget>
       builder: (context, dimens) => GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (details) {},
-        onTapUp: (details) {},
+        onTapUp: (details) => _turnFromTap(details, dimens),
         onPanDown: (details) {},
         onPanEnd: (details) {},
         onTapCancel: () {},
