@@ -10,6 +10,7 @@ export type CalendarEventType =
   | 'concierto'
   | 'culto'
   | 'besamanos'
+  | 'besapies'
   | 'quinario'
   | 'triduo'
   | 'pregon'
@@ -30,6 +31,7 @@ export interface CalendarEventRow {
   eventType: CalendarEventType;
   startsAt: string;
   endsAt: string | null;
+  spanUntil: string | null;
   liveForceState: EventLiveForceState;
   dayLabel: string | null;
   location: string | null;
@@ -55,6 +57,7 @@ export interface CalendarEventInput {
   eventType: CalendarEventType;
   startsAt: string;
   endsAt?: string | null;
+  spanUntil?: string | null;
   dayLabel?: string | null;
   location?: string | null;
   admissionLabel?: string | null;
@@ -89,6 +92,7 @@ export const CALENDAR_EVENT_TYPES: { value: CalendarEventType; label: string; ce
     { value: 'concierto', label: 'Conciertos', cellLabel: 'Concierto' },
     { value: 'culto', label: 'Cultos', cellLabel: 'Culto' },
     { value: 'besamanos', label: 'Besamanos', cellLabel: 'Besamanos' },
+    { value: 'besapies', label: 'Besapiés', cellLabel: 'Besapiés' },
     { value: 'quinario', label: 'Quinarios', cellLabel: 'Quinario' },
     { value: 'triduo', label: 'Triduos', cellLabel: 'Triduo' },
     { value: 'pregon', label: 'Pregones', cellLabel: 'Pregón' },

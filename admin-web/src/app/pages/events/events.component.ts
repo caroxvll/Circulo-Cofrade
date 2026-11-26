@@ -61,6 +61,7 @@ export class EventsPageComponent implements OnInit {
   formOrganizer = '';
   formStartsAtLocal = '';
   formEndsAtLocal = '';
+  formSpanUntil = '';
   formFirstEnd = '';
   formExtraSlots: { start: string; end: string }[] = [];
   formCoverUrl = '';
@@ -265,6 +266,7 @@ export class EventsPageComponent implements OnInit {
       start: slot.start,
       end: slot.end ?? '',
     }));
+    this.formSpanUntil = (event.spanUntil ?? '').slice(0, 10);
     this.formEndsAtLocal = event.endsAt
       ? toDatetimeLocalValue(new Date(event.endsAt))
       : '';
@@ -350,6 +352,7 @@ export class EventsPageComponent implements OnInit {
     this.formOrganizer = '';
     this.formStartsAtLocal = '';
     this.formEndsAtLocal = '';
+    this.formSpanUntil = '';
     this.formFirstEnd = '';
     this.formExtraSlots = [];
     this.formCoverUrl = '';
@@ -434,6 +437,10 @@ export class EventsPageComponent implements OnInit {
         endsAt: this.formEndsAtLocal.trim()
           ? fromDatetimeLocalValue(this.formEndsAtLocal)
           : null,
+        spanUntil:
+          this.formType === 'besamanos' || this.formType === 'besapies'
+            ? this.formSpanUntil.trim() || null
+            : null,
         location: this.formLocation,
         admissionLabel: this.formAdmission.trim() || null,
         timeSlots: this.slotsFromForm(),

@@ -39,6 +39,9 @@ class EventCard extends ConsumerWidget {
         ? null
         : _formatTimeCompact(eventThumbTime(event)!);
     final schedule = eventScheduleLabel(event);
+    final spanLabel = eventSpanEndDay(event) == null
+        ? null
+        : formatEventWhenLabel(event);
     final kind = event.calendarCellLabel.trim();
     final storedPlace = event.location?.trim() ?? '';
     final subtitle = event.subtitle.trim();
@@ -99,6 +102,21 @@ class EventCard extends ConsumerWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (spanLabel != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    spanLabel,
+                    style: AppTypography.bodyMedium(
+                      color: AppColors.goldDark,
+                    ).copyWith(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
                 if (schedule != null) ...[
                   const SizedBox(height: 4),
                   Text(
