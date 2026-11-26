@@ -12,6 +12,7 @@ import '../forums_provider.dart';
 import 'forum_compose_field.dart';
 import 'forum_compose_sheet_header.dart';
 import 'forum_compose_sheet_layout.dart';
+import '../../../core/widgets/image_source_credit.dart';
 import 'hermandad_post_image_picker.dart';
 
 Future<void> showTopicEditSheet(
@@ -51,6 +52,7 @@ class _TopicEditSheetState extends ConsumerState<_TopicEditSheet> {
   Uint8List? _coverBytes;
   String? _coverMimeType;
   String? _coverUrl;
+  late final TextEditingController _coverCreditController;
   var _submitting = false;
   String? _error;
 
@@ -66,12 +68,16 @@ class _TopicEditSheetState extends ConsumerState<_TopicEditSheet> {
         (existing != null && existing.isNotEmpty && !existing.startsWith('assets/'))
             ? existing
             : null;
+    _coverCreditController = TextEditingController(
+      text: widget.topic.coverImageCredit ?? '',
+    );
   }
 
   @override
   void dispose() {
     _titleController.dispose();
     _bodyController.dispose();
+    _coverCreditController.dispose();
     super.dispose();
   }
 
@@ -106,6 +112,8 @@ class _TopicEditSheetState extends ConsumerState<_TopicEditSheet> {
             body: body,
             excerpt: excerpt,
             coverImageUrl: coverUrl ?? '',
+            coverImageCredit:
+                sanitizeImageCredit(_coverCreditController.text) ?? '',
           );
       invalidateTopicData(
         ref,
@@ -194,6 +202,13 @@ class _TopicEditSheetState extends ConsumerState<_TopicEditSheet> {
               });
             },
           ),
+          if (_coverBytes != null || (_coverUrl?.isNotEmpty ?? false)) ...[
+            const SizedBox(height: 8),
+            ImageSourceCreditField(
+              controller: _coverCreditController,
+              enabled: !_submitting,
+            ),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: AppTypography.bodyMedium(color: AppColors.accentRed)),

@@ -617,6 +617,9 @@ class ForumsRepository {
       iconKey: row['icon_key'] as String?,
       iconImageUrl: row['icon_image_url'] as String?,
       coverImageUrl: row['cover_image_url'] as String?,
+      coverImageCredit: (row['cover_image_credit'] as String?)?.trim().isNotEmpty == true
+          ? (row['cover_image_credit'] as String).trim()
+          : null,
       galleryImageUrls: parseGalleryImageUrls(row['gallery_image_urls']),
       videoUrl: row['video_url'] as String?,
       videoPosterUrl: row['video_poster_url'] as String?,
@@ -661,6 +664,7 @@ class ForumsRepository {
     required String body,
     required String excerpt,
     String? coverImageUrl,
+    String? coverImageCredit,
   }) async {
     if (!_useRemote) throw const ForumsRemoteUnavailableException();
 
@@ -674,6 +678,10 @@ class ForumsRepository {
       patch['cover_image_url'] =
           coverImageUrl.trim().isEmpty ? null : coverImageUrl.trim();
     }
+    if (coverImageCredit != null) {
+      final credit = coverImageCredit.trim();
+      patch['cover_image_credit'] = credit.isEmpty ? null : credit;
+    }
 
     await _client!.from('forum_topics').update(patch).eq('id', topicId);
   }
@@ -681,12 +689,16 @@ class ForumsRepository {
   Future<void> setTopicCoverAsOwner({
     required String topicId,
     required String? coverImageUrl,
+    String? coverImageCredit,
   }) async {
     if (!_useRemote) throw const ForumsRemoteUnavailableException();
 
     final trimmed = coverImageUrl?.trim();
+    final credit = coverImageCredit?.trim();
     await _client!.from('forum_topics').update({
       'cover_image_url': (trimmed == null || trimmed.isEmpty) ? null : trimmed,
+      if (coverImageCredit != null)
+        'cover_image_credit': (credit == null || credit.isEmpty) ? null : credit,
       'edited_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', topicId);
   }

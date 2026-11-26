@@ -7,6 +7,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/text_normalize.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/forum_post_content.dart';
+import '../../../core/widgets/image_source_credit.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/verified_account_badge.dart';
 import '../../../shared/models/forum.dart';
@@ -265,7 +266,18 @@ class _TopicEditorialBody extends StatelessWidget {
                         : BoxFit.contain,
                   );
 
-    if (!hasBody) return media;
+    final credited = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        media,
+        if (topic.coverImageCredit?.trim().isNotEmpty == true) ...[
+          const SizedBox(height: 8),
+          ImageSourceCredit(credit: topic.coverImageCredit),
+        ],
+      ],
+    );
+
+    if (!hasBody) return credited;
 
     final caption = _EditorialCaptionColumn(
       text: normalizeStoredText(body),
@@ -276,7 +288,7 @@ class _TopicEditorialBody extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          media,
+          credited,
           const SizedBox(height: 16),
           caption,
         ],
@@ -288,7 +300,7 @@ class _TopicEditorialBody extends StatelessWidget {
       children: [
         Expanded(
           flex: compact ? 4 : 5,
-          child: media,
+          child: credited,
         ),
         SizedBox(width: compact ? 14 : 20),
         Expanded(

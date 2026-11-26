@@ -200,7 +200,7 @@ class _BookReaderState extends ConsumerState<_BookReader>
             : '$_page / $paperCount';
 
     return Scaffold(
-      backgroundColor: onCover ? const Color(0xFF3A1A16) : _paper,
+      backgroundColor: onCover ? const Color(0xFF2A1210) : _desk,
       body: Stack(
         children: [
           Positioned.fill(
@@ -213,16 +213,20 @@ class _BookReaderState extends ConsumerState<_BookReader>
                 historia.pages.length,
               ),
               onPageFlipped: _onFlipped,
-              lastPage: _ColophonPage(
-                historia: historia,
-                others: others,
+              lastPage: SizedBox.expand(
+                child: _ColophonPage(
+                  historia: historia,
+                  others: others,
+                ),
               ),
               children: [
-                _CoverLeaf(historia: historia),
+                SizedBox.expand(child: _CoverLeaf(historia: historia)),
                 for (var i = 0; i < historia.pages.length; i++)
-                  _PaperLeaf(
-                    page: historia.pages[i],
-                    dropCap: i == 0,
+                  SizedBox.expand(
+                    child: _PaperLeaf(
+                      page: historia.pages[i],
+                      dropCap: i == 0,
+                    ),
                   ),
               ],
             ),
@@ -344,12 +348,38 @@ class _CoverLeaf extends StatelessWidget {
   Widget build(BuildContext context) {
     final cover = historia.coverImageUrl?.trim();
     return ColoredBox(
-      color: const Color(0xFF3A1A16),
+      color: const Color(0xFF2A1210),
       child: cover != null && cover.isNotEmpty
-          ? CofradeoNetworkImage(
-              url: cover,
-              fit: BoxFit.contain,
-              alignment: Alignment.center,
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(28, 80, 28, 56),
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: 0.68,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          blurRadius: 28,
+                          offset: const Offset(0, 18),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: CofradeoNetworkImage(
+                        url: cover,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        alignment: Alignment.center,
+                        filterQuality: FilterQuality.medium,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             )
           : _TitlePage(historia: historia),
     );
@@ -468,34 +498,51 @@ class _PaperLeaf extends StatelessWidget {
     final caption = page.caption?.trim();
     final hasImage = imageUrl != null && imageUrl.isNotEmpty;
     return ColoredBox(
-      color: _paper,
+      color: _desk,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 72, 22, 40),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (hasImage) ...[
-              Expanded(
-                flex: page.hasText ? 5 : 8,
-                child: _PagePicture(
-                  url: imageUrl,
-                  caption: caption,
-                ),
+        padding: const EdgeInsets.fromLTRB(10, 64, 10, 36),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: _paper,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
-              if (page.hasText) const SizedBox(height: 14),
             ],
-            if (page.hasText)
-              Expanded(
-                flex: hasImage ? 5 : 8,
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: _HistoriaPageBody(
-                    body: page.body,
-                    dropCap: dropCap,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (hasImage) ...[
+                  Expanded(
+                    flex: page.hasText ? 5 : 8,
+                    child: _PagePicture(
+                      url: imageUrl,
+                      caption: caption,
+                    ),
                   ),
-                ),
-              ),
-          ],
+                  if (page.hasText) const SizedBox(height: 14),
+                ],
+                if (page.hasText)
+                  Expanded(
+                    flex: hasImage ? 5 : 8,
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: SingleChildScrollView(
+                        child: _HistoriaPageBody(
+                          body: page.body,
+                          dropCap: dropCap,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );

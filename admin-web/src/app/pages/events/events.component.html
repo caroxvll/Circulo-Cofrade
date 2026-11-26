@@ -468,6 +468,14 @@
             URL portada
             <input [(ngModel)]="formCoverUrl" placeholder="https://…" />
           </label>
+          <label>
+            Origen de la imagen
+            <input
+              [(ngModel)]="formCoverCredit"
+              maxlength="160"
+              placeholder="Archivo de la hermandad, fotógrafo, web…"
+            />
+          </label>
         </div>
 
         <div class="media-block">

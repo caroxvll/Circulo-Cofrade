@@ -203,6 +203,7 @@ class ForumTopic {
     this.iconKey,
     this.iconImageUrl,
     this.coverImageUrl,
+    this.coverImageCredit,
     this.galleryImageUrls = const [],
     this.videoUrl,
     this.videoPosterUrl,
@@ -257,6 +258,9 @@ class ForumTopic {
   /// Escudo / icono remoto (p. ej. tablones de hermandad).
   final String? iconImageUrl;
   final String? coverImageUrl;
+
+  /// Origen de la portada (archivo, fotógrafo, web) para el copyright.
+  final String? coverImageCredit;
 
   /// Fotos detrás de la portada, en orden. La de delante es [coverImageUrl].
   final List<String> galleryImageUrls;
@@ -369,6 +373,7 @@ class ForumTopic {
     String? iconKey,
     String? iconImageUrl,
     String? coverImageUrl,
+    String? coverImageCredit,
     List<String>? galleryImageUrls,
     String? videoUrl,
     String? videoPosterUrl,
@@ -415,6 +420,7 @@ class ForumTopic {
       iconKey: iconKey ?? this.iconKey,
       iconImageUrl: iconImageUrl ?? this.iconImageUrl,
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      coverImageCredit: coverImageCredit ?? this.coverImageCredit,
       galleryImageUrls: galleryImageUrls ?? this.galleryImageUrls,
       videoUrl: videoUrl ?? this.videoUrl,
       videoPosterUrl: videoPosterUrl ?? this.videoPosterUrl,

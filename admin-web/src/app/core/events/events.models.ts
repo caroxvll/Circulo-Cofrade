@@ -38,6 +38,7 @@ export interface CalendarEventRow {
   organizerLabel: string | null;
   customIconUrl: string | null;
   coverImageUrl: string | null;
+  coverImageCredit: string | null;
   status: CalendarEventStatus;
   createdBy: string | null;
   createdByHandle: string | null;
@@ -61,6 +62,7 @@ export interface CalendarEventInput {
   organizerLabel?: string | null;
   customIconUrl?: string | null;
   coverImageUrl?: string | null;
+  coverImageCredit?: string | null;
   paso?: SeasonPaso;
   seasonN?: number | null;
   withRetranqueo?: boolean;
