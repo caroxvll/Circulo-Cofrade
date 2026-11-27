@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofrade_confirm_dialog.dart';
 import '../../auth/auth_provider.dart';
+import '../../auth/delete_own_account_flow.dart';
 import '../../permissions/permissions_provider.dart';
 import '../profile_provider.dart';
 
@@ -103,6 +104,21 @@ Future<void> showOwnProfileMenu(BuildContext context, WidgetRef ref) async {
                 },
               ),
             const Divider(height: 1),
+            ListTile(
+              leading: const Icon(
+                Icons.delete_outline,
+                color: AppColors.accentRed,
+              ),
+              title: Text(
+                'Eliminar cuenta',
+                style: AppTypography.bodyLarge(color: AppColors.accentRed),
+              ),
+              subtitle: const Text('Borra tu perfil y tus datos de forma permanente'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await confirmAndDeleteOwnAccount(context, ref);
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.logout, color: AppColors.accentRed),
               title: Text(

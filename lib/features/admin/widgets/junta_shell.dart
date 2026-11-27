@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/cofradeo_badge.dart';
+import '../../auth/delete_own_account_flow.dart';
 import '../../profile/profile_provider.dart';
 import '../admin_provider.dart';
 import '../data/admin_repository.dart';
@@ -568,7 +569,69 @@ class _JuntaOverviewPanel extends ConsumerWidget {
                   .select(module),
             ),
           ],
+          const SizedBox(height: 20),
+          const _JuntaDeleteAccountCard(),
         ],
+      ),
+    );
+  }
+}
+
+class _JuntaDeleteAccountCard extends ConsumerWidget {
+  const _JuntaDeleteAccountCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(JuntaUi.cardRadius),
+      child: InkWell(
+        onTap: () => confirmAndDeleteOwnAccount(context, ref),
+        borderRadius: BorderRadius.circular(JuntaUi.cardRadius),
+        child: Container(
+          width: double.infinity,
+          padding: JuntaUi.cardPadding,
+          decoration: JuntaUi.cardDecoration(),
+          child: Row(
+            children: [
+              Container(
+                width: JuntaUi.iconCircleSize,
+                height: JuntaUi.iconCircleSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.accentRed.withValues(alpha: 0.12),
+                ),
+                child: const Icon(
+                  Icons.delete_outline,
+                  color: AppColors.accentRed,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Eliminar cuenta',
+                      style: JuntaUi.cardTitle(color: AppColors.accentRed),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Borra tu perfil y tus datos de forma permanente.',
+                      style: JuntaUi.body(),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                color: AppColors.goldDark,
+                size: 18,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
