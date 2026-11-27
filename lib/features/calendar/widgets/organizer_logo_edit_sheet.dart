@@ -93,6 +93,7 @@ class _OrganizerLogoEditSheetState extends ConsumerState<_OrganizerLogoEditSheet
         contentType: contentType,
         maxBytes: ImageUploadLimits.eventIconMaxBytes,
         maxSide: ImageUploadLimits.eventIconMaxSide,
+        fitAvatarCircle: true,
       );
       if (!mounted) return;
 

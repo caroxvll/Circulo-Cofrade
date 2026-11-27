@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
-import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../forums/topic_detail_typography.dart';
 import '../../forums/utils/hermandad_board_display.dart';
@@ -184,12 +184,9 @@ class _DayCrestChip extends StatelessWidget {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: hasRemote
-                      ? CofradeoNetworkImage(
+                      ? CofradeoCrestInCircle(
                           url: remote,
-                          fit: BoxFit.contain,
-                          width: 48,
-                          height: 48,
-                          cacheSize: 96,
+                          size: 48,
                           placeholder: const CofradeoSkeletonBone(
                             width: 48,
                             height: 48,
