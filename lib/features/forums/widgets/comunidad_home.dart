@@ -2418,18 +2418,23 @@ class _HermandadCrest extends StatelessWidget {
     );
     final Widget mark;
     if (remote != null && remote.isNotEmpty) {
-      mark = CofradeoNetworkImage(
+      mark = CofradeoCrestInCircle(
         url: remote,
-        fit: BoxFit.contain,
-        width: size,
-        height: size,
-        cacheSize: size * 2,
+        size: size,
+        errorWidget: Icon(
+          Icons.church_outlined,
+          color: accent,
+          size: size * 0.48,
+        ),
       );
     } else if (local != null) {
-      mark = CofradeoAssetImage(
-        assetPath: local,
-        fit: BoxFit.contain,
-        cacheWidth: ImageDecodeCache.px(context, size),
+      mark = Padding(
+        padding: EdgeInsets.all(size * 0.08),
+        child: CofradeoAssetImage(
+          assetPath: local,
+          fit: BoxFit.contain,
+          cacheWidth: ImageDecodeCache.px(context, size),
+        ),
       );
     } else {
       mark = Icon(Icons.church_outlined, color: accent, size: size * 0.48);
@@ -2447,7 +2452,6 @@ class _HermandadCrest extends StatelessWidget {
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      padding: EdgeInsets.all(size * 0.08),
       child: mark,
     );
   }

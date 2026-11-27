@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/time_ago.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
+import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../auth/auth_provider.dart';
@@ -464,12 +465,9 @@ class SsLiveHubCompactTile extends ConsumerWidget {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: remote != null && remote.isNotEmpty
-                    ? CofradeoNetworkImage(
+                    ? CofradeoCrestInCircle(
                         url: remote,
-                        fit: BoxFit.contain,
-                        width: 42,
-                        height: 42,
-                        cacheSize: 84,
+                        size: 42,
                         placeholder: const CofradeoSkeletonBone(
                           width: 42,
                           height: 42,

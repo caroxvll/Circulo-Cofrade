@@ -741,6 +741,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
         contentType: contentType,
         maxBytes: ImageUploadLimits.eventIconMaxBytes,
         maxSide: ImageUploadLimits.eventIconMaxSide,
+        fitAvatarCircle: true,
       );
       if (!mounted) return;
 
