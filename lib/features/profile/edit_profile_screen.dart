@@ -104,6 +104,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         raw,
         maxBytes: ImageUploadLimits.avatarMaxBytes,
         maxSide: ImageUploadLimits.avatarMaxSide,
+        fitAvatarCircle: true,
       );
 
       if (mounted && compressed.wasCompressed) {

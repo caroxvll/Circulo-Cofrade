@@ -109,6 +109,9 @@
                   @if (event.endsAt) {
                     <span>· fin {{ dateTime(event.endsAt) }}</span>
                   }
+                  @if (event.spanUntil) {
+                    <span>· hasta {{ event.spanUntil.slice(0, 10) }}</span>
+                  }
                   <span class="live-pill" [class.closed]="event.liveForceState === 'closed'">
                     {{ liveForceLabel(event) }}
                   </span>
@@ -323,6 +326,15 @@
         Si dejas el fin vacío, la app usa la duración por defecto (procesión/ensayo/iguala 4 h).
         En lluvia o fin anticipado usa «Cerrar live» en la lista.
       </p>
+      @if (formType === 'besamanos' || formType === 'besapies') {
+        <label>
+          Último día
+          <input type="date" [(ngModel)]="formSpanUntil" />
+        </label>
+        <p class="form-hint">
+          Si el besamanos o el besapiés dura varios días, indica el último. El calendario lo marca con una barra desde el día de inicio. Vacío = un solo día.
+        </p>
+      }
 
       <div class="form-row">
         <label>
@@ -467,6 +479,14 @@
           <label>
             URL portada
             <input [(ngModel)]="formCoverUrl" placeholder="https://…" />
+          </label>
+          <label>
+            Origen de la imagen
+            <input
+              [(ngModel)]="formCoverCredit"
+              maxlength="160"
+              placeholder="Archivo de la hermandad, fotógrafo, web…"
+            />
           </label>
         </div>
 

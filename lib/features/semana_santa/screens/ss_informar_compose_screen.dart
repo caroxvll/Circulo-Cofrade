@@ -9,6 +9,7 @@ import '../../../core/network/app_network_status_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
+import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/cofradeo_skeleton.dart';
 import '../../forums/topic_detail_typography.dart';
@@ -751,12 +752,9 @@ class _HermandadAvatar extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: hasRemote
-          ? CofradeoNetworkImage(
+          ? CofradeoCrestInCircle(
               url: url,
-              fit: BoxFit.contain,
-              width: size,
-              height: size,
-              cacheSize: size * 2,
+              size: size,
               placeholder: CofradeoSkeletonBone(
                 width: size,
                 height: size,

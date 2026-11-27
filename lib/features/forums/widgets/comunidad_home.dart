@@ -206,22 +206,9 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
     ref.invalidate(paraTiRiverProvider);
   }
 
-  /// Para ti, de más nuevo a más viejo. Una noticia o una respuesta reciente
-  /// pasa por delante de un comunicado de hermandad más antiguo.
-  /// Todo acumula el hilo. Noticias y Temas solo acotan, si alguien filtra.
+  /// Para ti: editoriales, avisos y temas/noticias. Lo que publican o
+  /// responden las cuentas que sigues vive en Siguiendo.
   List<Widget> _forYouPieces(List<_Activity> visible, ParaTiRiver river) {
-    final todo = _forYouFilter == _ForYouFilter.todo;
-    final signedIn = ref.watch(currentUserProvider) != null;
-    final posts = todo && signedIn
-        ? ref.watch(followedPeoplePostsProvider).asData?.value ??
-            const <FollowedPersonPost>[]
-        : const <FollowedPersonPost>[];
-    final digests = todo && signedIn
-        ? ref.watch(followedHermandadDigestsProvider).asData?.value ??
-            const <HermandadDigest>[]
-        : const <HermandadDigest>[];
-    final coveredTopics = {for (final post in posts) post.activity.topicId};
-    final coveredReplies = {for (final post in posts) post.activity.id};
     final riverEntries = [
       for (final entry in river.entries)
         if (_riverEntryMatches(entry)) entry,
@@ -235,31 +222,8 @@ class _ComunidadHomeState extends ConsumerState<ComunidadHome> {
     final ranked = <({int at, Widget child})>[
       for (final entry in riverEntries)
         (at: entry.at.millisecondsSinceEpoch, child: _riverEntry(entry)),
-      for (final post in posts)
-        (
-          at: post.at.millisecondsSinceEpoch,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-            child: _PersonPostCard(post: post),
-          ),
-        ),
-      for (final group in digests)
-        for (final section in group.sections)
-          if (!coveredReplies.contains(section.reply.id))
-            (
-              at: section.reply.createdAt?.millisecondsSinceEpoch ?? 0,
-              child: _HermandadLatestCard(
-                group: HermandadDigest(
-                  board: group.board,
-                  hermandadName: group.hermandadName,
-                  processionDay: group.processionDay,
-                  sections: [section],
-                ),
-              ),
-            ),
       for (final item in visible)
         if (item.kind != _ForYouKind.hermandad &&
-            !coveredTopics.contains(item.topicId) &&
             !editorialIds.contains(item.topicId))
           (
             at: item.forum.lastActivityAt?.millisecondsSinceEpoch ?? 0,
@@ -1646,59 +1610,29 @@ class _TopicActivityCard extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          if (item.kind == _ForYouKind.temas &&
-              topicId != null &&
-              topicId.isNotEmpty)
-            _ConversationSlide(
-              topicId: topicId,
-              chip: _Chip(label: _chipLabel(topic)),
-              post: _PulsePostFace(
-                title: item.title,
-                excerpt: excerpt,
-                media: thumb,
-              ),
-              footer: topic == null
-                  ? null
-                  : Row(
-                      children: [
-                        _FeedMetric(
-                          icon: Icons.chat_bubble_outline,
-                          value: formatCount(topic.commentCount),
-                          heat: topic.commentCount >= _hotCommentCount,
-                        ),
-                        const SizedBox(width: 16),
-                        _FeedMetric(
-                          icon: Icons.visibility_outlined,
-                          value: formatCount(topic.viewCount),
-                        ),
-                      ],
-                    ),
-            )
-          else ...[
-            _Chip(label: _chipLabel(topic)),
-            const SizedBox(height: 8),
-            _PulsePostFace(
-              title: item.title,
-              excerpt: excerpt,
-              media: thumb,
+          _Chip(label: _chipLabel(topic)),
+          const SizedBox(height: 8),
+          _PulsePostFace(
+            title: item.title,
+            excerpt: excerpt,
+            media: thumb,
+          ),
+          if (topic != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _FeedMetric(
+                  icon: Icons.chat_bubble_outline,
+                  value: formatCount(topic.commentCount),
+                  heat: topic.commentCount >= _hotCommentCount,
+                ),
+                const SizedBox(width: 16),
+                _FeedMetric(
+                  icon: Icons.visibility_outlined,
+                  value: formatCount(topic.viewCount),
+                ),
+              ],
             ),
-            if (topic != null) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _FeedMetric(
-                    icon: Icons.chat_bubble_outline,
-                    value: formatCount(topic.commentCount),
-                    heat: topic.commentCount >= _hotCommentCount,
-                  ),
-                  const SizedBox(width: 16),
-                  _FeedMetric(
-                    icon: Icons.visibility_outlined,
-                    value: formatCount(topic.viewCount),
-                  ),
-                ],
-              ),
-            ],
           ],
         ],
       ),
@@ -2484,18 +2418,23 @@ class _HermandadCrest extends StatelessWidget {
     );
     final Widget mark;
     if (remote != null && remote.isNotEmpty) {
-      mark = CofradeoNetworkImage(
+      mark = CofradeoCrestInCircle(
         url: remote,
-        fit: BoxFit.contain,
-        width: size,
-        height: size,
-        cacheSize: size * 2,
+        size: size,
+        errorWidget: Icon(
+          Icons.church_outlined,
+          color: accent,
+          size: size * 0.48,
+        ),
       );
     } else if (local != null) {
-      mark = CofradeoAssetImage(
-        assetPath: local,
-        fit: BoxFit.contain,
-        cacheWidth: ImageDecodeCache.px(context, size),
+      mark = Padding(
+        padding: EdgeInsets.all(size * 0.08),
+        child: CofradeoAssetImage(
+          assetPath: local,
+          fit: BoxFit.contain,
+          cacheWidth: ImageDecodeCache.px(context, size),
+        ),
       );
     } else {
       mark = Icon(Icons.church_outlined, color: accent, size: size * 0.48);
@@ -2513,7 +2452,6 @@ class _HermandadCrest extends StatelessWidget {
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      padding: EdgeInsets.all(size * 0.08),
       child: mark,
     );
   }

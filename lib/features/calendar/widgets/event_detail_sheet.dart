@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/event_type_icon.dart';
+import '../../../core/widgets/image_source_credit.dart';
 import '../../../shared/models/calendar_event.dart';
 import '../../auth/auth_provider.dart';
 import '../../forums/viewer_id_provider.dart';
@@ -128,8 +128,7 @@ class _EventDetailSheet extends ConsumerWidget {
     final logos = ref.watch(organizerLogosMapProvider).asData?.value;
     final shieldUrl = resolvedOrganizerShieldUrl(logos, event);
     final organizer = resolvedOrganizerLabel(logos, event);
-    final dateLabel = DateFormat("EEEE d 'de' MMMM", 'es').format(event.date);
-    final formattedDate = dateLabel[0].toUpperCase() + dateLabel.substring(1);
+    final formattedDate = formatEventWhenLabel(event);
     final hasCover = CalendarEventImage.hasDisplayableCover(event);
     final media = MediaQuery.of(context);
     final bottomPad = media.padding.bottom + 16;
@@ -157,6 +156,12 @@ class _EventDetailSheet extends ConsumerWidget {
                       hasCover: hasCover,
                       onClose: () => Navigator.pop(context),
                     ),
+                    if (hasCover &&
+                        (event.coverImageCredit?.trim().isNotEmpty ?? false))
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                        child: ImageSourceCredit(credit: event.coverImageCredit),
+                      ),
                     Padding(
                       padding: EdgeInsets.fromLTRB(20, 16, 20, bottomPad),
                       child: Column(

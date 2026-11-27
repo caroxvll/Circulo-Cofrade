@@ -91,11 +91,14 @@ class AuthRepository {
 
   Future<void> signInWithGoogle() async {
     _ensureAvailable();
+    // Sin esto Google entra solo con la última cuenta del teléfono/Chrome.
+    const accountPicker = {'prompt': 'select_account'};
     if (kIsWeb || !_usesSystemAuthSession) {
       await _client!.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: _oauthRedirectUrl,
         authScreenLaunchMode: LaunchMode.platformDefault,
+        queryParams: accountPicker,
       );
       return;
     }
@@ -105,6 +108,7 @@ class AuthRepository {
     final res = await _client!.auth.getOAuthSignInUrl(
       provider: OAuthProvider.google,
       redirectTo: _mobileOAuthCallback,
+      queryParams: accountPicker,
     );
     final String callback;
     try {
@@ -188,6 +192,54 @@ class AuthRepository {
       }
     }
     await _client.auth.signOut();
+  }
+
+  /// Borra la cuenta del usuario autenticado (Auth + contenido propio).
+  Future<void> deleteOwnAccount() async {
+    _ensureAvailable();
+    if (_client!.auth.currentUser == null) {
+      throw AuthException('No hay sesión.');
+    }
+
+    final userId = _client.auth.currentUser?.id;
+    final hook = beforeSignOut;
+    if (hook != null) {
+      try {
+        await hook(userId);
+      } catch (error, stack) {
+        debugPrint(
+          'No se pudo desvincular el dispositivo antes de borrar: $error\n$stack',
+        );
+      }
+    }
+
+    try {
+      final response = await _client.functions.invoke('delete-own-account');
+      final data = response.data;
+      if (data is Map) {
+        final error = data['error']?.toString().trim() ?? '';
+        if (error.isNotEmpty) {
+          throw AuthException(error);
+        }
+      }
+      if (response.status >= 400) {
+        throw AuthException('No se pudo eliminar la cuenta. Inténtalo de nuevo.');
+      }
+    } on FunctionException catch (error) {
+      final details = error.details;
+      if (details is Map) {
+        final message = details['error']?.toString().trim() ?? '';
+        if (message.isNotEmpty) throw AuthException(message);
+      }
+      if (details is String && details.trim().isNotEmpty) {
+        throw AuthException(details.trim());
+      }
+      throw AuthException('No se pudo eliminar la cuenta. Inténtalo de nuevo.');
+    }
+
+    try {
+      await _client.auth.signOut();
+    } catch (_) {}
   }
 
   Future<void> requestPasswordReset({required String email}) async {

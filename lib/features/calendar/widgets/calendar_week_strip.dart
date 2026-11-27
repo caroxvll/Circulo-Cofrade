@@ -52,6 +52,11 @@ class CalendarWeekStrip extends StatelessWidget {
                     ),
                   )
                   .isNotEmpty,
+              inSpan: eventsOnDate(events, days[i]).any(
+                (event) =>
+                    eventMatchesCalendarFilter(event, filter, bookmarkIds) &&
+                    eventSpanEdgeOn(event, days[i]) != null,
+              ),
               onTap: () => onDaySelected(days[i]),
             ),
           ),
@@ -68,6 +73,7 @@ class _WeekDayChip extends StatelessWidget {
     required this.isSelected,
     required this.isToday,
     required this.hasEvents,
+    required this.inSpan,
     required this.onTap,
   });
 
@@ -76,6 +82,7 @@ class _WeekDayChip extends StatelessWidget {
   final bool isSelected;
   final bool isToday;
   final bool hasEvents;
+  final bool inSpan;
   final VoidCallback onTap;
 
   @override
@@ -132,7 +139,17 @@ class _WeekDayChip extends StatelessWidget {
                   ),
                   maxLines: 1,
                 ),
-                if (isSelected || hasEvents)
+                if (inSpan)
+                  Container(
+                    margin: const EdgeInsets.only(top: 3),
+                    width: 18,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.textOnDark : AppColors.goldDark,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  )
+                else if (isSelected || hasEvents)
                   Container(
                     margin: const EdgeInsets.only(top: 2),
                     width: 4,

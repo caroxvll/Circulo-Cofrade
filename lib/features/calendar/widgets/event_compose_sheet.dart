@@ -13,6 +13,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/image_upload_compress.dart';
 import '../../../core/utils/pick_gallery_image.dart';
 import '../../../core/widgets/cofradeo_bottom_nav.dart';
+import '../../../core/widgets/image_source_credit.dart';
 import '../../../core/widgets/cofradeo_network_image.dart';
 import '../../../core/widgets/event_type_icon.dart';
 import '../../../shared/models/calendar_event.dart';
@@ -133,8 +134,10 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   final _locationController = TextEditingController();
   final _admissionController = TextEditingController();
   final _organizerController = TextEditingController();
+  final _coverCreditController = TextEditingController();
 
   late DateTime _date;
+  DateTime? _untilDate;
   late TimeOfDay _time;
   late EventType _type;
   bool _submitting = false;
@@ -169,6 +172,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       _type == EventType.iguala || _type == EventType.ensayo;
   bool get _showEnsayoN => _type == EventType.ensayo;
   bool get _showRetranqueo => _type == EventType.muda;
+  bool get _allowsDateSpan => _type.allowsDateSpan;
 
   @override
   void initState() {
@@ -182,9 +186,11 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       _admissionController.text = existing.admissionLabel ?? '';
       _organizerController.text = existing.organizerLabel ?? '';
       _date = existing.date;
+      _untilDate = eventSpanEndDay(existing);
       _type = existing.type;
       _customIconUrl = existing.customIconUrl;
       _coverImageUrl = existing.coverImageUrl;
+      _coverCreditController.text = existing.coverImageCredit ?? '';
       _hermandadTopicId = existing.hermandadTopicId;
       if (_hermandadTopicId != null) {
         _linkedOrganizerKey =
@@ -502,11 +508,27 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     _locationController.dispose();
     _admissionController.dispose();
     _organizerController.dispose();
+    _coverCreditController.dispose();
     super.dispose();
   }
 
   DateTime get _startsAt =>
       DateTime(_date.year, _date.month, _date.day, _time.hour, _time.minute);
+
+  Future<void> _pickUntilDate() async {
+    _hideEventComposeKeyboard();
+    final start = DateTime(_date.year, _date.month, _date.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _untilDate ?? start.add(const Duration(days: 1)),
+      firstDate: start,
+      lastDate: start.add(const Duration(days: 14)),
+      locale: const Locale('es'),
+    );
+    if (picked != null) {
+      setState(() => _untilDate = DateTime(picked.year, picked.month, picked.day));
+    }
+  }
 
   Future<void> _pickDate() async {
     _hideEventComposeKeyboard();
@@ -520,6 +542,13 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
     if (picked != null) {
       setState(() {
         _date = picked;
+        final until = _untilDate;
+        if (until != null &&
+            DateTime(until.year, until.month, until.day).isBefore(
+              DateTime(picked.year, picked.month, picked.day),
+            )) {
+          _untilDate = null;
+        }
         _ensureTimeNotInPast();
       });
     }
@@ -680,6 +709,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       _selectedCoverName = null;
       _selectedCoverExtension = null;
       _selectedCoverContentType = null;
+      _coverCreditController.clear();
     });
   }
 
@@ -711,6 +741,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
         contentType: contentType,
         maxBytes: ImageUploadLimits.eventIconMaxBytes,
         maxSide: ImageUploadLimits.eventIconMaxSide,
+        fitAvatarCircle: true,
       );
       if (!mounted) return;
 
@@ -810,6 +841,29 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       return;
     }
 
+    final startDay = DateTime(_date.year, _date.month, _date.day);
+    DateTime? spanUntil;
+    var clearSpanUntil = false;
+    if (_allowsDateSpan) {
+      final until = _untilDate;
+      if (until != null &&
+          DateTime(until.year, until.month, until.day).isAfter(startDay)) {
+        final days = DateTime(until.year, until.month, until.day)
+            .difference(startDay)
+            .inDays;
+        if (days > 14) {
+          setState(() => _error = 'El periodo no puede pasar de 15 días.');
+          return;
+        }
+        spanUntil = DateTime(until.year, until.month, until.day);
+      } else if (widget.existing?.spanUntil != null) {
+        clearSpanUntil = true;
+      }
+    } else if (widget.existing != null &&
+        eventSpanEndDay(widget.existing!) != null) {
+      clearSpanUntil = true;
+    }
+
     final user = ref.read(currentUserProvider);
     if (user == null) return;
 
@@ -884,6 +938,8 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           subtitle: subtitle,
           type: _type,
           startsAt: _startsAt,
+          spanUntil: spanUntil,
+          clearSpanUntil: clearSpanUntil,
           dayLabel: _seasonAwareDayLabel(),
           location: location,
           organizerLabel: organizer,
@@ -891,6 +947,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           clearHermandadTopicId: unlinkHermandad,
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
+          coverImageCredit: sanitizeImageCredit(_coverCreditController.text),
           admissionLabel: admission,
           timeSlots: slots,
           paso: paso,
@@ -904,6 +961,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           subtitle: subtitle,
           type: _type,
           startsAt: _startsAt,
+          spanUntil: spanUntil,
           dayLabel: _seasonAwareDayLabel(),
           location: location,
           organizerLabel: organizer,
@@ -911,6 +969,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
           publisherHandle: handle,
           customIconUrl: customIconUrl,
           coverImageUrl: coverImageUrl,
+          coverImageCredit: sanitizeImageCredit(_coverCreditController.text),
           admissionLabel: admission,
           timeSlots: slots,
           paso: paso,
@@ -920,6 +979,7 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
       }
 
       invalidateCalendarMonth(ref, _date);
+      if (spanUntil != null) invalidateCalendarMonth(ref, spanUntil);
       ref.read(calendarEventsEpochProvider.notifier).bump();
       ref.invalidate(hermandadSeasonActsCoverageProvider);
       ref.invalidate(seasonActsEventsProvider);
@@ -966,6 +1026,10 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
   @override
   Widget build(BuildContext context) {
     final dateLabel = DateFormat('d MMMM yyyy', 'es').format(_date);
+    final until = _untilDate;
+    final untilLabel = until == null
+        ? 'Varios días'
+        : 'Hasta el ${DateFormat('d MMMM', 'es').format(until)}';
     final timeLabel = _time.format(context);
 
     return Material(
@@ -1081,6 +1145,14 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
               onPickCover: _submitting || _processingImagePick ? null : _pickCover,
               onClearCover: _submitting ? null : _clearCover,
             ),
+            if (_coverImageUrl?.trim().isNotEmpty == true ||
+                _selectedCoverBytes != null) ...[
+              const SizedBox(height: 8),
+              ImageSourceCreditField(
+                controller: _coverCreditController,
+                enabled: !_submitting,
+              ),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _titleController,
@@ -1163,6 +1235,35 @@ class _EventComposeSheetState extends ConsumerState<_EventComposeSheet> {
                 ),
               ],
             ),
+            if (_allowsDateSpan) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _submitting ? null : _pickUntilDate,
+                      icon: const Icon(Icons.date_range_outlined, size: 18),
+                      label: Text(untilLabel, overflow: TextOverflow.ellipsis),
+                    ),
+                  ),
+                  if (_untilDate != null)
+                    IconButton(
+                      tooltip: 'Un solo día',
+                      onPressed: _submitting
+                          ? null
+                          : () => setState(() => _untilDate = null),
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Si dura más de un día, indica el último. En el calendario se ve como una barra de un día a otro. Máximo 15 días.',
+                style: AppTypography.bodyMedium(
+                  color: AppColors.textMuted,
+                ).copyWith(fontSize: 12, height: 1.3),
+              ),
+            ],
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,

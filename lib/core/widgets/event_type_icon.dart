@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../constants/app_assets.dart';
 import '../theme/app_colors.dart';
 import '../utils/image_decode_cache.dart';
-import 'cofradeo_network_image.dart';
+import 'cofradeo_avatar.dart';
 import '../../shared/models/calendar_event.dart';
 
 /// Icono de tipo de evento: usa tu imagen en assets/icons/ si existe,
@@ -61,6 +61,7 @@ class EventTypeIcon extends StatelessWidget {
       EventType.concierto => Icons.music_note,
       EventType.culto => Icons.menu_book_outlined,
       EventType.besamanos => Icons.front_hand_outlined,
+      EventType.besapies => Icons.do_not_step_outlined,
       EventType.quinario => Icons.auto_stories_outlined,
       EventType.triduo => Icons.church_outlined,
       EventType.pregon => Icons.campaign_outlined,
@@ -107,12 +108,9 @@ class _IconImage extends StatelessWidget {
       );
     }
     if (isNetwork) {
-      return CofradeoNetworkImage(
+      return CofradeoCrestInCircle(
         url: path,
-        fit: BoxFit.cover,
-        width: size,
-        height: size,
-        cacheSize: size,
+        size: size,
         placeholder: fallback,
         errorWidget: fallback,
       );

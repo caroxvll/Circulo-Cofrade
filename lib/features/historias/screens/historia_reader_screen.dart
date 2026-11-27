@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:page_flip/page_flip.dart';
@@ -75,7 +78,7 @@ class _HistoriaReaderScreenState extends ConsumerState<HistoriaReaderScreen> {
               body: Center(child: CircularProgressIndicator()),
             );
           }
-          _openedAtPage = clampHistoriaResumePage(
+          _openedAtPage = historiaReaderStartPage(
             widget.resumePage ?? progress.asData?.value ?? 0,
             historia.pages.length,
           );
@@ -110,7 +113,6 @@ class _BookReader extends ConsumerStatefulWidget {
 class _BookReaderState extends ConsumerState<_BookReader>
     with WidgetsBindingObserver {
   late int _page = widget.initialPage;
-  final _flip = PageFlipController();
   Timer? _saveTimer;
 
   Historia get historia => widget.historia;
@@ -134,9 +136,19 @@ class _BookReaderState extends ConsumerState<_BookReader>
   void deactivate() {
     _saveTimer?.cancel();
     // El container sigue vivo en la estantería; `mounted` ya no, tras el pop.
-    final container = ProviderScope.containerOf(context);
-    unawaited(_persist(_page, refreshShelf: true, container: container));
+    try {
+      final container = ProviderScope.containerOf(context);
+      unawaited(_persist(_page, refreshShelf: true, container: container));
+    } catch (_) {}
     super.deactivate();
+  }
+
+  void _leave() {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    context.go('/foros');
   }
 
   @override
@@ -200,40 +212,16 @@ class _BookReaderState extends ConsumerState<_BookReader>
             : '$_page / $paperCount';
 
     return Scaffold(
-      backgroundColor: onCover ? const Color(0xFF3A1A16) : _paper,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: PageFlipWidget(
-              controller: _flip,
-              backgroundColor: _paper,
-              duration: const Duration(milliseconds: 520),
-              initialIndex: widget.initialPage.clamp(
-                0,
-                historia.pages.length,
-              ),
-              onPageFlipped: _onFlipped,
-              lastPage: _ColophonPage(
-                historia: historia,
-                others: others,
-              ),
-              children: [
-                _CoverLeaf(historia: historia),
-                for (var i = 0; i < historia.pages.length; i++)
-                  _PaperLeaf(
-                    page: historia.pages[i],
-                    dropCap: i == 0,
-                  ),
-              ],
-            ),
-          ),
-          SafeArea(
-            child: Padding(
+      backgroundColor: onCover ? const Color(0xFF2A1210) : _desk,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: Row(
                 children: [
                   TextButton.icon(
-                    onPressed: () => Navigator.maybePop(context),
+                    onPressed: _leave,
                     icon: Icon(
                       Icons.close_rounded,
                       color: onCover ? AppColors.goldPale : AppColors.burgundyDark,
@@ -265,9 +253,9 @@ class _BookReaderState extends ConsumerState<_BookReader>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: AppTypography.hermandadName().copyWith(
-                          fontSize: 15,
-                        ),
+                        style: AppTypography.bodyMedium(
+                          color: AppColors.textPrimary,
+                        ).copyWith(fontWeight: FontWeight.w700),
                       ),
                     ),
                   const Spacer(),
@@ -310,27 +298,361 @@ class _BookReaderState extends ConsumerState<_BookReader>
                 ],
               ),
             ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: AppTypography.labelSmall(
-                    color: onCover ? AppColors.goldPale : AppColors.goldDark,
-                  ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.6),
+            Expanded(
+              child: _TurningPages(
+                initialPage: widget.initialPage.clamp(
+                  0,
+                  historia.pages.length,
                 ),
+                onPageChanged: _onFlipped,
+                pages: [
+                  _CoverLeaf(historia: historia),
+                  for (var i = 0; i < historia.pages.length; i++)
+                    _PaperLeaf(
+                      page: historia.pages[i],
+                      dropCap: i == 0,
+                    ),
+                  _ColophonPage(historia: historia, others: others),
+                ],
               ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8, top: 4),
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: AppTypography.labelSmall(
+                  color: onCover ? AppColors.goldPale : AppColors.goldDark,
+                ).copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.6),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+/// Rizo de la hoja con el dedo. Quieta, se pinta el texto vivo.
+/// El bitmap solo existe mientras el papel se está doblando.
+class _TurningPages extends StatefulWidget {
+  const _TurningPages({
+    required this.initialPage,
+    required this.onPageChanged,
+    required this.pages,
+  });
+
+  final int initialPage;
+  final ValueChanged<int> onPageChanged;
+  final List<Widget> pages;
+
+  @override
+  State<_TurningPages> createState() => _TurningPagesState();
+}
+
+class _TurningPagesState extends State<_TurningPages>
+    with SingleTickerProviderStateMixin {
+  late int _index = widget.initialPage.clamp(0, widget.pages.length - 1);
+  late final AnimationController _turn = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+  );
+  final _dragN = ValueNotifier<double>(0);
+  final _curKey = GlobalKey();
+  final _prevKey = GlobalKey();
+  ui.Image? _sheet;
+  Future<void>? _captureJob;
+  bool _forward = true;
+  bool _turning = false;
+  bool _fallback = false;
+  bool _busy = false;
+  double _drag = 0;
+  double _pending = 0;
+
+  @override
+  void dispose() {
+    _turn.dispose();
+    _dragN.dispose();
+    _sheet?.dispose();
+    _sheet = null;
+    super.dispose();
+  }
+
+  void _setDrag(double value) {
+    if (!mounted) return;
+    _drag = value.clamp(0.0, 1.0);
+    _dragN.value = _drag;
+    if (_fallback) setState(() {});
+  }
+
+  Future<void> _animateTo(double target) async {
+    if ((_drag - target).abs() < 0.001) {
+      _setDrag(target);
+      return;
+    }
+    final start = _drag;
+    void tick() {
+      if (!mounted) return;
+      final t = Curves.easeOutCubic.transform(_turn.value);
+      _setDrag(start + (target - start) * t);
+    }
+
+    _turn.addListener(tick);
+    _turn.reset();
+    try {
+      await _turn.forward();
+    } on TickerCanceled {
+      // El lector se cerró a mitad del rizo.
+    } finally {
+      try {
+        _turn.removeListener(tick);
+      } catch (_) {}
+    }
+  }
+
+  Future<ui.Image?> _snap(GlobalKey key) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final boundary = key.currentContext?.findRenderObject();
+      if (boundary is RenderRepaintBoundary &&
+          boundary.hasSize &&
+          !boundary.size.isEmpty) {
+        try {
+          final ratio =
+              MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0);
+          final image = await boundary.toImage(pixelRatio: ratio);
+          if (image.width > 0 && image.height > 0) return image;
+          image.dispose();
+        } catch (_) {
+          // La hoja aún no estaba pintada. Se reintenta un frame.
+        }
+      }
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return null;
+    }
+    return null;
+  }
+
+  Future<void> _ensureSheet() async {
+    if (_sheet != null || _fallback) return;
+    final forward = _forward;
+    final last = widget.pages.length - 1;
+    if (forward && _index >= last) return;
+    if (!forward && _index <= 0) return;
+    if (mounted) setState(() => _turning = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    final image = await _snap(forward ? _curKey : _prevKey);
+    if (!mounted) {
+      image?.dispose();
+      return;
+    }
+    if (image == null) {
+      setState(() => _fallback = true);
+      return;
+    }
+    setState(() => _sheet = image);
+  }
+
+  void _dropSheet(ui.Image? image) {
+    if (image == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => image.dispose());
+  }
+
+  void _commit(bool forward) {
+    final image = _sheet;
+    final next = (_index + (forward ? 1 : -1)).clamp(
+      0,
+      widget.pages.length - 1,
+    );
+    setState(() {
+      _index = next;
+      _drag = 0;
+      _turning = false;
+      _fallback = false;
+      _sheet = null;
+      _captureJob = null;
+    });
+    _dragN.value = 0;
+    widget.onPageChanged(_index);
+    _dropSheet(image);
+  }
+
+  void _resetTurn() {
+    final image = _sheet;
+    setState(() {
+      _drag = 0;
+      _turning = false;
+      _fallback = false;
+      _sheet = null;
+      _captureJob = null;
+    });
+    _dragN.value = 0;
+    _dropSheet(image);
+  }
+
+  Future<void> _finishTurn(bool forward) async {
+    if (_busy || _turning) return;
+    if (forward && _index >= widget.pages.length - 1) return;
+    if (!forward && _index <= 0) return;
+    _busy = true;
+    _forward = forward;
+    _turning = true;
+    _captureJob = _ensureSheet();
+    try {
+      await _captureJob;
+      if (!mounted) return;
+      await _animateTo(1);
+      if (!mounted) return;
+      _commit(forward);
+    } finally {
+      _busy = false;
+    }
+  }
+
+  void _onDragUpdate(DragUpdateDetails details, double width) {
+    if (_busy || width <= 0) return;
+    if (!_turning) {
+      _pending += details.delta.dx;
+      if (_pending.abs() < 10) return;
+      final forward = _pending < 0;
+      if (forward && _index >= widget.pages.length - 1) {
+        _pending = 0;
+        return;
+      }
+      if (!forward && _index <= 0) {
+        _pending = 0;
+        return;
+      }
+      _forward = forward;
+      final seeded = _pending.abs() / width;
+      _pending = 0;
+      _turning = true;
+      _captureJob = _ensureSheet();
+      _setDrag(seeded);
+      return;
+    }
+    final delta = details.delta.dx / width;
+    _setDrag(_forward ? _drag - delta : _drag + delta);
+  }
+
+  Future<void> _onDragEnd() async {
+    _pending = 0;
+    if (_busy || (!_turning && _drag == 0)) return;
+    _busy = true;
+    try {
+      final job = _captureJob;
+      if (job != null) await job;
+      if (!mounted) return;
+      if (_drag > 0.18) {
+        await _animateTo(1);
+        if (!mounted) return;
+        _commit(_forward);
+      } else {
+        await _animateTo(0);
+        if (!mounted) return;
+        _resetTurn();
+      }
+    } finally {
+      _busy = false;
+    }
+  }
+
+  void _onTap(TapUpDetails details, double width) {
+    if (_busy || _turning || width <= 0) return;
+    if (details.localPosition.dx >= width * 0.7) {
+      _finishTurn(true);
+    } else if (details.localPosition.dx <= width * 0.3) {
+      _finishTurn(false);
+    }
+  }
+
+  Widget _hinge(Widget child, double angle) {
+    return Transform(
+      alignment: Alignment.centerLeft,
+      filterQuality: FilterQuality.medium,
+      transform: Matrix4.identity()
+        ..setEntry(3, 2, 0.0015)
+        ..rotateY(angle),
+      child: child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final last = widget.pages.length - 1;
+    final curlingForward = _sheet != null && _forward;
+    final hingeForward = _fallback && _forward && _drag > 0;
+    final hingeBack = _fallback && !_forward && _drag > 0;
+    final showNext = _turning && _forward && _index < last;
+    final showPrev = _index > 0 && _sheet == null && !hingeForward && !hingeBack;
+    final showCurrent = !curlingForward && !hingeForward;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ClipRect(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragUpdate: (details) =>
+                _onDragUpdate(details, constraints.maxWidth),
+            onHorizontalDragEnd: (_) => _onDragEnd(),
+            onHorizontalDragCancel: () {
+              _pending = 0;
+              if (_turning && !_busy) _onDragEnd();
+            },
+            onTapUp: (details) => _onTap(details, constraints.maxWidth),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (showNext)
+                  IgnorePointer(child: widget.pages[_index + 1]),
+                if (showPrev)
+                  IgnorePointer(
+                    child: RepaintBoundary(
+                      key: _prevKey,
+                      child: widget.pages[_index - 1],
+                    ),
+                  ),
+                if (showCurrent)
+                  RepaintBoundary(
+                    key: _curKey,
+                    child: widget.pages[_index],
+                  ),
+                if (hingeForward)
+                  _hinge(widget.pages[_index], -_drag * math.pi / 2),
+                if (hingeBack)
+                  _hinge(
+                    widget.pages[_index - 1],
+                    -(1 - _drag) * math.pi / 2,
+                  ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: ValueListenableBuilder<double>(
+                      valueListenable: _dragN,
+                      builder: (context, drag, _) {
+                        final image = _sheet;
+                        if (image == null) return const SizedBox.shrink();
+                        if (!_forward && drag <= 0) {
+                          return const SizedBox.shrink();
+                        }
+                        final amount = _forward ? (1 - drag) : drag;
+                        return CustomPaint(
+                          painter: PageFlipEffect(
+                            amount: AlwaysStoppedAnimation(amount),
+                            image: image,
+                            backgroundColor: _paper,
+                            isRightSwipe: false,
+                          ),
+                          child: const SizedBox.expand(),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -344,12 +666,38 @@ class _CoverLeaf extends StatelessWidget {
   Widget build(BuildContext context) {
     final cover = historia.coverImageUrl?.trim();
     return ColoredBox(
-      color: const Color(0xFF3A1A16),
+      color: const Color(0xFF2A1210),
       child: cover != null && cover.isNotEmpty
-          ? CofradeoNetworkImage(
-              url: cover,
-              fit: BoxFit.contain,
-              alignment: Alignment.center,
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(28, 16, 28, 20),
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: 0.68,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          blurRadius: 28,
+                          offset: const Offset(0, 18),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: CofradeoNetworkImage(
+                        url: cover,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        alignment: Alignment.center,
+                        filterQuality: FilterQuality.medium,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             )
           : _TitlePage(historia: historia),
     );
@@ -364,7 +712,7 @@ class _TitlePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 72, 28, 28),
+      padding: const EdgeInsets.fromLTRB(28, 20, 28, 20),
       child: Column(
         children: [
           Text(
@@ -468,34 +816,51 @@ class _PaperLeaf extends StatelessWidget {
     final caption = page.caption?.trim();
     final hasImage = imageUrl != null && imageUrl.isNotEmpty;
     return ColoredBox(
-      color: _paper,
+      color: _desk,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 72, 22, 40),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (hasImage) ...[
-              Expanded(
-                flex: page.hasText ? 5 : 8,
-                child: _PagePicture(
-                  url: imageUrl,
-                  caption: caption,
-                ),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: _paper,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
-              if (page.hasText) const SizedBox(height: 14),
             ],
-            if (page.hasText)
-              Expanded(
-                flex: hasImage ? 5 : 8,
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: _HistoriaPageBody(
-                    body: page.body,
-                    dropCap: dropCap,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (hasImage) ...[
+                  Expanded(
+                    flex: page.hasText ? 5 : 8,
+                    child: _PagePicture(
+                      url: imageUrl,
+                      caption: caption,
+                    ),
                   ),
-                ),
-              ),
-          ],
+                  if (page.hasText) const SizedBox(height: 14),
+                ],
+                if (page.hasText)
+                  Expanded(
+                    flex: hasImage ? 5 : 8,
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: SingleChildScrollView(
+                        child: _HistoriaPageBody(
+                          body: page.body,
+                          dropCap: dropCap,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -516,7 +881,7 @@ class _ColophonPage extends StatelessWidget {
     return ColoredBox(
       color: _paper,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(28, 72, 28, 40),
+        padding: const EdgeInsets.fromLTRB(28, 20, 28, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

@@ -7,6 +7,7 @@ import '../../../core/utils/forum_markdown_blocks.dart';
 import '../../../core/utils/text_normalize.dart';
 import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../core/widgets/forum_post_content.dart';
+import '../../../core/widgets/image_source_credit.dart';
 import '../../../core/widgets/mention_rich_text.dart';
 import '../../../core/widgets/verified_account_badge.dart';
 import '../../../shared/models/forum.dart';
@@ -137,6 +138,16 @@ class NoticiasArticleHeader extends StatelessWidget {
                 ),
               ),
             ),
+            if (topic.coverImageCredit?.trim().isNotEmpty == true)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  _articleInset,
+                  8,
+                  _articleInset,
+                  0,
+                ),
+                child: ImageSourceCredit(credit: topic.coverImageCredit),
+              ),
           ],
           Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -321,6 +332,8 @@ class _NoticiasArticleBody extends StatelessWidget {
         children.add(
           ForumPostContent(
             text: switch (block.kind) {
+              ForumMarkdownBlockKind.heading =>
+                '${'#' * block.level.clamp(1, 3)} ${block.lines.first}',
               ForumMarkdownBlockKind.paragraph => block.lines.first,
               ForumMarkdownBlockKind.bulletList => [
                   for (final line in block.lines) '- $line',

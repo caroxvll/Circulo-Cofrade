@@ -147,13 +147,7 @@ class CalendarRepository {
   Future<List<CalendarEvent>> fetchBetween(DateTime start, DateTime end) async {
     if (_client == null) {
       return mockCalendarEvents
-          .where(
-            (e) =>
-                !e.date.isBefore(
-                  DateTime(start.year, start.month, start.day),
-                ) &&
-                e.date.isBefore(DateTime(end.year, end.month, end.day)),
-          )
+          .where((e) => eventOverlapsRange(e, start, end))
           .toList()
         ..sort((a, b) => a.date.compareTo(b.date));
     }
@@ -161,8 +155,10 @@ class CalendarRepository {
   }
 
   List<CalendarEvent> _mockForMonth(DateTime month) {
+    final start = DateTime(month.year, month.month, 1);
+    final end = DateTime(month.year, month.month + 1, 1);
     return mockCalendarEvents
-        .where((e) => e.date.year == month.year && e.date.month == month.month)
+        .where((e) => eventOverlapsRange(e, start, end))
         .toList();
   }
 
@@ -170,15 +166,55 @@ class CalendarRepository {
     DateTime start,
     DateTime end,
   ) async {
-    final rows = await _client!
+    const select = '*, profiles!created_by(handle, display_name)';
+    final startIso = start.toUtc().toIso8601String();
+    final endIso = end.toUtc().toIso8601String();
+    final started = await _client!
         .from('calendar_events')
-        .select('*, profiles!created_by(handle, display_name)')
+        .select(select)
         .eq('status', 'published')
-        .gte('starts_at', start.toUtc().toIso8601String())
-        .lt('starts_at', end.toUtc().toIso8601String())
+        .gte('starts_at', startIso)
+        .lt('starts_at', endIso)
         .order('starts_at', ascending: true);
+    var continued = const <dynamic>[];
+    try {
+      continued = await _client!
+          .from('calendar_events')
+          .select(select)
+          .eq('status', 'published')
+          .inFilter('event_type', const ['besamanos', 'besapies'])
+          .lt('starts_at', startIso)
+          .gte('span_until', _calendarDate(start))
+          .order('starts_at', ascending: true);
+    } catch (_) {
+      continued = const [];
+    }
 
-    return rows.map(_fromRow).toList();
+    final byId = <String, CalendarEvent>{};
+    for (final row in [...started, ...continued]) {
+      final event = _fromRow(row);
+      final id = event.id;
+      if (id == null || id.isEmpty) continue;
+      byId[id] = event;
+    }
+    final events = byId.values.toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    return events;
+  }
+
+  DateTime? _spanDay(Object? raw) {
+    if (raw == null) return null;
+    final parsed = DateTime.tryParse(raw.toString());
+    if (parsed == null) return null;
+    final local = parsed.isUtc ? parsed.toLocal() : parsed;
+    return DateTime(local.year, local.month, local.day);
+  }
+
+  String _calendarDate(DateTime date) {
+    final local = date.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '${local.year}-$month-$day';
   }
 
   Future<CalendarEvent> createEvent({
@@ -188,6 +224,7 @@ class CalendarRepository {
     required EventType type,
     required DateTime startsAt,
     DateTime? endsAt,
+    DateTime? spanUntil,
     String? dayLabel,
     String? location,
     String? organizerLabel,
@@ -195,6 +232,7 @@ class CalendarRepository {
     String? publisherHandle,
     String? customIconUrl,
     String? coverImageUrl,
+    String? coverImageCredit,
     String? admissionLabel,
     List<EventTimeSlot>? timeSlots,
     String? sourceReplyId,
@@ -214,6 +252,7 @@ class CalendarRepository {
           'event_type': type.dbValue,
           'starts_at': startsAt.toUtc().toIso8601String(),
           if (endsAt != null) 'ends_at': endsAt.toUtc().toIso8601String(),
+          if (spanUntil != null) 'span_until': _calendarDate(spanUntil),
           'day_label': dayLabel,
           'location': location ?? '',
           'organizer_label': organizerLabel ?? '',
@@ -221,6 +260,7 @@ class CalendarRepository {
               (hermandadId == null || hermandadId.isEmpty) ? null : hermandadId,
           'custom_icon_url': customIconUrl ?? '',
           'cover_image_url': coverImageUrl ?? '',
+          if (coverImageCredit != null) 'cover_image_credit': coverImageCredit,
           'admission_label': _admissionOrNull(admissionLabel),
           'time_slots': _slotsPayload(timeSlots),
           'created_by': userId,
@@ -244,6 +284,8 @@ class CalendarRepository {
     required DateTime startsAt,
     DateTime? endsAt,
     bool clearEndsAt = false,
+    DateTime? spanUntil,
+    bool clearSpanUntil = false,
     String? dayLabel,
     String? location,
     String? organizerLabel,
@@ -251,6 +293,7 @@ class CalendarRepository {
     bool clearHermandadTopicId = false,
     String? customIconUrl,
     String? coverImageUrl,
+    String? coverImageCredit,
     String? admissionLabel,
     List<EventTimeSlot>? timeSlots,
     SeasonPaso paso = SeasonPaso.ambos,
@@ -270,6 +313,7 @@ class CalendarRepository {
       'organizer_label': organizerLabel ?? '',
       'custom_icon_url': customIconUrl ?? '',
       'cover_image_url': coverImageUrl ?? '',
+      'cover_image_credit': coverImageCredit,
       'admission_label': _admissionOrNull(admissionLabel),
       'time_slots': _slotsPayload(timeSlots),
       'paso': paso.dbValue,
@@ -287,6 +331,11 @@ class CalendarRepository {
       payload['ends_at'] = null;
     } else if (endsAt != null) {
       payload['ends_at'] = endsAt.toUtc().toIso8601String();
+    }
+    if (clearSpanUntil) {
+      payload['span_until'] = null;
+    } else if (spanUntil != null) {
+      payload['span_until'] = _calendarDate(spanUntil);
     }
 
     final row = await _client!
@@ -1088,10 +1137,12 @@ class CalendarRepository {
       publisherHandle: handle,
       customIconUrl: row['custom_icon_url'] as String?,
       coverImageUrl: _nonEmptyUrl(row['cover_image_url'] as String?),
+      coverImageCredit: _creditOrNull(row['cover_image_credit'] as String?),
       status: CalendarEventStatusX.fromDb(row['status'] as String?),
       endsAt: row['ends_at'] != null
           ? DateTime.parse(row['ends_at'] as String).toLocal()
           : null,
+      spanUntil: _spanDay(row['span_until']),
       liveForceState: EventLiveForceState.fromDb(
         row['live_force_state'] as String?,
       ),
@@ -1130,6 +1181,12 @@ class CalendarRepository {
     final text = raw?.trim() ?? '';
     if (text.isEmpty) return null;
     return text.length > 40 ? text.substring(0, 40) : text;
+  }
+
+  String? _creditOrNull(String? raw) {
+    final text = raw?.trim() ?? '';
+    if (text.isEmpty) return null;
+    return text.length > 160 ? text.substring(0, 160) : text;
   }
 
   String? _nonEmptyUrl(String? raw) {

@@ -61,9 +61,11 @@ export class EventsPageComponent implements OnInit {
   formOrganizer = '';
   formStartsAtLocal = '';
   formEndsAtLocal = '';
+  formSpanUntil = '';
   formFirstEnd = '';
   formExtraSlots: { start: string; end: string }[] = [];
   formCoverUrl = '';
+  formCoverCredit = '';
   formIconUrl = '';
   formPaso: SeasonPaso = 'ambos';
   formEnsayoN = 1;
@@ -264,10 +266,12 @@ export class EventsPageComponent implements OnInit {
       start: slot.start,
       end: slot.end ?? '',
     }));
+    this.formSpanUntil = (event.spanUntil ?? '').slice(0, 10);
     this.formEndsAtLocal = event.endsAt
       ? toDatetimeLocalValue(new Date(event.endsAt))
       : '';
     this.formCoverUrl = event.coverImageUrl ?? '';
+    this.formCoverCredit = event.coverImageCredit ?? '';
     this.formIconUrl = event.customIconUrl ?? '';
     this.formPaso = event.paso ?? 'ambos';
     this.formEnsayoN = event.seasonN ?? 1;
@@ -348,9 +352,11 @@ export class EventsPageComponent implements OnInit {
     this.formOrganizer = '';
     this.formStartsAtLocal = '';
     this.formEndsAtLocal = '';
+    this.formSpanUntil = '';
     this.formFirstEnd = '';
     this.formExtraSlots = [];
     this.formCoverUrl = '';
+    this.formCoverCredit = '';
     this.formIconUrl = '';
     this.formPaso = 'ambos';
     this.formEnsayoN = 1;
@@ -431,11 +437,16 @@ export class EventsPageComponent implements OnInit {
         endsAt: this.formEndsAtLocal.trim()
           ? fromDatetimeLocalValue(this.formEndsAtLocal)
           : null,
+        spanUntil:
+          this.formType === 'besamanos' || this.formType === 'besapies'
+            ? this.formSpanUntil.trim() || null
+            : null,
         location: this.formLocation,
         admissionLabel: this.formAdmission.trim() || null,
         timeSlots: this.slotsFromForm(),
         organizerLabel,
         coverImageUrl,
+        coverImageCredit: this.formCoverCredit.trim() || null,
         customIconUrl,
         paso: this.formPaso,
         seasonN: this.formType === 'ensayo' ? this.formEnsayoN : null,
