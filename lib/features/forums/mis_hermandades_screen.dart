@@ -7,6 +7,7 @@ import '../../core/theme/app_typography.dart';
 import '../../core/utils/forum_text_format.dart';
 import '../../core/widgets/cofradeo_error_panel.dart';
 import '../../core/widgets/cofradeo_asset_image.dart';
+import '../../core/widgets/cofradeo_avatar.dart';
 import '../../core/widgets/cofradeo_network_image.dart';
 import '../../shared/models/followed_topic.dart';
 import '../search/follows_provider.dart';
@@ -261,14 +262,9 @@ class _BoardTile extends StatelessWidget {
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: hasRemote
-                          ? CofradeoNetworkImage(
+                          ? CofradeoCrestInCircle(
                               url: remote,
-                              fit: BoxFit.contain,
-                              width: 34,
-                              height: 34,
-                              cacheSize: 68,
-                              fadeInDuration: Duration.zero,
-                              fadeOutDuration: Duration.zero,
+                              size: 34,
                               errorWidget: Icon(
                                 Icons.church_outlined,
                                 size: 17,

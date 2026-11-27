@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../constants/app_assets.dart';
 import '../theme/app_colors.dart';
 import '../utils/image_decode_cache.dart';
-import 'cofradeo_network_image.dart';
+import 'cofradeo_avatar.dart';
 import '../../shared/models/calendar_event.dart';
 
 /// Icono de tipo de evento: usa tu imagen en assets/icons/ si existe,
@@ -108,12 +108,9 @@ class _IconImage extends StatelessWidget {
       );
     }
     if (isNetwork) {
-      return CofradeoNetworkImage(
+      return CofradeoCrestInCircle(
         url: path,
-        fit: BoxFit.cover,
-        width: size,
-        height: size,
-        cacheSize: size,
+        size: size,
         placeholder: fallback,
         errorWidget: fallback,
       );

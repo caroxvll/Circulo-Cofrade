@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/cofradeo_asset_image.dart';
-import '../../../core/widgets/cofradeo_network_image.dart';
+import '../../../core/widgets/cofradeo_avatar.dart';
 import '../../../shared/models/followed_topic.dart';
 import '../mis_hermandades_provider.dart';
 import '../utils/forum_navigation.dart';
@@ -338,14 +338,9 @@ class _HermandadChip extends StatelessWidget {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: hasRemote
-                      ? CofradeoNetworkImage(
+                      ? CofradeoCrestInCircle(
                           url: remote,
-                          fit: BoxFit.contain,
-                          width: 36,
-                          height: 36,
-                          cacheSize: 72,
-                          fadeInDuration: Duration.zero,
-                          fadeOutDuration: Duration.zero,
+                          size: 36,
                           errorWidget: Icon(
                             Icons.church_outlined,
                             size: 18,

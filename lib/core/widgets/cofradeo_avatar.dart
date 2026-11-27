@@ -59,3 +59,46 @@ class CofradeoAvatar extends StatelessWidget {
     );
   }
 }
+
+/// Escudo de hermandad en círculo: llena el disco y recorta el margen
+/// blanco típico de los PNG.
+class CofradeoCrestInCircle extends StatelessWidget {
+  const CofradeoCrestInCircle({
+    super.key,
+    required this.url,
+    required this.size,
+    this.errorWidget,
+    this.placeholder,
+    this.scale = 1.28,
+  });
+
+  final String url;
+  final double size;
+  final Widget? errorWidget;
+  final Widget? placeholder;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: ClipOval(
+        child: Transform.scale(
+          scale: scale,
+          child: CofradeoNetworkImage(
+            url: url,
+            fit: BoxFit.cover,
+            width: size,
+            height: size,
+            cacheSize: size * 2,
+            fadeInDuration: Duration.zero,
+            fadeOutDuration: Duration.zero,
+            placeholder: placeholder,
+            errorWidget: errorWidget,
+          ),
+        ),
+      ),
+    );
+  }
+}
